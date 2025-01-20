@@ -23,6 +23,8 @@
 #define LED_BUILTIN 2
 #endif
 
+unsigned long lastWifiUpdate = 0;
+
 // Note: Libraries are included in "Project Dependencies" file platformio.ini
 #include <private.h>               // Passwords etc. not for GitHub
 
@@ -55,7 +57,12 @@ const char jsonTemplate[] = "{ "
 int _retry = 0;
 void onUpdateData()
 {
-  digitalWrite(LED_BUILTIN, LOW); // turn on LED to show we are getting the data
+  // Set LED to indicate activity
+  digitalWrite(LED_BUILTIN, LOW); // Turn on LED to show activity
+
+  // Publish active reading state as true
+  mqtt.publish("everblu/cyble/active_reading", "true", true);
+
 
   struct tmeter_data meter_data;
   meter_data = get_meter_data();
@@ -93,7 +100,9 @@ void onUpdateData()
   sprintf(json, jsonTemplate, meter_data.liters, meter_data.reads_counter, meter_data.battery_left, iso8601);
   mqtt.publish("everblu/cyble/json", json, true); // send all data as a json message
 
-  digitalWrite(LED_BUILTIN, HIGH); // turn off the LED now the data has been pulled
+  // Turn off active reading state
+  mqtt.publish("everblu/cyble/active_reading", "false", true);
+  digitalWrite(LED_BUILTIN, HIGH); // Turn off LED now that data has been pulled
 }
 
 
@@ -187,7 +196,7 @@ String jsonDiscoveryDevice3 =
 
 String jsonDiscoveryDevice4 =
   "{ \
-  \"name\": \"Timestamp\", \
+  \"name\": \"Last Read\", \
   \"unique_id\": \"water_meter_timestamp\",\
   \"object_id\": \"water_meter_timestamp\",\
   \"device_class\": \"timestamp\",\
@@ -206,12 +215,15 @@ String jsonDiscoveryDevice4 =
 
 
 String jsonDiscoveryDevice5 =
-  "{ \
+"{ \
   \"name\": \"Request Reading Now\", \
   \"unique_id\": \"water_meter_request\",\
   \"object_id\": \"water_meter_request\",\
   \"qos\": \"0\",\
   \"command_topic\": \"everblu/cyble/trigger\",\
+  \"availability_topic\": \"everblu/cyble/status\",\
+  \"payload_available\": \"online\",\
+  \"payload_not_available\": \"offline\",\
   \"payload_press\": \"update\",\
   \"force_update\": \"true\",\
   \"device\" : {\
@@ -222,6 +234,249 @@ String jsonDiscoveryDevice5 =
   \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
   \"suggested_area\": \"Home\"}\
 }";
+
+
+String jsonDiscoveryActiveReading =
+"{ \
+  \"name\": \"Active Reading\", \
+  \"unique_id\": \"water_meter_active_reading\",\
+  \"object_id\": \"water_meter_active_reading\",\
+  \"device_class\": \"running\",\
+  \"qos\": \"0\",\
+  \"state_topic\": \"everblu/cyble/active_reading\",\
+  \"payload_on\": \"true\",\
+  \"payload_off\": \"false\",\
+  \"device\" : {\
+  \"identifiers\" : [\
+  \"14071984\" ],\
+  \"name\": \"Water Meter\",\
+  \"model\": \"Everblu Cyble ESP8266/ESP32\",\
+  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"suggested_area\": \"Home\"}\
+}";
+
+
+
+// JSON Discovery for Wi-Fi Details
+String jsonDiscoveryWifiIP =
+"{ \
+  \"name\": \"IP Address\", \
+  \"unique_id\": \"water_meter_wifi_ip\",\
+  \"object_id\": \"water_meter_wifi_ip\",\
+  \"icon\": \"mdi:ip-network-outline\",\
+  \"qos\": \"0\",\
+  \"state_topic\": \"everblu/cyble/wifi_ip\",\
+  \"force_update\": \"true\",\
+  \"entity_category\": \"diagnostic\",\
+  \"device\" : {\
+  \"identifiers\" : [\
+  \"14071984\" ],\
+  \"name\": \"Water Meter\",\
+  \"model\": \"Everblu Cyble ESP8266/ESP32\",\
+  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"suggested_area\": \"Home\"}\
+}";
+
+String jsonDiscoveryWifiRSSI =
+"{ \
+  \"name\": \"WiFi RSSI\", \
+  \"unique_id\": \"water_meter_wifi_rssi\",\
+  \"object_id\": \"water_meter_wifi_rssi\",\
+  \"device_class\": \"signal_strength\",\
+  \"icon\": \"mdi:signal-variant\",\
+  \"unit_of_measurement\": \"dBm\",\
+  \"qos\": \"0\",\
+  \"state_topic\": \"everblu/cyble/wifi_rssi\",\
+  \"force_update\": \"true\",\
+  \"entity_category\": \"diagnostic\",\
+  \"device\" : {\
+  \"identifiers\" : [\
+  \"14071984\" ],\
+  \"name\": \"Water Meter\",\
+  \"model\": \"Everblu Cyble ESP8266/ESP32\",\
+  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"suggested_area\": \"Home\"}\
+}";
+
+
+String jsonDiscoveryWifiSignalPercentage =
+"{ \
+  \"name\": \"WiFi Signal\", \
+  \"unique_id\": \"water_meter_wifi_signal_percentage\",\
+  \"object_id\": \"water_meter_wifi_signal_percentage\",\
+  \"device_class\": \"signal_strength\",\
+  \"icon\": \"mdi:wifi\",\
+  \"unit_of_measurement\": \"%\",\
+  \"qos\": \"0\",\
+  \"state_topic\": \"everblu/cyble/wifi_signal_percentage\",\
+  \"force_update\": \"true\",\
+  \"entity_category\": \"diagnostic\",\
+  \"device\" : {\
+  \"identifiers\" : [\
+  \"14071984\" ],\
+  \"name\": \"Water Meter\",\
+  \"model\": \"Everblu Cyble ESP8266/ESP32\",\
+  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"suggested_area\": \"Home\"}\
+}";
+
+
+String jsonDiscoveryMacAddress =
+"{ \
+  \"name\": \"MAC Address\", \
+  \"unique_id\": \"water_meter_mac_address\",\
+  \"object_id\": \"water_meter_mac_address\",\
+  \"icon\": \"mdi:network\",\
+  \"qos\": \"0\",\
+  \"state_topic\": \"everblu/cyble/mac_address\",\
+  \"force_update\": \"true\",\
+  \"entity_category\": \"diagnostic\",\
+  \"device\" : {\
+  \"identifiers\" : [\
+  \"14071984\" ],\
+  \"name\": \"Water Meter\",\
+  \"model\": \"Everblu Cyble ESP8266/ESP32\",\
+  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"suggested_area\": \"Home\"}\
+}";
+
+
+String jsonDiscoveryStatus =
+"{ \
+  \"name\": \"WiFi Status\", \
+  \"unique_id\": \"water_meter_wifi_status\",\
+  \"object_id\": \"water_meter_wifi_status\",\
+  \"device_class\": \"connectivity\",\
+  \"qos\": \"0\",\
+  \"state_topic\": \"everblu/cyble/status\",\
+  \"force_update\": \"true\",\
+  \"entity_category\": \"diagnostic\",\
+  \"device\" : {\
+  \"identifiers\" : [\
+  \"14071984\" ],\
+  \"name\": \"Water Meter\",\
+  \"model\": \"Everblu Cyble ESP8266/ESP32\",\
+  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"suggested_area\": \"Home\"}\
+}";
+
+String jsonDiscoveryBSSID =
+"{ \
+  \"name\": \"WiFi BSSID\", \
+  \"unique_id\": \"water_meter_wifi_bssid\",\
+  \"object_id\": \"water_meter_wifi_bssid\",\
+  \"icon\": \"mdi:access-point-network\",\
+  \"qos\": \"0\",\
+  \"state_topic\": \"everblu/cyble/bssid\",\
+  \"force_update\": \"true\",\
+  \"entity_category\": \"diagnostic\",\
+  \"device\" : {\
+  \"identifiers\" : [\
+  \"14071984\" ],\
+  \"name\": \"Water Meter\",\
+  \"model\": \"Everblu Cyble ESP8266/ESP32\",\
+  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"suggested_area\": \"Home\"}\
+}";
+
+
+String jsonDiscoverySSID =
+"{ \
+  \"name\": \"WiFi SSID\", \
+  \"unique_id\": \"water_meter_wifi_ssid\",\
+  \"object_id\": \"water_meter_wifi_ssid\",\
+  \"icon\": \"mdi:help-network-outline\",\
+  \"qos\": \"0\",\
+  \"state_topic\": \"everblu/cyble/ssid\",\
+  \"force_update\": \"true\",\
+  \"entity_category\": \"diagnostic\",\
+  \"device\" : {\
+  \"identifiers\" : [\
+  \"14071984\" ],\
+  \"name\": \"Water Meter\",\
+  \"model\": \"Everblu Cyble ESP8266/ESP32\",\
+  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"suggested_area\": \"Home\"}\
+}";
+
+String jsonDiscoveryUptime =
+"{ \
+  \"name\": \"Device Uptime\", \
+  \"unique_id\": \"water_meter_uptime\",\
+  \"object_id\": \"water_meter_uptime\",\
+  \"device_class\": \"timestamp\",\
+  \"qos\": \"0\",\
+  \"state_topic\": \"everblu/cyble/uptime\",\
+  \"force_update\": \"true\",\
+  \"entity_category\": \"diagnostic\",\
+  \"device\" : {\
+  \"identifiers\" : [\
+  \"14071984\" ],\
+  \"name\": \"Water Meter\",\
+  \"model\": \"Everblu Cyble ESP8266/ESP32\",\
+  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"suggested_area\": \"Home\"}\
+}";
+
+
+
+String jsonDiscoveryRestartButton =
+"{ \
+  \"name\": \"Restart Device\", \
+  \"unique_id\": \"water_meter_restart\",\
+  \"object_id\": \"water_meter_restart\",\
+  \"qos\": \"0\",\
+  \"command_topic\": \"everblu/cyble/restart\",\
+  \"payload_press\": \"restart\",\
+  \"entity_category\": \"config\",\
+  \"device\" : {\
+  \"identifiers\" : [\
+  \"14071984\" ],\
+  \"name\": \"Water Meter\",\
+  \"model\": \"Everblu Cyble ESP8266/ESP32\",\
+  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"suggested_area\": \"Home\"}\
+}";
+
+
+
+
+
+int calculateWiFiSignalStrengthPercentage(int rssi) {
+  int strength = constrain(rssi, -100, -50); // Clamp RSSI to a reasonable range
+  return map(strength, -100, -50, 0, 100);   // Map RSSI to percentage (0-100%)
+}
+
+void publishWifiDetails() {
+  String wifiIP = WiFi.localIP().toString();
+  int wifiRSSI = WiFi.RSSI();
+  int wifiSignalPercentage = calculateWiFiSignalStrengthPercentage(wifiRSSI); // Convert RSSI to percentage
+  String macAddress = WiFi.macAddress();
+  String wifiSSID = WiFi.SSID();
+  String wifiBSSID = WiFi.BSSIDstr();
+  String status = (WiFi.status() == WL_CONNECTED) ? "online" : "offline";
+
+  // Uptime calculation
+  unsigned long uptimeMillis = millis();
+  time_t uptimeSeconds = uptimeMillis / 1000;
+  time_t now = time(nullptr);
+  time_t uptimeTimestamp = now - uptimeSeconds;
+  char uptimeISO[32];
+  strftime(uptimeISO, sizeof(uptimeISO), "%FT%TZ", gmtime(&uptimeTimestamp));
+
+  // Publish diagnostics
+  mqtt.publish("everblu/cyble/wifi_ip", wifiIP, true);
+  mqtt.publish("everblu/cyble/wifi_rssi", String(wifiRSSI, DEC), true);
+  mqtt.publish("everblu/cyble/wifi_signal_percentage", String(wifiSignalPercentage, DEC), true);
+  mqtt.publish("everblu/cyble/mac_address", macAddress, true);
+  mqtt.publish("everblu/cyble/ssid", wifiSSID, true);
+  mqtt.publish("everblu/cyble/bssid", wifiBSSID, true);
+  mqtt.publish("everblu/cyble/status", status, true);
+  mqtt.publish("everblu/cyble/uptime", uptimeISO, true);
+}
+
+
+
 
 void onConnectionEstablished()
 {
@@ -288,6 +543,14 @@ void onConnectionEstablished()
   });
 
 
+mqtt.subscribe("everblu/cyble/restart", [](const String& message) {
+  if (message == "restart") {
+    Serial.println("Restart command received via MQTT. Restarting...");
+    ESP.restart(); // Restart the ESP device
+  }
+});
+
+
 
   Serial.println("> Send MQTT config for HA.");
   // Auto discovery
@@ -303,7 +566,38 @@ void onConnectionEstablished()
   mqtt.publish("homeassistant/button/water_meter_request/config", jsonDiscoveryDevice5, true);
   delay(50); // Do not remove
 
+  // Publish Wi-Fi details discovery configuration
+  mqtt.publish("homeassistant/sensor/water_meter_wifi_ip/config", jsonDiscoveryWifiIP, true);
+  delay(50);
+  mqtt.publish("homeassistant/sensor/water_meter_wifi_rssi/config", jsonDiscoveryWifiRSSI, true);
+  delay(50);
+  mqtt.publish("homeassistant/sensor/water_meter_mac_address/config", jsonDiscoveryMacAddress, true);
+  delay(50);
+  mqtt.publish("homeassistant/sensor/water_meter_wifi_ssid/config", jsonDiscoverySSID, true);
+  delay(50);
+  mqtt.publish("homeassistant/sensor/water_meter_wifi_bssid/config", jsonDiscoveryBSSID, true);
+  delay(50);
+  mqtt.publish("homeassistant/sensor/water_meter_wifi_status/config", jsonDiscoveryStatus, true);
+  delay(50);
+  mqtt.publish("homeassistant/sensor/water_meter_uptime/config", jsonDiscoveryUptime, true);
+  delay(50);
+  mqtt.publish("homeassistant/sensor/water_meter_wifi_signal_percentage/config", jsonDiscoveryWifiSignalPercentage, true);
+  delay(50);
 
+  // Publish MQTT discovery messages for the Restart Button
+  mqtt.publish("homeassistant/button/water_meter_restart/config", jsonDiscoveryRestartButton, true);
+  delay(50);
+
+  // Publish MQTT discovery message for the binary sensor
+  mqtt.publish("homeassistant/binary_sensor/water_meter_active_reading/config", jsonDiscoveryActiveReading, true);
+  delay(50);
+
+  // Set initial state for active reading
+  mqtt.publish("everblu/cyble/active_reading", "false", true);
+  delay(50);
+
+  // Publish initial Wi-Fi details
+  publishWifiDetails();
 
 
 
@@ -325,8 +619,19 @@ void setup()
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW); // turned on to start with
 
-  mqtt.setMaxPacketSize(1024);
-  //mqtt.enableDebuggingMessages(true);
+  // Increase the max packet size to handle large MQTT payloads
+  mqtt.setMaxPacketSize(2048); // Set to a size larger than your longest payload
+
+  // Set the Last Will and Testament (LWT)
+  mqtt.enableLastWillMessage("everblu/cyble/status", "offline", true);  // You can activate the retain flag by setting the third parameter to true
+
+  // Optional functionalities of EspMQTTClient
+  mqtt.enableDebuggingMessages(); // Enable debugging messages sent to serial output
+  mqtt.enableHTTPWebUpdater(); // Enable the web updater. User and password default to values of MQTTUsername and MQTTPassword. These can be overridded with enableHTTPWebUpdater("user", "password").
+  mqtt.enableOTA(); // Enable OTA (Over The Air) updates. Password defaults to MQTTPassword. Port is the default OTA port. Can be overridden with enableOTA("password", port).
+
+
+  // mqtt.enableDebuggingMessages(true);
 
   /*
   // Use this piece of code to find the right frequency.
@@ -361,17 +666,17 @@ void setup()
   while (42);
   */
 
-  // Optional functionalities of EspMQTTClient
-  mqtt.enableDebuggingMessages(); // Enable debugging messages sent to serial output
-  mqtt.enableHTTPWebUpdater(); // Enable the web updater. User and password default to values of MQTTUsername and MQTTPassword. These can be overridded with enableHTTPWebUpdater("user", "password").
-  mqtt.enableOTA(); // Enable OTA (Over The Air) updates. Password defaults to MQTTPassword. Port is the default OTA port. Can be overridden with enableOTA("password", port).
-  mqtt.enableLastWillMessage("everblu/cyble/lastwill", "I am going offline", true);  // You can activate the retain flag by setting the third parameter to true
-
-
 }
 
-void loop()
-{
-  mqtt.loop(); 
+
+
+void loop() {
+  mqtt.loop();
   ArduinoOTA.handle();
+
+  // Update Wi-Fi details every 5 minutes
+  if (millis() - lastWifiUpdate > 300000) { // 5 minutes in ms
+    publishWifiDetails();
+    lastWifiUpdate = millis();
+  }
 }
