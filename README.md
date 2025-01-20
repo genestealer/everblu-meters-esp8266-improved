@@ -7,6 +7,7 @@ Note: HASS autodiscovery is working.
 Meters supported:
 - Itron EverBlu Cyble Enhanced
 
+![Itron EverBlu Cyble Enhanced](meter.jpg)
 
 ## Hardware
 ![ESP8266 with CC1101](board2.jpg)
