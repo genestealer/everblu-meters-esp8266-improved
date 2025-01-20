@@ -3,8 +3,8 @@
 
 struct tmeter_data {
   int liters;
-  int reads_counter; // how many times the meter has been readed
-  int battery_left; //in months
+  int reads_counter; // how many times the meter has been read
+  int battery_left; // in months
   int time_start; // like 8am
   int time_end; // like 4pm
 };
