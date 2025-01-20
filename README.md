@@ -9,8 +9,8 @@ Meters supported:
 
 
 ## Hardware
-![ESP8266 with CC1101](board.jpg)
 ![ESP8266 with CC1101](board2.jpg)
+![ESP8266 with CC1101](board.jpg)
 
 The project runs on ESP8266/ESP32 with an RF transreciver (CC1101). 
 
