@@ -46,7 +46,29 @@ Pins wiring for [Wemos D1 board](https://www.wemos.cc/en/latest/d1/index.html) a
 
 ### Frequency adjustment
 Your transreciver module may be not calibrated correctly, please modify frequency a bit lower or higher and try again. You may use RTL-SDR to measure the offset needed.
-You can uncomment the part of the code in the `everblu-meters-esp8266.ino` file that scans all the frequencies around the meter frequency to find the correct one.
+You can uncomment the part of the code in the `everblu-meters-esp8266.cpp` file that scans all the frequencies around the meter frequency to find the correct one.
+
+```
+  // Use this piece of code to find the right frequency.
+  for (float i = 433.76f; i < 433.890f; i += 0.0005f) {
+    Serial.printf("Test frequency : %f\n", i);
+    cc1101_init(i);
+
+    struct tmeter_data meter_data;
+    meter_data = get_meter_data();
+
+    if (meter_data.reads_counter != 0 || meter_data.liters != 0) {
+      Serial.printf("\n------------------------------\nGot frequency : %f\n------------------------------\n", i);
+
+      Serial.printf("Liters : %d\nBattery (in months) : %d\nCounter : %d\n\n", meter_data.liters, meter_data.battery_left, meter_data.reads_counter);
+
+      digitalWrite(LED_BUILTIN, LOW); // turned on
+
+      while (42);
+    }
+  }
+```
+
 
 ### Business hours
 Your meter may be configured in such a way that is listens for request only during hours when data collectors work - to conserve energy. If you are unable to communicate with the meter, please try again during business hours (8:00-16:00), Monday to Friday. As a rule of thumb, please try to set up your device only during business hours, then you can avoid confusion and asking questions why is it not working!  
