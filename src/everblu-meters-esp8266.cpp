@@ -1,5 +1,11 @@
-#include <ArduinoOTA.h>
+#include <ESP8266WiFi.h>
+#include <ESP8266mDNS.h>
+#include <WiFiUdp.h>
 
+#include <arduino.h>
+
+
+#include <ArduinoOTA.h>
 #include "everblu_meters.h"
 
 // Project source : 
@@ -17,28 +23,40 @@
 #define LED_BUILTIN 2
 #endif
 
+// Note: Libraries are included in "Project Dependencies" file platformio.ini
+#include <private.h>               // Passwords etc. not for GitHub
 
 EspMQTTClient mqtt(
-  "MyESSID",            // Your Wifi SSID
-  "MyWiFiKey",          // Your WiFi key
-  "mqtt.server.com",    // MQTT Broker server ip
-  "MQTTUsername",       // Can be omitted if not needed
-  "MQTTPassword",       // Can be omitted if not needed
-  "EverblueCyble",      // Client name that uniquely identify your device
-  1883                  // MQTT Broker server port
+    secret_wifi_ssid,     // Your Wifi SSID
+    secret_wifi_password, // Your WiFi key
+    secret_mqtt_server,   // MQTT Broker server ip
+    secret_mqtt_username, // MQTT Username Can be omitted if not needed
+    secret_mqtt_password, // MQTT Password Can be omitted if not needed
+    secret_clientName,    // MQTT Client name that uniquely identify your device
+    1883                  // MQTT Broker server port
 );
 
-char *jsonTemplate = 
-"{                    \
-\"liters\": %d,       \
-\"counter\" : %d,     \
-\"battery\" : %d,     \
-\"timestamp\" : \"%s\"\
-}";
+// char *jsonTemplate = 
+// "{                    \
+// \"liters\": %d,       \
+// \"counter\" : %d,     \
+// \"battery\" : %d,     \
+// \"timestamp\" : \"%s\"\
+// }";
+
+// const char jsonTemplate[] = "{ \"liters\": %d, \"counter\" : %d, \"battery\" : %d, \"timestamp\" : \"%s\" }";
+
+const char jsonTemplate[] = "{ "
+                            "\"liters\": %d, "
+                            "\"counter\" : %d, "
+                            "\"battery\" : %d, "
+                            "\"timestamp\" : \"%s\" }";
 
 int _retry = 0;
 void onUpdateData()
 {
+  digitalWrite(LED_BUILTIN, LOW); // turn on LED to show we are getting the data
+
   struct tmeter_data meter_data;
   meter_data = get_meter_data();
 
@@ -59,7 +77,6 @@ void onUpdateData()
     return;
   }
 
-  digitalWrite(LED_BUILTIN, LOW); // turned on
 
   Serial.printf("Liters : %d\nBattery (in months) : %d\nCounter : %d\n\n", meter_data.liters, meter_data.battery_left, meter_data.reads_counter);
 
@@ -75,6 +92,8 @@ void onUpdateData()
   char json[512];
   sprintf(json, jsonTemplate, meter_data.liters, meter_data.reads_counter, meter_data.battery_left, iso8601);
   mqtt.publish("everblu/cyble/json", json, true); // send all data as a json message
+
+  digitalWrite(LED_BUILTIN, HIGH); // turn off the LED now the data has been pulled
 }
 
 
@@ -105,9 +124,9 @@ void onScheduled()
 }
 
 
-String jsonDiscoveryDevice1(
+String jsonDiscoveryDevice1 =
 "{ \
-  \"name\": \"Compteur Eau Index\", \
+  \"name\": \"Reading (Total)\", \
   \"unique_id\": \"water_meter_value\",\
   \"object_id\": \"water_meter_value\",\
   \"icon\": \"mdi:water\",\
@@ -121,15 +140,15 @@ String jsonDiscoveryDevice1(
   \"device\" : {\
   \"identifiers\" : [\
   \"14071984\" ],\
-  \"name\": \"Compteur Eau\",\
+  \"name\": \"Water Meter\",\
   \"model\": \"Everblu Cyble ESP8266/ESP32\",\
-  \"manufacturer\": \"Psykokwak\",\
+  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
   \"suggested_area\": \"Home\"}\
-}");
+}";
 
-String jsonDiscoveryDevice2(
+String jsonDiscoveryDevice2 = 
 "{ \
-  \"name\": \"Compteur Eau Batterie\", \
+  \"name\": \"Battery\", \
   \"unique_id\": \"water_meter_battery\",\
   \"object_id\": \"water_meter_battery\",\
   \"device_class\": \"battery\",\
@@ -142,15 +161,15 @@ String jsonDiscoveryDevice2(
   \"device\" : {\
   \"identifiers\" : [\
   \"14071984\" ],\
-  \"name\": \"Compteur Eau\",\
+  \"name\": \"Water Meter\",\
   \"model\": \"Everblu Cyble ESP8266/ESP32\",\
-  \"manufacturer\": \"Psykokwak\",\
+  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
   \"suggested_area\": \"Home\"}\
-}");
+}";
 
-String jsonDiscoveryDevice3(
+String jsonDiscoveryDevice3 =
 "{ \
-  \"name\": \"Compteur Eau Compteur\", \
+  \"name\": \"Read Counter\", \
   \"unique_id\": \"water_meter_counter\",\
   \"object_id\": \"water_meter_counter\",\
   \"icon\": \"mdi:counter\",\
@@ -160,15 +179,15 @@ String jsonDiscoveryDevice3(
   \"device\" : {\
   \"identifiers\" : [\
   \"14071984\" ],\
-  \"name\": \"Compteur Eau\",\
+  \"name\": \"Water Meter\",\
   \"model\": \"Everblu Cyble ESP8266/ESP32\",\
-  \"manufacturer\": \"Psykokwak\",\
+  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
   \"suggested_area\": \"Home\"}\
-}");
+}";
 
-String jsonDiscoveryDevice4(
+String jsonDiscoveryDevice4 =
   "{ \
-  \"name\": \"Compteur Eau Timestamp\", \
+  \"name\": \"Timestamp\", \
   \"unique_id\": \"water_meter_timestamp\",\
   \"object_id\": \"water_meter_timestamp\",\
   \"device_class\": \"timestamp\",\
@@ -179,21 +198,45 @@ String jsonDiscoveryDevice4(
   \"device\" : {\
   \"identifiers\" : [\
   \"14071984\" ],\
-  \"name\": \"Compteur Eau\",\
+  \"name\": \"Water Meter\",\
   \"model\": \"Everblu Cyble ESP8266/ESP32\",\
-  \"manufacturer\": \"Psykokwak\",\
+  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
   \"suggested_area\": \"Home\"}\
-}");
+}";
+
+
+String jsonDiscoveryDevice5 =
+  "{ \
+  \"name\": \"Request Reading Now\", \
+  \"unique_id\": \"water_meter_request\",\
+  \"object_id\": \"water_meter_request\",\
+  \"qos\": \"0\",\
+  \"command_topic\": \"everblu/cyble/trigger\",\
+  \"payload_press\": \"update\",\
+  \"force_update\": \"true\",\
+  \"device\" : {\
+  \"identifiers\" : [\
+  \"14071984\" ],\
+  \"name\": \"Water Meter\",\
+  \"model\": \"Everblu Cyble ESP8266/ESP32\",\
+  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"suggested_area\": \"Home\"}\
+}";
 
 void onConnectionEstablished()
 {
   Serial.println("Connected to MQTT Broker :)");
 
-  Serial.println("> Configure time from NTP server.");
-  configTzTime("UTC0", "pool.ntp.org");
 
+  Serial.println("> Configure time from NTP server. Please wait...");
+  // Note, my VLAN has no WAN/internet, so I am useing Home Assistant Community Add-on: chrony to proxy the time
+  configTzTime("UTC0", secret_local_timeclock_server);
 
-
+  delay(5000); // Give it a moment for the time to sync the print out the time
+  time_t tnow = time(nullptr);
+  struct tm *ptm = gmtime(&tnow);
+  Serial.printf("Current date (UTC) : %04d/%02d/%02d %02d:%02d:%02d - %s\n", ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, String(tnow, DEC).c_str());
+  
 
   Serial.println("> Configure Arduino OTA flash.");
   ArduinoOTA.onStart([]() {
@@ -257,6 +300,15 @@ void onConnectionEstablished()
   delay(50); // Do not remove
   mqtt.publish("homeassistant/sensor/water_meter_timestamp/config", jsonDiscoveryDevice4, true);
   delay(50); // Do not remove
+  mqtt.publish("homeassistant/button/water_meter_request/config", jsonDiscoveryDevice5, true);
+  delay(50); // Do not remove
+
+
+
+
+
+  // Turn off LED to show everything is setup
+  digitalWrite(LED_BUILTIN, HIGH); // turned off
 
   onScheduled();
 }
@@ -265,9 +317,13 @@ void setup()
 {
   Serial.begin(115200);
   Serial.println("\n");
+  Serial.println("Everblu Meters ESP8266 Starting...");
+  Serial.println("Water usage data for Home Assistant");
+  Serial.println("https://github.com/genestealer/everblu-meters-esp8266-improved");
+
 
   pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, HIGH); // turned off
+  digitalWrite(LED_BUILTIN, LOW); // turned on to start with
 
   mqtt.setMaxPacketSize(1024);
   //mqtt.enableDebuggingMessages(true);
@@ -304,6 +360,14 @@ void setup()
   Serial.printf("\nLiters : %d\nBattery (in months) : %d\nCounter : %d\nTime start : %d\nTime end : %d\n\n", meter_data.liters, meter_data.battery_left, meter_data.reads_counter, meter_data.time_start, meter_data.time_end);
   while (42);
   */
+
+  // Optional functionalities of EspMQTTClient
+  mqtt.enableDebuggingMessages(); // Enable debugging messages sent to serial output
+  mqtt.enableHTTPWebUpdater(); // Enable the web updater. User and password default to values of MQTTUsername and MQTTPassword. These can be overridded with enableHTTPWebUpdater("user", "password").
+  mqtt.enableOTA(); // Enable OTA (Over The Air) updates. Password defaults to MQTTPassword. Port is the default OTA port. Can be overridden with enableOTA("password", port).
+  mqtt.enableLastWillMessage("everblu/cyble/lastwill", "I am going offline", true);  // You can activate the retain flag by setting the third parameter to true
+
+
 }
 
 void loop()
