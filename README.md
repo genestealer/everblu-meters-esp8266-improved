@@ -2,7 +2,9 @@
 # everblu-meters - Water usage data for Home Assistant
 Fetch water/gas usage data from Cyble EverBlu meters using RADIAN protocol on 433Mhz. Intergrated with Home Assistant via MQTT. 
 
-Note: HASS autodiscovery is working.
+Note: Home Assistant MQTT autodiscovery is working.
+
+![Home Assistant MQTT autodiscovery](MQTT_HASS.jpg)
 
 Meters supported:
 - Itron EverBlu Cyble Enhanced
