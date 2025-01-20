@@ -10,23 +10,27 @@ Meters supported:
 
 ## Hardware
 ![ESP8266 with CC1101](board.jpg)
+![ESP8266 with CC1101](board2.jpg)
+
 The project runs on ESP8266/ESP32 with an RF transreciver (CC1101). 
 
 ### Connections (ESP32/ESP8266 to CC1101):
 - See `cc1101.ccp` for SPI pins mapping.
 - See `everblu_meters.h` for GDOx pins mapping.
 
-Pins wiring for [Wemos D1 board](https://www.wemos.cc/en/latest/d1/index.html) :
-|CC1101|Wemos|
-|--|--|
-|VCC|3V3|
-|GOD0 (GDO0) |D1|
-|CSN (SPI chip select) |D8|
-|SCK (SPI clock)|D5|
-|MOSI (SPI MOSI) |D7|
-|GOD1 (SPI MISO)|D6|
-|GOD2 (GDO2) |D2|
-|GND (ground)|G|
+Pins wiring for [Wemos D1 board](https://www.wemos.cc/en/latest/d1/index.html) and [Adafruit Feather HUZZAH ESP8266](https://www.wemos.cc/en/latest/d1/index.html](https://learn.adafruit.com/adafruit-feather-huzzah-esp8266/pinouts)):
+
+| **CC1101**  | **Wemos** | **HUZZAH ESP8266** | **Notes**                                      |
+|-------------|-----------|---------------------------|------------------------------------------------|
+| VCC         | 3V3       | 3V                       | Connect to the 3.3V power pin.                |
+| GDO0        | D1        | GPIO5                    | General-purpose digital output.               |
+| CSN         | D8        | GPIO15                   | SPI chip select; Feather has GPIO15 as CS.    |
+| SCK         | D5        | GPIO14                   | SPI clock pin; SPI SCK maps to GPIO14.        |
+| MOSI        | D7        | GPIO13                   | SPI MOSI pin; maps to GPIO13 on the Feather.  |
+| GDO1 (MISO) | D6        | GPIO12                   | SPI MISO pin; maps to GPIO12 on the Feather.  |
+| GDO2        | D2        | GPIO4                    | Another general-purpose digital output.       |
+| GND         | G         | GND                      | Connect to ground.                            |
+
 
 ## Configuration
 1. Install EspMQTTClient through Arduino library manager as it required for MQTT
