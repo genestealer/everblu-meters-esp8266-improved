@@ -7,6 +7,7 @@
 #include <SPI.h>
 
 #include "everblu_meters.h"
+#include <private.h> // Passwords etc. not for GitHub
 #include "utils.h"
 
 #include "cc1101.h"

@@ -5,7 +5,8 @@
 #include <arduino.h>
 
 #include "everblu_meters.h"
- 
+#include <private.h> // Passwords etc. not for GitHub
+
 void show_in_hex(uint8_t* buffer, size_t len)
 {
   int i=0;

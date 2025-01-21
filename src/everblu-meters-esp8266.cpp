@@ -7,7 +7,7 @@
 
 #include <ArduinoOTA.h>
 #include "everblu_meters.h"
-
+#include <private.h> // Passwords etc. not for GitHub
 // Project source : 
 // http://www.lamaisonsimon.fr/wiki/doku.php?id=maison2:compteur_d_eau:compteur_d_eau
 
@@ -25,8 +25,6 @@
 
 unsigned long lastWifiUpdate = 0;
 
-// Note: Libraries are included in "Project Dependencies" file platformio.ini
-#include <private.h>               // Passwords etc. not for GitHub
 
 EspMQTTClient mqtt(
     secret_wifi_ssid,     // Your Wifi SSID

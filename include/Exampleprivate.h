@@ -8,3 +8,10 @@
 #define secret_mqtt_password "xxxxxxxxxxxxxxx"
 
 #define secret_local_timeclock_server "pool.ntp.org"
+
+// Change these define according to your hardware
+
+#define METER_YEAR 20
+#define METER_SERIAL 257000
+#define FREQUENCY 433.700007
+#define GDO0 5 //header 11 
