@@ -148,8 +148,9 @@ String jsonDiscoveryDevice1 =
   \"identifiers\" : [\
   \"14071984\" ],\
   \"name\": \"Water Meter\",\
-  \"model\": \"Everblu Cyble ESP8266/ESP32\",\
+  \"model\": \"Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32\",\
   \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"support_url\": \"https://github.com/genestealer/everblu-meters-esp8266-improved\",\
   \"suggested_area\": \"Home\"}\
 }";
 
@@ -169,8 +170,9 @@ String jsonDiscoveryDevice2 =
   \"identifiers\" : [\
   \"14071984\" ],\
   \"name\": \"Water Meter\",\
-  \"model\": \"Everblu Cyble ESP8266/ESP32\",\
+  \"model\": \"Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32\",\
   \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"support_url\": \"https://github.com/genestealer/everblu-meters-esp8266-improved\",\
   \"suggested_area\": \"Home\"}\
 }";
 
@@ -187,8 +189,9 @@ String jsonDiscoveryDevice3 =
   \"identifiers\" : [\
   \"14071984\" ],\
   \"name\": \"Water Meter\",\
-  \"model\": \"Everblu Cyble ESP8266/ESP32\",\
+  \"model\": \"Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32\",\
   \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"support_url\": \"https://github.com/genestealer/everblu-meters-esp8266-improved\",\
   \"suggested_area\": \"Home\"}\
 }";
 
@@ -206,8 +209,9 @@ String jsonDiscoveryDevice4 =
   \"identifiers\" : [\
   \"14071984\" ],\
   \"name\": \"Water Meter\",\
-  \"model\": \"Everblu Cyble ESP8266/ESP32\",\
+  \"model\": \"Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32\",\
   \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"support_url\": \"https://github.com/genestealer/everblu-meters-esp8266-improved\",\
   \"suggested_area\": \"Home\"}\
 }";
 
@@ -228,8 +232,9 @@ String jsonDiscoveryDevice5 =
   \"identifiers\" : [\
   \"14071984\" ],\
   \"name\": \"Water Meter\",\
-  \"model\": \"Everblu Cyble ESP8266/ESP32\",\
+  \"model\": \"Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32\",\
   \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"support_url\": \"https://github.com/genestealer/everblu-meters-esp8266-improved\",\
   \"suggested_area\": \"Home\"}\
 }";
 
@@ -248,8 +253,9 @@ String jsonDiscoveryActiveReading =
   \"identifiers\" : [\
   \"14071984\" ],\
   \"name\": \"Water Meter\",\
-  \"model\": \"Everblu Cyble ESP8266/ESP32\",\
+  \"model\": \"Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32\",\
   \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"support_url\": \"https://github.com/genestealer/everblu-meters-esp8266-improved\",\
   \"suggested_area\": \"Home\"}\
 }";
 
@@ -270,8 +276,9 @@ String jsonDiscoveryWifiIP =
   \"identifiers\" : [\
   \"14071984\" ],\
   \"name\": \"Water Meter\",\
-  \"model\": \"Everblu Cyble ESP8266/ESP32\",\
+  \"model\": \"Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32\",\
   \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"support_url\": \"https://github.com/genestealer/everblu-meters-esp8266-improved\",\
   \"suggested_area\": \"Home\"}\
 }";
 
@@ -291,8 +298,9 @@ String jsonDiscoveryWifiRSSI =
   \"identifiers\" : [\
   \"14071984\" ],\
   \"name\": \"Water Meter\",\
-  \"model\": \"Everblu Cyble ESP8266/ESP32\",\
+  \"model\": \"Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32\",\
   \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"support_url\": \"https://github.com/genestealer/everblu-meters-esp8266-improved\",\
   \"suggested_area\": \"Home\"}\
 }";
 
@@ -313,8 +321,9 @@ String jsonDiscoveryWifiSignalPercentage =
   \"identifiers\" : [\
   \"14071984\" ],\
   \"name\": \"Water Meter\",\
-  \"model\": \"Everblu Cyble ESP8266/ESP32\",\
+  \"model\": \"Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32\",\
   \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"support_url\": \"https://github.com/genestealer/everblu-meters-esp8266-improved\",\
   \"suggested_area\": \"Home\"}\
 }";
 
@@ -333,8 +342,9 @@ String jsonDiscoveryMacAddress =
   \"identifiers\" : [\
   \"14071984\" ],\
   \"name\": \"Water Meter\",\
-  \"model\": \"Everblu Cyble ESP8266/ESP32\",\
+  \"model\": \"Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32\",\
   \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"support_url\": \"https://github.com/genestealer/everblu-meters-esp8266-improved\",\
   \"suggested_area\": \"Home\"}\
 }";
 
@@ -353,8 +363,9 @@ String jsonDiscoveryStatus =
   \"identifiers\" : [\
   \"14071984\" ],\
   \"name\": \"Water Meter\",\
-  \"model\": \"Everblu Cyble ESP8266/ESP32\",\
+  \"model\": \"Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32\",\
   \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"support_url\": \"https://github.com/genestealer/everblu-meters-esp8266-improved\",\
   \"suggested_area\": \"Home\"}\
 }";
 
@@ -372,8 +383,9 @@ String jsonDiscoveryBSSID =
   \"identifiers\" : [\
   \"14071984\" ],\
   \"name\": \"Water Meter\",\
-  \"model\": \"Everblu Cyble ESP8266/ESP32\",\
+  \"model\": \"Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32\",\
   \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"support_url\": \"https://github.com/genestealer/everblu-meters-esp8266-improved\",\
   \"suggested_area\": \"Home\"}\
 }";
 
@@ -392,8 +404,9 @@ String jsonDiscoverySSID =
   \"identifiers\" : [\
   \"14071984\" ],\
   \"name\": \"Water Meter\",\
-  \"model\": \"Everblu Cyble ESP8266/ESP32\",\
+  \"model\": \"Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32\",\
   \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"support_url\": \"https://github.com/genestealer/everblu-meters-esp8266-improved\",\
   \"suggested_area\": \"Home\"}\
 }";
 
@@ -411,8 +424,9 @@ String jsonDiscoveryUptime =
   \"identifiers\" : [\
   \"14071984\" ],\
   \"name\": \"Water Meter\",\
-  \"model\": \"Everblu Cyble ESP8266/ESP32\",\
+  \"model\": \"Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32\",\
   \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"support_url\": \"https://github.com/genestealer/everblu-meters-esp8266-improved\",\
   \"suggested_area\": \"Home\"}\
 }";
 
@@ -431,8 +445,9 @@ String jsonDiscoveryRestartButton =
   \"identifiers\" : [\
   \"14071984\" ],\
   \"name\": \"Water Meter\",\
-  \"model\": \"Everblu Cyble ESP8266/ESP32\",\
+  \"model\": \"Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32\",\
   \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"support_url\": \"https://github.com/genestealer/everblu-meters-esp8266-improved\",\
   \"suggested_area\": \"Home\"}\
 }";
 
@@ -529,6 +544,9 @@ void onConnectionEstablished()
   });
   ArduinoOTA.setHostname("EVERBLUREADER");
   ArduinoOTA.begin();
+  Serial.println("Ready");
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());
 
   mqtt.subscribe("everblu/cyble/trigger", [](const String& message) {
     if (message.length() > 0) {
@@ -624,12 +642,9 @@ void setup()
   mqtt.enableLastWillMessage("everblu/cyble/status", "offline", true);  // You can activate the retain flag by setting the third parameter to true
 
   // Optional functionalities of EspMQTTClient
-  mqtt.enableDebuggingMessages(); // Enable debugging messages sent to serial output
-  mqtt.enableHTTPWebUpdater(); // Enable the web updater. User and password default to values of MQTTUsername and MQTTPassword. These can be overridded with enableHTTPWebUpdater("user", "password").
-  mqtt.enableOTA(); // Enable OTA (Over The Air) updates. Password defaults to MQTTPassword. Port is the default OTA port. Can be overridden with enableOTA("password", port).
+  // mqtt.enableDebuggingMessages(true); // Enable debugging messages sent to serial output
 
 
-  // mqtt.enableDebuggingMessages(true);
 
   /*
   // Use this piece of code to find the right frequency.
