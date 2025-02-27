@@ -1,10 +1,7 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
 #include <WiFiUdp.h>
-
 #include <arduino.h>
-
-
 #include <ArduinoOTA.h>
 #include "everblu_meters.h"
 #include <private.h> // Passwords etc. not for GitHub
@@ -16,15 +13,12 @@
 // https://github.com/plapointe6/EspMQTTClient/releases/tag/1.13.3
 #include "EspMQTTClient.h"
 
-// Edit "everblu_meters.h" file then change the define at the end of the file
-
 #ifndef LED_BUILTIN
 // Change this pin if needed
 #define LED_BUILTIN 2
 #endif
 
 unsigned long lastWifiUpdate = 0;
-
 
 EspMQTTClient mqtt(
     secret_wifi_ssid,     // Your Wifi SSID
@@ -36,13 +30,7 @@ EspMQTTClient mqtt(
     1883                  // MQTT Broker server port
 );
 
-// char *jsonTemplate = 
-// "{                    \
-// \"liters\": %d,       \
-// \"counter\" : %d,     \
-// \"battery\" : %d,     \
-// \"timestamp\" : \"%s\"\
-// }";
+// char *jsonTemplate = "{\"liters\": %d, \"counter\" : %d, \"battery\" : %d, \"timestamp\" : \"%s\" }";
 
 // const char jsonTemplate[] = "{ \"liters\": %d, \"counter\" : %d, \"battery\" : %d, \"timestamp\" : \"%s\" }";
 
@@ -61,7 +49,6 @@ void onUpdateData()
   // Publish active reading state as true
   mqtt.publish("everblu/cyble/active_reading", "true", true);
 
-
   struct tmeter_data meter_data;
   meter_data = get_meter_data();
 
@@ -78,10 +65,8 @@ void onUpdateData()
     // Call back this function in 10 sec (in miliseconds)
     if (_retry++ < 10)
       mqtt.executeDelayed(1000 * 10, onUpdateData);
-
     return;
   }
-
 
   Serial.printf("Liters : %d\nBattery (in months) : %d\nCounter : %d\n\n", meter_data.liters, meter_data.battery_left, meter_data.reads_counter);
 
@@ -103,13 +88,11 @@ void onUpdateData()
   digitalWrite(LED_BUILTIN, HIGH); // Turn off LED now that data has been pulled
 }
 
-
 // This function calls onUpdateData() every days at 10:00am UTC
 void onScheduled()
 {
   time_t tnow = time(nullptr);
   struct tm *ptm = gmtime(&tnow);
-
 
   // At 10:00:00am UTC
   if (ptm->tm_hour == 10 && ptm->tm_min == 0 && ptm->tm_sec == 0) {
@@ -129,7 +112,6 @@ void onScheduled()
   // Every 500 ms
   mqtt.executeDelayed(500, onScheduled);
 }
-
 
 String jsonDiscoveryDevice1 =
 "{ \
@@ -259,8 +241,6 @@ String jsonDiscoveryActiveReading =
   \"suggested_area\": \"Home\"}\
 }";
 
-
-
 // JSON Discovery for Wi-Fi Details
 String jsonDiscoveryWifiIP =
 "{ \
@@ -304,7 +284,6 @@ String jsonDiscoveryWifiRSSI =
   \"suggested_area\": \"Home\"}\
 }";
 
-
 String jsonDiscoveryWifiSignalPercentage =
 "{ \
   \"name\": \"WiFi Signal\", \
@@ -327,7 +306,6 @@ String jsonDiscoveryWifiSignalPercentage =
   \"suggested_area\": \"Home\"}\
 }";
 
-
 String jsonDiscoveryMacAddress =
 "{ \
   \"name\": \"MAC Address\", \
@@ -347,7 +325,6 @@ String jsonDiscoveryMacAddress =
   \"support_url\": \"https://github.com/genestealer/everblu-meters-esp8266-improved\",\
   \"suggested_area\": \"Home\"}\
 }";
-
 
 String jsonDiscoveryStatus =
 "{ \
@@ -389,7 +366,6 @@ String jsonDiscoveryBSSID =
   \"suggested_area\": \"Home\"}\
 }";
 
-
 String jsonDiscoverySSID =
 "{ \
   \"name\": \"WiFi SSID\", \
@@ -430,8 +406,6 @@ String jsonDiscoveryUptime =
   \"suggested_area\": \"Home\"}\
 }";
 
-
-
 String jsonDiscoveryRestartButton =
 "{ \
   \"name\": \"Restart Device\", \
@@ -450,10 +424,6 @@ String jsonDiscoveryRestartButton =
   \"support_url\": \"https://github.com/genestealer/everblu-meters-esp8266-improved\",\
   \"suggested_area\": \"Home\"}\
 }";
-
-
-
-
 
 int calculateWiFiSignalStrengthPercentage(int rssi) {
   int strength = constrain(rssi, -100, -50); // Clamp RSSI to a reasonable range
@@ -488,13 +458,9 @@ void publishWifiDetails() {
   mqtt.publish("everblu/cyble/uptime", uptimeISO, true);
 }
 
-
-
-
 void onConnectionEstablished()
 {
   Serial.println("Connected to MQTT Broker :)");
-
 
   Serial.println("> Configure time from NTP server. Please wait...");
   // Note, my VLAN has no WAN/internet, so I am useing Home Assistant Community Add-on: chrony to proxy the time
@@ -505,7 +471,6 @@ void onConnectionEstablished()
   struct tm *ptm = gmtime(&tnow);
   Serial.printf("Current date (UTC) : %04d/%02d/%02d %02d:%02d:%02d - %s\n", ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, String(tnow, DEC).c_str());
   
-
   Serial.println("> Configure Arduino OTA flash.");
   ArduinoOTA.onStart([]() {
     String type;
@@ -558,15 +523,12 @@ void onConnectionEstablished()
     }
   });
 
-
 mqtt.subscribe("everblu/cyble/restart", [](const String& message) {
   if (message == "restart") {
     Serial.println("Restart command received via MQTT. Restarting...");
     ESP.restart(); // Restart the ESP device
   }
 });
-
-
 
   Serial.println("> Send MQTT config for HA.");
   // Auto discovery
@@ -615,8 +577,6 @@ mqtt.subscribe("everblu/cyble/restart", [](const String& message) {
   // Publish initial Wi-Fi details
   publishWifiDetails();
 
-
-
   // Turn off LED to show everything is setup
   digitalWrite(LED_BUILTIN, HIGH); // turned off
 
@@ -644,30 +604,27 @@ void setup()
   // Optional functionalities of EspMQTTClient
   // mqtt.enableDebuggingMessages(true); // Enable debugging messages sent to serial output
 
-
-
+  // Frequency Discovery
+  // Use this piece of code to find the right frequency to use going forwards. Un-comment for first use. Re-comment once you have your meter's values.
+  // Note: Some meters are configured to broadcast their data only at specific times, typically this is during nominal working hours, so try to do this process within those times
   /*
-  // Use this piece of code to find the right frequency.
+  Serial.printf("###### FREQUENCY DISCOVERY ENABLED ######\nStarting Frequency Scan...\n");
+  String meterinfo = "Target meter: " + String(METER_YEAR, DEC) + "-0" + String(METER_SERIAL, DEC) + "\n";
+  Serial.println(meterinfo);
   for (float i = 433.76f; i < 433.890f; i += 0.0005f) {
     Serial.printf("Test frequency : %f\n", i);
     cc1101_init(i);
-
     struct tmeter_data meter_data;
     meter_data = get_meter_data();
-
     if (meter_data.reads_counter != 0 || meter_data.liters != 0) {
       Serial.printf("\n------------------------------\nGot frequency : %f\n------------------------------\n", i);
-
       Serial.printf("Liters : %d\nBattery (in months) : %d\nCounter : %d\n\n", meter_data.liters, meter_data.battery_left, meter_data.reads_counter);
-
       digitalWrite(LED_BUILTIN, LOW); // turned on
-
       while (42);
     }
   }
+    Serial.printf("###### FREQUENCY DISCOVERY FINISHED ######\nOnce you have discovered the correct frequency you can disable this scan.\n\n");
   */
-
-
 
   cc1101_init(FREQUENCY);
 
@@ -680,8 +637,6 @@ void setup()
   */
 
 }
-
-
 
 void loop() {
   mqtt.loop();
