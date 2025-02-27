@@ -35,17 +35,17 @@ Pins wiring for [Wemos D1 board](https://www.wemos.cc/en/latest/d1/index.html) a
 
 ## Configuration 
 1. Clone this repo in VSCode
-1.1 This should prompt to install dependancies such as PlatformIO, follow the setup process before proceeding (may require a VSCode Restart)
+   - This should prompt to install dependancies such as PlatformIO, follow the setup process before proceeding (may require a VSCode Restart)
 2. copy `Exampleprivate.h` into the src folder, rename to `private.h` 
-* Update WiFi and MQTT details in `private.h`. If you do not use username and password for MQTT then comment those out with //
-* Set meter serial number (without the leading 0) and production year in `private.h`, it can be found on the meter label itself:
-![Cyble Meter v2 Label](meter_label.png)![Cyble Meter v2.1 Label](meter_label_21.png)
-3 Update platformio.ini to match your specific platform and baord
-4 First time setup only: towards the bottom of `everblu-meters-esp8266.cpp` uncomment the Frequency Discovery code snippet to show debug output of your meter's dsicovered frequency value. Once you have this you can update the FREQUENCY value in `private.h` and re-comment out this code. For best results do this process well within your local nominal business working hours. For more information see blow section on Frequency Adjustment. 
+   - Update WiFi and MQTT details in `private.h`. If you do not use username and password for MQTT then comment those out with //
+   - Set meter serial number (without the leading 0) and production year in `private.h`, it can be found on the meter label itself:<br/>![Cyble Meter v2 Label](meter_label.png)![Cyble Meter v2.1 Label](meter_label_21.png)
+3. Update platformio.ini to match your specific platform and baord
+4. First time setup only: towards the bottom of `everblu-meters-esp8266.cpp` uncomment the Frequency Discovery code snippet to show debug output of your meter's dsicovered frequency value. Once you have this you can update the FREQUENCY value in `private.h
+` and re-comment out this code. For best results do this process well within your local nominal business working hours. For more information see blow section on Frequency Adjustment. 
 5. Compile and flash to your ESP device, keep it connected to your computer 
-* Use PlatformIO > Upload and Monitor for the first time frequency Discovery process, use PlatformIO > Upload if you have your frequency info or are just updating the build 
+   - Use PlatformIO > Upload and Monitor for the first time frequency Discovery process, use PlatformIO > Upload if you have your frequency info or are just updating the build 
 4. After a few seconds your meter data should be on the bottom panel (terminal) and data should be pushed to MQTT. 
-* If you have setup the Frequency Discvery you should also see this process being output at this point.
+   - If you have setup the Frequency Discvery you should also see this process being output at this point.
 5. The device will query the meter once a day, every 24 hours and retry every hour if query failed.
 
 ## Troubleshooting
