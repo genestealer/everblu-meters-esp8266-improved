@@ -36,6 +36,11 @@ Pins wiring for [Wemos D1 board](https://www.wemos.cc/en/latest/d1/index.html) a
 | GDO2        | D2        | GPIO4                    | Another general-purpose digital output.       |
 | GND         | G         | GND                      | Connect to ground.                            |
 
+### CC1101
+Some modules are not labelled on the PCB, this is the pinout for one:
+![CC1101 pinout diagram](cc1101-mapping.png)
+![CC1101 example](cc1101.jpg)
+
 
 ## Configuration
 1. Install EspMQTTClient through Arduino library manager as it required for MQTT
