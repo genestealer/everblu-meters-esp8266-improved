@@ -43,13 +43,14 @@ Some modules are not labelled on the PCB, this is the pinout for one:
 
 
 ## Configuration
-1. Install EspMQTTClient through Arduino library manager as it required for MQTT
-2. Update WiFi and MQTT details in everblu-meters-esp8266.ino, if you do not use username and password for MQTT then comment those out with //
-3. Set meter serial number (without the leading 0) and production year in `everblu_meters.h` (at the end of the file), it can be found on the meter label itself:
-![Cyble Meter Label](meter_label.png)
-4. Flash the sketch to your ESP device
-5. After a few second your meter data should be on the screen (serial console) and data should be pushed to MQTT.
-6. The device will query the meter once a day, every 24 hours and retry every hour if query failed.
+1. Download [Visual Studio Code](https://code.visualstudio.com/)
+1. Install [PlatformIO for VS Code](https://platformio.org/) (this will install all dependencies required)
+1. Update WiFi and MQTT details in everblu-meters-esp8266.cpp, if you do not use username and password 1or MQTT then comment those out with //
+1. Set meter serial number (without the leading 0) and production year in `everblu_meters.h` (at the end 1f the file), it can be found on the meter label itself:
+1[Cyble Meter Label](meter_label.png)
+1. Flash the sketch to your ESP device
+1. After a few second your meter data should be on the screen (serial console) and data should be pushed 1o MQTT.
+1. The device will query the meter once a day, every 24 hours and retry every hour if query failed.
 
 ## Troubleshooting
 
@@ -80,7 +81,9 @@ You can uncomment the part of the code in the `everblu-meters-esp8266.cpp` file 
 
 
 ### Business hours
-Your meter may be configured in such a way that is listens for request only during hours when data collectors work - to conserve energy. If you are unable to communicate with the meter, please try again during business hours (8:00-16:00), Monday to Friday. As a rule of thumb, please try to set up your device only during business hours, then you can avoid confusion and asking questions why is it not working!  
+> [!TIP]
+> Your meter may be configured in such a way that is listens for request only during hours when data collectors work - to conserve energy. If you are unable to communicate with the meter, please try again during business hours (8:00-16:00), Monday to Friday. As a rule of thumb, please try to set up your device only during business hours, then you can avoid confusion and asking questions why is it not working!
+> Note: This is definitely the case in the UK.
 
 ### Serial number starting with 0
 Please ignore the leading 0, provide serial in configuration without it.
