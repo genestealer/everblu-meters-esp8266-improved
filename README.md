@@ -83,6 +83,8 @@ You can uncomment the part of the code in the `everblu-meters-esp8266.cpp` file 
 ### Business hours
 > [!TIP]
 > Your meter may be configured in such a way that is listens for request only during hours when data collectors work - to conserve energy. If you are unable to communicate with the meter, please try again during business hours (8:00-16:00), Monday to Friday. As a rule of thumb, please try to set up your device only during business hours, then you can avoid confusion and asking questions why is it not working!
+
+> [!NOTE]
 > Note: This is definitely the case in the UK.
 
 ### Serial number starting with 0
