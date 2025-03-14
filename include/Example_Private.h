@@ -11,7 +11,7 @@
 
 // Change these define according to your hardware
 
-#define METER_YEAR 20
+#define METER_YEAR 20 // last two digits (e.g. 2019 is 19)
 #define METER_SERIAL 257000
-#define FREQUENCY 433.700007
+#define FREQUENCY 433.700007 // you can test for this using the test code in everblu-meters-esp8266.cpp
 #define GDO0 5 //header 11 

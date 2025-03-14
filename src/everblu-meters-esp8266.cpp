@@ -2,12 +2,12 @@
 #include <ESP8266mDNS.h>
 #include <WiFiUdp.h>
 
-#include <arduino.h>
+#include <Arduino.h>
 
 
 #include <ArduinoOTA.h>
 #include "everblu_meters.h"
-#include <private.h> // Passwords etc. not for GitHub
+#include <Private.h> // Passwords etc. not for GitHub
 // Project source : 
 // http://www.lamaisonsimon.fr/wiki/doku.php?id=maison2:compteur_d_eau:compteur_d_eau
 

@@ -2,10 +2,10 @@
  /*  it is exposed just to demonstrate CC1101 capability to reader water meter indexes */
  /*  there is no Warranty on radian_trx SW */
 
-#include <arduino.h>
+#include <Arduino.h>
 
 #include "everblu_meters.h"
-#include <private.h> // Passwords etc. not for GitHub
+#include <Private.h> // Passwords etc. not for GitHub
 
 void show_in_hex(uint8_t* buffer, size_t len)
 {
