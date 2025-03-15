@@ -295,7 +295,6 @@ String jsonDiscoveryWifiRSSI =
   \"suggested_area\": \"Home\"}\
 }";
 
-//homeassistant/sensor/water_meter_wifi_signal_percentage/config"
 String jsonDiscoveryWifiSignalPercentage =
 "{ \
   \"name\": \"WiFi Signal\", \
