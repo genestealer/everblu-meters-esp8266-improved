@@ -12,7 +12,7 @@ Meters supported:
 ![Itron EverBlu Cyble Enhanced](meter.jpg)
 
 ## Hardware
-The project runs on ESP8266/ESP32 with an RF transceiver (CC1101). Hardware can be any ESP32+CC1101 with correct wiring.
+The project runs on ESP8266/ESP32 with an RF transreciver (CC1101). Hardware can be any ESP32+CC1101 with correct wiring.
 ![ESP8266 with CC1101](board2.jpg)
 ![ESP8266 with CC1101](board.jpg)
 
@@ -35,30 +35,29 @@ Pins wiring for [Wemos D1 board](https://www.wemos.cc/en/latest/d1/index.html) a
 
 ## Configuration 
 1. Clone this repo in VSCode
-   - This should prompt to install dependencies such as PlatformIO, follow the setup process before proceeding (may require a VSCode Restart)
+1.1 This should prompt to install dependancies such as PlatformIO, follow the setup process before proceeding (may require a VSCode Restart)
 2. copy `Exampleprivate.h` into the src folder, rename to `private.h` 
-   - Update WiFi and MQTT details in `private.h`. If you do not use username and password for MQTT then comment those out with //
-   - Set meter serial number (without the leading 0) and production year in `private.h`, it can be found on the meter label itself:<br/>![Cyble Meter v2 Label](meter_label.png)![Cyble Meter v2.1 Label](meter_label_21.png)
-3. Update platformio.ini to match your specific platform and board
-4. First time setup only: towards the bottom of `everblu-meters-esp8266.cpp` uncomment the Frequency Discovery code snippet to show debug output of your meter's discovered frequency value. Once you have this you can update the FREQUENCY value in `private.h` and re-comment out this code. For best results do this process well within your local nominal business working hours. For more information see blow section on Frequency Adjustment. 
+* Update WiFi and MQTT details in `private.h`. If you do not use username and password for MQTT then comment those out with //
+* Set meter serial number (without the leading 0) and production year in `private.h`, it can be found on the meter label itself:
+![Cyble Meter Label]
+(meter_label.png)(meter_label_21.png)
+3 Update platformio.ini to match your specific platform and baord
+4 First time setup only: towards the bottom of `everblu-meters-esp8266.cpp` uncomment the Frequency Discovery code snippet to show debug output of your meter's dsicovered frequency value. Once you have this you can update the FREQUENCY value in `private.h` and re-comment out this code. For best results do this process well within your local nominal business working hours. For more information see blow section on Frequency Adjustment. 
 5. Compile and flash to your ESP device, keep it connected to your computer 
-   - Use PlatformIO > Upload and Monitor for the first time frequency Discovery process
-   - Use PlatformIO > Upload if you have your frequency info or are just updating the build 
+* Use PlatformIO > Upload and Monitor for the first time frequency Discovery process, use PlatformIO > Upload if you have your frequency info or are just updating the build 
 4. After a few seconds your meter data should be on the bottom panel (terminal) and data should be pushed to MQTT. 
-   - If you have setup the Frequency Discovery you should also see this process being output at this point.
+* If you have setup the Frequency Discvery you should also see this process being output at this point.
 5. The device will query the meter once a day, every 24 hours and retry every hour if query failed.
 
 ## Troubleshooting
 
-### Frequency Adjustment
-Your transceiver module may be not calibrated correctly, please modify frequency a bit lower or higher and try again. You may use RTL-SDR to measure the offset needed.
+### Frequency adjustment
+Your transreciver module may be not calibrated correctly, please modify frequency a bit lower or higher and try again. You may use RTL-SDR to measure the offset needed.
 You can uncomment the part of the code in the `everblu-meters-esp8266.cpp` file that scans all the frequencies around the meter frequency to find the correct one.
 
 ```
   /*
   Serial.printf("###### FREQUENCY DISCOVERY ENABLED ######\nStarting Frequency Scan...\n");
-  String meterinfo = "Target meter: " + String(METER_YEAR, DEC) + "-0" + String(METER_SERIAL, DEC) + "\n";
-  Serial.println(meterinfo);
   for (float i = 433.76f; i < 433.890f; i += 0.0005f) {
     Serial.printf("Test frequency : %f\n", i);
     cc1101_init(i);
