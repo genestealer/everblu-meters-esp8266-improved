@@ -3,27 +3,21 @@
 /*  there is no Warranty on radian_trx SW */
 
 #include <arduino.h>
-
 #include <SPI.h>
-
 #include "everblu_meters.h"
 #include <private.h> // Passwords etc. not for GitHub
 #include "utils.h"
-
 #include "cc1101.h"
 
 uint8_t RF_config_u8 = 0xFF;
 uint8_t RF_Test_u8 = 0;
 //                     +10,  +7,   5,   0, -10, -15, -20, -30
 uint8_t PA_Test[] = { 0xC0,0xC8,0x85,0x60,0x34,0x1D,0x0E,0x12, };
-
 uint8_t PA[] = { 0x60,0x00,0x00,0x00,0x00,0x00,0x00,0x00, };
-
 uint8_t CC1101_status_state = 0;
 uint8_t CC1101_status_FIFO_FreeByte = 0;
 uint8_t CC1101_status_FIFO_ReadByte = 0;
 uint8_t debug_out = 0;
-
 
 #ifndef TRUE
 #define TRUE true
@@ -32,7 +26,6 @@ uint8_t debug_out = 0;
 #ifndef FALSE
 #define FALSE true
 #endif
-
 
 #define TX_LOOP_OUT 300
 /*---------------------------[CC1100 - R/W offsets]------------------------------*/
@@ -145,8 +138,6 @@ int wiringPiSPISetup(int channel, int speed)
   return 0;
 }
 
-
-
 /*----------------------------[END config register]------------------------------*/
 //------------------[write register]--------------------------------
 uint8_t halRfWriteReg(uint8_t reg_addr, uint8_t value)
@@ -257,9 +248,6 @@ void CC1101_CMD(uint8_t spi_instr)
   CC1101_status_state = (tbuf[0] >> 4) & 0x0F;
 }
 
-
-
-
 void echo_cc1101_version(void);
 void show_cc1101_registers_settings(void);
 
@@ -284,7 +272,6 @@ void cc1101_reset(void)			// reset defined in cc1100 datasheet §19.1
 
   CC1101_CMD(SFTX);   //flush the TX_fifo content -> a must for interrupt handling
   CC1101_CMD(SFRX);	//flush the RX_fifo content -> a must for interrupt handling	
-
 }
 
 void setMHZ(float mhz) {
@@ -412,7 +399,6 @@ int8_t cc1100_rssi_convert2dbm(uint8_t Rssi_dec)
   return rssi_dbm;
 }
 
-
 /* configure cc1101 in receive mode */
 void cc1101_rec_mode(void)
 {
@@ -431,7 +417,6 @@ void echo_cc1101_version(void)
   echo_debug(debug_out, "CC1101 Partnumber: 0x%02X\n", halRfReadReg(PARTNUM_ADDR));
   echo_debug(debug_out, "CC1101 Version != 00 or 0xFF  : 0x%02X\n", halRfReadReg(VERSION_ADDR));  // != 00 or 0xFF
 }
-
 
 #define CFG_REGISTER  			0x2F									//47 registers
 void show_cc1101_registers_settings(void)
@@ -514,8 +499,6 @@ uint8_t cc1101_check_packet_received(void)
       echo_debug(debug_out, ".");
     }
     fflush(stdout);
-
-
     return TRUE;
   }
   return FALSE;
@@ -544,12 +527,10 @@ uint8_t cc1101_wait_for_packet(int milliseconds)
 struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
 {
   struct tmeter_data data;
-
-
   if (size >= 30)
   {
     //echo_debug(1,"\n%u/%u/20%u %u:%u:%u ",decoded_buffer[24],decoded_buffer[25],decoded_buffer[26],decoded_buffer[28],decoded_buffer[29],decoded_buffer[30]);
-    //echo_debug(1,"%u litres ",decoded_buffer[18]+decoded_buffer[19]*256 + decoded_buffer[20]*65536 + decoded_buffer[21]*16777216);
+    //echo_debug(1,"%u liters ",decoded_buffer[18]+decoded_buffer[19]*256 + decoded_buffer[20]*65536 + decoded_buffer[21]*16777216);
 
     data.liters = decoded_buffer[18] + decoded_buffer[19] * 256 + decoded_buffer[20] * 65536 + decoded_buffer[21] * 16777216;
   }
@@ -561,7 +542,6 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
     data.time_start = decoded_buffer[44];
     data.time_end = decoded_buffer[45];
   }
-
   return data;
 }
 
@@ -625,7 +605,6 @@ uint8_t decode_4bitpbit_serial(uint8_t *rxBuffer, int l_total_byte, uint8_t* dec
   }//scan TX_byte
   return dest_byte_cnt;
 }
-
 
 /*
    search for 0101010101010000b sync pattern then change data rate in order to get 4bit per bit

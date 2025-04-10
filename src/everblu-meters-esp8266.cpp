@@ -1,10 +1,7 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
 #include <WiFiUdp.h>
-
 #include <arduino.h>
-
-
 #include <ArduinoOTA.h>
 #include "everblu_meters.h"
 #include <private.h> // Passwords etc. not for GitHub
@@ -16,15 +13,12 @@
 // https://github.com/plapointe6/EspMQTTClient/releases/tag/1.13.3
 #include "EspMQTTClient.h"
 
-// Edit "everblu_meters.h" file then change the define at the end of the file
-
 #ifndef LED_BUILTIN
 // Change this pin if needed
 #define LED_BUILTIN 2
 #endif
 
 unsigned long lastWifiUpdate = 0;
-
 
 EspMQTTClient mqtt(
     secret_wifi_ssid,     // Your Wifi SSID
@@ -36,13 +30,7 @@ EspMQTTClient mqtt(
     1883                  // MQTT Broker server port
 );
 
-// char *jsonTemplate = 
-// "{                    \
-// \"liters\": %d,       \
-// \"counter\" : %d,     \
-// \"battery\" : %d,     \
-// \"timestamp\" : \"%s\"\
-// }";
+// char *jsonTemplate = "{\"liters\": %d, \"counter\" : %d, \"battery\" : %d, \"timestamp\" : \"%s\" }";
 
 // const char jsonTemplate[] = "{ \"liters\": %d, \"counter\" : %d, \"battery\" : %d, \"timestamp\" : \"%s\" }";
 
@@ -61,7 +49,6 @@ void onUpdateData()
   // Publish active reading state as true
   mqtt.publish("everblu/cyble/active_reading", "true", true);
 
-
   struct tmeter_data meter_data;
   meter_data = get_meter_data();
 
@@ -78,10 +65,8 @@ void onUpdateData()
     // Call back this function in 10 sec (in miliseconds)
     if (_retry++ < 10)
       mqtt.executeDelayed(1000 * 10, onUpdateData);
-
     return;
   }
-
 
   Serial.printf("Liters : %d\nBattery (in months) : %d\nCounter : %d\n\n", meter_data.liters, meter_data.battery_left, meter_data.reads_counter);
 
@@ -103,13 +88,11 @@ void onUpdateData()
   digitalWrite(LED_BUILTIN, HIGH); // Turn off LED now that data has been pulled
 }
 
-
 // This function calls onUpdateData() every days at 10:00am UTC
 void onScheduled()
 {
   time_t tnow = time(nullptr);
   struct tm *ptm = gmtime(&tnow);
-
 
   // At 10:00:00am UTC
   if (ptm->tm_hour == 10 && ptm->tm_min == 0 && ptm->tm_sec == 0) {
@@ -130,7 +113,6 @@ void onScheduled()
   mqtt.executeDelayed(500, onScheduled);
 }
 
-
 String jsonDiscoveryDevice1 =
 "{ \
   \"name\": \"Reading (Total)\", \
@@ -141,7 +123,7 @@ String jsonDiscoveryDevice1 =
   \"unit_of_measurement\": \"L\",\
   \"device_class\": \"water\",\
   \"state_class\": \"total_increasing\",\
-  \"qos\": \"0\",\
+  \"qos\": 0,\
   \"state_topic\": \"everblu/cyble/liters\",\
   \"force_update\": \"true\",\
   \"device\" : {\
@@ -149,7 +131,8 @@ String jsonDiscoveryDevice1 =
   \"14071984\" ],\
   \"name\": \"Water Meter\",\
   \"model\": \"Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32\",\
-  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\"}\
+  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"suggested_area\": \"Home\"}\
 }";
 
 String jsonDiscoveryDevice2 = 
@@ -160,7 +143,7 @@ String jsonDiscoveryDevice2 =
   \"device_class\": \"battery\",\
   \"icon\": \"mdi:battery\",\
   \"unit_of_measurement\": \"%\",\
-  \"qos\": \"0\",\
+  \"qos\": 0,\
   \"state_topic\": \"everblu/cyble/battery\",\
   \"value_template\": \"{{ [(value|int), 100] | min }}\",\
   \"force_update\": \"true\",\
@@ -169,7 +152,8 @@ String jsonDiscoveryDevice2 =
   \"14071984\" ],\
   \"name\": \"Water Meter\",\
   \"model\": \"Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32\",\
-  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\"}\
+  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"suggested_area\": \"Home\"}\
 }";
 
 String jsonDiscoveryDevice3 =
@@ -178,7 +162,7 @@ String jsonDiscoveryDevice3 =
   \"unique_id\": \"water_meter_counter\",\
   \"object_id\": \"water_meter_counter\",\
   \"icon\": \"mdi:counter\",\
-  \"qos\": \"0\",\
+  \"qos\": 0,\
   \"state_topic\": \"everblu/cyble/counter\",\
   \"force_update\": \"true\",\
   \"device\" : {\
@@ -186,7 +170,8 @@ String jsonDiscoveryDevice3 =
   \"14071984\" ],\
   \"name\": \"Water Meter\",\
   \"model\": \"Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32\",\
-  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\"}\
+  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"suggested_area\": \"Home\"}\
 }";
 
 String jsonDiscoveryDevice4 =
@@ -196,7 +181,7 @@ String jsonDiscoveryDevice4 =
   \"object_id\": \"water_meter_timestamp\",\
   \"device_class\": \"timestamp\",\
   \"icon\": \"mdi:clock\",\
-  \"qos\": \"0\",\
+  \"qos\": 0,\
   \"state_topic\": \"everblu/cyble/timestamp\",\
   \"force_update\": \"true\",\
   \"device\" : {\
@@ -204,16 +189,16 @@ String jsonDiscoveryDevice4 =
   \"14071984\" ],\
   \"name\": \"Water Meter\",\
   \"model\": \"Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32\",\
-  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\"}\
+  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"suggested_area\": \"Home\"}\
 }";
-
 
 String jsonDiscoveryDevice5 =
 "{ \
   \"name\": \"Request Reading Now\", \
   \"unique_id\": \"water_meter_request\",\
   \"object_id\": \"water_meter_request\",\
-  \"qos\": \"0\",\
+  \"qos\": 0,\
   \"command_topic\": \"everblu/cyble/trigger\",\
   \"availability_topic\": \"everblu/cyble/status\",\
   \"payload_available\": \"online\",\
@@ -225,9 +210,9 @@ String jsonDiscoveryDevice5 =
   \"14071984\" ],\
   \"name\": \"Water Meter\",\
   \"model\": \"Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32\",\
-  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\"}\
+  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"suggested_area\": \"Home\"}\
 }";
-
 
 String jsonDiscoveryActiveReading =
 "{ \
@@ -235,7 +220,7 @@ String jsonDiscoveryActiveReading =
   \"unique_id\": \"water_meter_active_reading\",\
   \"object_id\": \"water_meter_active_reading\",\
   \"device_class\": \"running\",\
-  \"qos\": \"0\",\
+  \"qos\": 0,\
   \"state_topic\": \"everblu/cyble/active_reading\",\
   \"payload_on\": \"true\",\
   \"payload_off\": \"false\",\
@@ -244,10 +229,9 @@ String jsonDiscoveryActiveReading =
   \"14071984\" ],\
   \"name\": \"Water Meter\",\
   \"model\": \"Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32\",\
-  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\"}\
+  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"suggested_area\": \"Home\"}\
 }";
-
-
 
 // JSON Discovery for Wi-Fi Details
 String jsonDiscoveryWifiIP =
@@ -256,7 +240,7 @@ String jsonDiscoveryWifiIP =
   \"unique_id\": \"water_meter_wifi_ip\",\
   \"object_id\": \"water_meter_wifi_ip\",\
   \"icon\": \"mdi:ip-network-outline\",\
-  \"qos\": \"0\",\
+  \"qos\": 0,\
   \"state_topic\": \"everblu/cyble/wifi_ip\",\
   \"force_update\": \"true\",\
   \"entity_category\": \"diagnostic\",\
@@ -265,7 +249,8 @@ String jsonDiscoveryWifiIP =
   \"14071984\" ],\
   \"name\": \"Water Meter\",\
   \"model\": \"Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32\",\
-  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\"}\
+  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"suggested_area\": \"Home\"}\
 }";
 
 String jsonDiscoveryWifiRSSI =
@@ -276,7 +261,7 @@ String jsonDiscoveryWifiRSSI =
   \"device_class\": \"signal_strength\",\
   \"icon\": \"mdi:signal-variant\",\
   \"unit_of_measurement\": \"dBm\",\
-  \"qos\": \"0\",\
+  \"qos\": 0,\
   \"state_topic\": \"everblu/cyble/wifi_rssi\",\
   \"force_update\": \"true\",\
   \"entity_category\": \"diagnostic\",\
@@ -285,19 +270,20 @@ String jsonDiscoveryWifiRSSI =
   \"14071984\" ],\
   \"name\": \"Water Meter\",\
   \"model\": \"Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32\",\
-  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\"}\
+  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"suggested_area\": \"Home\"}\
 }";
 
-
+//homeassistant/sensor/water_meter_wifi_signal_percentage/config"
 String jsonDiscoveryWifiSignalPercentage =
 "{ \
   \"name\": \"WiFi Signal\", \
   \"unique_id\": \"water_meter_wifi_signal_percentage\",\
   \"object_id\": \"water_meter_wifi_signal_percentage\",\
-  \"device_class\": \"signal_strength\",\
+  \"device_class\": \"\",\
   \"icon\": \"mdi:wifi\",\
-  \"unit_of_measurement\": \"%\",\
-  \"qos\": \"0\",\
+  \"unit_of_measurement\": \"Signal %\",\
+  \"qos\": 0,\
   \"state_topic\": \"everblu/cyble/wifi_signal_percentage\",\
   \"force_update\": \"true\",\
   \"entity_category\": \"diagnostic\",\
@@ -306,9 +292,9 @@ String jsonDiscoveryWifiSignalPercentage =
   \"14071984\" ],\
   \"name\": \"Water Meter\",\
   \"model\": \"Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32\",\
-  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\"}\
+  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"suggested_area\": \"Home\"}\
 }";
-
 
 String jsonDiscoveryMacAddress =
 "{ \
@@ -316,7 +302,7 @@ String jsonDiscoveryMacAddress =
   \"unique_id\": \"water_meter_mac_address\",\
   \"object_id\": \"water_meter_mac_address\",\
   \"icon\": \"mdi:network\",\
-  \"qos\": \"0\",\
+  \"qos\": 0,\
   \"state_topic\": \"everblu/cyble/mac_address\",\
   \"force_update\": \"true\",\
   \"entity_category\": \"diagnostic\",\
@@ -325,17 +311,17 @@ String jsonDiscoveryMacAddress =
   \"14071984\" ],\
   \"name\": \"Water Meter\",\
   \"model\": \"Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32\",\
-  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\"}\
+  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"suggested_area\": \"Home\"}\
 }";
-
 
 String jsonDiscoveryStatus =
 "{ \
   \"name\": \"WiFi Status\", \
   \"unique_id\": \"water_meter_wifi_status\",\
   \"object_id\": \"water_meter_wifi_status\",\
-  \"device_class\": \"connectivity\",\
-  \"qos\": \"0\",\
+  \"device_class\": \"signal_strength\",\
+  \"qos\": 0,\
   \"state_topic\": \"everblu/cyble/status\",\
   \"force_update\": \"true\",\
   \"entity_category\": \"diagnostic\",\
@@ -344,7 +330,8 @@ String jsonDiscoveryStatus =
   \"14071984\" ],\
   \"name\": \"Water Meter\",\
   \"model\": \"Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32\",\
-  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\"}\
+  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"suggested_area\": \"Home\"}\
 }";
 
 String jsonDiscoveryBSSID =
@@ -353,7 +340,7 @@ String jsonDiscoveryBSSID =
   \"unique_id\": \"water_meter_wifi_bssid\",\
   \"object_id\": \"water_meter_wifi_bssid\",\
   \"icon\": \"mdi:access-point-network\",\
-  \"qos\": \"0\",\
+  \"qos\": 0,\
   \"state_topic\": \"everblu/cyble/bssid\",\
   \"force_update\": \"true\",\
   \"entity_category\": \"diagnostic\",\
@@ -362,9 +349,9 @@ String jsonDiscoveryBSSID =
   \"14071984\" ],\
   \"name\": \"Water Meter\",\
   \"model\": \"Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32\",\
-  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\"}\
+  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"suggested_area\": \"Home\"}\
 }";
-
 
 String jsonDiscoverySSID =
 "{ \
@@ -372,7 +359,7 @@ String jsonDiscoverySSID =
   \"unique_id\": \"water_meter_wifi_ssid\",\
   \"object_id\": \"water_meter_wifi_ssid\",\
   \"icon\": \"mdi:help-network-outline\",\
-  \"qos\": \"0\",\
+  \"qos\": 0,\
   \"state_topic\": \"everblu/cyble/ssid\",\
   \"force_update\": \"true\",\
   \"entity_category\": \"diagnostic\",\
@@ -381,7 +368,8 @@ String jsonDiscoverySSID =
   \"14071984\" ],\
   \"name\": \"Water Meter\",\
   \"model\": \"Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32\",\
-  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\"}\
+  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"suggested_area\": \"Home\"}\
 }";
 
 String jsonDiscoveryUptime =
@@ -390,7 +378,7 @@ String jsonDiscoveryUptime =
   \"unique_id\": \"water_meter_uptime\",\
   \"object_id\": \"water_meter_uptime\",\
   \"device_class\": \"timestamp\",\
-  \"qos\": \"0\",\
+  \"qos\": 0,\
   \"state_topic\": \"everblu/cyble/uptime\",\
   \"force_update\": \"true\",\
   \"entity_category\": \"diagnostic\",\
@@ -399,17 +387,16 @@ String jsonDiscoveryUptime =
   \"14071984\" ],\
   \"name\": \"Water Meter\",\
   \"model\": \"Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32\",\
-  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\"}\
+  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"suggested_area\": \"Home\"}\
 }";
-
-
 
 String jsonDiscoveryRestartButton =
 "{ \
   \"name\": \"Restart Device\", \
   \"unique_id\": \"water_meter_restart\",\
   \"object_id\": \"water_meter_restart\",\
-  \"qos\": \"0\",\
+  \"qos\": 0,\
   \"command_topic\": \"everblu/cyble/restart\",\
   \"payload_press\": \"restart\",\
   \"entity_category\": \"config\",\
@@ -418,12 +405,9 @@ String jsonDiscoveryRestartButton =
   \"14071984\" ],\
   \"name\": \"Water Meter\",\
   \"model\": \"Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32\",\
-  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\"}\
+  \"manufacturer\": \"Psykokwak [Forked by Genestealer]\",\
+  \"suggested_area\": \"Home\"}\
 }";
-
-
-
-
 
 int calculateWiFiSignalStrengthPercentage(int rssi) {
   int strength = constrain(rssi, -100, -50); // Clamp RSSI to a reasonable range
@@ -458,13 +442,9 @@ void publishWifiDetails() {
   mqtt.publish("everblu/cyble/uptime", uptimeISO, true);
 }
 
-
-
-
 void onConnectionEstablished()
 {
   Serial.println("Connected to MQTT Broker :)");
-
 
   Serial.println("> Configure time from NTP server. Please wait...");
   // Note, my VLAN has no WAN/internet, so I am useing Home Assistant Community Add-on: chrony to proxy the time
@@ -475,7 +455,6 @@ void onConnectionEstablished()
   struct tm *ptm = gmtime(&tnow);
   Serial.printf("Current date (UTC) : %04d/%02d/%02d %02d:%02d:%02d - %s\n", ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, String(tnow, DEC).c_str());
   
-
   Serial.println("> Configure Arduino OTA flash.");
   ArduinoOTA.onStart([]() {
     String type;
@@ -528,15 +507,12 @@ void onConnectionEstablished()
     }
   });
 
-
 mqtt.subscribe("everblu/cyble/restart", [](const String& message) {
   if (message == "restart") {
     Serial.println("Restart command received via MQTT. Restarting...");
     ESP.restart(); // Restart the ESP device
   }
 });
-
-
 
   Serial.println("> Send MQTT config for HA.");
   // Auto discovery
@@ -585,8 +561,6 @@ mqtt.subscribe("everblu/cyble/restart", [](const String& message) {
   // Publish initial Wi-Fi details
   publishWifiDetails();
 
-
-
   // Turn off LED to show everything is setup
   digitalWrite(LED_BUILTIN, HIGH); // turned off
 
@@ -600,7 +574,8 @@ void setup()
   Serial.println("Everblu Meters ESP8266 Starting...");
   Serial.println("Water usage data for Home Assistant");
   Serial.println("https://github.com/genestealer/everblu-meters-esp8266-improved");
-
+  String meterinfo = "Target meter: " + String(METER_YEAR, DEC) + "-0" + String(METER_SERIAL, DEC) + "\nTarget frequency: " + String(FREQUENCY, DEC) + "\n";
+  Serial.println(meterinfo);
 
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW); // turned on to start with
@@ -612,33 +587,27 @@ void setup()
   mqtt.enableLastWillMessage("everblu/cyble/status", "offline", true);  // You can activate the retain flag by setting the third parameter to true
 
   // Optional functionalities of EspMQTTClient
-  mqtt.enableDebuggingMessages(true); // Enable debugging messages sent to serial output
+  // mqtt.enableDebuggingMessages(true); // Enable debugging messages sent to serial output
 
-
-
-  // *****************************************************************************
-  // Use this piece of code to find the right frequency.
-  // for (float i = 433.76f; i < 433.890f; i += 0.0005f) {
-  //   Serial.printf("Test frequency : %f\n", i);
-  //   cc1101_init(i);
-
-  //   struct tmeter_data meter_data;
-  //   meter_data = get_meter_data();
-
-  //   if (meter_data.reads_counter != 0 || meter_data.liters != 0) {
-  //     Serial.printf("\n------------------------------\nGot frequency : %f\n------------------------------\n", i);
-
-  //     Serial.printf("Liters : %d\nBattery (in months) : %d\nCounter : %d\n\n", meter_data.liters, meter_data.battery_left, meter_data.reads_counter);
-
-  //     digitalWrite(LED_BUILTIN, LOW); // turned on
-
-  //     while (42);
-  //   }
-  // }
-  // *****************************************************************************
-  
-
-
+  // Frequency Discovery
+  // Use this piece of code to find the right frequency to use going forwards. Un-comment for first use. Re-comment once you have your meter's values.
+  // Note: Some meters are configured to broadcast their data only at specific times, typically this is during nominal working hours, so try to do this process within those times
+  /*
+  Serial.printf("###### FREQUENCY DISCOVERY ENABLED ######\nStarting Frequency Scan...\n");
+  for (float i = 433.76f; i < 433.890f; i += 0.0005f) {
+    Serial.printf("Test frequency : %f\n", i);
+    cc1101_init(i);
+    struct tmeter_data meter_data;
+    meter_data = get_meter_data();
+    if (meter_data.reads_counter != 0 || meter_data.liters != 0) {
+      Serial.printf("\n------------------------------\nGot frequency : %f\n------------------------------\n", i);
+      Serial.printf("Liters : %d\nBattery (in months) : %d\nCounter : %d\n\n", meter_data.liters, meter_data.battery_left, meter_data.reads_counter);
+      digitalWrite(LED_BUILTIN, LOW); // turned on
+      while (42);
+    }
+  }
+    Serial.printf("###### FREQUENCY DISCOVERY FINISHED ######\nOnce you have discovered the correct frequency you can disable this scan.\n\n");
+  */
 
   cc1101_init(FREQUENCY);
 
@@ -651,8 +620,6 @@ void setup()
   */
 
 }
-
-
 
 void loop() {
   mqtt.loop();
