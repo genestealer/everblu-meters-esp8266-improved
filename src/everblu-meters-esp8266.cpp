@@ -1,17 +1,14 @@
-#include <ESP8266WiFi.h>
-#include <ESP8266mDNS.h>
-#include <WiFiUdp.h>
-#include <arduino.h>
-#include <ArduinoOTA.h>
-#include "everblu_meters.h"
-#include <private.h> // Passwords etc. not for GitHub
 // Project source : 
 // http://www.lamaisonsimon.fr/wiki/doku.php?id=maison2:compteur_d_eau:compteur_d_eau
 
-// Require EspMQTTClient library (by Patrick Lapointe) version 1.13.3
-// Install from Arduino library manager (and its dependancies)
-// https://github.com/plapointe6/EspMQTTClient/releases/tag/1.13.3
-#include "EspMQTTClient.h"
+// Note: Libraries are included in "Project Dependencies" file platformio.ini
+#include "private.h"        // Include the local private file for passwords etc. not for GitHub. Generate your own private.h file with the same content as private_example.h
+#include "everblu_meters.h" // Include the local everblu_meters library
+#include <ESP8266WiFi.h>    // Include the ESP8266 Wi-Fi library
+#include <ESP8266mDNS.h>    // Include the ESP8266 mDNS library
+#include <Arduino.h>        // Include the Arduino library
+#include <ArduinoOTA.h>     // Include the Arduino OTA library
+#include <EspMQTTClient.h>  // Include the EspMQTTClient library
 
 #ifndef LED_BUILTIN
 // Change this pin if needed
@@ -431,6 +428,70 @@ String jsonDiscoveryRestartButton = R"rawliteral(
 }
 )rawliteral";
 
+// JSON Discovery for Meter Year
+String jsonDiscoveryMeterYear = R"rawliteral(
+{
+  "name": "Meter Year",
+  "uniq_id": "water_meter_year",
+  "obj_id": "water_meter_year",
+  "ic": "mdi:calendar",
+  "qos": 0,
+  "avty_t": "everblu/cyble/status",
+  "stat_t": "everblu/cyble/water_meter_year",
+  "frc_upd": "true",
+  "ent_cat": "diagnostic",
+  "dev": {
+    "ids": ["14071984"],
+    "name": "Water Meter",
+    "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
+    "mf": "Psykokwak [Forked by Genestealer]"
+  }
+}
+)rawliteral";
+
+// JSON Discovery for Meter Serial
+String jsonDiscoveryMeterSerial = R"rawliteral(
+{
+  "name": "Meter Serial",
+  "uniq_id": "water_meter_serial",
+  "obj_id": "water_meter_serial",
+  "ic": "mdi:barcode",
+  "qos": 0,
+  "avty_t": "everblu/cyble/status",
+  "stat_t": "everblu/cyble/water_meter_serial",
+  "frc_upd": "true",
+  "ent_cat": "diagnostic",
+  "dev": {
+    "ids": ["14071984"],
+    "name": "Water Meter",
+    "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
+    "mf": "Psykokwak [Forked by Genestealer]"
+  }
+}
+)rawliteral";
+
+// JSON Discovery for Frequency
+String jsonDiscoveryFrequency = R"rawliteral(
+{
+  "name": "Meter Frequency",
+  "uniq_id": "water_meter_frequency",
+  "obj_id": "water_meter_frequency",
+  "ic": "mdi:signal",
+  "unit_of_meas": "MHz",
+  "qos": 0,
+  "avty_t": "everblu/cyble/status",
+  "stat_t": "everblu/cyble/water_meter_frequency",
+  "frc_upd": "true",
+  "ent_cat": "diagnostic",
+  "dev": {
+    "ids": ["14071984"],
+    "name": "Water Meter",
+    "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
+    "mf": "Psykokwak [Forked by Genestealer]"
+  }
+}
+)rawliteral";
+
 int calculateWiFiSignalStrengthPercentage(int rssi) {
   int strength = constrain(rssi, -100, -50); // Clamp RSSI to a reasonable range
   return map(strength, -100, -50, 0, 100);   // Map RSSI to percentage (0-100%)
@@ -453,7 +514,7 @@ void publishWifiDetails() {
   char uptimeISO[32];
   strftime(uptimeISO, sizeof(uptimeISO), "%FT%TZ", gmtime(&uptimeTimestamp));
 
-  // Publish diagnostics
+  // Publish diagnostic sensors
   mqtt.publish("everblu/cyble/wifi_ip", wifiIP, true);
   mqtt.publish("everblu/cyble/wifi_rssi", String(wifiRSSI, DEC), true);
   mqtt.publish("everblu/cyble/wifi_signal_percentage", String(wifiSignalPercentage, DEC), true);
@@ -462,6 +523,13 @@ void publishWifiDetails() {
   mqtt.publish("everblu/cyble/bssid", wifiBSSID, true);
   mqtt.publish("everblu/cyble/status", status, true);
   mqtt.publish("everblu/cyble/uptime", uptimeISO, true);
+}
+
+void publishMeterSettings() {
+  // Publish Meter Year, Serial, and Frequency
+  mqtt.publish("everblu/cyble/water_meter_year", String(METER_YEAR, DEC), true);
+  mqtt.publish("everblu/cyble/water_meter_serial", String(METER_SERIAL, DEC), true);
+  mqtt.publish("everblu/cyble/water_meter_frequency", String(FREQUENCY, 6), true);
 }
 
 void onConnectionEstablished()
@@ -574,12 +642,23 @@ mqtt.subscribe("everblu/cyble/restart", [](const String& message) {
   mqtt.publish("homeassistant/binary_sensor/water_meter_active_reading/config", jsonDiscoveryActiveReading, true);
   delay(50);
 
+  // Publish MQTT discovery messages for Meter Year, Serial, and Frequency
+  mqtt.publish("homeassistant/sensor/water_meter_year/config", jsonDiscoveryMeterYear, true);
+  delay(50);
+  mqtt.publish("homeassistant/sensor/water_meter_serial/config", jsonDiscoveryMeterSerial, true);
+  delay(50);
+  mqtt.publish("homeassistant/sensor/water_meter_frequency/config", jsonDiscoveryFrequency, true);
+  delay(50);
+
   // Set initial state for active reading
   mqtt.publish("everblu/cyble/active_reading", "false", true);
   delay(50);
 
   // Publish initial Wi-Fi details
   publishWifiDetails();
+
+  // Publish once the meter settings as set in the softeware
+  publishMeterSettings();
 
   // Turn off LED to show everything is setup
   digitalWrite(LED_BUILTIN, HIGH); // turned off
@@ -645,7 +724,7 @@ void loop() {
   mqtt.loop();
   ArduinoOTA.handle();
 
-  // Update Wi-Fi details every 5 minutes
+  // Update diagnostics and Wi-Fi details every 5 minutes
   if (millis() - lastWifiUpdate > 300000) { // 5 minutes in ms
     publishWifiDetails();
     lastWifiUpdate = millis();

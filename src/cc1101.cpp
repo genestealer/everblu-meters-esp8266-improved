@@ -2,12 +2,12 @@
 /*  it is exposed just to demonstrate CC1101 capability to reader water meter indexes */
 /*  there is no Warranty on radian_trx SW */
 
-#include <arduino.h>
-#include <SPI.h>
-#include "everblu_meters.h"
-#include <private.h> // Passwords etc. not for GitHub
-#include "utils.h"
-#include "cc1101.h"
+#include "private.h"        // Include the local private file for passwords etc. not for GitHub. Generate your own private.h file with the same content as private_example.h
+#include "everblu_meters.h" // Include the local everblu_meters library
+#include "utils.h"          // Include the local utils library for utility functions
+#include "cc1101.h"         // Include the local cc1101 library for CC1101 functions
+#include <Arduino.h>        // Include the Arduino library for basic functions
+#include <SPI.h>            // Include the SPI library for SPI communication
 
 uint8_t RF_config_u8 = 0xFF;
 uint8_t RF_Test_u8 = 0;

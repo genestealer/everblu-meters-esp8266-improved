@@ -50,6 +50,7 @@ secrets
 secrets1
 Private
 Private.h
+private.h
 
 .vscode/c_cpp_properties.json
 .vscode/extensions.json
