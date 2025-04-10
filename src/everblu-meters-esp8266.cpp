@@ -2,6 +2,7 @@
 // http://www.lamaisonsimon.fr/wiki/doku.php?id=maison2:compteur_d_eau:compteur_d_eau
 
 // Note: Libraries are included in "Project Dependencies" file platformio.ini
+// Note: Cases are important in the include statements. Make sure to use the correct case for the library names.
 #include "private.h"        // Include the local private file for passwords etc. not for GitHub. Generate your own private.h file with the same content as private_example.h
 #include "everblu_meters.h" // Include the local everblu_meters library
 #include <ESP8266WiFi.h>    // Include the ESP8266 Wi-Fi library
@@ -516,20 +517,31 @@ void publishWifiDetails() {
 
   // Publish diagnostic sensors
   mqtt.publish("everblu/cyble/wifi_ip", wifiIP, true);
+  delay(50);
   mqtt.publish("everblu/cyble/wifi_rssi", String(wifiRSSI, DEC), true);
+  delay(50);
   mqtt.publish("everblu/cyble/wifi_signal_percentage", String(wifiSignalPercentage, DEC), true);
+  delay(50);
   mqtt.publish("everblu/cyble/mac_address", macAddress, true);
+  delay(50);
   mqtt.publish("everblu/cyble/ssid", wifiSSID, true);
+  delay(50);
   mqtt.publish("everblu/cyble/bssid", wifiBSSID, true);
+  delay(50);
   mqtt.publish("everblu/cyble/status", status, true);
+  delay(50);
   mqtt.publish("everblu/cyble/uptime", uptimeISO, true);
+  delay(50);
 }
 
 void publishMeterSettings() {
   // Publish Meter Year, Serial, and Frequency
   mqtt.publish("everblu/cyble/water_meter_year", String(METER_YEAR, DEC), true);
+  delay(50);
   mqtt.publish("everblu/cyble/water_meter_serial", String(METER_SERIAL, DEC), true);
+  delay(50);
   mqtt.publish("everblu/cyble/water_meter_frequency", String(FREQUENCY, 6), true);
+  delay(50);
 }
 
 void onConnectionEstablished()
