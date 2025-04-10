@@ -99,6 +99,7 @@ Your transceiver module may not be calibrated correctly. Adjust the frequency sl
 
 > [!TIP]
 > Your meter may be configured to listen for requests only during business hours to conserve energy. If you are unable to communicate with the meter, try again during business hours (8:00–16:00), Monday to Friday. As a rule of thumb, set up your device during business hours to avoid confusion and unnecessary troubleshooting.
+
 > [!NOTE]
 > This is particularly relevant in the UK.
 
