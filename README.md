@@ -33,9 +33,17 @@ Pins wiring for [Wemos D1 board](https://www.wemos.cc/en/latest/d1/index.html) a
 | GDO2        | D2        | GPIO4                    | Another general-purpose digital output.       |
 | GND         | G         | GND                      | Connect to ground.                            |
 
-## Configuration 
-1. Clone this repo in VSCode
-1.1 This should prompt to install dependancies such as PlatformIO, follow the setup process before proceeding (may require a VSCode Restart)
+
+### CC1101
+Some modules are not labelled on the PCB, this is the pinout for one:
+![CC1101 pinout diagram](cc1101-mapping.png)
+![CC1101 example](cc1101.jpg)
+
+
+
+## Configuration
+1. Download [Visual Studio Code](https://code.visualstudio.com/)
+1.1 Install [PlatformIO for VS Code](https://platformio.org/) (this will install all dependencies required) (may require a VSCode Restart)
 2. copy `Exampleprivate.h` into the src folder, rename to `private.h` 
 * Update WiFi and MQTT details in `private.h`. If you do not use username and password for MQTT then comment those out with //
 * Set meter serial number (without the leading 0) and production year in `private.h`, it can be found on the meter label itself:
@@ -48,6 +56,8 @@ Pins wiring for [Wemos D1 board](https://www.wemos.cc/en/latest/d1/index.html) a
 4. After a few seconds your meter data should be on the bottom panel (terminal) and data should be pushed to MQTT. 
 * If you have setup the Frequency Discvery you should also see this process being output at this point.
 5. The device will query the meter once a day, every 24 hours and retry every hour if query failed.
+
+
 
 ## Troubleshooting
 
@@ -75,7 +85,11 @@ You can uncomment the part of the code in the `everblu-meters-esp8266.cpp` file 
 ```
 
 ### Business hours
-Your meter may be configured in such a way that is listens for request only during hours when data collectors work - to conserve energy. If you are unable to communicate with the meter, please try again during business hours (8:00-16:00), Monday to Friday. As a rule of thumb, please try to set up your device only during business hours, then you can avoid confusion and asking questions why is it not working!  
+> [!TIP]
+> Your meter may be configured in such a way that is listens for request only during hours when data collectors work - to conserve energy. If you are unable to communicate with the meter, please try again during business hours (8:00-16:00), Monday to Friday. As a rule of thumb, please try to set up your device only during business hours, then you can avoid confusion and asking questions why is it not working!
+
+> [!NOTE]
+> Note: This is definitely the case in the UK.
 
 ### Serial number starting with 0
 Please ignore the leading 0, provide serial in configuration without it.
