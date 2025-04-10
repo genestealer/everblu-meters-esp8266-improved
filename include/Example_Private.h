@@ -1,17 +1,20 @@
-#define secret_wifi_ssid "xxxx"
-#define secret_wifi_password "xxxxxxx"
+// WiFi credentials
+#define secret_wifi_ssid "xxxx"          // WiFi SSID (network name)
+#define secret_wifi_password "xxxxxxx"  // WiFi password
 
-#define secret_mqtt_server "192.168.xxx.xxx"
-#define secret_clientName "everbluMeters"
+// MQTT server configuration
+#define secret_mqtt_server "192.168.xxx.xxx" // MQTT server IP address
+#define secret_clientName "everbluMeters"   // MQTT client name
 
-#define secret_mqtt_username "xxxxxxxxx"
-#define secret_mqtt_password "xxxxxxxxxxxxxxx"
+// MQTT authentication
+#define secret_mqtt_username "xxxxxxxxx"        // MQTT username
+#define secret_mqtt_password "xxxxxxxxxxxxxxx"  // MQTT password
 
-#define secret_local_timeclock_server "pool.ntp.org"
+// NTP server for time synchronization
+#define secret_local_timeclock_server "pool.ntp.org" // NTP server address
 
-// Change these define according to your hardware
-
-#define METER_YEAR 20 // last two digits (e.g. 2019 is 19)
-#define METER_SERIAL 257000
-#define FREQUENCY 433.700007 // you can test for this using the test code in everblu-meters-esp8266.cpp
-#define GDO0 5 //header 11 
+// Meter-specific configuration
+#define METER_YEAR 20        // Last two digits of the year printed on the meter (e.g., 2019 is 19)
+#define METER_SERIAL 257000  // Serial number printed on the meter
+#define FREQUENCY 433.700007 // Frequency of the meter (discovered via test code)
+#define GDO0 5               // Pin on ESP8266 used for GDO0 (General Digital Output 0)
