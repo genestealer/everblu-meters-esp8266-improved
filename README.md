@@ -54,7 +54,8 @@ Some modules are not labelled on the PCB. Below is the pinout for one:
 
 - Set the meter serial number (without the leading 0) and production year in `private.h`. This information can be found on the meter label itself:
 
-  ![Cyble Meter Label](imgs/meter_label.png)(imgs/meter_label_21.png)
+  ![Cyble Meter Label](imgs/meter_label.png)
+  ![Cyble Meter Label](imgs/meter_label_21.png)
 
 4. Update `platformio.ini` to match your specific platform and board.
 
