@@ -1,15 +1,30 @@
-// Project source : 
-// http://www.lamaisonsimon.fr/wiki/doku.php?id=maison2:compteur_d_eau:compteur_d_eau
+/*
+ * Project: EverBlu Meters ESP8266/ESP32
+ * Description: Fetch water/gas usage data from Itron EverBlu Cyble Enhanced RF water meters using the RADIAN protocol on 433 MHz.
+ *              Integrated with Home Assistant via MQTT AutoDiscovery.
+ * Author: Forked and improved by Genestealer, based on work by Psykokwak and Neutrinus.
+ * License: Unknown (refer to the README for details).
+ * 
+ * Hardware Requirements:
+ * - ESP8266/ESP32
+ * - CC1101 RF Transceiver
+ * 
+ * Features:
+ * - MQTT integration for Home Assistant
+ * - Frequency discovery for meter communication
+ * - Wi-Fi diagnostics and OTA updates
+ * - Daily scheduled meter readings
+ * 
+ * For more details, refer to the README file.
+ */
 
-// Note: Libraries are included in "Project Dependencies" file platformio.ini
-// Note: Cases are important in the include statements. Make sure to use the correct case for the library names.
-#include "private.h"        // Include the local private file for passwords etc. not for GitHub. Generate your own private.h file with the same content as private_example.h
-#include "everblu_meters.h" // Include the local everblu_meters library
-#include <ESP8266WiFi.h>    // Include the ESP8266 Wi-Fi library
-#include <ESP8266mDNS.h>    // Include the ESP8266 mDNS library
-#include <Arduino.h>        // Include the Arduino library
-#include <ArduinoOTA.h>     // Include the Arduino OTA library
-#include <EspMQTTClient.h>  // Include the EspMQTTClient library
+#include "private.h"        // Include private configuration (Wi-Fi, MQTT, etc.)
+#include "everblu_meters.h" // Include EverBlu meter communication library
+#include <ESP8266WiFi.h>    // Wi-Fi library for ESP8266
+#include <ESP8266mDNS.h>    // mDNS library for ESP8266
+#include <Arduino.h>        // Core Arduino library
+#include <ArduinoOTA.h>     // OTA update library
+#include <EspMQTTClient.h>  // MQTT client library
 
 #ifndef LED_BUILTIN
 // Change this pin if needed
@@ -18,6 +33,7 @@
 
 unsigned long lastWifiUpdate = 0;
 
+// Secrets pulled from private.h
 EspMQTTClient mqtt(
     secret_wifi_ssid,     // Your Wifi SSID
     secret_wifi_password, // Your WiFi key
@@ -39,17 +55,21 @@ const char jsonTemplate[] = "{ "
                             "\"timestamp\" : \"%s\" }";
 
 int _retry = 0;
+
+// Function: onUpdateData
+// Description: Fetches data from the water meter and publishes it to MQTT topics.
+//              Retries up to 10 times if data retrieval fails.
 void onUpdateData()
 {
-  // Set LED to indicate activity
-  digitalWrite(LED_BUILTIN, LOW); // Turn on LED to show activity
+  // Indicate activity with LED
+  digitalWrite(LED_BUILTIN, LOW); // Turn on LED
 
-  // Publish active reading state as true
+  // Notify MQTT that active reading has started
   mqtt.publish("everblu/cyble/active_reading", "true", true);
 
-  struct tmeter_data meter_data;
-  meter_data = get_meter_data();
+  struct tmeter_data meter_data = get_meter_data(); // Fetch meter data
 
+  // Get current UTC time
   time_t tnow = time(nullptr);
   struct tm *ptm = gmtime(&tnow);
   Serial.printf("Current date (UTC) : %04d/%02d/%02d %02d:%02d:%02d - %s\n", ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, String(tnow, DEC).c_str());
@@ -57,17 +77,17 @@ void onUpdateData()
   char iso8601[128];
   strftime(iso8601, sizeof iso8601, "%FT%TZ", gmtime(&tnow));
 
+  // Handle data retrieval failure
   if (meter_data.reads_counter == 0 || meter_data.liters == 0) {
     Serial.println("Unable to retrieve data from meter. Retry later...");
-
-    // Call back this function in 10 sec (in miliseconds)
     if (_retry++ < 10)
-      mqtt.executeDelayed(1000 * 10, onUpdateData);
+      mqtt.executeDelayed(1000 * 10, onUpdateData); // Retry in 10 seconds
     return;
   }
 
   Serial.printf("Liters : %d\nBattery (in months) : %d\nCounter : %d\n\n", meter_data.liters, meter_data.battery_left, meter_data.reads_counter);
-
+  
+  // Publish meter data to MQTT
   mqtt.publish("everblu/cyble/liters", String(meter_data.liters, DEC), true);
   delay(50);
   mqtt.publish("everblu/cyble/counter", String(meter_data.reads_counter, DEC), true);
@@ -77,22 +97,24 @@ void onUpdateData()
   mqtt.publish("everblu/cyble/timestamp", iso8601, true); // timestamp since epoch in UTC
   delay(50);
 
+  // Publish all data as a JSON message
   char json[512];
   sprintf(json, jsonTemplate, meter_data.liters, meter_data.reads_counter, meter_data.battery_left, iso8601);
-  mqtt.publish("everblu/cyble/json", json, true); // send all data as a json message
+  mqtt.publish("everblu/cyble/json", json, true);
 
-  // Turn off active reading state
+  // Notify MQTT that active reading has ended
   mqtt.publish("everblu/cyble/active_reading", "false", true);
-  digitalWrite(LED_BUILTIN, HIGH); // Turn off LED now that data has been pulled
+  digitalWrite(LED_BUILTIN, HIGH); // Turn off LED
 }
 
-// This function calls onUpdateData() every days at 10:00am UTC
+// Function: onScheduled
+// Description: Schedules daily meter readings at 10:00 AM UTC.
 void onScheduled()
 {
   time_t tnow = time(nullptr);
   struct tm *ptm = gmtime(&tnow);
 
-  // At 10:00:00am UTC
+  // Trigger reading at 10:00 AM UTC
   if (ptm->tm_hour == 10 && ptm->tm_min == 0 && ptm->tm_sec == 0) {
 
     // Call back in 23 hours
@@ -103,11 +125,10 @@ void onScheduled()
     // Update data
     _retry = 0;
     onUpdateData();
-
     return;
   }
 
-  // Every 500 ms
+  // Check every 500 ms
   mqtt.executeDelayed(500, onScheduled);
 }
 
@@ -493,11 +514,15 @@ String jsonDiscoveryFrequency = R"rawliteral(
 }
 )rawliteral";
 
+// Function: calculateWiFiSignalStrengthPercentage
+// Description: Converts RSSI to a percentage value (0-100%).
 int calculateWiFiSignalStrengthPercentage(int rssi) {
   int strength = constrain(rssi, -100, -50); // Clamp RSSI to a reasonable range
   return map(strength, -100, -50, 0, 100);   // Map RSSI to percentage (0-100%)
 }
 
+// Function: publishWifiDetails
+// Description: Publishes Wi-Fi diagnostics (IP, RSSI, signal strength, etc.) to MQTT.
 void publishWifiDetails() {
   String wifiIP = WiFi.localIP().toString();
   int wifiRSSI = WiFi.RSSI();
@@ -534,6 +559,8 @@ void publishWifiDetails() {
   delay(50);
 }
 
+// Function: publishMeterSettings
+// Description: Publishes meter configuration (year, serial, frequency) to MQTT.
 void publishMeterSettings() {
   // Publish Meter Year, Serial, and Frequency
   mqtt.publish("everblu/cyble/water_meter_year", String(METER_YEAR, DEC), true);
@@ -544,6 +571,8 @@ void publishMeterSettings() {
   delay(50);
 }
 
+// Function: onConnectionEstablished
+// Description: Handles MQTT connection establishment, including Home Assistant discovery and OTA setup.
 void onConnectionEstablished()
 {
   Serial.println("Connected to MQTT Broker :)");
@@ -609,12 +638,12 @@ void onConnectionEstablished()
     }
   });
 
-mqtt.subscribe("everblu/cyble/restart", [](const String& message) {
-  if (message == "restart") {
-    Serial.println("Restart command received via MQTT. Restarting...");
-    ESP.restart(); // Restart the ESP device
-  }
-});
+  mqtt.subscribe("everblu/cyble/restart", [](const String& message) {
+    if (message == "restart") {
+      Serial.println("Restart command received via MQTT. Restarting...");
+      ESP.restart(); // Restart the ESP device
+    }
+  });
 
   Serial.println("> Send MQTT config for HA.");
   // Auto discovery
@@ -678,6 +707,8 @@ mqtt.subscribe("everblu/cyble/restart", [](const String& message) {
   onScheduled();
 }
 
+// Function: setup
+// Description: Initializes the device, including serial communication, Wi-Fi, MQTT, and frequency discovery.
 void setup()
 {
   Serial.begin(115200);
@@ -700,6 +731,7 @@ void setup()
   // Optional functionalities of EspMQTTClient
   // mqtt.enableDebuggingMessages(true); // Enable debugging messages sent to serial output
 
+  // ********************************************************************************
   // Frequency Discovery
   // Use this piece of code to find the right frequency to use going forwards. Un-comment for first use. Re-comment once you have your meter's values.
   // Note: Some meters are configured to broadcast their data only at specific times, typically this is during nominal working hours, so try to do this process within those times
@@ -719,6 +751,8 @@ void setup()
   }
     Serial.printf("###### FREQUENCY DISCOVERY FINISHED ######\nOnce you have discovered the correct frequency you can disable this scan.\n\n");
   */
+  // ********************************************************************************
+
 
   cc1101_init(FREQUENCY);
 
@@ -732,6 +766,8 @@ void setup()
 
 }
 
+// Function: loop
+// Description: Main loop to handle MQTT and OTA operations, and update diagnostics periodically.
 void loop() {
   mqtt.loop();
   ArduinoOTA.handle();
