@@ -2,6 +2,11 @@
 
 Fetch water/gas usage data from Itron EverBlu Cyble Enhanced RF water meters using the RADIAN protocol on 433 MHz with an ESP32/ESP8266 and CC1101 transceiver. Integrated with Home Assistant via MQTT AutoDiscovery.
 
+According to the radio communication approval paperwork, this may also be known as work with the following models, but are untested:
+- AnyQuest Cyble Enhanced
+- EverBlu Cyble
+- AnyQuest Cyble Basic
+
 ![Home Assistant MQTT autodiscovery](imgs/MQTT_HASS.jpg)
 
 The original software (and much of the hard work to get things functioning) was initially done [here](http://www.lamaisonsimon.fr/wiki/doku.php?id=maison2:compteur_d_eau:compteur_d_eau), then published on GitHub by @neutrinus [here](https://github.com/neutrinus/everblu-meters), and later forked by [psykokwak](https://github.com/psykokwak-com/everblu-meters-esp8266).
