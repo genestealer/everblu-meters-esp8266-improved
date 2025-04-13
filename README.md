@@ -1,18 +1,17 @@
 # everblu-meters-esp8266/esp32 - Water Usage Data for Home Assistant
 
-Fetch water/gas usage data from Itron EverBlu Cyble Enhanced RF water meters using the RADIAN protocol (Sontex, Itron) on 433 MHz with an ESP32/ESP8266 and CC1101 transceiver. Integrated with Home Assistant via MQTT AutoDiscovery.
+Fetch water or gas usage data from Itron EverBlu Cyble Enhanced RF water meters using the RADIAN protocol (Sontex, Itron) on 433 MHz with an ESP32/ESP8266 and CC1101 transceiver. Integrated with Home Assistant via MQTT AutoDiscovery.
 
-According to the radio communication approval paperwork, this may also work with the following models, but are untested:
+According to the radio communication approval paperwork, this may also work with the following models, though they are untested:
 - AnyQuest Cyble Enhanced
 - EverBlu Cyble
 - AnyQuest Cyble Basic
-  
 
 ![Home Assistant MQTT autodiscovery](imgs/MQTT_HASS.jpg)
 
-The original software (and much of the hard work to get things functioning) was initially done [here](http://www.lamaisonsimon.fr/wiki/doku.php?id=maison2:compteur_d_eau:compteur_d_eau), then published on GitHub by @neutrinus [here](https://github.com/neutrinus/everblu-meters), and later forked by [psykokwak](https://github.com/psykokwak-com/everblu-meters-esp8266).
+The original software (and much of the foundational work) was initially developed [here](http://www.lamaisonsimon.fr/wiki/doku.php?id=maison2:compteur_d_eau:compteur_d_eau), later published on GitHub by @neutrinus [here](https://github.com/neutrinus/everblu-meters), and subsequently forked by [psykokwak](https://github.com/psykokwak-com/everblu-meters-esp8266).
 
-Meters supported:
+Supported meters:
 
 - [Itron EverBlu Cyble Enhanced](https://multipartirtaanugra.com/wp-content/uploads/2020/09/09.-Cyble-RF.pdf)
 
@@ -43,39 +42,45 @@ Pin wiring for the [Wemos D1 board](https://www.wemos.cc/en/latest/d1/index.html
 | GND         | G         | GND                | Connect to ground.                            |
 
 ### CC1101
-
-Some modules are not labelled on the PCB. Below is the pinout for one:
+l
+Some modules are not labeled on the PCB. Below is the pinout for one:
 ![CC1101 pinout diagram](imgs/cc1101-mapping.png)
 ![CC1101 example](imgs/cc1101.jpg)
 
 ## Configuration
 
-1. Download [Visual Studio Code](https://code.visualstudio.com/).
+1. **Install Required Tools**  
+  - Download and install [Visual Studio Code](https://code.visualstudio.com/).  
+  - Install the [PlatformIO extension for VS Code](https://platformio.org/). This will install all required dependencies and may require restarting VS Code.
 
-2. Install [PlatformIO for VS Code](https://platformio.org/) (this will install all required dependencies and may require a VS Code restart).
+2. **Prepare Configuration Files**  
+  - Copy `Exampleprivate.h` into the `src` folder and rename it to `private.h`.  
+  - Update the following details in `private.h`:
+    - Wi-Fi and MQTT credentials. If your MQTT setup does not require a username and password, comment out those lines using `//`.  
+    - Meter serial number (omit the leading 0) and production year. This information is printed on the meter label:  
+     ![Cyble Meter Label](imgs/meter_label.png) ![Cyble Meter Label](imgs/meter_label_21.png)
 
-3. Copy `Exampleprivate.h` into the `src` folder and rename it to `private.h`.
+3. **Update Platform Configuration**  
+  - Modify the `platformio.ini` file to match your specific platform and board configuration.
 
-- Update Wi-Fi and MQTT details in `private.h`. If you do not use a username and password for MQTT, comment those lines out with `//`.
+4. **Perform Frequency Discovery (First-Time Setup)**  
+  - Open `private.h` and set `SCAN_FREQUENCY_433MHZ` to `1` to enable frequency discovery.  
+  - Compile and upload the code to your ESP device using PlatformIO. Use **PlatformIO > Upload and Monitor**.  
+  - Keep the device connected to your computer during this process. The serial monitor will display debug output as the device scans frequencies in the 433 MHz range.  
+  - Once the correct frequency is identified, update the `FREQUENCY` value in `private.h`.  
+  - Disable frequency discovery by setting `SCAN_FREQUENCY_433MHZ` back to `0` in `private.h`.  
+  - For best results, perform this step during local business hours. Refer to the "Frequency Adjustment" section below for additional guidance.
 
-- Set the meter serial number (without the leading 0) and production year in `private.h`. This information can be found on the meter label itself:
+5. **Compile and Flash the Code**  
+  - Compile and upload the code to your ESP device using **PlatformIO > Upload and Monitor**.  
+  - Keep the device connected to your computer during this process.
 
-  ![Cyble Meter Label](imgs/meter_label.png)
-  ![Cyble Meter Label](imgs/meter_label_21.png)
+6. **Verify Meter Data**  
+  - After a few seconds, the meter data should appear in the terminal (bottom panel) and be pushed to MQTT.  
+  - If Frequency Discovery is still enabled, its output will also be displayed during this step.
 
-4. Update `platformio.ini` to match your specific platform and board.
-
-5. For the first-time setup only: Open `private.h` and locate the line `SCAN_FREQUENCY_433MHZ`, set the value to `1` to enable frequency discovery. Compile and upload the code to your ESP device using PlatformIO. Open the serial monitor to view the debug output. The device will scan frequencies in the 433 MHz range and display the discovered frequency. Once the correct frequency is found, update the `FREQUENCY` value in `private.h`, disable frequency discovery by setting `SCAN_FREQUENCY_433MHZ` back to 0.  For best results, perform this process during local business hours. For more information, see the section on Frequency Adjustment below.
-
-6. Compile and flash the code to your ESP device, keeping it connected to your computer.
-
-- Use PlatformIO > Upload and Monitor for the first-time Frequency Discovery process. Use PlatformIO > Upload if you already have your frequency information or are just updating the build.
-
-7. After a few seconds, your meter data should appear in the bottom panel (terminal), and data should be pushed to MQTT.
-
-- If you have set up Frequency Discovery, you should also see this process output at this point.
-
-8. The device will query the meter once a day (every 24 hours) and retry every hour if the query fails.
+7. **Automatic Meter Query**  
+  - The device will automatically query the meter once every 24 hours. If the query fails, it will retry every hour until successful.
 
 ## Troubleshooting
 
@@ -98,12 +103,12 @@ Ignore the leading 0 and provide the serial number in the configuration without 
 ### Distance Between Device and Meter
 
 Typically, a CC1101 433 MHz module with an external wire coil antenna has a maximum range of 300–500 m. SMA CC1101 boards with high-gain antennas may increase or even double this range. However, be mindful of the distance for effective use.
-
-## Origin and Licence
-
-This code is based on code from [La Maison Simon](http://www.lamaisonsimon.fr/wiki/doku.php?id=maison2:compteur_d_eau:compteur_d_eau).
-
-The licence is unknown. According to one of the authors (Fred):
-
-> I didn't put a licence on this code; maybe I should. I didn't know much about licensing at the time.
+c
+## Origin and License
+ccod
+This code is based on work from [La Maison Simon](http://www.lamaisonsimon.fr/wiki/doku.php?id=maison2:compteur_d_eau:compteur_d_eau).
+c
+The license is unknown. According to one of the authors (Fred):
+c
+> I didn't put a license on this code; maybe I should. I didn't know much about licensing at the time.
 > This code was created by "looking" at the RADIAN protocol, which is said to be open source earlier in the page. I don't know if that helps.
