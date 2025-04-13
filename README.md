@@ -59,6 +59,7 @@ Some modules are not labeled on the PCB. Below is the pinout for one:
     - Wi-Fi and MQTT credentials. If your MQTT setup does not require a username and password, comment out those lines using `//`.  
     - Meter serial number (omit the leading 0) and production year. This information is printed on the meter label:  
      ![Cyble Meter Label](imgs/meter_label.png) ![Cyble Meter Label](imgs/meter_label_21.png)
+    - **Wi-Fi PHY Mode**: To enable 802.11g Wi-Fi PHY mode, set `ENABLE_WIFI_PHY_MODE_11G` to `1` in the `private.h` file. By default, it is set to `0` (disabled).
 
 3. **Update Platform Configuration**  
   - Modify the `platformio.ini` file to match your specific platform and board configuration.
