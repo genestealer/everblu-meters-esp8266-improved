@@ -17,6 +17,17 @@ Supported meters:
 
 ![Itron EverBlu Cyble Enhanced](imgs/meter.jpg)
 
+## Features
+
+- Fetch water or gas usage data from Itron EverBlu Cyble Enhanced RF water meters.
+- MQTT integration for Home Assistant with AutoDiscovery.
+- Frequency discovery for meter communication.
+- Wi-Fi diagnostics and OTA updates.
+- Reading Schedule Configuration: Configure the days when the meter should be queried (e.g., Monday-Friday, Monday-Saturday, or Monday-Sunday).
+- Daily scheduled meter readings.
+
+---
+
 ## Hardware
 
 The project runs on ESP8266/ESP32 with an RF transceiver (CC1101). The hardware can be any ESP32+CC1101 with the correct wiring.
@@ -42,7 +53,7 @@ Pin wiring for the [Wemos D1 board](https://www.wemos.cc/en/latest/d1/index.html
 | GND         | G         | GND                | Connect to ground.                            |
 
 ### CC1101
-l
+
 Some modules are not labeled on the PCB. Below is the pinout for one:
 ![CC1101 pinout diagram](imgs/cc1101-mapping.png)
 ![CC1101 example](imgs/cc1101.jpg)
@@ -83,6 +94,20 @@ Some modules are not labeled on the PCB. Below is the pinout for one:
 7. **Automatic Meter Query**  
   - The device will automatically query the meter once every 24 hours. If the query fails, it will retry every hour until successful.
 
+### Reading Schedule
+
+The **Reading Schedule** feature allows you to configure the days when the meter should be queried. By default, the schedule is set to `Monday-Friday`. You can change this in the `private.h` file by modifying the `DEFAULT_READING_SCHEDULE`.
+
+Available options:
+- `"Monday-Friday"`: Queries the meter only on weekdays.
+- `"Monday-Saturday"`: Queries the meter from Monday to Saturday.
+- `"Monday-Sunday"`: Queries the meter every day.
+
+Example configuration in `private.h`:
+```cpp
+#define DEFAULT_READING_SCHEDULE "Monday-Saturday"
+```
+
 ## Troubleshooting
 
 ### Frequency Adjustment
@@ -104,12 +129,12 @@ Ignore the leading 0 and provide the serial number in the configuration without 
 ### Distance Between Device and Meter
 
 Typically, a CC1101 433 MHz module with an external wire coil antenna has a maximum range of 300–500 m. SMA CC1101 boards with high-gain antennas may increase or even double this range. However, be mindful of the distance for effective use.
-c
+
 ## Origin and License
-ccod
+
 This code is based on work from [La Maison Simon](http://www.lamaisonsimon.fr/wiki/doku.php?id=maison2:compteur_d_eau:compteur_d_eau).
-c
+
 The license is unknown. According to one of the authors (Fred):
-c
+
 > I didn't put a license on this code; maybe I should. I didn't know much about licensing at the time.
 > This code was created by "looking" at the RADIAN protocol, which is said to be open source earlier in the page. I don't know if that helps.

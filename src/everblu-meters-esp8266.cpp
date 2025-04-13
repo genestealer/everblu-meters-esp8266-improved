@@ -41,6 +41,12 @@
 #define SCAN_FREQUENCY_433MHZ 0 // Set to 1 to enable frequency scanning
 #endif
 
+// Define the default reading schedule if missing from the private.h file.
+// Options: "Monday-Friday", "Monday-Saturday", or "Monday-Sunday"
+#ifndef DEFAULT_READING_SCHEDULE
+#define DEFAULT_READING_SCHEDULE "Monday-Friday"
+#endif
+
 unsigned long lastWifiUpdate = 0;
 
 // Secrets pulled from private.h file
@@ -62,6 +68,20 @@ const char jsonTemplate[] = "{ "
 
 int _retry = 0;
 
+// Global variable to store the reading schedule (default from private.h)
+String readingSchedule = DEFAULT_READING_SCHEDULE;
+
+// Function to check if today is within the configured schedule
+bool isReadingDay(struct tm *ptm) {
+  if (readingSchedule == "Monday-Friday") {
+    return ptm->tm_wday >= 1 && ptm->tm_wday <= 5; // Monday to Friday
+  } else if (readingSchedule == "Monday-Saturday") {
+    return ptm->tm_wday >= 1 && ptm->tm_wday <= 6; // Monday to Saturday
+  } else if (readingSchedule == "Monday-Sunday") {
+    return true; // Every day
+  }
+  return false;
+}
 
 // Function to scan for the correct frequency in the 433 MHz range
 void scanFrequency433MHz() {
@@ -138,9 +158,8 @@ void onScheduled()
   time_t tnow = time(nullptr);
   struct tm *ptm = gmtime(&tnow);
 
-  // Trigger reading at 10:00 AM UTC
-  if (ptm->tm_hour == 10 && ptm->tm_min == 0 && ptm->tm_sec == 0) {
-
+  // Check if today is a valid reading day
+  if (isReadingDay(ptm) && ptm->tm_hour == 10 && ptm->tm_min == 0 && ptm->tm_sec == 0) {
     // Call back in 23 hours
     mqtt.executeDelayed(1000 * 60 * 60 * 23, onScheduled);
 
@@ -305,7 +324,6 @@ String jsonDiscoveryWifiIP = R"rawliteral(
   "obj_id": "water_meter_wifi_ip",
   "ic": "mdi:ip-network-outline",
   "qos": 0,
-  "avty_t": "everblu/cyble/status",
   "stat_t": "everblu/cyble/wifi_ip",
   "frc_upd": "true",
   "ent_cat": "diagnostic",
@@ -329,7 +347,6 @@ String jsonDiscoveryWifiRSSI = R"rawliteral(
   "ic": "mdi:signal-variant",
   "unit_of_meas": "dBm",
   "qos": 0,
-  "avty_t": "everblu/cyble/status",
   "stat_t": "everblu/cyble/wifi_rssi",
   "frc_upd": "true",
   "ent_cat": "diagnostic",
@@ -352,7 +369,6 @@ String jsonDiscoveryWifiSignalPercentage = R"rawliteral(
   "ic": "mdi:wifi",
   "unit_of_meas": "%",
   "qos": 0,
-  "avty_t": "everblu/cyble/status",
   "stat_t": "everblu/cyble/wifi_signal_percentage",
   "frc_upd": "true",
   "ent_cat": "diagnostic",
@@ -374,7 +390,6 @@ String jsonDiscoveryMacAddress = R"rawliteral(
   "obj_id": "water_meter_mac_address",
   "ic": "mdi:network",
   "qos": 0,
-  "avty_t": "everblu/cyble/status",
   "stat_t": "everblu/cyble/mac_address",
   "frc_upd": "true",
   "ent_cat": "diagnostic",
@@ -396,7 +411,6 @@ String jsonDiscoveryBSSID = R"rawliteral(
   "obj_id": "water_meter_wifi_bssid",
   "ic": "mdi:access-point-network",
   "qos": 0,
-  "avty_t": "everblu/cyble/status",
   "stat_t": "everblu/cyble/bssid",
   "frc_upd": "true",
   "ent_cat": "diagnostic",
@@ -418,7 +432,6 @@ String jsonDiscoverySSID = R"rawliteral(
   "obj_id": "water_meter_wifi_ssid",
   "ic": "mdi:help-network-outline",
   "qos": 0,
-  "avty_t": "everblu/cyble/status",
   "stat_t": "everblu/cyble/ssid",
   "frc_upd": "true",
   "ent_cat": "diagnostic",
@@ -538,6 +551,27 @@ String jsonDiscoveryFrequency = R"rawliteral(
 }
 )rawliteral";
 
+// JSON Discovery for Reading Schedule
+String jsonDiscoveryReadingSchedule = R"rawliteral(
+{
+  "name": "Reading Schedule",
+  "uniq_id": "water_meter_reading_schedule",
+  "obj_id": "water_meter_reading_schedule",
+  "ic": "mdi:calendar-clock",
+  "qos": 0,
+  "avty_t": "everblu/cyble/status",
+  "stat_t": "everblu/cyble/reading_schedule",
+  "frc_upd": "true",
+  "ent_cat": "diagnostic",
+  "dev": {
+    "ids": ["14071984"],
+    "name": "Water Meter",
+    "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
+    "mf": "Psykokwak [Forked by Genestealer]"
+  }
+}
+)rawliteral";
+
 // Function: calculateWiFiSignalStrengthPercentage
 // Description: Converts RSSI to a percentage value (0-100%).
 int calculateWiFiSignalStrengthPercentage(int rssi) {
@@ -592,6 +626,10 @@ void publishMeterSettings() {
   mqtt.publish("everblu/cyble/water_meter_serial", String(METER_SERIAL, DEC), true);
   delay(50);
   mqtt.publish("everblu/cyble/water_meter_frequency", String(FREQUENCY, 6), true);
+  delay(50);
+
+  // Publish Reading Schedule
+  mqtt.publish("everblu/cyble/reading_schedule", readingSchedule, true);
   delay(50);
 }
 
@@ -715,6 +753,10 @@ void onConnectionEstablished()
   mqtt.publish("homeassistant/sensor/water_meter_frequency/config", jsonDiscoveryFrequency, true);
   delay(50);
 
+  // Publish JSON discovery for Reading Schedule
+  mqtt.publish("homeassistant/sensor/water_meter_reading_schedule/config", jsonDiscoveryReadingSchedule, true);
+  delay(50);
+
   // Set initial state for active reading
   mqtt.publish("everblu/cyble/active_reading", "false", true);
   delay(50);
@@ -760,7 +802,8 @@ void setup()
   Serial.println("Wi-Fi PHY mode 11G is disabled.");
   #endif
 
-
+  // Log the default reading schedule
+  Serial.printf("Default reading schedule: %s\n", readingSchedule.c_str());
 
   // Optional functionalities of EspMQTTClient
   // mqtt.enableDebuggingMessages(true); // Enable debugging messages sent to serial output
