@@ -1,6 +1,6 @@
 /*
  * Project: EverBlu Meters ESP8266/ESP32
- * Description: Fetch water/gas usage data from Itron EverBlu Cyble Enhanced RF water meters using the RADIAN protocol on 433 MHz.
+ * Description: Fetch water/gas usage data from Itron EverBlu Cyble Enhanced RF water meters using the RADIAN protocol on 433 and 868 MHz.
  *              Integrated with Home Assistant via MQTT AutoDiscovery.
  * Author: Forked and improved by Genestealer, based on work by Psykokwak and Neutrinus.
  * License: Unknown (refer to the README for details).
@@ -55,6 +55,40 @@ const char jsonTemplate[] = "{ "
                             "\"timestamp\" : \"%s\" }";
 
 int _retry = 0;
+
+// Function to scan for the correct frequency in the 433 MHz range
+void scanFrequency433MHz() {
+    Serial.printf("###### FREQUENCY DISCOVERY ENABLED (433 MHz) ######\nStarting Frequency Scan...\n");
+    for (float i = 433.76f; i < 433.890f; i += 0.0005f) {
+        Serial.printf("Test frequency : %f\n", i);
+        cc1101_init(i);
+        struct tmeter_data meter_data = get_meter_data();
+        if (meter_data.reads_counter != 0 || meter_data.liters != 0) {
+            Serial.printf("\n------------------------------\nGot frequency : %f\n------------------------------\n", i);
+            Serial.printf("Liters : %d\nBattery (in months) : %d\nCounter : %d\n\n", meter_data.liters, meter_data.battery_left, meter_data.reads_counter);
+            digitalWrite(LED_BUILTIN, LOW); // turned on
+            while (42); // Stop execution once frequency is found
+        }
+    }
+    Serial.printf("###### FREQUENCY DISCOVERY FINISHED (433 MHz) ######\nOnce you have discovered the correct frequency you can disable this scan.\n\n");
+}
+
+// Function to scan for the correct frequency in the 868 MHz range
+void scanFrequency868MHz() {
+    Serial.printf("###### FREQUENCY DISCOVERY ENABLED (868 MHz) ######\nStarting Frequency Scan...\n");
+    for (float i = 868.0f; i < 868.2f; i += 0.0005f) {
+        Serial.printf("Test frequency : %f\n", i);
+        cc1101_init(i);
+        struct tmeter_data meter_data = get_meter_data();
+        if (meter_data.reads_counter != 0 || meter_data.liters != 0) {
+            Serial.printf("\n------------------------------\nGot frequency : %f\n------------------------------\n", i);
+            Serial.printf("Liters : %d\nBattery (in months) : %d\nCounter : %d\n\n", meter_data.liters, meter_data.battery_left, meter_data.reads_counter);
+            digitalWrite(LED_BUILTIN, LOW); // turned on
+            while (42); // Stop execution once frequency is found
+        }
+    }
+    Serial.printf("###### FREQUENCY DISCOVERY FINISHED (868 MHz) ######\nOnce you have discovered the correct frequency you can disable this scan.\n\n");
+}
 
 // Function: onUpdateData
 // Description: Fetches data from the water meter and publishes it to MQTT topics.
@@ -731,28 +765,9 @@ void setup()
   // Optional functionalities of EspMQTTClient
   // mqtt.enableDebuggingMessages(true); // Enable debugging messages sent to serial output
 
-  // ********************************************************************************
-  // Frequency Discovery
-  // Use this piece of code to find the right frequency to use going forwards. Un-comment for first use. Re-comment once you have your meter's values.
-  // Note: Some meters are configured to broadcast their data only at specific times, typically this is during nominal working hours, so try to do this process within those times
-  /*
-  Serial.printf("###### FREQUENCY DISCOVERY ENABLED ######\nStarting Frequency Scan...\n");
-  for (float i = 433.76f; i < 433.890f; i += 0.0005f) {
-    Serial.printf("Test frequency : %f\n", i);
-    cc1101_init(i);
-    struct tmeter_data meter_data;
-    meter_data = get_meter_data();
-    if (meter_data.reads_counter != 0 || meter_data.liters != 0) {
-      Serial.printf("\n------------------------------\nGot frequency : %f\n------------------------------\n", i);
-      Serial.printf("Liters : %d\nBattery (in months) : %d\nCounter : %d\n\n", meter_data.liters, meter_data.battery_left, meter_data.reads_counter);
-      digitalWrite(LED_BUILTIN, LOW); // turned on
-      while (42);
-    }
-  }
-    Serial.printf("###### FREQUENCY DISCOVERY FINISHED ######\nOnce you have discovered the correct frequency you can disable this scan.\n\n");
-  */
-  // ********************************************************************************
-
+  // Uncomment the desired frequency scan function
+  // scanFrequency433MHz();
+  // scanFrequency868MHz();
 
   cc1101_init(FREQUENCY);
 

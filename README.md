@@ -1,6 +1,6 @@
 # everblu-meters-esp8266/esp32 - Water Usage Data for Home Assistant
 
-Fetch water/gas usage data from Itron EverBlu Cyble Enhanced RF water meters using the RADIAN protocol on 433 MHz with an ESP32/ESP8266 and CC1101 transceiver. Integrated with Home Assistant via MQTT AutoDiscovery.
+Fetch water/gas usage data from Itron EverBlu Cyble Enhanced RF water meters using the RADIAN protocol on 433 MHz and 868 MHz with an ESP32/ESP8266 and CC1101 transceiver. Integrated with Home Assistant via MQTT AutoDiscovery.
 
 ![Home Assistant MQTT autodiscovery](imgs/MQTT_HASS.jpg)
 
@@ -59,7 +59,7 @@ Some modules are not labelled on the PCB. Below is the pinout for one:
 
 4. Update `platformio.ini` to match your specific platform and board.
 
-5. For the first-time setup only: towards the bottom of `everblu-meters-esp8266.cpp`, uncomment the Frequency Discovery code snippet to display debug output of your meter's discovered frequency value. Once you have this, update the `FREQUENCY` value in `private.h` and re-comment this code. For best results, perform this process during local business hours. For more information, see the section on Frequency Adjustment below.
+5. For the first-time setup only: Uncomment the desired frequency discovery function (`scanFrequency433MHz` or `scanFrequency868MHz`) in `everblu-meters-esp8266.cpp` to scan for the correct frequency. Once the correct frequency is found, update the `FREQUENCY` value in `private.h` and re-comment the discovery function.
 
 6. Compile and flash the code to your ESP device, keeping it connected to your computer.
 
@@ -75,7 +75,7 @@ Some modules are not labelled on the PCB. Below is the pinout for one:
 
 ### Frequency Adjustment
 
-Your transceiver module may not be calibrated correctly. Adjust the frequency slightly lower or higher and try again. You may use an RTL-SDR to measure the required offset. Uncomment the relevant part of the code in the `everblu-meters-esp8266.cpp` file to scan all frequencies around the meter's frequency to find the correct one.
+Your transceiver module may not be calibrated correctly. Adjust the frequency slightly lower or higher and try again. Uncomment the relevant part of the code in `everblu-meters-esp8266.cpp` to scan all frequencies around the meter's frequency (433 MHz or 868 MHz) to find the correct one.
 
 ```cpp
   /*
