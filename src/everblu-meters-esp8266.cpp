@@ -26,14 +26,24 @@
 #include <ArduinoOTA.h>     // OTA update library
 #include <EspMQTTClient.h>  // MQTT client library
 
+// Define the LED_BUILTIN pin if missing
 #ifndef LED_BUILTIN
-// Change this pin if needed
-#define LED_BUILTIN 2
+#define LED_BUILTIN 2 // Change this pin if needed
+#endif
+
+// Define the Wi-Fi PHY mode if missing from the private.h file
+#ifndef ENABLE_WIFI_PHY_MODE_11G
+#define ENABLE_WIFI_PHY_MODE_11G 0  // Set to 1 to enable 11G PHY mode
+#endif
+
+// Define the 433MHZ scan mode if missing from the private.h file
+#ifndef SCAN_FREQUENCY_433MHZ
+#define SCAN_FREQUENCY_433MHZ 0 // Set to 1 to enable frequency scanning
 #endif
 
 unsigned long lastWifiUpdate = 0;
 
-// Secrets pulled from private.h
+// Secrets pulled from private.h file
 EspMQTTClient mqtt(
     secret_wifi_ssid,     // Your Wifi SSID
     secret_wifi_password, // Your WiFi key
@@ -44,10 +54,6 @@ EspMQTTClient mqtt(
     1883                  // MQTT Broker server port
 );
 
-// char *jsonTemplate = "{\"liters\": %d, \"counter\" : %d, \"battery\" : %d, \"timestamp\" : \"%s\" }";
-
-// const char jsonTemplate[] = "{ \"liters\": %d, \"counter\" : %d, \"battery\" : %d, \"timestamp\" : \"%s\" }";
-
 const char jsonTemplate[] = "{ "
                             "\"liters\": %d, "
                             "\"counter\" : %d, "
@@ -55,6 +61,24 @@ const char jsonTemplate[] = "{ "
                             "\"timestamp\" : \"%s\" }";
 
 int _retry = 0;
+
+
+// Function to scan for the correct frequency in the 433 MHz range
+void scanFrequency433MHz() {
+  Serial.printf("###### FREQUENCY DISCOVERY ENABLED (433 MHz) ######\nStarting Frequency Scan...\n");
+  for (float i = 433.76f; i < 433.890f; i += 0.0005f) {
+      Serial.printf("Test frequency : %f\n", i);
+      cc1101_init(i);
+      struct tmeter_data meter_data = get_meter_data();
+      if (meter_data.reads_counter != 0 || meter_data.liters != 0) {
+          Serial.printf("\n------------------------------\nGot frequency : %f\n------------------------------\n", i);
+          Serial.printf("Liters : %d\nBattery (in months) : %d\nCounter : %d\n\n", meter_data.liters, meter_data.battery_left, meter_data.reads_counter);
+          digitalWrite(LED_BUILTIN, LOW); // turned on
+          while (42); // Stop execution once frequency is found
+      }
+  }
+  Serial.printf("###### FREQUENCY DISCOVERY FINISHED (433 MHz) ######\nOnce you have discovered the correct frequency you can disable this scan.\n\n");
+}
 
 // Function: onUpdateData
 // Description: Fetches data from the water meter and publishes it to MQTT topics.
@@ -728,32 +752,26 @@ void setup()
   // Set the Last Will and Testament (LWT)
   mqtt.enableLastWillMessage("everblu/cyble/status", "offline", true);  // You can activate the retain flag by setting the third parameter to true
 
+  // Conditionally enable Wi-Fi PHY mode 11G.  Set this in private.h to 0 to disable.
+  #if ENABLE_WIFI_PHY_MODE_11G
+  WiFi.setPhyMode(WIFI_PHY_MODE_11G);
+  Serial.println("Wi-Fi PHY mode set to 11G.");
+  #else
+  Serial.println("Wi-Fi PHY mode 11G is disabled.");
+  #endif
+
+
+
   // Optional functionalities of EspMQTTClient
   // mqtt.enableDebuggingMessages(true); // Enable debugging messages sent to serial output
 
-  // ********************************************************************************
-  // Frequency Discovery
-  // Use this piece of code to find the right frequency to use going forwards. Un-comment for first use. Re-comment once you have your meter's values.
-  // Note: Some meters are configured to broadcast their data only at specific times, typically this is during nominal working hours, so try to do this process within those times
-  /*
-  Serial.printf("###### FREQUENCY DISCOVERY ENABLED ######\nStarting Frequency Scan...\n");
-  for (float i = 433.76f; i < 433.890f; i += 0.0005f) {
-    Serial.printf("Test frequency : %f\n", i);
-    cc1101_init(i);
-    struct tmeter_data meter_data;
-    meter_data = get_meter_data();
-    if (meter_data.reads_counter != 0 || meter_data.liters != 0) {
-      Serial.printf("\n------------------------------\nGot frequency : %f\n------------------------------\n", i);
-      Serial.printf("Liters : %d\nBattery (in months) : %d\nCounter : %d\n\n", meter_data.liters, meter_data.battery_left, meter_data.reads_counter);
-      digitalWrite(LED_BUILTIN, LOW); // turned on
-      while (42);
-    }
-  }
-    Serial.printf("###### FREQUENCY DISCOVERY FINISHED ######\nOnce you have discovered the correct frequency you can disable this scan.\n\n");
-  */
-  // ********************************************************************************
+  // Conditionally enable scan for meter on 433 MHz. Set this in private.h to 1 to enable.  Only needed to find the frequency of the meter once.
+  #if SCAN_FREQUENCY_433MHZ
+  scanFrequency433MHz();
+  #endif
 
-
+    
+  // Set CC1101 radio frequency
   cc1101_init(FREQUENCY);
 
   /*

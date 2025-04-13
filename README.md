@@ -65,7 +65,7 @@ Some modules are not labelled on the PCB. Below is the pinout for one:
 
 4. Update `platformio.ini` to match your specific platform and board.
 
-5. For the first-time setup only: towards the bottom of `everblu-meters-esp8266.cpp`, uncomment the Frequency Discovery code snippet to display debug output of your meter's discovered frequency value. Once you have this, update the `FREQUENCY` value in `private.h` and re-comment this code. For best results, perform this process during local business hours. For more information, see the section on Frequency Adjustment below.
+5. For the first-time setup only: Open `private.h` and locate the line `SCAN_FREQUENCY_433MHZ`, set the value to `1` to enable frequency discovery. Compile and upload the code to your ESP device using PlatformIO. Open the serial monitor to view the debug output. The device will scan frequencies in the 433 MHz range and display the discovered frequency. Once the correct frequency is found, update the `FREQUENCY` value in `private.h`, disable frequency discovery by setting `SCAN_FREQUENCY_433MHZ` back to 0.  For best results, perform this process during local business hours. For more information, see the section on Frequency Adjustment below.
 
 6. Compile and flash the code to your ESP device, keeping it connected to your computer.
 
@@ -81,26 +81,7 @@ Some modules are not labelled on the PCB. Below is the pinout for one:
 
 ### Frequency Adjustment
 
-Your transceiver module may not be calibrated correctly. Adjust the frequency slightly lower or higher and try again. You may use an RTL-SDR to measure the required offset. Uncomment the relevant part of the code in the `everblu-meters-esp8266.cpp` file to scan all frequencies around the meter's frequency to find the correct one.
-
-```cpp
-  /*
-  Serial.printf("###### FREQUENCY DISCOVERY ENABLED ######\nStarting Frequency Scan...\n");
-  for (float i = 433.76f; i < 433.890f; i += 0.0005f) {
-   Serial.printf("Test frequency : %f\n", i);
-   cc1101_init(i);
-   struct tmeter_data meter_data;
-   meter_data = get_meter_data();
-   if (meter_data.reads_counter != 0 || meter_data.liters != 0) {
-    Serial.printf("\n------------------------------\nGot frequency : %f\n------------------------------\n", i);
-    Serial.printf("Litres : %d\nBattery (in months) : %d\nCounter : %d\n\n", meter_data.liters, meter_data.battery_left, meter_data.reads_counter);
-    digitalWrite(LED_BUILTIN, LOW); // turned on
-    while (42);
-   }
-  }
-   Serial.printf("###### FREQUENCY DISCOVERY FINISHED ######\nOnce you have discovered the correct frequency you can disable this scan.\n\n");
-  */
-```
+Your transceiver module may not be calibrated correctly. Adjust the frequency slightly lower or higher and try again. You may use an RTL-SDR to measure the required offset and rerun the Frequency Discovery code.
 
 ### Business Hours
 
