@@ -64,6 +64,7 @@ const char jsonTemplate[] = "{ "
                             "\"liters\": %d, "
                             "\"counter\" : %d, "
                             "\"battery\" : %d, "
+                            "\"rssi\" : %d, "
                             "\"timestamp\" : \"%s\" }";
 
 int _retry = 0;
@@ -100,13 +101,43 @@ void scanFrequency433MHz() {
   Serial.printf("###### FREQUENCY DISCOVERY FINISHED (433 MHz) ######\nOnce you have discovered the correct frequency you can disable this scan.\n\n");
 }
 
+
+// Function: calculateWiFiSignalStrengthPercentage
+// Description: Converts RSSI to a percentage value (0-100%).
+int calculateWiFiSignalStrengthPercentage(int rssi) {
+  int strength = constrain(rssi, -100, -50); // Clamp RSSI to a reasonable range
+  return map(strength, -100, -50, 0, 100);   // Map RSSI to percentage (0-100%)
+}
+
+// Function: calculateMeterdBmToPercentage
+// Description: Converts 433 MHz RSSI (dBm) to a percentage (0-100%).
+int calculateMeterdBmToPercentage(int rssi_dbm) {
+  // Clamp RSSI to a reasonable range (e.g., -120 dBm to -40 dBm)
+  int clamped_rssi = constrain(rssi_dbm, -120, -40);
+  
+  // Map the clamped RSSI value to a percentage (0-100%)
+  return map(clamped_rssi, -120, -40, 0, 100);
+}
+
+// Function: calculateLQIToPercentage
+// Description: Converts LQI (Link Quality Indicator) to a percentage (0-100%).
+int calculateLQIToPercentage(int lqi) {
+  int strength = constrain(lqi, 0, 255); // Clamp LQI to valid range
+  return map(strength, 0, 255, 0, 100);  // Map LQI to percentage
+}
+
+
 // Function: onUpdateData
 // Description: Fetches data from the water meter and publishes it to MQTT topics.
 //              Retries up to 10 times if data retrieval fails.
 void onUpdateData()
 {
+  Serial.printf("Updating data from meter...\n");
+  Serial.printf("Retry count : %d\n", _retry);
+  Serial.printf("Reading schedule : %s\n", readingSchedule.c_str());
+
   // Indicate activity with LED
-  digitalWrite(LED_BUILTIN, LOW); // Turn on LED
+  digitalWrite(LED_BUILTIN, LOW); // Turn on LED to indicate activity
 
   // Notify MQTT that active reading has started
   mqtt.publish("everblu/cyble/active_reading", "true", true);
@@ -116,7 +147,7 @@ void onUpdateData()
   // Get current UTC time
   time_t tnow = time(nullptr);
   struct tm *ptm = gmtime(&tnow);
-  Serial.printf("Current date (UTC) : %04d/%02d/%02d %02d:%02d:%02d - %s\n", ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, String(tnow, DEC).c_str());
+  Serial.printf("Current date (UTC) : %04d/%02d/%02d %02d:%02d/%02d - %s\n", ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, String(tnow, DEC).c_str());
 
   char iso8601[128];
   strftime(iso8601, sizeof iso8601, "%FT%TZ", gmtime(&tnow));
@@ -129,8 +160,22 @@ void onUpdateData()
     return;
   }
 
-  Serial.printf("Liters : %d\nBattery (in months) : %d\nCounter : %d\n\n", meter_data.liters, meter_data.battery_left, meter_data.reads_counter);
   
+  // Format int time_start and time_end as "HH:MM"
+  char timeStartFormatted[6];
+  char timeEndFormatted[6];
+  int timeStart = constrain(meter_data.time_start, 0, 23); // Ensure valid hour range
+  int timeEnd = constrain(meter_data.time_end, 0, 23);     // Ensure valid hour range
+  snprintf(timeStartFormatted, sizeof(timeStartFormatted), "%02d:00", timeStart);
+  snprintf(timeEndFormatted, sizeof(timeEndFormatted), "%02d:00", timeEnd);
+
+  Serial.printf("Data from meter:\n");
+  Serial.printf("Liters : %d\nBattery (in months) : %d\nCounter : %d\nRSSI : %d\nTime start : %s\nTime end : %s\n\n", meter_data.liters, meter_data.battery_left, meter_data.reads_counter, meter_data.rssi, timeStartFormatted, timeEndFormatted);
+  Serial.printf("RSSI (dBm) : %d\n", meter_data.rssi_dbm);
+  Serial.printf("RSSI (percentage) : %d\n", calculateMeterdBmToPercentage(meter_data.rssi_dbm));
+  Serial.printf("Signal quality (LQI) : %d\n", meter_data.lqi);
+  Serial.printf("Signal quality (LQI percentage) : %d\n", calculateLQIToPercentage(meter_data.lqi));
+
   // Publish meter data to MQTT
   mqtt.publish("everblu/cyble/liters", String(meter_data.liters, DEC), true);
   delay(50);
@@ -138,17 +183,31 @@ void onUpdateData()
   delay(50);
   mqtt.publish("everblu/cyble/battery", String(meter_data.battery_left, DEC), true);
   delay(50);
+  mqtt.publish("everblu/cyble/rssi_dbm", String(meter_data.rssi_dbm, DEC), true);
+  delay(50);
+  mqtt.publish("everblu/cyble/rssi_percentage", String(calculateMeterdBmToPercentage(meter_data.rssi_dbm), DEC), true);
+  delay(50);
+  mqtt.publish("everblu/cyble/lqi", String(meter_data.lqi, DEC), true); // Publish LQI
+  delay(50);
+  mqtt.publish("everblu/cyble/time_start", timeStartFormatted, true);
+  delay(50);
+  mqtt.publish("everblu/cyble/time_end", timeEndFormatted, true);
+  delay(50);
   mqtt.publish("everblu/cyble/timestamp", iso8601, true); // timestamp since epoch in UTC
   delay(50);
+  mqtt.publish("everblu/cyble/lqi_percentage", String(calculateLQIToPercentage(meter_data.lqi), DEC), true);   // Publish LQI percentage to MQTT
+  delay(50);
 
-  // Publish all data as a JSON message
+  // Publish all data as a JSON message as well this is redundant but may be useful for some
   char json[512];
-  sprintf(json, jsonTemplate, meter_data.liters, meter_data.reads_counter, meter_data.battery_left, iso8601);
+  sprintf(json, jsonTemplate, meter_data.liters, meter_data.reads_counter, meter_data.battery_left, meter_data.rssi, iso8601);
   mqtt.publish("everblu/cyble/json", json, true);
 
   // Notify MQTT that active reading has ended
   mqtt.publish("everblu/cyble/active_reading", "false", true);
-  digitalWrite(LED_BUILTIN, HIGH); // Turn off LED
+  digitalWrite(LED_BUILTIN, HIGH); // Turn off LED to indicate completion
+
+  Serial.printf("Data update complete.\n\n");
 }
 
 // Function: onScheduled
@@ -572,12 +631,134 @@ String jsonDiscoveryReadingSchedule = R"rawliteral(
 }
 )rawliteral";
 
-// Function: calculateWiFiSignalStrengthPercentage
-// Description: Converts RSSI to a percentage value (0-100%).
-int calculateWiFiSignalStrengthPercentage(int rssi) {
-  int strength = constrain(rssi, -100, -50); // Clamp RSSI to a reasonable range
-  return map(strength, -100, -50, 0, 100);   // Map RSSI to percentage (0-100%)
+// JSON Discovery for Battery Months Left
+String jsonDiscoveryBatteryMonths = R"rawliteral(
+{
+  "name": "Months Remaining",
+  "uniq_id": "water_meter_battery_months",
+  "obj_id": "water_meter_battery_months",
+  "device_class": "duration",
+  "ic": "mdi:battery-clock",
+  "unit_of_meas": "months",
+  "qos": 0,
+  "avty_t": "everblu/cyble/status",
+  "stat_t": "everblu/cyble/battery",
+  "frc_upd": "true",
+  "dev": {
+    "ids": ["14071984"],
+    "name": "Water Meter",
+    "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
+    "mf": "Psykokwak [Forked by Genestealer]"
+  }
 }
+)rawliteral";
+
+// JSON Discovery for Meter RSSI (dBm)
+String jsonDiscoveryMeterRSSIDBm = R"rawliteral(
+{
+  "name": "RSSI",
+  "uniq_id": "water_meter_rssi_dbm",
+  "obj_id": "water_meter_rssi_dbm",
+  "device_class": "signal_strength",
+  "ic": "mdi:signal",
+  "unit_of_meas": "dBm",
+  "qos": 0,
+  "avty_t": "everblu/cyble/status",
+  "stat_t": "everblu/cyble/rssi_dbm",
+  "frc_upd": "true",
+  "dev": {
+    "ids": ["14071984"],
+    "name": "Water Meter",
+    "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
+    "mf": "Psykokwak [Forked by Genestealer]"
+  }
+}
+)rawliteral";
+
+// JSON Discovery for Meter RSSI (Percentage)
+String jsonDiscoveryMeterRSSIPercentage = R"rawliteral(
+{
+  "name": "Signal",
+  "uniq_id": "water_meter_rssi_percentage",
+  "obj_id": "water_meter_rssi_percentage",
+  "ic": "mdi:signal-cellular-3",
+  "unit_of_meas": "%",
+  "qos": 0,
+  "avty_t": "everblu/cyble/status",
+  "stat_t": "everblu/cyble/rssi_percentage",
+  "frc_upd": "true",
+  "dev": {
+    "ids": ["14071984"],
+    "name": "Water Meter",
+    "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
+    "mf": "Psykokwak [Forked by Genestealer]"
+  }
+}
+)rawliteral";
+
+// JSON Discovery for Meter LQI (Link Quality Indicator)
+String jsonDiscoveryLQIPercentage = R"rawliteral(
+  {
+    "name": "Signal Quality (LQI)",
+    "uniq_id": "water_meter_lqi_percentage",
+    "obj_id": "water_meter_lqi_percentage",
+    "ic": "mdi:signal-cellular-outline",
+    "unit_of_meas": "%",
+    "qos": 0,
+    "avty_t": "everblu/cyble/status",
+    "stat_t": "everblu/cyble/lqi_percentage",
+    "frc_upd": "true",
+    "dev": {
+      "ids": ["14071984"],
+      "name": "Water Meter",
+      "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
+      "mf": "Psykokwak [Forked by Genestealer]"
+    }
+  }
+  )rawliteral";
+  
+// JSON Discovery for Meter Wake Time
+String jsonDiscoveryTimeStart = R"rawliteral(
+{
+  "name": "Wake Time",
+  "uniq_id": "water_meter_time_start",
+  "obj_id": "water_meter_time_start",
+  "ic": "mdi:clock-start",
+  "qos": 0,
+  "avty_t": "everblu/cyble/status",
+  "stat_t": "everblu/cyble/time_start",
+  "frc_upd": "true",
+  "dev": {
+    "ids": ["14071984"],
+    "name": "Water Meter",
+    "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
+    "mf": "Psykokwak [Forked by Genestealer]"
+  }
+}
+)rawliteral";
+
+// JSON Discovery for Meter Sleep Time
+String jsonDiscoveryTimeEnd = R"rawliteral(
+{
+  "name": "Sleep Time",
+  "uniq_id": "water_meter_time_end",
+  "obj_id": "water_meter_time_end",
+  "ic": "mdi:clock-end",
+  "qos": 0,
+  "avty_t": "everblu/cyble/status",
+  "stat_t": "everblu/cyble/time_end",
+  "frc_upd": "true",
+  "dev": {
+    "ids": ["14071984"],
+    "name": "Water Meter",
+    "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
+    "mf": "Psykokwak [Forked by Genestealer]"
+  }
+}
+)rawliteral";
+
+
+
 
 // Function: publishWifiDetails
 // Description: Publishes Wi-Fi diagnostics (IP, RSSI, signal strength, etc.) to MQTT.
@@ -653,7 +834,7 @@ void onConnectionEstablished()
   delay(5000); // Give it a moment for the time to sync the print out the time
   time_t tnow = time(nullptr);
   struct tm *ptm = gmtime(&tnow);
-  Serial.printf("Current date (UTC) : %04d/%02d/%02d %02d:%02d:%02d - %s\n", ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, String(tnow, DEC).c_str());
+  Serial.printf("Current date (UTC) : %04d/%02d/%02d %02d:%02d/%02d - %s\n", ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, String(tnow, DEC).c_str());
   
   Serial.println("> Configure Arduino OTA flash.");
   ArduinoOTA.onStart([]() {
@@ -715,7 +896,8 @@ void onConnectionEstablished()
   });
 
   Serial.println("> Send MQTT config for HA.");
-  // Auto discovery
+
+  // Publish Meter details discovery configuration
   delay(50);
   mqtt.publish("homeassistant/sensor/water_meter_value/config", jsonDiscoveryReading, true);
   delay(50);
@@ -762,6 +944,24 @@ void onConnectionEstablished()
 
   // Publish JSON discovery for Reading Schedule
   mqtt.publish("homeassistant/sensor/water_meter_reading_schedule/config", jsonDiscoveryReadingSchedule, true);
+  delay(50);
+
+  // Publish JSON discovery for Battery Months Left
+  mqtt.publish("homeassistant/sensor/water_meter_battery_months/config", jsonDiscoveryBatteryMonths, true);
+  delay(50);
+
+  // Publish JSON discovery for Meter RSSI (dBm), RSSI (%), and LQI (%)
+  mqtt.publish("homeassistant/sensor/water_meter_rssi_dbm/config", jsonDiscoveryMeterRSSIDBm, true);
+  delay(50);
+  mqtt.publish("homeassistant/sensor/water_meter_rssi_percentage/config", jsonDiscoveryMeterRSSIPercentage, true);
+  delay(50);
+  mqtt.publish("homeassistant/sensor/water_meter_lqi_percentage/config", jsonDiscoveryLQIPercentage, true);
+  delay(50);
+
+  // Publish JSON discovery for the times the meter wakes and sleeps
+  mqtt.publish("homeassistant/sensor/water_meter_time_start/config", jsonDiscoveryTimeStart, true);
+  delay(50);
+  mqtt.publish("homeassistant/sensor/water_meter_time_end/config", jsonDiscoveryTimeEnd, true);
   delay(50);
 
   // Set initial state for active reading

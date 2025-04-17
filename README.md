@@ -20,8 +20,10 @@ Supported meters:
 ## Features
 
 - Fetch water or gas usage data from Itron EverBlu Cyble Enhanced RF water meters.
+- Includes RSSI (Radio Signal Strength Indicator), LQI (Link Quality) and Signal Strength for the meter for diagnostics.
+- Time Start and Time End sensors to indicate when the meter wakes and sleeps.
 - MQTT integration for Home Assistant with AutoDiscovery.
-- Frequency discovery for meter communication.
+- Frequency discovery for meter communication via config file.
 - Wi-Fi diagnostics and OTA updates.
 - Reading Schedule Configuration: Configure the days when the meter should be queried (e.g., Monday-Friday, Monday-Saturday, or Monday-Sunday).
 - Daily scheduled meter readings.
@@ -57,6 +59,33 @@ Pin wiring for the [Wemos D1 board](https://www.wemos.cc/en/latest/d1/index.html
 Some modules are not labeled on the PCB. Below is the pinout for one:
 ![CC1101 pinout diagram](imgs/cc1101-mapping.png)
 ![CC1101 example](imgs/cc1101.jpg)
+
+---
+
+## MQTT Integration
+
+The following MQTT topics are used to integrate the device with Home Assistant via AutoDiscovery:
+
+| **Sensor**          | **MQTT Topic**                  | **Description**                                                                 |
+|----------------------|----------------------------------|---------------------------------------------------------------------------------|
+| `Liters`            | `everblu/cyble/liters`          | Total water usage in liters.                                                   |
+| `Battery`           | `everblu/cyble/battery`         | Remaining battery life in months.                                              |
+| `Counter`           | `everblu/cyble/counter`         | Number of times the meter has been read.                                       |
+| `RSSI`              | `everblu/cyble/rssi`            | Raw RSSI value of the meter's signal.                                          |
+| `RSSI (dBm)`        | `everblu/cyble/rssi_dbm`        | RSSI value converted to dBm.                                                   |
+| `RSSI (%)`          | `everblu/cyble/rssi_percentage` | RSSI value converted to a percentage.                                         |
+| **`Time Start`**    | `everblu/cyble/time_start`      | Time when the meter wakes up, formatted as `HH:MM`.                            |
+| **`Time End`**      | `everblu/cyble/time_end`        | Time when the meter goes to sleep, formatted as `HH:MM`.                       |
+| `Timestamp`         | `everblu/cyble/timestamp`       | ISO 8601 timestamp of the last reading.                                        |
+| `Wi-Fi IP`          | `everblu/cyble/wifi_ip`         | IP address of the device.                                                      |
+| `Wi-Fi RSSI`        | `everblu/cyble/wifi_rssi`       | Wi-Fi signal strength in dBm.                                                  |
+| `Wi-Fi Signal (%)`  | `everblu/cyble/wifi_signal_percentage` | Wi-Fi signal strength as a percentage.                                    |
+| `MAC Address`       | `everblu/cyble/mac_address`     | MAC address of the device.                                                     |
+| `SSID`              | `everblu/cyble/ssid`            | Wi-Fi SSID the device is connected to.                                         |
+| `BSSID`             | `everblu/cyble/bssid`           | Wi-Fi BSSID the device is connected to.                                        |
+| `Uptime`            | `everblu/cyble/uptime`          | Device uptime in ISO 8601 format.                                              |
+
+---
 
 ## Configuration
 
@@ -94,6 +123,8 @@ Some modules are not labeled on the PCB. Below is the pinout for one:
 7. **Automatic Meter Query**  
   - The device will automatically query the meter once every 24 hours. If the query fails, it will retry every hour until successful.
 
+---
+
 ### Reading Schedule
 
 The **Reading Schedule** feature allows you to configure the days when the meter should be queried. By default, the schedule is set to `Monday-Friday`. You can change this in the `private.h` file by modifying the `DEFAULT_READING_SCHEDULE`.
@@ -107,6 +138,8 @@ Example configuration in `private.h`:
 ```cpp
 #define DEFAULT_READING_SCHEDULE "Monday-Saturday"
 ```
+
+---
 
 ## Troubleshooting
 

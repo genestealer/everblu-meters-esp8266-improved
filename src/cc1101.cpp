@@ -791,5 +791,8 @@ struct tmeter_data get_meter_data(void)
   {
     echo_debug(debug_out, "TMO on REC\n");
   }
+  sdata.rssi = halRfReadReg(RSSI_ADDR); // Read RSSI value from CC1101
+  sdata.rssi_dbm = cc1100_rssi_convert2dbm(halRfReadReg(RSSI_ADDR));  // Read RSSI value from CC1101 and convert to dBm
+  sdata.lqi = halRfReadReg(LQI_ADDR); // Read LQI value from CC1101
   return sdata;
 }
