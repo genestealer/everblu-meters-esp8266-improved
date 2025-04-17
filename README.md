@@ -7,7 +7,7 @@ According to the radio communication approval paperwork, this may also work with
 - EverBlu Cyble
 - AnyQuest Cyble Basic
 
-![Home Assistant MQTT autodiscovery](imgs/MQTT_HASS.jpg)
+![Home Assistant MQTT autodiscovery](imgs/MQTT_HASS2.jpg)
 
 The original software (and much of the foundational work) was initially developed [here](http://www.lamaisonsimon.fr/wiki/doku.php?id=maison2:compteur_d_eau:compteur_d_eau), later published on GitHub by @neutrinus [here](https://github.com/neutrinus/everblu-meters), and subsequently forked by [psykokwak](https://github.com/psykokwak-com/everblu-meters-esp8266).
 
