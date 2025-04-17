@@ -582,6 +582,7 @@ int calculateWiFiSignalStrengthPercentage(int rssi) {
 // Function: publishWifiDetails
 // Description: Publishes Wi-Fi diagnostics (IP, RSSI, signal strength, etc.) to MQTT.
 void publishWifiDetails() {
+  Serial.println("> Publish Wi-Fi details");
   String wifiIP = WiFi.localIP().toString();
   int wifiRSSI = WiFi.RSSI();
   int wifiSignalPercentage = calculateWiFiSignalStrengthPercentage(wifiRSSI); // Convert RSSI to percentage
@@ -615,11 +616,15 @@ void publishWifiDetails() {
   delay(50);
   mqtt.publish("everblu/cyble/uptime", uptimeISO, true);
   delay(50);
+
+  Serial.println("> Wi-Fi details published");
 }
 
 // Function: publishMeterSettings
 // Description: Publishes meter configuration (year, serial, frequency) to MQTT.
 void publishMeterSettings() {
+  Serial.println("> Publish meter settings");
+
   // Publish Meter Year, Serial, and Frequency
   mqtt.publish("everblu/cyble/water_meter_year", String(METER_YEAR, DEC), true);
   delay(50);
@@ -631,6 +636,8 @@ void publishMeterSettings() {
   // Publish Reading Schedule
   mqtt.publish("everblu/cyble/reading_schedule", readingSchedule, true);
   delay(50);
+
+  Serial.println("> Meter settings published");
 }
 
 // Function: onConnectionEstablished
@@ -686,8 +693,8 @@ void onConnectionEstablished()
   });
   ArduinoOTA.setHostname("EVERBLUREADER");
   ArduinoOTA.begin();
-  Serial.println("Ready");
-  Serial.print("IP address: ");
+  Serial.println("> Ready");
+  Serial.print("> IP address: ");
   Serial.println(WiFi.localIP());
 
   mqtt.subscribe("everblu/cyble/trigger", [](const String& message) {
@@ -761,6 +768,8 @@ void onConnectionEstablished()
   mqtt.publish("everblu/cyble/active_reading", "false", true);
   delay(50);
 
+  Serial.println("> MQTT config sent");
+
   // Publish initial Wi-Fi details
   publishWifiDetails();
 
@@ -769,6 +778,8 @@ void onConnectionEstablished()
 
   // Turn off LED to show everything is setup
   digitalWrite(LED_BUILTIN, HIGH); // turned off
+
+  Serial.println("> Setup done");
 
   onScheduled();
 }
@@ -799,11 +810,11 @@ void setup()
   WiFi.setPhyMode(WIFI_PHY_MODE_11G);
   Serial.println("Wi-Fi PHY mode set to 11G.");
   #else
-  Serial.println("Wi-Fi PHY mode 11G is disabled.");
+  Serial.println("> Wi-Fi PHY mode 11G is disabled.");
   #endif
 
-  // Log the default reading schedule
-  Serial.printf("Default reading schedule: %s\n", readingSchedule.c_str());
+  // Log the reading schedule
+  Serial.printf("> Reading schedule: %s\n", DEFAULT_READING_SCHEDULE);
 
   // Optional functionalities of EspMQTTClient
   // mqtt.enableDebuggingMessages(true); // Enable debugging messages sent to serial output
