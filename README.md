@@ -3,6 +3,7 @@
 Fetch water or gas usage data from Itron EverBlu Cyble Enhanced RF water meters using the RADIAN protocol (Sontex, Itron) on 433 MHz with an ESP32/ESP8266 and CC1101 transceiver. Integrated with Home Assistant via MQTT AutoDiscovery.
 
 According to the radio communication approval paperwork, this may also work with the following models, though they are untested:
+
 - AnyQuest Cyble Enhanced
 - EverBlu Cyble
 - AnyQuest Cyble Basic
@@ -29,9 +30,11 @@ Supported meters:
 - Daily scheduled meter readings.
 
 ---
+
 ### Credits
 
 This project builds on reverse engineering efforts by:
+
 - La Maison Simon (http://www.lamaisonsimon.fr/)
 - @neutrinus and @psykokwak on GitHub
 
@@ -75,20 +78,20 @@ Some modules are not labeled on the PCB. Below is the pinout for one:
 
 The following MQTT topics are used to integrate the device with Home Assistant via AutoDiscovery:
 
-| **Sensor**          | **MQTT Topic**                  | **Description**                                                                 |
-|----------------------|----------------------------------|---------------------------------------------------------------------------------|
+| **Sensor**          | **MQTT Topic**                  | **Description**                                                                |
+|---------------------|---------------------------------|--------------------------------------------------------------------------------|
 | `Liters`            | `everblu/cyble/liters`          | Total water usage in liters.                                                   |
 | `Battery`           | `everblu/cyble/battery`         | Remaining battery life in months.                                              |
 | `Counter`           | `everblu/cyble/counter`         | Number of times the meter has been read.                                       |
 | `RSSI`              | `everblu/cyble/rssi`            | Raw RSSI value of the meter's signal.                                          |
 | `RSSI (dBm)`        | `everblu/cyble/rssi_dbm`        | RSSI value converted to dBm.                                                   |
-| `RSSI (%)`          | `everblu/cyble/rssi_percentage` | RSSI value converted to a percentage.                                         |
-| **`Time Start`**    | `everblu/cyble/time_start`      | Time when the meter wakes up, formatted as `HH:MM`.                            |
-| **`Time End`**      | `everblu/cyble/time_end`        | Time when the meter goes to sleep, formatted as `HH:MM`.                       |
+| `RSSI (%)`          | `everblu/cyble/rssi_percentage` | RSSI value converted to a percentage.                                          |
+| `Time Start`        | `everblu/cyble/time_start`      | Time when the meter wakes up, formatted as `HH:MM`.                            |
+| `Time End`          | `everblu/cyble/time_end`        | Time when the meter goes to sleep, formatted as `HH:MM`.                       |
 | `Timestamp`         | `everblu/cyble/timestamp`       | ISO 8601 timestamp of the last reading.                                        |
 | `Wi-Fi IP`          | `everblu/cyble/wifi_ip`         | IP address of the device.                                                      |
 | `Wi-Fi RSSI`        | `everblu/cyble/wifi_rssi`       | Wi-Fi signal strength in dBm.                                                  |
-| `Wi-Fi Signal (%)`  | `everblu/cyble/wifi_signal_percentage` | Wi-Fi signal strength as a percentage.                                    |
+| `Wi-Fi Signal (%)`  | `everblu/cyble/wifi_signal_percentage` | Wi-Fi signal strength as a percentage.                                  |
 | `MAC Address`       | `everblu/cyble/mac_address`     | MAC address of the device.                                                     |
 | `SSID`              | `everblu/cyble/ssid`            | Wi-Fi SSID the device is connected to.                                         |
 | `BSSID`             | `everblu/cyble/bssid`           | Wi-Fi BSSID the device is connected to.                                        |
@@ -261,5 +264,3 @@ On the flip side, the existence of these community solutions shows a growing des
 - Maison Simon Wiki – technical breakdown of RADIAN protocol (frames, no encryption, similarity to Wireless M-Bus) ([maison2:compteur_d_eau:compteur_d_eau [Le WIKI de la Maison Simon]](http://www.lamaisonsimon.fr/wiki/doku.php?id=maison2:compteur_d_eau:compteur_d_eau#:~:text=the%20Everblu%20Cyble%20Enhanced%20meters,Bus%20strandard)).  
 - Sontex data sheet – example of RADIAN protocol with AES-128 encryption on 433 MHz devices ([](https://sontex.ch/wp-content/uploads/2022/11/data-sheet-stx-565-566-868-878.pdf#:~:text=%EF%82%A7%20Frequency%3A%20433,128)).  
 - UK Wireless Telegraphy Act 2006, Section 48 – illegality of intercepting radio communications without authority ([united kingdom - Is it legal to intercept 2.4Ghz communications (wifi 802.11) in the UK? - Law Stack Exchange](https://law.stackexchange.com/questions/25962/is-it-legal-to-intercept-2-4ghz-communications-wifi-802-11-in-the-uk#:~:text=No%E2%80%94the%20interception%20of%20any%20radio,the%20Wireless%20Telegraphy%20Act%202006)).
-
-
