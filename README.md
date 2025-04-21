@@ -29,6 +29,15 @@ Supported meters:
 - Daily scheduled meter readings.
 
 ---
+### Credits
+
+This project builds on reverse engineering efforts by:
+- La Maison Simon (http://www.lamaisonsimon.fr/)
+- @neutrinus and @psykokwak on GitHub
+
+Their original projects did not include an open-source license. If you reuse or modify their specific code portions, please review their repositories and respect any stated limitations or intentions.
+
+---
 
 ## Hardware
 
@@ -163,6 +172,8 @@ Ignore the leading 0 and provide the serial number in the configuration without 
 
 Typically, a CC1101 433 MHz module with an external wire coil antenna has a maximum range of 300–500 m. SMA CC1101 boards with high-gain antennas may increase or even double this range. However, be mindful of the distance for effective use.
 
+---
+
 ## ⚠️ Legal Status of Decoding RADIAN
 
 ### Protocol Details
@@ -194,6 +205,8 @@ Typically, a CC1101 433 MHz module with an external wire coil antenna has a maxi
 ### Community Resources
 - [Maison Simon Wiki (FR) – RADIAN protocol explained](https://lamaisonsimon.fr/wiki/doku.php?id=eau:sonde_eau_radio)
 - [ESP8266/ESP32 + CC1101 decoder](https://github.com/neutrinus/everblu-meters)
+
+---
 
 # Itron EverBlu Cyble Enhanced and the RADIAN Protocol
 
