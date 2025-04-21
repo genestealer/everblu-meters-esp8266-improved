@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2025
+Copyright (c) 2025 Richard
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -20,4 +20,11 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-DISCLAIMER: This software includes an implementation of the RADIAN protocol for educational and personal use only. The RADIAN protocol is not an open standard, and its use may be subject to intellectual property rights or other legal restrictions. Users are solely responsible for ensuring compliance with applicable laws and regulations in their jurisdiction.
+---
+
+**Disclaimer**: This software includes an implementation of the RADIAN protocol for educational and personal use only. The RADIAN protocol is not an open standard, and its use may be subject to intellectual property rights or other legal restrictions. Users are solely responsible for ensuring compliance with applicable laws and regulations in their jurisdiction.
+
+This project includes code that interacts with the proprietary RADIAN protocol used by Itron and other utility meters. While the implementation is based on reverse engineering for personal, educational use, use of this software may not be legally permitted in all jurisdictions.
+
+You are responsible for ensuring compliance with local laws and regulations regarding wireless communications and reverse engineering.
+
