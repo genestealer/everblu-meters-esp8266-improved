@@ -980,6 +980,7 @@ void onConnectionEstablished()
   digitalWrite(LED_BUILTIN, HIGH); // turned off
 
   Serial.println("> Setup done");
+  Serial.println("Ready to go...");
 
   onScheduled();
 }
