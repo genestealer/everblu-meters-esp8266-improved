@@ -1,0 +1,49 @@
+mqtt:
+  sensor:
+    # Water Usage in Liters (main sensor)
+    - state_topic: "everblu/cyble/liters"
+      unit_of_measurement: "L"
+      name: "Water Usage"
+      icon: "mdi:water"
+      state_class: "total_increasing"
+      device_class: "water" 
+      unique_id: "everblu_water_liters"
+      
+    # Water Usage in Cubic Meters  
+    - state_topic: "everblu/cyble/liters"
+      unit_of_measurement: "m³"
+      value_template: "{{ (value | float / 1000) | round(3) }}"
+      name: "Water Usage m³"
+      icon: "mdi:gauge"
+      state_class: "total_increasing"
+      device_class: "water"
+      unique_id: "everblu_water_m3"
+      
+    # Battery Life
+    - state_topic: "everblu/cyble/battery"
+      unit_of_measurement: "months"
+      name: "Water Meter Battery"
+      icon: "mdi:battery"
+      unique_id: "everblu_battery"
+      
+    # Signal Strength
+    - state_topic: "everblu/cyble/rssi_percentage"
+      unit_of_measurement: "%"
+      name: "Water Meter Signal"
+      icon: "mdi:wifi"
+      unique_id: "everblu_signal"
+      
+    # Reading Counter
+    - state_topic: "everblu/cyble/counter"
+      name: "Water Meter Readings"
+      icon: "mdi:counter"
+      unique_id: "everblu_counter"
+
+  # Manual trigger button (CORRECTED)
+  button:
+    - platform: mqtt
+      command_topic: "everblu/cyble/trigger"
+      payload_press: "update"
+      name: "Request Water Reading"
+      icon: "mdi:water-sync"
+      unique_id: "everblu_trigger" 

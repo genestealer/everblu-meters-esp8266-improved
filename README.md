@@ -66,11 +66,29 @@ Pin wiring for the [Wemos D1 board](https://www.wemos.cc/en/latest/d1/index.html
 | GDO2        | D2        | GPIO4              | Another general-purpose digital output.       |
 | GND         | G         | GND                | Connect to ground.                            |
 
+
+
+NodeMCU v3          CC1101 Module (TinyTronics)
+                   [Antenna connected to SMA]
+                   
+3V3 ──────────────── VCC (Pin 2)
+GND ──────────────── GND (Pin 1)
+D1 (GPIO5) ───────── GDO0 (Pin 3)
+D8 (GPIO15) ──────── CSN (Pin 4)  
+D5 (GPIO14) ──────── SCK (Pin 5)
+D7 (GPIO13) ──────── MOSI (Pin 6)
+D6 (GPIO12) ──────── MISO/GDO1 (Pin 7)
+D2 (GPIO4) ───────── GDO2 (Pin 8)
+
 ### CC1101
 
 Some modules are not labeled on the PCB. Below is the pinout for one:
 ![CC1101 pinout diagram](imgs/cc1101-mapping.png)
 ![CC1101 example](imgs/cc1101.jpg)
+
+### 3D Print box model
+
+https://www.thingiverse.com/thing:4795566
 
 ---
 

@@ -1029,14 +1029,6 @@ void setup()
   // Set CC1101 radio frequency
   cc1101_init(FREQUENCY);
 
-  /*
-  // Use this piece of code to test
-  struct tmeter_data meter_data;
-  meter_data = get_meter_data();
-  Serial.printf("\nLiters : %d\nBattery (in months) : %d\nCounter : %d\nTime start : %d\nTime end : %d\n\n", meter_data.liters, meter_data.battery_left, meter_data.reads_counter, meter_data.time_start, meter_data.time_end);
-  while (42);
-  */
-
 }
 
 // Function: loop
