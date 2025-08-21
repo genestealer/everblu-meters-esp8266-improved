@@ -510,6 +510,7 @@ uint8_t cc1101_wait_for_packet(int milliseconds)
   for (i = 0; i < milliseconds; i++)
   {
     delay(1); //in ms	
+    if (i % 100 == 0) ESP.wdtFeed(); // Feed watchdog every 100ms
     //echo_cc1101_MARCSTATE();
     if (cc1101_check_packet_received()) //delay till system has data available
     {
@@ -632,11 +633,15 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t*rxBuffer, int rxB
   halRfWriteReg(PKTLEN, 1); // just one byte of synch pattern
   cc1101_rec_mode();
 
-  while ((digitalRead(GDO0) == FALSE) && (l_tmo < rx_tmo_ms)) { delay(1); l_tmo++; }
+  while ((digitalRead(GDO0) == FALSE) && (l_tmo < rx_tmo_ms)) { 
+    delay(1); l_tmo++;
+    if (l_tmo % 50 == 0) ESP.wdtFeed(); // Feed watchdog every 50ms
+  }
   if (l_tmo < rx_tmo_ms) echo_debug(debug_out, "GDO0! (0, %d) ", l_tmo); else return 0;
   while ((l_byte_in_rx == 0) && (l_tmo < rx_tmo_ms))
   {
     delay(5); l_tmo += 5; //wait for some byte received
+    ESP.wdtFeed(); // Feed watchdog during receive wait
     l_byte_in_rx = (halRfReadReg(RXBYTES_ADDR) & RXBYTES_MASK);
     if (l_byte_in_rx)
     {
@@ -662,11 +667,15 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t*rxBuffer, int rxB
 
   l_total_byte = 0;
   l_byte_in_rx = 1;
-  while ((digitalRead(GDO0) == FALSE) && (l_tmo < rx_tmo_ms)) { delay(1); l_tmo++; }
+  while ((digitalRead(GDO0) == FALSE) && (l_tmo < rx_tmo_ms)) { 
+    delay(1); l_tmo++;
+    if (l_tmo % 50 == 0) ESP.wdtFeed(); // Feed watchdog every 50ms
+  }
   if (l_tmo < rx_tmo_ms) echo_debug(debug_out, "GDO0! (1, %d) ", l_tmo); else return 0;
   while ((l_total_byte < (l_radian_frame_size_byte * 4)) && (l_tmo < rx_tmo_ms))
   {
     delay(5); l_tmo += 5; //wait for some byte received
+    ESP.wdtFeed(); // Feed watchdog during frame receive
     l_byte_in_rx = (halRfReadReg(RXBYTES_ADDR) & RXBYTES_MASK);
     if (l_byte_in_rx)
     {
@@ -718,12 +727,14 @@ struct tmeter_data get_meter_data(void)
   uint8_t wupbuffer[] = { 0x55,0x55,0x55,0x55,0x55,0x55,0x55,0x55 };
   uint8_t wup2send = 77;
   uint16_t tmo = 0;
-  uint8_t rxBuffer[1000];
+  static uint8_t rxBuffer[1000];  // Make static to avoid stack overflow
   int rxBuffer_size;
-  uint8_t meter_data[200];
+  static uint8_t meter_data[200]; // Make static to avoid stack overflow
   uint8_t meter_data_size = 0;
 
   memset(&sdata, 0, sizeof(sdata));
+  memset(rxBuffer, 0, sizeof(rxBuffer));    // Clear static buffer
+  memset(meter_data, 0, sizeof(meter_data)); // Clear static buffer
 
   uint8_t txbuffer[100];
   Make_Radian_Master_req(txbuffer, METER_YEAR, METER_SERIAL);
@@ -737,6 +748,9 @@ struct tmeter_data get_meter_data(void)
   echo_debug(debug_out, "MARCSTATE : raw:0x%02X  0x%02X free_byte:0x%02X sts:0x%02X sending 2s WUP...\n", marcstate, marcstate & 0x1F, CC1101_status_FIFO_FreeByte, CC1101_status_state);
   while ((CC1101_status_state == 0x02) && (tmo < TX_LOOP_OUT))					//in TX
   {
+    // Feed watchdog to prevent reset during long operations
+    ESP.wdtFeed();
+    
     if (wup2send)
     {
       if (wup2send < 0xFF)
@@ -744,6 +758,7 @@ struct tmeter_data get_meter_data(void)
         if (CC1101_status_FIFO_FreeByte <= 10)
         { //this give 10+20ms from previous frame : 8*8/2.4k=26.6ms  temps pour envoyer un wupbuffer
           delay(20);
+          ESP.wdtFeed(); // Feed watchdog after delay
           tmo++; tmo++;
         }
         SPIWriteBurstReg(TX_FIFO_ADDR, wupbuffer, 8);
@@ -753,6 +768,7 @@ struct tmeter_data get_meter_data(void)
     else
     {
       delay(130); //130ms time to free 39bytes FIFO space
+      ESP.wdtFeed(); // Feed watchdog after long delay
       SPIWriteBurstReg(TX_FIFO_ADDR, txbuffer, 39);
       if (debug_out && 0) {
         echo_debug(debug_out, "txbuffer:\n");
@@ -761,6 +777,7 @@ struct tmeter_data get_meter_data(void)
       wup2send = 0xFF;
     }
     delay(10); tmo++;
+    ESP.wdtFeed(); // Feed watchdog in main loop
     marcstate = halRfReadReg(MARCSTATE_ADDR); //read out state of cc1100 to be sure in IDLE and TX is finished this update also CC1101_status_state
     //echo_debug(debug_out,"%ifree_byte:0x%02X sts:0x%02X\n",tmo,CC1101_status_FIFO_FreeByte,CC1101_status_state);			
   }
@@ -775,7 +792,7 @@ struct tmeter_data get_meter_data(void)
   if (!receive_radian_frame(0x12, 150, rxBuffer, sizeof(rxBuffer))) echo_debug(debug_out, "TMO on REC\n");
   //delay(30); //50ms de 111111  , mais on a 7+3ms de printf et xxms calculs
   /*34ms 0101...01  14.25ms 000...000  14ms 1111...11111  582ms de data avec l'index */
-  rxBuffer_size = receive_radian_frame(0x7C, 700, rxBuffer, sizeof(rxBuffer));
+  rxBuffer_size = receive_radian_frame(0x7C, 1000, rxBuffer, sizeof(rxBuffer)); // Increased from 700ms to 1000ms to allow full meter response
   if (rxBuffer_size)
   {
     if (debug_out) {
