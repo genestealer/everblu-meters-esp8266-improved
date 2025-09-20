@@ -637,7 +637,6 @@ String jsonDiscoveryBatteryMonths = R"rawliteral(
   "name": "Months Remaining",
   "uniq_id": "water_meter_battery_months",
   "obj_id": "water_meter_battery_months",
-  "device_class": "duration",
   "ic": "mdi:battery-clock",
   "unit_of_meas": "months",
   "qos": 0,
