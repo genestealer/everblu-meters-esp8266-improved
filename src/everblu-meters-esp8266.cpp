@@ -1027,7 +1027,18 @@ void setup()
 
     
   // Set CC1101 radio frequency
-  cc1101_init(FREQUENCY);
+  Serial.println("> Initializing CC1101 radio...");
+  if (!cc1101_init(FREQUENCY)) {
+    Serial.println("FATAL ERROR: CC1101 radio initialization failed!");
+    Serial.println("Please check your wiring and connections.");
+    while (true) {
+      digitalWrite(LED_BUILTIN, LOW);  // Blink LED to indicate error
+      delay(200);
+      digitalWrite(LED_BUILTIN, HIGH);
+      delay(200);
+    }
+  }
+  Serial.println("> CC1101 radio initialized successfully");
 
   /*
   // Use this piece of code to test

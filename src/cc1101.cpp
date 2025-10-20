@@ -364,7 +364,7 @@ void cc1101_configureRF_0(float freq)
   SPIWriteBurstReg(PATABLE_ADDR, PA, 8);
 }
 
-void  cc1101_init(float freq)
+bool cc1101_init(float freq)
 {
   pinMode(GDO0, INPUT_PULLUP);
 
@@ -373,16 +373,33 @@ void  cc1101_init(float freq)
   if ((wiringPiSPISetup(0, 500000)) < 0)        // channel 0 100khz   min 500khz ds la doc ?
   {
     //fprintf (stderr, "Can't open the SPI bus: %s\n", strerror (errno)) ;
-    printf("Can't open the SPI bus");
-    exit(EXIT_FAILURE);
+    printf("ERROR: Can't open the SPI bus - CC1101 radio NOT found!\n");
+    return false;
   }
+  
   cc1101_reset();
   delay(1); //1ms
+  
+  // Verify CC1101 is present by reading version register
+  uint8_t partnum = halRfReadReg(PARTNUM_ADDR);
+  uint8_t version = halRfReadReg(VERSION_ADDR);
+  
+  // Check if version register returns a valid value (not 0x00 or 0xFF)
+  // PARTNUM may be 0x00 on some variants, so we rely mainly on VERSION
+  if (version == 0x00 || version == 0xFF) {
+    printf("ERROR: CC1101 radio NOT detected! (PARTNUM: 0x%02X, VERSION: 0x%02X)\n", partnum, version);
+    return false;
+  }
+  
+  printf("> CC1101 radio found OK (PARTNUM: 0x%02X, VERSION: 0x%02X)\n", partnum, version);
+  
   //echo_cc1101_version();
   //delay(1);
   //show_cc1101_registers_settings();
   //delay(1);
   cc1101_configureRF_0(freq);
+  
+  return true;
 }
 
 int8_t cc1100_rssi_convert2dbm(uint8_t Rssi_dec)

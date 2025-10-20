@@ -13,7 +13,7 @@ struct tmeter_data {
 };
 
 void setMHZ(float mhz);
-void  cc1101_init(float freq);
+bool cc1101_init(float freq);
 struct tmeter_data get_meter_data(void);
 
 #endif // __CC1101_H__
