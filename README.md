@@ -50,21 +50,65 @@ The project runs on ESP8266/ESP32 with an RF transceiver (CC1101). The hardware 
 
 ### Connections (ESP32/ESP8266 to CC1101)
 
-- Refer to `cc1101.ccp` for SPI pin mappings.
-- Refer to `everblu_meters.h` for GDOx pin mappings.
+The project uses the ESP8266/ESP32's **hardware SPI pins** to communicate with the CC1101 radio module. Below are the wiring diagrams for common ESP8266 boards.
 
-Pin wiring for the [Wemos D1 board](https://www.wemos.cc/en/latest/d1/index.html) and [Adafruit Feather HUZZAH ESP8266](https://learn.adafruit.com/adafruit-feather-huzzah-esp8266/pinouts):
+#### Pin Mapping Reference
 
-| **CC1101**  | **Wemos** | **HUZZAH ESP8266** | **Notes**                                      |
-|-------------|-----------|--------------------|------------------------------------------------|
-| VCC         | 3V3       | 3V                 | Connect to the 3.3V power pin.                |
-| GDO0        | D1        | GPIO5              | General-purpose digital output.               |
-| CSN         | D8        | GPIO15             | SPI chip select; Feather uses GPIO15 as CS.   |
-| SCK         | D5        | GPIO14             | SPI clock pin; SPI SCK maps to GPIO14.        |
-| MOSI        | D7        | GPIO13             | SPI MOSI pin; maps to GPIO13 on the Feather.  |
-| GDO1 (MISO) | D6        | GPIO12             | SPI MISO pin; maps to GPIO12 on the Feather.  |
-| GDO2        | D2        | GPIO4              | Another general-purpose digital output.       |
-| GND         | G         | GND                | Connect to ground.                            |
+**For ESP8266 (All Boards):**
+- **SCK (SPI Clock)**: GPIO 14
+- **MISO (Master In Slave Out)**: GPIO 12
+- **MOSI (Master Out Slave In)**: GPIO 13
+- **CS/SS (Chip Select)**: GPIO 15
+- **GDO0 (CC1101 Data Ready)**: GPIO 5 (configurable in `Private.h`)
+
+#### Wiring Table
+
+Pin wiring for the [Wemos D1 Mini](https://www.wemos.cc/en/latest/d1/index.html) and [Adafruit Feather HUZZAH ESP8266](https://learn.adafruit.com/adafruit-feather-huzzah-esp8266/pinouts):
+
+| **CC1101 Pin** | **Function** | **ESP8266 GPIO** | **Wemos D1 Mini** | **HUZZAH ESP8266** | **Notes** |
+|----------------|--------------|------------------|-------------------|--------------------|-----------|
+| **VCC**        | Power        | 3.3V             | 3V3               | 3V                 | **Important:** Use 3.3V only! |
+| **GND**        | Ground       | GND              | G                 | GND                | Common ground |
+| **SCK**        | SPI Clock    | GPIO 14          | D5                | #14                | Hardware SPI clock |
+| **MISO**       | SPI Data In  | GPIO 12          | D6                | #12                | Also labeled as GDO1 on some CC1101 modules |
+| **MOSI**       | SPI Data Out | GPIO 13          | D7                | #13                | Hardware SPI MOSI |
+| **CSN/CS**     | Chip Select  | GPIO 15          | D8                | #15                | SPI chip select |
+| **GDO0**       | Data Ready   | GPIO 5           | D1                | #5                 | Digital interrupt pin (configurable) |
+| **GDO2**       | Not used     | -                | -                 | -                  | Leave disconnected (optional) |
+
+#### Important Notes
+
+- **Voltage:** The CC1101 operates at **3.3V only**. Do not connect to 5V or you will damage the module.
+- **Hardware SPI:** This project uses the ESP8266's hardware SPI interface for reliable, high-speed communication.
+- **GDO0 Pin:** Default is GPIO 5, but you can change this in your `Private.h` file if needed.
+- **Wemos D1 Mini Labels:** The Wemos board uses "D" labels (D1, D5, D6, etc.) which correspond to specific GPIO numbers. See the table above for the mapping.
+- **HUZZAH Pinout:** The Adafruit HUZZAH uses GPIO numbers directly on the silkscreen (no "D" labels). The table shows the corresponding GPIO numbers.
+
+#### Quick Reference: Wemos D1 Mini
+
+```
+CC1101 → Wemos D1 Mini
+VCC    → 3V3
+GND    → G
+SCK    → D5 (GPIO 14)
+MISO   → D6 (GPIO 12)
+MOSI   → D7 (GPIO 13)
+CSN    → D8 (GPIO 15)
+GDO0   → D1 (GPIO 5)
+```
+
+#### Quick Reference: Adafruit Feather HUZZAH ESP8266
+
+```
+CC1101 → HUZZAH ESP8266
+VCC    → 3V
+GND    → GND
+SCK    → #14 (GPIO 14)
+MISO   → #12 (GPIO 12)
+MOSI   → #13 (GPIO 13)
+CSN    → #15 (GPIO 15)
+GDO0   → #5  (GPIO 5)
+```
 
 ### CC1101
 
