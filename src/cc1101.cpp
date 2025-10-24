@@ -391,7 +391,12 @@ bool cc1101_init(float freq)
     return false;
   }
   
-  printf("> CC1101 radio found OK (PARTNUM: 0x%02X, VERSION: 0x%02X)\n", partnum, version);
+  // Print the detection banner only once to avoid flooding logs during scans
+  static bool s_reported_ok = false;
+  if (!s_reported_ok) {
+    printf("> CC1101 radio found OK (PARTNUM: 0x%02X, VERSION: 0x%02X)\n", partnum, version);
+    s_reported_ok = true;
+  }
   
   //echo_cc1101_version();
   //delay(1);

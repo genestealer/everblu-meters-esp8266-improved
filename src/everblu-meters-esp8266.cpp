@@ -25,6 +25,7 @@
 #include <Arduino.h>        // Core Arduino library
 #include <ArduinoOTA.h>     // OTA update library
 #include <EspMQTTClient.h>  // MQTT client library
+#include <math.h>           // For floor/ceil during scan alignment
 
 // Define the LED_BUILTIN pin if missing
 #ifndef LED_BUILTIN
@@ -71,6 +72,186 @@ int _retry = 0;
 
 // Global variable to store the reading schedule (default from private.h)
 String readingSchedule = DEFAULT_READING_SCHEDULE;
+
+// ----- Runtime Frequency Scan (433 MHz) -----
+// State for non-blocking, two-phase scan controlled via MQTT
+volatile bool scanningActive = false;
+
+// Overall scan range (can be customized later via MQTT if needed)
+const float scanRangeStartMHz = 433.7600f;
+const float scanRangeEndMHz   = 433.8900f;
+
+// Phase settings
+const float coarseStepMHz = 0.0250f; // 25 kHz coarse scan for speed
+const float fineStepMHz   = 0.0010f; // 1 kHz fine scan for precision (was 0.5 kHz)
+const float fineWindowKHz = 12.5f;   // +/- window around coarse hit for fine scan
+
+// Scan phase: 0=idle, 1=coarse, 2=fine
+int scanPhase = 0;
+
+// Current phase boundaries and cursor
+float phaseStartMHz = 0.0f;
+float phaseEndMHz   = 0.0f;
+float scanCurrentMHz = 0.0f;
+
+// Coarse phase aligned boundaries (for resuming after fine scan if needed)
+float coarsePhaseStartMHz = 0.0f;
+float coarsePhaseEndMHz   = 0.0f;
+
+// Discovered/best frequencies
+float discoveredFrequencyMHz = 0.0f;
+float coarseHitMHz = 0.0f;
+int   fineBestRssiDbm = -200;
+float fineBestFrequencyMHz = 0.0f;
+
+// Helpers to align to a step grid (avoid float rounding surprises)
+static inline float alignDownToStep(float value, float step) {
+  return floorf((value + 1e-9f) / step) * step;
+}
+static inline float alignUpToStep(float value, float step) {
+  return ceilf((value - 1e-9f) / step) * step;
+}
+
+// Helper to publish scan state and discovered frequency
+void publishScanDiagnostics() {
+  mqtt.publish("everblu/cyble/scanning", scanningActive ? "true" : "false", true);
+  delay(25);
+  if (discoveredFrequencyMHz > 0.0f) {
+    mqtt.publish("everblu/cyble/discovered_frequency", String(discoveredFrequencyMHz, 6), true);
+  } else {
+    mqtt.publish("everblu/cyble/discovered_frequency", "", true);
+  }
+  delay(25);
+}
+
+// Single scan step; schedules itself until done or stopped
+void scanStepTask() {
+  if (!scanningActive) {
+    return;
+  }
+
+  // Safety clamp for current phase boundaries
+  if (scanCurrentMHz < phaseStartMHz || scanCurrentMHz > phaseEndMHz) {
+    if (scanPhase == 1) {
+      // Coarse phase completed
+      scanningActive = false;
+      publishScanDiagnostics();
+      Serial.println("> Coarse frequency scan finished (no hit in range).");
+      cc1101_init(FREQUENCY);
+      return;
+    } else if (scanPhase == 2) {
+      // Fine phase completed - decide result
+      if (fineBestFrequencyMHz > 0.0f) {
+        discoveredFrequencyMHz = fineBestFrequencyMHz;
+        Serial.printf(">>> Fine scan chose frequency: %.6f MHz (RSSI %d dBm)\n", discoveredFrequencyMHz, fineBestRssiDbm);
+        // Visual hit indicator
+        digitalWrite(LED_BUILTIN, LOW);
+        delay(150);
+        digitalWrite(LED_BUILTIN, HIGH);
+        scanningActive = false;
+        publishScanDiagnostics();
+        cc1101_init(FREQUENCY);
+        return;
+      }
+      // No fine hits - resume coarse scan at next step
+      scanPhase = 1; // back to coarse
+      phaseStartMHz = scanCurrentMHz = alignUpToStep(coarseHitMHz + coarseStepMHz, coarseStepMHz);
+      phaseEndMHz = coarsePhaseEndMHz;
+      Serial.println("> Fine scan found nothing, resuming coarse scan...");
+    }
+  }
+
+  if (scanPhase == 1) {
+    // Coarse phase
+    Serial.printf("> [Coarse] Scan test frequency: %.6f MHz\n", scanCurrentMHz);
+    cc1101_init(scanCurrentMHz);
+    struct tmeter_data meter_data = get_meter_data();
+
+    if (meter_data.reads_counter != 0 || meter_data.liters != 0) {
+      // Found something in coarse pass; prepare fine pass
+      coarseHitMHz = scanCurrentMHz;
+      Serial.printf("> Coarse hit at %.6f MHz - starting fine scan +/- %.1f kHz\n", coarseHitMHz, fineWindowKHz);
+
+      float fineStart = coarseHitMHz - (fineWindowKHz / 1000.0f);
+      float fineEnd   = coarseHitMHz + (fineWindowKHz / 1000.0f);
+      // Clamp to overall range
+      fineStart = max(fineStart, scanRangeStartMHz);
+      fineEnd   = min(fineEnd,   scanRangeEndMHz);
+      // Align to fine step
+      phaseStartMHz = alignDownToStep(fineStart, fineStepMHz);
+      phaseEndMHz   = alignUpToStep(fineEnd,   fineStepMHz);
+      scanCurrentMHz = phaseStartMHz;
+
+      fineBestRssiDbm = -200;
+      fineBestFrequencyMHz = 0.0f;
+      scanPhase = 2; // enter fine phase
+    } else {
+      // Advance coarse scan
+      scanCurrentMHz += coarseStepMHz;
+      if (scanCurrentMHz > phaseEndMHz) {
+        scanningActive = false;
+        Serial.println("> Coarse frequency scan completed without a hit.");
+        publishScanDiagnostics();
+        cc1101_init(FREQUENCY);
+        return;
+      }
+    }
+  } else if (scanPhase == 2) {
+    // Fine phase
+    Serial.printf("> [Fine] Scan test frequency: %.6f MHz\n", scanCurrentMHz);
+    cc1101_init(scanCurrentMHz);
+    struct tmeter_data meter_data = get_meter_data();
+    if (meter_data.reads_counter != 0 || meter_data.liters != 0) {
+      // Track best by RSSI
+      int rssi = meter_data.rssi_dbm;
+      if (rssi > fineBestRssiDbm) {
+        fineBestRssiDbm = rssi;
+        fineBestFrequencyMHz = scanCurrentMHz;
+      }
+    }
+    // Advance fine scan
+    scanCurrentMHz += fineStepMHz;
+  }
+
+  // Schedule next step quickly but yield to MQTT/OTA
+  mqtt.executeDelayed(250, scanStepTask);
+}
+
+void startFrequencyScan() {
+  if (scanningActive) {
+    Serial.println("> Scan already running");
+    return;
+  }
+  Serial.println("> Starting frequency scan (433 MHz): Coarse 25 kHz, then Fine 1 kHz window...");
+  scanningActive = true;
+  discoveredFrequencyMHz = 0.0f;
+
+  // Initialize coarse phase boundaries aligned to 25 kHz grid
+  coarsePhaseStartMHz = alignUpToStep(scanRangeStartMHz, coarseStepMHz);
+  coarsePhaseEndMHz   = alignDownToStep(scanRangeEndMHz, coarseStepMHz);
+
+  scanPhase = 1; // enter coarse phase
+  phaseStartMHz = coarsePhaseStartMHz;
+  phaseEndMHz   = coarsePhaseEndMHz;
+  scanCurrentMHz = phaseStartMHz;
+
+  publishScanDiagnostics();
+  // kick off first step
+  mqtt.executeDelayed(50, scanStepTask);
+}
+
+void stopFrequencyScan() {
+  if (!scanningActive) {
+    Serial.println("> Scan not running");
+    return;
+  }
+  scanningActive = false;
+  scanPhase = 0;
+  publishScanDiagnostics();
+  Serial.println("> Frequency scan stopped by command.");
+  // Restore radio to configured operating frequency
+  cc1101_init(FREQUENCY);
+}
 
 // Function to check if today is within the configured schedule
 bool isReadingDay(struct tm *ptm) {
@@ -214,6 +395,12 @@ void onUpdateData()
 // Description: Schedules daily meter readings at 10:00 AM UTC.
 void onScheduled()
 {
+  // Defer scheduled reads while scanning is active
+  if (scanningActive) {
+    mqtt.executeDelayed(500, onScheduled);
+    return;
+  }
+
   time_t tnow = time(nullptr);
   struct tm *ptm = gmtime(&tnow);
 
@@ -343,6 +530,92 @@ String jsonDiscoveryRequestReading = R"rawliteral(
   "payload_not_available": "offline",
   "pl_prs": "update",
   "frc_upd": "true",
+  "dev": {
+    "ids": ["14071984"],
+    "name": "Water Meter",
+    "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
+    "mf": "Psykokwak [Forked by Genestealer]"
+  }
+}
+)rawliteral";
+
+// JSON Discovery for Start Frequency Scan (button)
+String jsonDiscoveryScanStartButton = R"rawliteral(
+{
+  "name": "Start Frequency Scan",
+  "uniq_id": "water_meter_scan_start",
+  "obj_id": "water_meter_scan_start",
+  "ic": "mdi:radar",
+  "qos": 0,
+  "avty_t": "everblu/cyble/status",
+  "cmd_t": "everblu/cyble/scan",
+  "pl_prs": "start",
+  "ent_cat": "diagnostic",
+  "dev": {
+    "ids": ["14071984"],
+    "name": "Water Meter",
+    "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
+    "mf": "Psykokwak [Forked by Genestealer]"
+  }
+}
+)rawliteral";
+
+// JSON Discovery for Stop Frequency Scan (button)
+String jsonDiscoveryScanStopButton = R"rawliteral(
+{
+  "name": "Stop Frequency Scan",
+  "uniq_id": "water_meter_scan_stop",
+  "obj_id": "water_meter_scan_stop",
+  "ic": "mdi:stop-circle-outline",
+  "qos": 0,
+  "avty_t": "everblu/cyble/status",
+  "cmd_t": "everblu/cyble/scan",
+  "pl_prs": "stop",
+  "ent_cat": "diagnostic",
+  "dev": {
+    "ids": ["14071984"],
+    "name": "Water Meter",
+    "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
+    "mf": "Psykokwak [Forked by Genestealer]"
+  }
+}
+)rawliteral";
+
+// JSON Discovery for Scanning Active (binary sensor)
+String jsonDiscoveryScanningBinary = R"rawliteral(
+{
+  "name": "Frequency Scan Running",
+  "uniq_id": "water_meter_scanning",
+  "obj_id": "water_meter_scanning",
+  "device_class": "running",
+  "qos": 0,
+  "avty_t": "everblu/cyble/status",
+  "stat_t": "everblu/cyble/scanning",
+  "payload_on": "true",
+  "payload_off": "false",
+  "ent_cat": "diagnostic",
+  "dev": {
+    "ids": ["14071984"],
+    "name": "Water Meter",
+    "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
+    "mf": "Psykokwak [Forked by Genestealer]"
+  }
+}
+)rawliteral";
+
+// JSON Discovery for Discovered Frequency (sensor)
+String jsonDiscoveryDiscoveredFrequency = R"rawliteral(
+{
+  "name": "Discovered Frequency",
+  "uniq_id": "water_meter_discovered_frequency",
+  "obj_id": "water_meter_discovered_frequency",
+  "ic": "mdi:signal",
+  "unit_of_meas": "MHz",
+  "qos": 0,
+  "avty_t": "everblu/cyble/status",
+  "stat_t": "everblu/cyble/discovered_frequency",
+  "frc_upd": "true",
+  "ent_cat": "diagnostic",
   "dev": {
     "ids": ["14071984"],
     "name": "Water Meter",
@@ -895,6 +1168,15 @@ void onConnectionEstablished()
     }
   });
 
+  // Subscribe to scan control
+  mqtt.subscribe("everblu/cyble/scan", [](const String& message) {
+    if (message == "start") {
+      startFrequencyScan();
+    } else if (message == "stop") {
+      stopFrequencyScan();
+    }
+  });
+
   Serial.println("> Send MQTT config for HA.");
 
   // Publish Meter details discovery configuration
@@ -908,6 +1190,16 @@ void onConnectionEstablished()
   mqtt.publish("homeassistant/sensor/water_meter_timestamp/config", jsonDiscoveryLastRead, true);
   delay(50);
   mqtt.publish("homeassistant/button/water_meter_request/config", jsonDiscoveryRequestReading, true);
+  delay(50);
+
+  // Publish Frequency Scan controls and diagnostics
+  mqtt.publish("homeassistant/button/water_meter_scan_start/config", jsonDiscoveryScanStartButton, true);
+  delay(50);
+  mqtt.publish("homeassistant/button/water_meter_scan_stop/config", jsonDiscoveryScanStopButton, true);
+  delay(50);
+  mqtt.publish("homeassistant/binary_sensor/water_meter_scanning/config", jsonDiscoveryScanningBinary, true);
+  delay(50);
+  mqtt.publish("homeassistant/sensor/water_meter_discovered_frequency/config", jsonDiscoveryDiscoveredFrequency, true);
   delay(50);
 
   // Publish Wi-Fi details discovery configuration
@@ -967,6 +1259,11 @@ void onConnectionEstablished()
   // Set initial state for active reading
   mqtt.publish("everblu/cyble/active_reading", "false", true);
   delay(50);
+
+  // Initialize scan diagnostics
+  scanningActive = false;
+  discoveredFrequencyMHz = 0.0f;
+  publishScanDiagnostics();
 
   Serial.println("> MQTT config sent");
 
