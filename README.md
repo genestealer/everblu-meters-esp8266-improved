@@ -86,7 +86,7 @@ Pin wiring for the [Wemos D1 Mini](https://www.wemos.cc/en/latest/d1/index.html)
 
 #### Quick Reference: Wemos D1 Mini
 
-```
+```text
 CC1101 → Wemos D1 Mini
 VCC    → 3V3
 GND    → G
@@ -99,7 +99,7 @@ GDO0   → D1 (GPIO 5)
 
 #### Quick Reference: Adafruit Feather HUZZAH ESP8266
 
-```
+```text
 CC1101 → HUZZAH ESP8266
 VCC    → 3V
 GND    → GND
@@ -109,6 +109,41 @@ MOSI   → #13 (GPIO 13)
 CSN    → #15 (GPIO 15)
 GDO0   → #5  (GPIO 5)
 ```
+
+#### Adafruit Feather HUZZAH Silkscreen Labels
+
+To make wiring dead-simple on the HUZZAH, here’s the exact silkscreen text next to each pin we use and what it connects to on the CC1101:
+
+- Power
+  - Board label: "3V" → CC1101 VCC (3.3V only)
+  - Board label: "GND" → CC1101 GND
+
+- SPI signals
+  - Board label: "SCK / #14" → CC1101 SCK (SPI Clock)
+  - Board label: "MISO / #12" → CC1101 MISO
+  - Board label: "MOSI / #13" → CC1101 MOSI
+  - Board label: "SS / #15"   → CC1101 CSN (Chip Select)
+
+- CC1101 interrupt (data ready)
+  - Board label: "#5" → CC1101 GDO0  (default; configurable via `Private.h`)
+
+Notes
+- On the HUZZAH, many pins show both the function and the GPIO number, e.g. "SCK / #14". You can use either reference when wiring.
+- Only use the 3V (3.3V) pin to power the CC1101. Do not use 5V.
+
+#### HUZZAH Boot-Strap Pins and Red LED (GPIO #0)
+
+On the Adafruit Feather HUZZAH ESP8266, **GPIO #0 has a red LED attached and is also a boot-strap pin** used to enter the ROM bootloader. Important implications:
+
+- If GPIO #0 is held LOW during reset/power-up, the ESP8266 will enter the bootloader instead of running your sketch.
+- The red LED on GPIO #0 is wired “reverse”: writing LOW turns the LED ON, writing HIGH turns it OFF.
+- GPIO #0 does not have an internal pull-up by default.
+
+Because of the above, **do not use GPIO #0 for CC1101 GDO0**. This project defaults to using **GPIO #5** for GDO0 on HUZZAH, which is safe and avoids accidental bootloader entry. You can still use GPIO #0 for simple LED indication in your own code, but avoid wiring CC1101 signals to it.
+
+Also note other ESP8266 boot-strap pins on HUZZAH:
+- GPIO #15 (used here as CS/SS) must be LOW at boot (the HUZZAH board provides the correct pull-down). Don’t force it HIGH during reset.
+- GPIO #2 should normally be HIGH at boot (not used by this project).
 
 ### CC1101
 
