@@ -247,12 +247,12 @@ String jsonDiscoveryReading = R"rawliteral(
   "obj_id": "water_meter_value",
   "ic": "mdi:water",
   "unit_of_meas": "L",
-  "device_class": "water",
-  "state_class": "total_increasing",
+  "dev_cla": "water",
+  "stat_cla": "total_increasing",
   "qos": 0,
   "avty_t": "everblu/cyble/status",
   "stat_t": "everblu/cyble/liters",
-  "frc_upd": "true",
+  "frc_upd": true,
   "dev": {
     "ids": ["14071984"],
     "name": "Water Meter",
@@ -262,29 +262,9 @@ String jsonDiscoveryReading = R"rawliteral(
 }
 )rawliteral";
 
-// JSON Discovery for Battery Level
-// This is used to show the battery level in Home Assistant
-String jsonDiscoveryBattery = R"rawliteral(
-{
-  "name": "Battery",
-  "uniq_id": "water_meter_battery",
-  "obj_id": "water_meter_battery",
-  "device_class": "battery",
-  "ic": "mdi:battery",
-  "unit_of_meas": "%",
-  "qos": 0,
-  "avty_t": "everblu/cyble/status",
-  "stat_t": "everblu/cyble/battery",
-  "value_template": "{{ [(value|int), 100] | min }}",
-  "frc_upd": "true",
-  "dev": {
-    "ids": ["14071984"],
-    "name": "Water Meter",
-    "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
-    "mf": "Psykokwak [Forked by Genestealer]"
-  }
-}
-)rawliteral";
+// Note: Battery percentage sensor removed to comply with HA docs.
+// We only expose months remaining (see jsonDiscoveryBatteryMonths) because the
+// meter reports months, not percent. Mapping months->% would be arbitrary.
 
 // JSON Discovery for Read Counter
 // This is used to show the number of times the meter has been read in Home Assistant
@@ -297,7 +277,7 @@ String jsonDiscoveryReadCounter = R"rawliteral(
   "qos": 0,
   "avty_t": "everblu/cyble/status",
   "stat_t": "everblu/cyble/counter",
-  "frc_upd": "true",
+  "frc_upd": true,
   "dev": {
     "ids": ["14071984"],
     "name": "Water Meter",
@@ -314,12 +294,12 @@ String jsonDiscoveryLastRead = R"rawliteral(
   "name": "Last Read",
   "uniq_id": "water_meter_timestamp",
   "obj_id": "water_meter_timestamp",
-  "device_class": "timestamp",
+  "dev_cla": "timestamp",
   "ic": "mdi:clock",
   "qos": 0,
   "avty_t": "everblu/cyble/status",
   "stat_t": "everblu/cyble/timestamp",
-  "frc_upd": "true",
+  "frc_upd": true,
   "dev": {
     "ids": ["14071984"],
     "name": "Water Meter",
@@ -339,10 +319,10 @@ String jsonDiscoveryRequestReading = R"rawliteral(
   "qos": 0,
   "avty_t": "everblu/cyble/status",
   "cmd_t": "everblu/cyble/trigger",
-  "payload_available": "online",
-  "payload_not_available": "offline",
+  "pl_avail": "online",
+  "pl_not_avail": "offline",
   "pl_prs": "update",
-  "frc_upd": "true",
+  "frc_upd": true,
   "dev": {
     "ids": ["14071984"],
     "name": "Water Meter",
@@ -359,12 +339,12 @@ String jsonDiscoveryActiveReading = R"rawliteral(
   "name": "Active Reading",
   "uniq_id": "water_meter_active_reading",
   "obj_id": "water_meter_active_reading",
-  "device_class": "running",
+  "dev_cla": "running",
   "qos": 0,
   "avty_t": "everblu/cyble/status",
   "stat_t": "everblu/cyble/active_reading",
-  "payload_on": "true",
-  "payload_off": "false",
+  "pl_on": "true",
+  "pl_off": "false",
   "dev": {
     "ids": ["14071984"],
     "name": "Water Meter",
@@ -384,7 +364,7 @@ String jsonDiscoveryWifiIP = R"rawliteral(
   "ic": "mdi:ip-network-outline",
   "qos": 0,
   "stat_t": "everblu/cyble/wifi_ip",
-  "frc_upd": "true",
+  "frc_upd": true,
   "ent_cat": "diagnostic",
   "dev": {
     "ids": ["14071984"],
@@ -402,12 +382,13 @@ String jsonDiscoveryWifiRSSI = R"rawliteral(
   "name": "WiFi RSSI",
   "uniq_id": "water_meter_wifi_rssi",
   "obj_id": "water_meter_wifi_rssi",
-  "device_class": "signal_strength",
+  "dev_cla": "signal_strength",
   "ic": "mdi:signal-variant",
   "unit_of_meas": "dBm",
+  "stat_cla": "measurement",
   "qos": 0,
   "stat_t": "everblu/cyble/wifi_rssi",
-  "frc_upd": "true",
+  "frc_upd": true,
   "ent_cat": "diagnostic",
   "dev": {
     "ids": ["14071984"],
@@ -427,9 +408,10 @@ String jsonDiscoveryWifiSignalPercentage = R"rawliteral(
   "obj_id": "water_meter_wifi_signal_percentage",
   "ic": "mdi:wifi",
   "unit_of_meas": "%",
+  "stat_cla": "measurement",
   "qos": 0,
   "stat_t": "everblu/cyble/wifi_signal_percentage",
-  "frc_upd": "true",
+  "frc_upd": true,
   "ent_cat": "diagnostic",
   "dev": {
     "ids": ["14071984"],
@@ -450,7 +432,7 @@ String jsonDiscoveryMacAddress = R"rawliteral(
   "ic": "mdi:network",
   "qos": 0,
   "stat_t": "everblu/cyble/mac_address",
-  "frc_upd": "true",
+  "frc_upd": true,
   "ent_cat": "diagnostic",
   "dev": {
     "ids": ["14071984"],
@@ -471,7 +453,7 @@ String jsonDiscoveryBSSID = R"rawliteral(
   "ic": "mdi:access-point-network",
   "qos": 0,
   "stat_t": "everblu/cyble/bssid",
-  "frc_upd": "true",
+  "frc_upd": true,
   "ent_cat": "diagnostic",
   "dev": {
     "ids": ["14071984"],
@@ -492,7 +474,7 @@ String jsonDiscoverySSID = R"rawliteral(
   "ic": "mdi:help-network-outline",
   "qos": 0,
   "stat_t": "everblu/cyble/ssid",
-  "frc_upd": "true",
+  "frc_upd": true,
   "ent_cat": "diagnostic",
   "dev": {
     "ids": ["14071984"],
@@ -510,11 +492,11 @@ String jsonDiscoveryUptime = R"rawliteral(
   "name": "Device Uptime",
   "uniq_id": "water_meter_uptime",
   "obj_id": "water_meter_uptime",
-  "device_class": "timestamp",
+  "dev_cla": "timestamp",
   "qos": 0,
   "avty_t": "everblu/cyble/status",
   "stat_t": "everblu/cyble/uptime",
-  "frc_upd": "true",
+  "frc_upd": true,
   "ent_cat": "diagnostic",
   "dev": {
     "ids": ["14071984"],
@@ -556,7 +538,7 @@ String jsonDiscoveryMeterYear = R"rawliteral(
   "qos": 0,
   "avty_t": "everblu/cyble/status",
   "stat_t": "everblu/cyble/water_meter_year",
-  "frc_upd": "true",
+  "frc_upd": true,
   "ent_cat": "diagnostic",
   "dev": {
     "ids": ["14071984"],
@@ -577,7 +559,7 @@ String jsonDiscoveryMeterSerial = R"rawliteral(
   "qos": 0,
   "avty_t": "everblu/cyble/status",
   "stat_t": "everblu/cyble/water_meter_serial",
-  "frc_upd": "true",
+  "frc_upd": true,
   "ent_cat": "diagnostic",
   "dev": {
     "ids": ["14071984"],
@@ -598,7 +580,7 @@ String jsonDiscoveryReadingSchedule = R"rawliteral(
   "qos": 0,
   "avty_t": "everblu/cyble/status",
   "stat_t": "everblu/cyble/reading_schedule",
-  "frc_upd": "true",
+  "frc_upd": true,
   "ent_cat": "diagnostic",
   "dev": {
     "ids": ["14071984"],
@@ -617,12 +599,12 @@ String jsonDiscoveryBatteryMonths = R"rawliteral(
   "obj_id": "water_meter_battery_months",
   "ic": "mdi:battery-clock",
   "unit_of_meas": "months",
-  "state_class": "measurement",
-  "suggested_display_precision": 0,
+  "stat_cla": "measurement",
+  "sug_dsp_prc": 0,
   "qos": 0,
   "avty_t": "everblu/cyble/status",
   "stat_t": "everblu/cyble/battery",
-  "frc_upd": "true",
+  "frc_upd": true,
   "dev": {
     "ids": ["14071984"],
     "name": "Water Meter",
@@ -638,13 +620,14 @@ String jsonDiscoveryMeterRSSIDBm = R"rawliteral(
   "name": "RSSI",
   "uniq_id": "water_meter_rssi_dbm",
   "obj_id": "water_meter_rssi_dbm",
-  "device_class": "signal_strength",
+  "dev_cla": "signal_strength",
   "ic": "mdi:signal",
   "unit_of_meas": "dBm",
+  "stat_cla": "measurement",
   "qos": 0,
   "avty_t": "everblu/cyble/status",
   "stat_t": "everblu/cyble/rssi_dbm",
-  "frc_upd": "true",
+  "frc_upd": true,
   "dev": {
     "ids": ["14071984"],
     "name": "Water Meter",
@@ -662,10 +645,11 @@ String jsonDiscoveryMeterRSSIPercentage = R"rawliteral(
   "obj_id": "water_meter_rssi_percentage",
   "ic": "mdi:signal-cellular-3",
   "unit_of_meas": "%",
+  "stat_cla": "measurement",
   "qos": 0,
   "avty_t": "everblu/cyble/status",
   "stat_t": "everblu/cyble/rssi_percentage",
-  "frc_upd": "true",
+  "frc_upd": true,
   "dev": {
     "ids": ["14071984"],
     "name": "Water Meter",
@@ -683,10 +667,12 @@ String jsonDiscoveryLQIPercentage = R"rawliteral(
     "obj_id": "water_meter_lqi_percentage",
     "ic": "mdi:signal-cellular-outline",
     "unit_of_meas": "%",
+  "stat_cla": "measurement",
     "qos": 0,
     "avty_t": "everblu/cyble/status",
     "stat_t": "everblu/cyble/lqi_percentage",
-    "frc_upd": "true",
+    "frc_upd": true,
+    "ent_cat": "diagnostic",
     "dev": {
       "ids": ["14071984"],
       "name": "Water Meter",
@@ -706,7 +692,7 @@ String jsonDiscoveryTimeStart = R"rawliteral(
   "qos": 0,
   "avty_t": "everblu/cyble/status",
   "stat_t": "everblu/cyble/time_start",
-  "frc_upd": "true",
+  "frc_upd": true,
   "dev": {
     "ids": ["14071984"],
     "name": "Water Meter",
@@ -726,7 +712,7 @@ String jsonDiscoveryTimeEnd = R"rawliteral(
   "qos": 0,
   "avty_t": "everblu/cyble/status",
   "stat_t": "everblu/cyble/time_end",
-  "frc_upd": "true",
+  "frc_upd": true,
   "dev": {
     "ids": ["14071984"],
     "name": "Water Meter",
@@ -877,8 +863,6 @@ void onConnectionEstablished()
   // Publish Meter details discovery configuration
   delay(50);
   mqtt.publish("homeassistant/sensor/water_meter_value/config", jsonDiscoveryReading, true);
-  delay(50);
-  mqtt.publish("homeassistant/sensor/water_meter_battery/config", jsonDiscoveryBattery, true);
   delay(50);
   mqtt.publish("homeassistant/sensor/water_meter_counter/config", jsonDiscoveryReadCounter, true);
   delay(50);
