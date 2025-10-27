@@ -43,6 +43,15 @@
 #define DEFAULT_READING_SCHEDULE "Monday-Friday"
 #endif
 
+// Define a default meter frequency if missing from config.h.
+// RADIAN protocol nominal center frequency for EverBlu is 433.82 MHz.
+#ifndef FREQUENCY
+#define FREQUENCY 433.82
+#define FREQUENCY_DEFINED_DEFAULT 1
+#else
+#define FREQUENCY_DEFINED_DEFAULT 0
+#endif
+
 unsigned long lastWifiUpdate = 0;
 
 // Secrets pulled from private.h file
@@ -65,8 +74,21 @@ const char jsonTemplate[] = "{ "
 
 int _retry = 0;
 
-// Global variable to store the reading schedule (default from private.h)
+// Global variable to store the reading schedule (default from config.h)
 String readingSchedule = DEFAULT_READING_SCHEDULE;
+
+// Helper: validate schedule string against supported options
+static bool isValidReadingSchedule(const String &s) {
+  return (s == "Monday-Friday" || s == "Monday-Saturday" || s == "Monday-Sunday");
+}
+
+// Ensure schedule is valid; if not, fall back to a safe default and warn
+static void validateReadingSchedule() {
+  if (!isValidReadingSchedule(readingSchedule)) {
+    Serial.printf("WARNING: Invalid reading schedule '%s'. Falling back to 'Monday-Friday'.\n", readingSchedule.c_str());
+    readingSchedule = "Monday-Friday";
+  }
+}
 
 // Function to check if today is within the configured schedule
 bool isReadingDay(struct tm *ptm) {
@@ -566,28 +588,6 @@ String jsonDiscoveryMeterSerial = R"rawliteral(
 }
 )rawliteral";
 
-// JSON Discovery for Frequency
-String jsonDiscoveryFrequency = R"rawliteral(
-{
-  "name": "Meter Frequency",
-  "uniq_id": "water_meter_frequency",
-  "obj_id": "water_meter_frequency",
-  "ic": "mdi:signal",
-  "unit_of_meas": "MHz",
-  "qos": 0,
-  "avty_t": "everblu/cyble/status",
-  "stat_t": "everblu/cyble/water_meter_frequency",
-  "frc_upd": "true",
-  "ent_cat": "diagnostic",
-  "dev": {
-    "ids": ["14071984"],
-    "name": "Water Meter",
-    "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
-    "mf": "Psykokwak [Forked by Genestealer]"
-  }
-}
-)rawliteral";
-
 // JSON Discovery for Reading Schedule
 String jsonDiscoveryReadingSchedule = R"rawliteral(
 {
@@ -615,9 +615,10 @@ String jsonDiscoveryBatteryMonths = R"rawliteral(
   "name": "Months Remaining",
   "uniq_id": "water_meter_battery_months",
   "obj_id": "water_meter_battery_months",
-  "device_class": "duration",
   "ic": "mdi:battery-clock",
   "unit_of_meas": "months",
+  "state_class": "measurement",
+  "suggested_display_precision": 0,
   "qos": 0,
   "avty_t": "everblu/cyble/status",
   "stat_t": "everblu/cyble/battery",
@@ -784,12 +785,10 @@ void publishWifiDetails() {
 void publishMeterSettings() {
   Serial.println("> Publish meter settings");
 
-  // Publish Meter Year, Serial, and Frequency
+  // Publish Meter Year, Serial
   mqtt.publish("everblu/cyble/water_meter_year", String(METER_YEAR, DEC), true);
   delay(50);
   mqtt.publish("everblu/cyble/water_meter_serial", String(METER_SERIAL, DEC), true);
-  delay(50);
-  mqtt.publish("everblu/cyble/water_meter_frequency", String(FREQUENCY, 6), true);
   delay(50);
 
   // Publish Reading Schedule
@@ -912,12 +911,10 @@ void onConnectionEstablished()
   mqtt.publish("homeassistant/binary_sensor/water_meter_active_reading/config", jsonDiscoveryActiveReading, true);
   delay(50);
 
-  // Publish MQTT discovery messages for Meter Year, Serial, and Frequency
+  // Publish MQTT discovery messages for Meter Year, Serial
   mqtt.publish("homeassistant/sensor/water_meter_year/config", jsonDiscoveryMeterYear, true);
   delay(50);
   mqtt.publish("homeassistant/sensor/water_meter_serial/config", jsonDiscoveryMeterSerial, true);
-  delay(50);
-  mqtt.publish("homeassistant/sensor/water_meter_frequency/config", jsonDiscoveryFrequency, true);
   delay(50);
 
   // Publish JSON discovery for Reading Schedule
@@ -972,7 +969,7 @@ void setup()
   Serial.println("Everblu Meters ESP8266 Starting...");
   Serial.println("Water usage data for Home Assistant");
   Serial.println("https://github.com/genestealer/everblu-meters-esp8266-improved");
-  String meterinfo = "Target meter: " + String(METER_YEAR, DEC) + "-0" + String(METER_SERIAL, DEC) + "\nTarget frequency: " + String(FREQUENCY, DEC) + "\n";
+  String meterinfo = "Target meter: " + String(METER_YEAR, DEC) + "-0" + String(METER_SERIAL, DEC) + "\n";
   Serial.println(meterinfo);
 
   pinMode(LED_BUILTIN, OUTPUT);
@@ -992,8 +989,16 @@ void setup()
   Serial.println("> Wi-Fi PHY mode 11G is disabled.");
   #endif
 
-  // Log the reading schedule
-  Serial.printf("> Reading schedule: %s\n", DEFAULT_READING_SCHEDULE);
+  // Validate and log the configured reading schedule
+  Serial.printf("> Reading schedule (configured): %s\n", readingSchedule.c_str());
+  validateReadingSchedule();
+  Serial.printf("> Reading schedule (effective): %s\n", readingSchedule.c_str());
+
+  // Log effective frequency and warn if default is used
+  Serial.printf("> Frequency (effective): %.6f MHz\n", (double)FREQUENCY);
+#if FREQUENCY_DEFINED_DEFAULT
+  Serial.println("WARNING: FREQUENCY not set in config.h; using default 433.820000 MHz (RADIAN).");
+#endif
 
   // Optional functionalities of EspMQTTClient
   // mqtt.enableDebuggingMessages(true); // Enable debugging messages sent to serial output
