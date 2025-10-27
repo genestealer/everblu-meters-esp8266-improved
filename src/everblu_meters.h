@@ -12,9 +12,9 @@
 
 #ifdef __unix__
 # include <time.h>
-# include <unistd.h>    // pour sleep
+# include <unistd.h>    // for sleep
 # include <termios.h>
-//# include <ncurses.h>   // pour getch mais fonctionne bizarement
+//# include <ncurses.h>   // for getch but works oddly
 	char getch(){
 		/*#include <unistd.h>   //_getch*/
 		/*#include <termios.h>  //_getch*/
@@ -41,7 +41,7 @@
 
 #elif defined _WIN32
 # include <windows.h>
-# include <conio.h> // pour getch
+# include <conio.h> // for getch
 #define sleep(x) Sleep(1000 * x)
 #endif
 

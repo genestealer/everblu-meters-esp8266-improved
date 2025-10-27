@@ -331,11 +331,11 @@ void cc1101_configureRF_0(float freq)
   //halRfWriteReg(FREQ2,0x10);   //Frequency Control Word, High Byte  Base frequency = 433.82
   //halRfWriteReg(FREQ1,0xAF);   //Frequency Control Word, Middle Byte
   //halRfWriteReg(FREQ0, freq0);
-  //halRfWriteReg(FREQ0,0x75); //Frequency Control Word, Low Byte la fréquence reel etait 433.790 (centre)
+  //halRfWriteReg(FREQ0,0x75); //Frequency Control Word, Low Byte the real frequency was 433.790 (centre)
   //halRfWriteReg(FREQ0,0xC1); //Frequency Control Word, Low Byte rasmobo 814 824 (KO) ; minepi 810 820 (OK)
-  //halRfWriteReg(FREQ0,0x9B); //rasmobo 808.5  -16  pour -38
+  //halRfWriteReg(FREQ0,0x9B); //rasmobo 808.5  -16  for -38
   //halRfWriteReg(FREQ0,0xB7);   //rasmobo 810 819.5 OK
-  //mon compteur F1 : 433809500  F2 : 433820000   deviation +-5.25khz depuis 433.81475M
+  //my meter F1 : 433809500  F2 : 433820000   deviation +-5.25khz from 433.81475M
 
   halRfWriteReg(MDMCFG4, 0xF6); //Modem Configuration   RX filter BW = 58Khz
   halRfWriteReg(MDMCFG3, 0x83); //Modem Configuration   26M*((256+83h)*2^6)/2^28 = 2.4kbps 
@@ -345,18 +345,15 @@ void cc1101_configureRF_0(float freq)
   halRfWriteReg(DEVIATN, 0x15);  //5.157471khz 
   //halRfWriteReg(MCSM1,0x0F);   //CCA always ; default mode RX
   halRfWriteReg(MCSM1, 0x00);   //CCA always ; default mode IDLE
-  halRfWriteReg(MCSM0, 0x18);   //Main Radio Control State Machine Configuration
-  halRfWriteReg(FOCCFG, 0x1D);  //Frequency Offset Compensation Configuration
+  halRfWriteReg(MCSM0, 0x18);   //MCSM0: Auto-calibrate from IDLE->RX/TX (FS_AUTOCAL=01b), improves frequency accuracy
+  halRfWriteReg(FOCCFG, 0x1D);  //FOCCFG: Enable automatic frequency offset compensation (FOC) with 4K/2K gain for better reception
   halRfWriteReg(BSCFG, 0x1C);   //Bit Synchronization Configuration
   halRfWriteReg(AGCCTRL2, 0xC7);//AGC Control
   halRfWriteReg(AGCCTRL1, 0x00);//AGC Control
   halRfWriteReg(AGCCTRL0, 0xB2);//AGC Control
   halRfWriteReg(WORCTRL, 0xFB); //Wake On Radio Control
   halRfWriteReg(FREND1, 0xB6);  //Front End RX Configuration
-  halRfWriteReg(FSCAL3, 0xE9);  //Frequency Synthesizer Calibration
-  halRfWriteReg(FSCAL2, 0x2A);  //Frequency Synthesizer Calibration
-  halRfWriteReg(FSCAL1, 0x00);  //Frequency Synthesizer Calibration
-  halRfWriteReg(FSCAL0, 0x1F);  //Frequency Synthesizer Calibration
+  // Note: Static FSCAL3/2/1/0 register writes removed - automatic calibration handles these dynamically
   halRfWriteReg(TEST2, 0x81);   //Various Test Settings link to adc retention
   halRfWriteReg(TEST1, 0x35);   //Various Test Settings link to adc retention
   halRfWriteReg(TEST0, 0x09);   //Various Test Settings link to adc retention
@@ -369,8 +366,8 @@ bool cc1101_init(float freq)
   pinMode(GDO0, INPUT_PULLUP);
 
   // to use SPI pi@MinePi ~ $ gpio unload spi  then gpio load spi   
-  // sinon pas de MOSI ni pas de CSn , buffer de 4kB
-  if ((wiringPiSPISetup(0, 500000)) < 0)        // channel 0 100khz   min 500khz ds la doc ?
+  // otherwise no MOSI nor CSn, buffer of 4kB
+  if ((wiringPiSPISetup(0, 500000)) < 0)        // channel 0 100khz   min 500khz in the doc ?
   {
     //fprintf (stderr, "Can't open the SPI bus: %s\n", strerror (errno)) ;
     printf("ERROR: Can't open the SPI bus - CC1101 radio NOT found!\n");
@@ -403,6 +400,14 @@ bool cc1101_init(float freq)
   //show_cc1101_registers_settings();
   //delay(1);
   cc1101_configureRF_0(freq);
+  
+  // Perform manual calibration after configuration
+  // This calibrates the frequency synthesizer for the current frequency
+  CC1101_CMD(SIDLE);  // Must be in IDLE state to calibrate
+  CC1101_CMD(SCAL);   // Calibrate frequency synthesizer and turn it off
+  delay(5);           // Wait for calibration to complete (typically <1ms, but we add margin)
+  
+  echo_debug(debug_out, "> Frequency synthesizer calibrated for %.6f MHz\n", freq);
   
   return true;
 }
@@ -705,7 +710,7 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t*rxBuffer, int rxB
   CC1101_CMD(SFRX);
   CC1101_CMD(SIDLE);
   //echo_debug(debug_out,"RAW buffer");
-  //show_in_hex_array(rxBuffer,l_total_byte); //16ms pour 124b->682b , 7ms pour 18b->99byte
+  //show_in_hex_array(rxBuffer,l_total_byte); //16ms for 124b->682b , 7ms for 18b->99byte
   /*restore default reg */
   halRfWriteReg(MDMCFG4, 0xF6); //Modem Configuration   RX filter BW = 58Khz
   halRfWriteReg(MDMCFG3, 0x83); //Modem Configuration   26M*((256+83h)*2^6)/2^28 = 2.4kbps
@@ -764,7 +769,7 @@ struct tmeter_data get_meter_data(void)
       if (wup2send < 0xFF)
       {
         if (CC1101_status_FIFO_FreeByte <= 10)
-        { //this give 10+20ms from previous frame : 8*8/2.4k=26.6ms  temps pour envoyer un wupbuffer
+        { //this gives 10+20ms from previous frame : 8*8/2.4k=26.6ms  time to send a wupbuffer
           delay(20);
           tmo++; tmo++;
         }

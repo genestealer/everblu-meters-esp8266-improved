@@ -21,24 +21,24 @@ Purpose: Firmware for ESP8266/ESP32 + CC1101 to actively poll Itron EverBlu Cybl
 - Keep secrets out of commits. Use the example file for diffs and don’t check real creds into VCS.
 
 ## Radio/protocol essentials
-- Frequency: start with ~433.82 MHz. You can:
-  - Compile-time scan: set `SCAN_FREQUENCY_433MHZ 1` in `private.h` to sweep 433.76–433.89 MHz in 0.5 kHz steps (blocks until hit).
-  - Runtime scan: via MQTT, publish `start`/`stop` to `everblu/cyble/scan`. Scan runs non‑blocking in two phases (25 kHz coarse → 1 kHz fine). Result at `everblu/cyble/discovered_frequency`.
+- Frequency: Configure the target frequency in `FREQUENCY` in `private.h` (typically ~433.82 MHz, but varies by meter/region).
+  - The CC1101 now uses **automatic frequency synthesizer calibration** and **frequency offset compensation (FOC)** for improved accuracy and reliability.
+  - Manual calibration is performed at init via the `SCAL` strobe command.
+  - Automatic calibration occurs on every IDLE→RX/TX transition (configured in MCSM0 register).
+  - FOC automatically compensates for frequency drift during reception (configured in FOCCFG register).
 - Reading pipeline: `get_meter_data()` sends a wake preamble, RADIAN poll (`Make_Radian_Master_req`), then receives/decodes; returns `tmeter_data { liters, reads_counter, battery_left, time_start, time_end, rssi, rssi_dbm, lqi }`.
 
 ## MQTT and Home Assistant
 - Sensor topics (retained):
   - `everblu/cyble/liters`, `battery`, `counter`, `rssi_dbm`, `rssi_percentage`, `lqi`, `lqi_percentage`, `time_start`, `time_end`, `timestamp`.
-  - Wi‑Fi/diag: `wifi_ip`, `wifi_rssi`, `wifi_signal_percentage`, `mac_address`, `ssid`, `bssid`, `uptime`, `status` (LWT online/offline), `active_reading`, scan topics above.
+  - Wi‑Fi/diag: `wifi_ip`, `wifi_rssi`, `wifi_signal_percentage`, `mac_address`, `ssid`, `bssid`, `uptime`, `status` (LWT online/offline), `active_reading`.
 - Commands:
   - `everblu/cyble/trigger` → any payload triggers immediate read.
   - `everblu/cyble/restart` → payload `restart` reboots device.
-  - `everblu/cyble/scan` → `start`/`stop` controls runtime scan.
 - HA AutoDiscovery: Sent on connect in `onConnectionEstablished()` using compact JSON strings. Discovery topics are under `homeassistant/<component>/<object_id>/config` and are retained. If you add a new metric, add both a discovery JSON and a publish in the corresponding data/diag function.
 
 ## Scheduling and timing
 - Daily reading at 10:00 UTC when `isReadingDay()` matches. Default schedule is `Monday‑Friday` via `DEFAULT_READING_SCHEDULE` (override in `private.h`).
-- While a runtime frequency scan is active, scheduled reads are deferred.
 - Wi‑Fi diagnostics publish every 5 minutes.
 
 ## Hardware/pins
@@ -57,6 +57,7 @@ Purpose: Firmware for ESP8266/ESP32 + CC1101 to actively poll Itron EverBlu Cybl
 
 ## Quick debug tips
 - Use serial monitor at 115200. Enable `mqtt.enableDebuggingMessages(true)` if needed.
-- If no data, try during business hours (meters wake intermittently), verify frequency via scan, and check antenna/CC1101 variant.
+- If no data, try during business hours (meters wake intermittently), verify frequency is correct in `private.h`, and check antenna/CC1101 variant.
+- The CC1101 automatically calibrates on every state transition and compensates for frequency offset, improving reliability over a wide temperature range.
 
 If any part of this is unclear (e.g., secret file naming/casing, adding new HA sensors, or adapting to ESP32), tell me what you’d like to do and I’ll refine these instructions. 
