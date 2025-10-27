@@ -2,7 +2,7 @@
 /*  it is exposed just to demonstrate CC1101 capability to reader water meter indexes */
 /*  there is no Warranty on radian_trx SW */
 
-#include "private.h"        // Include the local private file for passwords etc. not for GitHub. Generate your own private.h file with the same content as private_example.h
+#include "config.h"         // Include the local config file for passwords etc. not for GitHub. Generate your own config.h file with the same content as config.example.h
 #include "everblu_meters.h" // Include the local everblu_meters library
 #include "utils.h"          // Include the local utils library for utility functions
 #include "cc1101.h"         // Include the local cc1101 library for CC1101 functions

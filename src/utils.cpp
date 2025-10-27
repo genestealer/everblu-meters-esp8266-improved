@@ -5,7 +5,7 @@
  #include <Arduino.h>
 
  #include "everblu_meters.h"
- #include <private.h> // Passwords etc. not for GitHub
+ #include <config.h> // Configuration file (Wi-Fi, MQTT, meter settings)
  
  void show_in_hex(uint8_t* buffer, size_t len)
  {

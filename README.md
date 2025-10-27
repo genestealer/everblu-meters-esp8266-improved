@@ -8,7 +8,7 @@ According to the radio communication approval paperwork, this may also work with
 - EverBlu Cyble
 - AnyQuest Cyble Basic
 
-![Home Assistant MQTT autodiscovery](imgs/MQTT_HASS2.jpg)
+![Home Assistant MQTT autodiscovery](docs/images/MQTT_HASS2.jpg)
 
 The original software (and much of the foundational work) was initially developed [here](http://www.lamaisonsimon.fr/wiki/doku.php?id=maison2:compteur_d_eau:compteur_d_eau), later published on GitHub by @neutrinus [here](https://github.com/neutrinus/everblu-meters), and subsequently forked by [psykokwak](https://github.com/psykokwak-com/everblu-meters-esp8266).
 
@@ -16,7 +16,7 @@ Supported meters:
 
 - [Itron EverBlu Cyble Enhanced](https://multipartirtaanugra.com/wp-content/uploads/2020/09/09.-Cyble-RF.pdf)
 
-![Itron EverBlu Cyble Enhanced](imgs/meter.jpg)
+![Itron EverBlu Cyble Enhanced](docs/images/meter.jpg)
 
 ## Features
 
@@ -45,8 +45,8 @@ Their original projects did not include an open-source license. If you reuse or 
 ## Hardware
 
 The project runs on ESP8266/ESP32 with an RF transceiver (CC1101). The hardware can be any ESP32+CC1101 with the correct wiring.
-![ESP8266 with CC1101](imgs/board2.jpg)
-![ESP8266 with CC1101](imgs/board.jpg)
+![ESP8266 with CC1101](docs/images/board2.jpg)
+![ESP8266 with CC1101](docs/images/board.jpg)
 
 ### Connections (ESP32/ESP8266 to CC1101)
 
@@ -59,7 +59,7 @@ The project uses the ESP8266/ESP32's **hardware SPI pins** to communicate with t
 - **MISO (Master In Slave Out)**: GPIO 12
 - **MOSI (Master Out Slave In)**: GPIO 13
 - **CS/SS (Chip Select)**: GPIO 15
-- **GDO0 (CC1101 Data Ready)**: GPIO 5 (configurable in `Private.h`)
+- **GDO0 (CC1101 Data Ready)**: GPIO 5 (configurable in `config.h`)
 
 #### Wiring Table
 
@@ -80,7 +80,7 @@ Pin wiring for the [Wemos D1 Mini](https://www.wemos.cc/en/latest/d1/index.html)
 
 - **Voltage:** The CC1101 operates at **3.3V only**. Do not connect to 5V or you will damage the module.
 - **Hardware SPI:** This project uses the ESP8266's hardware SPI interface for reliable, high-speed communication.
-- **GDO0 Pin:** Default is GPIO 5, but you can change this in your `Private.h` file if needed.
+- **GDO0 Pin:** Default is GPIO 5, but you can change this in your `config.h` file if needed.
 - **Wemos D1 Mini Labels:** The Wemos board uses "D" labels (D1, D5, D6, etc.) which correspond to specific GPIO numbers. See the table above for the mapping.
 - **HUZZAH Pinout:** The Adafruit HUZZAH uses GPIO numbers directly on the silkscreen (no "D" labels). The table shows the corresponding GPIO numbers.
 
@@ -125,7 +125,7 @@ To make wiring dead-simple on the HUZZAH, here’s the exact silkscreen text nex
   - Board label: "SS / #15"   → CC1101 CSN (Chip Select)
 
 - CC1101 interrupt (data ready)
-  - Board label: "#5" → CC1101 GDO0  (default; configurable via `Private.h`)
+  - Board label: "#5" → CC1101 GDO0  (default; configurable via `config.h`)
 
 Notes
 - On the HUZZAH, many pins show both the function and the GPIO number, e.g. "SCK / #14". You can use either reference when wiring.
@@ -148,8 +148,8 @@ Also note other ESP8266 boot-strap pins on HUZZAH:
 ### CC1101
 
 Some modules are not labeled on the PCB. Below is the pinout for one:
-![CC1101 pinout diagram](imgs/cc1101-mapping.png)
-![CC1101 example](imgs/cc1101.jpg)
+![CC1101 pinout diagram](docs/images/cc1101-mapping.png)
+![CC1101 example](docs/images/cc1101.jpg)
 
 ---
 
@@ -185,22 +185,22 @@ The following MQTT topics are used to integrate the device with Home Assistant v
   - Install the [PlatformIO extension for VS Code](https://platformio.org/). This will install all required dependencies and may require restarting VS Code.
 
 2. **Prepare Configuration Files**  
-  - Copy `Exampleprivate.h` into the `src` folder and rename it to `private.h`.  
-  - Update the following details in `private.h`:
+  - Copy `include/config.example.h` to `include/config.h`.  
+  - Update the following details in `config.h`:
     - Wi-Fi and MQTT credentials. If your MQTT setup does not require a username and password, comment out those lines using `//`.  
     - Meter serial number (omit the leading 0) and production year. This information is printed on the meter label:  
-     ![Cyble Meter Label](imgs/meter_label.png) ![Cyble Meter Label](imgs/meter_label_21.png)
-    - **Wi-Fi PHY Mode**: To enable 802.11g Wi-Fi PHY mode, set `ENABLE_WIFI_PHY_MODE_11G` to `1` in the `private.h` file. By default, it is set to `0` (disabled).
+     ![Cyble Meter Label](docs/images/meter_label.png) ![Cyble Meter Label](docs/images/meter_label_21.png)
+    - **Wi-Fi PHY Mode**: To enable 802.11g Wi-Fi PHY mode, set `ENABLE_WIFI_PHY_MODE_11G` to `1` in the `config.h` file. By default, it is set to `0` (disabled).
 
 3. **Update Platform Configuration**  
   - Modify the `platformio.ini` file to match your specific platform and board configuration.
 
 4. **Perform Frequency Discovery (First-Time Setup)**  
-  - Open `private.h` and set `SCAN_FREQUENCY_433MHZ` to `1` to enable frequency discovery.  
+  - Open `config.h` and set `SCAN_FREQUENCY_433MHZ` to `1` to enable frequency discovery.  
   - Compile and upload the code to your ESP device using PlatformIO. Use **PlatformIO > Upload and Monitor**.  
   - Keep the device connected to your computer during this process. The serial monitor will display debug output as the device scans frequencies in the 433 MHz range.  
-  - Once the correct frequency is identified, update the `FREQUENCY` value in `private.h`.  
-  - Disable frequency discovery by setting `SCAN_FREQUENCY_433MHZ` back to `0` in `private.h`.  
+  - Once the correct frequency is identified, update the `FREQUENCY` value in `config.h`.  
+  - Disable frequency discovery by setting `SCAN_FREQUENCY_433MHZ` back to `0` in `config.h`.  
   - For best results, perform this step during local business hours. Refer to the "Frequency Adjustment" section below for additional guidance.
 
 5. **Compile and Flash the Code**  
@@ -218,14 +218,14 @@ The following MQTT topics are used to integrate the device with Home Assistant v
 
 ### Reading Schedule
 
-The **Reading Schedule** feature allows you to configure the days when the meter should be queried. By default, the schedule is set to `Monday-Friday`. You can change this in the `private.h` file by modifying the `DEFAULT_READING_SCHEDULE`.
+The **Reading Schedule** feature allows you to configure the days when the meter should be queried. By default, the schedule is set to `Monday-Friday`. You can change this in the `config.h` file by modifying the `DEFAULT_READING_SCHEDULE`.
 
 Available options:
 - `"Monday-Friday"`: Queries the meter only on weekdays.
 - `"Monday-Saturday"`: Queries the meter from Monday to Saturday.
 - `"Monday-Sunday"`: Queries the meter every day.
 
-Example configuration in `private.h`:
+Example configuration in `config.h`:
 ```cpp
 #define DEFAULT_READING_SCHEDULE "Monday-Saturday"
 ```
@@ -343,3 +343,4 @@ On the flip side, the existence of these community solutions shows a growing des
 - Maison Simon Wiki – technical breakdown of RADIAN protocol (frames, no encryption, similarity to Wireless M-Bus) ([maison2:compteur_d_eau:compteur_d_eau [Le WIKI de la Maison Simon]](http://www.lamaisonsimon.fr/wiki/doku.php?id=maison2:compteur_d_eau:compteur_d_eau#:~:text=the%20Everblu%20Cyble%20Enhanced%20meters,Bus%20strandard)).  
 - Sontex data sheet – example of RADIAN protocol with AES-128 encryption on 433 MHz devices ([](https://sontex.ch/wp-content/uploads/2022/11/data-sheet-stx-565-566-868-878.pdf#:~:text=%EF%82%A7%20Frequency%3A%20433,128)).  
 - UK Wireless Telegraphy Act 2006, Section 48 – illegality of intercepting radio communications without authority ([united kingdom - Is it legal to intercept 2.4Ghz communications (wifi 802.11) in the UK? - Law Stack Exchange](https://law.stackexchange.com/questions/25962/is-it-legal-to-intercept-2-4ghz-communications-wifi-802-11-in-the-uk#:~:text=No%E2%80%94the%20interception%20of%20any%20radio,the%20Wireless%20Telegraphy%20Act%202006)).
+

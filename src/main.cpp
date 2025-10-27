@@ -18,7 +18,7 @@
  * For more details, refer to the README file.
  */
 
-#include "private.h"        // Include private configuration (Wi-Fi, MQTT, etc.)
+#include "config.h"         // Include private configuration (Wi-Fi, MQTT, etc.)
 #include "everblu_meters.h" // Include EverBlu meter communication library
 #include <ESP8266WiFi.h>    // Wi-Fi library for ESP8266
 #include <ESP8266mDNS.h>    // mDNS library for ESP8266

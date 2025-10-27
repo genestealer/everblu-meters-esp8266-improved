@@ -3,10 +3,10 @@
 Purpose: Firmware for ESP8266/ESP32 + CC1101 to actively poll Itron EverBlu Cyble Enhanced (RADIAN at 433 MHz), then publish readings to Home Assistant via MQTT AutoDiscovery.
 
 ## Big picture
-- Entry point: `src/everblu-meters-esp8266.cpp` orchestrates Wi‑Fi/MQTT, CC1101 radio, and HA discovery.
-- Radio layer: `src/cc1101.{h,cpp}` implements CC1101 SPI control, RADIAN wake/poll, bitstream decoding, and parsing to `tmeter_data`.
-- Protocol helpers: `src/everblu_meters.{h,cpp}` provide frame encoding, CRC (Kermit), and small debug utilities.
-- Configuration: `private.h` (must exist in include path) defines Wi‑Fi/MQTT secrets, meter serial/year, GDO0 pin, and radio frequency.
+- Entry point: `src/main.cpp` orchestrates Wi‑Fi/MQTT, CC1101 radio, and HA discovery.
+- Radio layer: `src/cc1101.cpp` and `include/cc1101.h` implement CC1101 SPI control, RADIAN wake/poll, bitstream decoding, and parsing to `tmeter_data`.
+- Protocol helpers: `include/everblu_meters.h` and `src/utils.cpp` provide frame encoding, CRC (Kermit), and small debug utilities.
+- Configuration: `include/config.h` (must exist in include path) defines Wi‑Fi/MQTT secrets, meter serial/year, GDO0 pin, and radio frequency.
 - Data flow: at boot → Wi‑Fi+MQTT → HA discovery → scheduled or manual "read" → `get_meter_data()` → publish metrics to MQTT topics under `everblu/cyble/*`.
 
 ## Build/flash workflow (PlatformIO)
@@ -15,13 +15,13 @@ Purpose: Firmware for ESP8266/ESP32 + CC1101 to actively poll Itron EverBlu Cybl
 - OTA is supported (ArduinoOTA). To use it, uncomment `upload_protocol = espota` and `upload_port = <device-ip>` in `platformio.ini`.
 
 ## Required configuration (do this first)
-- Copy `include/Example_Private.h` to `include/private.h` (exact lowercase name to match `#include "private.h"`). Fill values:
+- Copy `include/config.example.h` to `include/config.h` (exact lowercase name to match `#include "config.h"`). Fill values:
   - `secret_wifi_ssid`, `secret_wifi_password`, `secret_mqtt_server`, optional `secret_mqtt_username/password`, `secret_clientName`, `secret_local_timeclock_server`.
   - Meter info: `METER_YEAR` (YY), `METER_SERIAL` (no leading 0), `FREQUENCY` (MHz float), `GDO0` (default 5 on ESP8266).
-- Keep secrets out of commits. Use the example file for diffs and don’t check real creds into VCS.
+- Keep secrets out of commits. Use the example file for diffs and don't check real creds into VCS.
 
 ## Radio/protocol essentials
-- Frequency: Configure the target frequency in `FREQUENCY` in `private.h` (typically ~433.82 MHz, but varies by meter/region).
+- Frequency: Configure the target frequency in `FREQUENCY` in `config.h` (typically ~433.82 MHz, but varies by meter/region).
   - The CC1101 now uses **automatic frequency synthesizer calibration** and **frequency offset compensation (FOC)** for improved accuracy and reliability.
   - Manual calibration is performed at init via the `SCAL` strobe command.
   - Automatic calibration occurs on every IDLE→RX/TX transition (configured in MCSM0 register).
@@ -38,7 +38,7 @@ Purpose: Firmware for ESP8266/ESP32 + CC1101 to actively poll Itron EverBlu Cybl
 - HA AutoDiscovery: Sent on connect in `onConnectionEstablished()` using compact JSON strings. Discovery topics are under `homeassistant/<component>/<object_id>/config` and are retained. If you add a new metric, add both a discovery JSON and a publish in the corresponding data/diag function.
 
 ## Scheduling and timing
-- Daily reading at 10:00 UTC when `isReadingDay()` matches. Default schedule is `Monday‑Friday` via `DEFAULT_READING_SCHEDULE` (override in `private.h`).
+- Daily reading at 10:00 UTC when `isReadingDay()` matches. Default schedule is `Monday‑Friday` via `DEFAULT_READING_SCHEDULE` (override in `config.h`).
 - Wi‑Fi diagnostics publish every 5 minutes.
 
 ## Hardware/pins
@@ -57,7 +57,7 @@ Purpose: Firmware for ESP8266/ESP32 + CC1101 to actively poll Itron EverBlu Cybl
 
 ## Quick debug tips
 - Use serial monitor at 115200. Enable `mqtt.enableDebuggingMessages(true)` if needed.
-- If no data, try during business hours (meters wake intermittently), verify frequency is correct in `private.h`, and check antenna/CC1101 variant.
+- If no data, try during business hours (meters wake intermittently), verify frequency is correct in `config.h`, and check antenna/CC1101 variant.
 - The CC1101 automatically calibrates on every state transition and compensates for frequency offset, improving reliability over a wide temperature range.
 
 If any part of this is unclear (e.g., secret file naming/casing, adding new HA sensors, or adapting to ESP32), tell me what you’d like to do and I’ll refine these instructions. 
