@@ -24,7 +24,7 @@ Supported meters:
 - Includes RSSI (Radio Signal Strength Indicator), LQI (Link Quality) and Signal Strength for the meter for diagnostics.
 - Time Start and Time End sensors to indicate when the meter wakes and sleeps.
 - MQTT integration for Home Assistant with AutoDiscovery.
-- Frequency discovery for meter communication via config file.
+- Automatic CC1101 frequency calibration with manual fallback.
 - Wi-Fi diagnostics and OTA updates.
 - Reading Schedule Configuration: Configure the days when the meter should be queried (e.g., Monday-Friday, Monday-Saturday, or Monday-Sunday).
 - Daily scheduled meter readings.
@@ -228,6 +228,55 @@ Available options:
 Example configuration in `config.h`:
 ```cpp
 #define DEFAULT_READING_SCHEDULE "Monday-Saturday"
+```
+
+---
+
+### Frequency Configuration
+
+The firmware uses **automatic frequency calibration** on the CC1101 radio to ensure accurate communication with your meter. The frequency is configured at compile time in your `config.h` file.
+
+#### How It Works
+
+1. **Compile-Time Configuration**: The operating frequency is set via the `FREQUENCY` define in `config.h` (e.g., `#define FREQUENCY 433.82`).
+
+2. **Default Frequency**: If you don't specify `FREQUENCY` in your config file, the firmware will automatically default to **433.82 MHz**, which is the standard RADIAN protocol center frequency for EverBlu meters. A warning will be logged at startup if the default is used.
+
+3. **Automatic Calibration**: The CC1101 radio performs automatic frequency synthesizer calibration on every idle-to-RX/TX transition (via the `FS_AUTOCAL` setting in `MCSM0`). Additionally, the firmware triggers a manual calibration (`SCAL` strobe) immediately after setting the frequency during initialization.
+
+4. **Frequency Offset Compensation**: The CC1101's built-in frequency offset compensation (FOC) is enabled to automatically correct for small frequency drift during reception.
+
+5. **No MQTT Publishing**: The frequency is **not published to MQTT or Home Assistant**. It's a low-level radio configuration parameter that:
+   - Doesn't change during runtime
+   - Is already visible in the serial debug log at startup
+   - Isn't meaningful as a "sensor" value in Home Assistant
+   - Would only add unnecessary clutter to your HA dashboard
+
+#### Why This Approach?
+
+Previous versions required manual frequency scanning and static calibration values. The new approach:
+- **Simplifies setup**: Just set your frequency once in `config.h` (or use the default)
+- **Improves accuracy**: Automatic calibration adapts to temperature and voltage variations
+- **Reduces maintenance**: No need to manually determine and set `FSCAL` values
+- **Enhances reliability**: FOC compensates for small frequency errors during reception
+
+#### Configuration Example
+
+In your `config.h`:
+```cpp
+// Optional: Specify the meter's frequency in MHz
+// If not defined, defaults to 433.82 MHz (RADIAN protocol standard)
+#define FREQUENCY 433.82
+```
+
+To find your meter's exact frequency, you can:
+1. Use the frequency scanning mode (set `SCAN_FREQUENCY_433MHZ` to `1`) during initial setup
+2. Use an RTL-SDR to measure the frequency while a utility reader is polling your meter
+3. Start with the default 433.82 MHz and adjust slightly if needed (typically ±0.01 MHz)
+
+The effective frequency is always displayed in the serial log during startup:
+```
+> Frequency (effective): 433.820000 MHz
 ```
 
 ---
