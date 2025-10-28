@@ -73,6 +73,9 @@ const char jsonTemplate[] = "{ "
                             "\"timestamp\" : \"%s\" }";
 
 int _retry = 0;
+const int MAX_RETRIES = 3; // Maximum number of retry attempts
+unsigned long lastFailedAttempt = 0; // Timestamp of last failed attempt
+const unsigned long RETRY_COOLDOWN = 3600000; // 1 hour cooldown in milliseconds
 
 // Global variable to store the reading schedule (default from config.h)
 String readingSchedule = DEFAULT_READING_SCHEDULE;
@@ -154,9 +157,25 @@ void onUpdateData()
 
   // Handle data retrieval failure
   if (meter_data.reads_counter == 0 || meter_data.liters == 0) {
-    Serial.println("Unable to retrieve data from meter. Retry later...");
-    if (_retry++ < 10)
-      mqtt.executeDelayed(1000 * 10, onUpdateData); // Retry in 10 seconds
+    Serial.printf("Unable to retrieve data from meter (attempt %d/%d)\n", _retry + 1, MAX_RETRIES);
+    
+    if (_retry < MAX_RETRIES) {
+      _retry++;
+      Serial.printf("Retrying in 10 seconds... (attempt %d/%d)\n", _retry + 1, MAX_RETRIES);
+      mqtt.publish("everblu/cyble/active_reading", "false", true);
+      digitalWrite(LED_BUILTIN, HIGH); // Turn off LED
+      // Schedule retry without recursion - use a simple delay approach
+      delay(10000); // Wait 10 seconds
+      onUpdateData(); // Try again
+    } else {
+      // Max retries reached, enter cooldown period
+      lastFailedAttempt = millis();
+      Serial.printf("Max retries (%d) reached. Entering 1-hour cooldown period.\n", MAX_RETRIES);
+      mqtt.publish("everblu/cyble/active_reading", "false", true);
+      mqtt.publish("everblu/cyble/status_message", "Failed after max retries, cooling down for 1 hour", true);
+      digitalWrite(LED_BUILTIN, HIGH); // Turn off LED
+      _retry = 0; // Reset retry counter for next scheduled attempt
+    }
     return;
   }
 
@@ -207,6 +226,10 @@ void onUpdateData()
   mqtt.publish("everblu/cyble/active_reading", "false", true);
   digitalWrite(LED_BUILTIN, HIGH); // Turn off LED to indicate completion
 
+  // Reset retry counter and cooldown on successful read
+  _retry = 0;
+  lastFailedAttempt = 0;
+
   Serial.printf("Data update complete.\n\n");
 }
 
@@ -219,6 +242,19 @@ void onScheduled()
 
   // Check if today is a valid reading day
   if (isReadingDay(ptm) && ptm->tm_hour == 10 && ptm->tm_min == 0 && ptm->tm_sec == 0) {
+    // Check if we're still in cooldown period after failed attempts
+    if (lastFailedAttempt > 0 && (millis() - lastFailedAttempt) < RETRY_COOLDOWN) {
+      unsigned long remainingCooldown = (RETRY_COOLDOWN - (millis() - lastFailedAttempt)) / 1000;
+      Serial.printf("Still in cooldown period. %lu seconds remaining.\n", remainingCooldown);
+      mqtt.publish("everblu/cyble/status_message", 
+                   String("Cooldown active, " + String(remainingCooldown) + "s remaining").c_str(), true);
+      mqtt.executeDelayed(500, onScheduled);
+      return;
+    }
+    
+    // Cooldown period is over, reset and proceed
+    lastFailedAttempt = 0;
+    
     // Call back in 23 hours
     mqtt.executeDelayed(1000 * 60 * 60 * 23, onScheduled);
 
@@ -240,7 +276,7 @@ void onScheduled()
 
 // JSON Discovery for Reading (Total)
 // This is used to show the total water usage in Home Assistant
-String jsonDiscoveryReading = R"rawliteral(
+const char jsonDiscoveryReading[] PROGMEM = R"rawliteral(
 {
   "name": "Reading (Total)",
   "uniq_id": "water_meter_value",
@@ -268,7 +304,7 @@ String jsonDiscoveryReading = R"rawliteral(
 
 // JSON Discovery for Read Counter
 // This is used to show the number of times the meter has been read in Home Assistant
-String jsonDiscoveryReadCounter = R"rawliteral(
+const char jsonDiscoveryReadCounter[] PROGMEM = R"rawliteral(
 {
   "name": "Read Counter",
   "uniq_id": "water_meter_counter",
@@ -289,7 +325,7 @@ String jsonDiscoveryReadCounter = R"rawliteral(
 
 // JSON Discovery for Last Read (timestamp)
 // This is used to show the last time the meter was read in Home Assistant
-String jsonDiscoveryLastRead = R"rawliteral(
+const char jsonDiscoveryLastRead[] PROGMEM = R"rawliteral(
 {
   "name": "Last Read",
   "uniq_id": "water_meter_timestamp",
@@ -311,7 +347,7 @@ String jsonDiscoveryLastRead = R"rawliteral(
 
 // JSON Discovery for Request Reading (button)
 // This is used to trigger a reading from the meter when pressed in Home Assistant
-String jsonDiscoveryRequestReading = R"rawliteral(
+const char jsonDiscoveryRequestReading[] PROGMEM = R"rawliteral(
 {
   "name": "Request Reading Now",
   "uniq_id": "water_meter_request",
@@ -334,7 +370,7 @@ String jsonDiscoveryRequestReading = R"rawliteral(
 
 // JSON Discovery for Active Reading (binary sensor)
 // This is used to indicate that the device is currently reading data from the meter
-String jsonDiscoveryActiveReading = R"rawliteral(
+const char jsonDiscoveryActiveReading[] PROGMEM = R"rawliteral(
 {
   "name": "Active Reading",
   "uniq_id": "water_meter_active_reading",
@@ -356,7 +392,7 @@ String jsonDiscoveryActiveReading = R"rawliteral(
 
 // JSON Discovery for Wi-Fi Details
 // These are used to provide information about the Wi-Fi connection of the device
-String jsonDiscoveryWifiIP = R"rawliteral(
+const char jsonDiscoveryWifiIP[] PROGMEM = R"rawliteral(
 {
   "name": "IP Address",
   "uniq_id": "water_meter_wifi_ip",
@@ -377,7 +413,7 @@ String jsonDiscoveryWifiIP = R"rawliteral(
 
 // JSON Discovery for Wi-Fi RSSI
 // This is used to show the Wi-Fi signal strength in Home Assistant
-String jsonDiscoveryWifiRSSI = R"rawliteral(
+const char jsonDiscoveryWifiRSSI[] PROGMEM = R"rawliteral(
 {
   "name": "WiFi RSSI",
   "uniq_id": "water_meter_wifi_rssi",
@@ -401,7 +437,7 @@ String jsonDiscoveryWifiRSSI = R"rawliteral(
 
 // JSON Discovery for Wi-Fi Signal Percentage
 // This is used to show the Wi-Fi signal strength as a percentage in Home Assistant
-String jsonDiscoveryWifiSignalPercentage = R"rawliteral(
+const char jsonDiscoveryWifiSignalPercentage[] PROGMEM = R"rawliteral(
 {
   "name": "WiFi Signal",
   "uniq_id": "water_meter_wifi_signal_percentage",
@@ -424,7 +460,7 @@ String jsonDiscoveryWifiSignalPercentage = R"rawliteral(
 
 // JSON Discovery for MAC Address
 // This is used to show the MAC address of the device in Home Assistant
-String jsonDiscoveryMacAddress = R"rawliteral(
+const char jsonDiscoveryMacAddress[] PROGMEM = R"rawliteral(
 {
   "name": "MAC Address",
   "uniq_id": "water_meter_mac_address",
@@ -445,7 +481,7 @@ String jsonDiscoveryMacAddress = R"rawliteral(
 
 // JSON Discovery for BSSID
 // This is used to show the BSSID of the device in Home Assistant
-String jsonDiscoveryBSSID = R"rawliteral(
+const char jsonDiscoveryBSSID[] PROGMEM = R"rawliteral(
 {
   "name": "WiFi BSSID",
   "uniq_id": "water_meter_wifi_bssid",
@@ -466,7 +502,7 @@ String jsonDiscoveryBSSID = R"rawliteral(
 
 // JSON Discovery for Wi-Fi SSID
 // This is used to show the SSID of the device in Home Assistant
-String jsonDiscoverySSID = R"rawliteral(
+const char jsonDiscoverySSID[] PROGMEM = R"rawliteral(
 {
   "name": "WiFi SSID",
   "uniq_id": "water_meter_wifi_ssid",
@@ -487,7 +523,7 @@ String jsonDiscoverySSID = R"rawliteral(
 
 // JSON Discovery for Uptime
 // This is used to show the uptime of the device in Home Assistant
-String jsonDiscoveryUptime = R"rawliteral(
+const char jsonDiscoveryUptime[] PROGMEM = R"rawliteral(
 {
   "name": "Device Uptime",
   "uniq_id": "water_meter_uptime",
@@ -509,7 +545,7 @@ String jsonDiscoveryUptime = R"rawliteral(
 
 // JSON Discovery for Restart Button
 // This is used to trigger a restart of the device when pressed in Home Assistant
-String jsonDiscoveryRestartButton = R"rawliteral(
+const char jsonDiscoveryRestartButton[] PROGMEM = R"rawliteral(
 {
   "name": "Restart Device",
   "uniq_id": "water_meter_restart",
@@ -529,7 +565,7 @@ String jsonDiscoveryRestartButton = R"rawliteral(
 )rawliteral";
 
 // JSON Discovery for Meter Year
-String jsonDiscoveryMeterYear = R"rawliteral(
+const char jsonDiscoveryMeterYear[] PROGMEM = R"rawliteral(
 {
   "name": "Meter Year",
   "uniq_id": "water_meter_year",
@@ -550,7 +586,7 @@ String jsonDiscoveryMeterYear = R"rawliteral(
 )rawliteral";
 
 // JSON Discovery for Meter Serial
-String jsonDiscoveryMeterSerial = R"rawliteral(
+const char jsonDiscoveryMeterSerial[] PROGMEM = R"rawliteral(
 {
   "name": "Meter Serial",
   "uniq_id": "water_meter_serial",
@@ -571,7 +607,7 @@ String jsonDiscoveryMeterSerial = R"rawliteral(
 )rawliteral";
 
 // JSON Discovery for Reading Schedule
-String jsonDiscoveryReadingSchedule = R"rawliteral(
+const char jsonDiscoveryReadingSchedule[] PROGMEM = R"rawliteral(
 {
   "name": "Reading Schedule",
   "uniq_id": "water_meter_reading_schedule",
@@ -592,7 +628,7 @@ String jsonDiscoveryReadingSchedule = R"rawliteral(
 )rawliteral";
 
 // JSON Discovery for Battery Months Left
-String jsonDiscoveryBatteryMonths = R"rawliteral(
+const char jsonDiscoveryBatteryMonths[] PROGMEM = R"rawliteral(
 {
   "name": "Months Remaining",
   "uniq_id": "water_meter_battery_months",
@@ -615,7 +651,7 @@ String jsonDiscoveryBatteryMonths = R"rawliteral(
 )rawliteral";
 
 // JSON Discovery for Meter RSSI (dBm)
-String jsonDiscoveryMeterRSSIDBm = R"rawliteral(
+const char jsonDiscoveryMeterRSSIDBm[] PROGMEM = R"rawliteral(
 {
   "name": "RSSI",
   "uniq_id": "water_meter_rssi_dbm",
@@ -638,7 +674,7 @@ String jsonDiscoveryMeterRSSIDBm = R"rawliteral(
 )rawliteral";
 
 // JSON Discovery for Meter RSSI (Percentage)
-String jsonDiscoveryMeterRSSIPercentage = R"rawliteral(
+const char jsonDiscoveryMeterRSSIPercentage[] PROGMEM = R"rawliteral(
 {
   "name": "Signal",
   "uniq_id": "water_meter_rssi_percentage",
@@ -660,7 +696,7 @@ String jsonDiscoveryMeterRSSIPercentage = R"rawliteral(
 )rawliteral";
 
 // JSON Discovery for Meter LQI (Link Quality Indicator)
-String jsonDiscoveryLQIPercentage = R"rawliteral(
+const char jsonDiscoveryLQIPercentage[] PROGMEM = R"rawliteral(
   {
     "name": "Signal Quality (LQI)",
     "uniq_id": "water_meter_lqi_percentage",
@@ -683,7 +719,7 @@ String jsonDiscoveryLQIPercentage = R"rawliteral(
   )rawliteral";
   
 // JSON Discovery for Meter Wake Time
-String jsonDiscoveryTimeStart = R"rawliteral(
+const char jsonDiscoveryTimeStart[] PROGMEM = R"rawliteral(
 {
   "name": "Wake Time",
   "uniq_id": "water_meter_time_start",
@@ -703,7 +739,7 @@ String jsonDiscoveryTimeStart = R"rawliteral(
 )rawliteral";
 
 // JSON Discovery for Meter Sleep Time
-String jsonDiscoveryTimeEnd = R"rawliteral(
+const char jsonDiscoveryTimeEnd[] PROGMEM = R"rawliteral(
 {
   "name": "Sleep Time",
   "uniq_id": "water_meter_time_end",
@@ -843,6 +879,14 @@ void onConnectionEstablished()
 
   mqtt.subscribe("everblu/cyble/trigger", [](const String& message) {
     if (message.length() > 0) {
+      // Check if we're in cooldown period
+      if (lastFailedAttempt > 0 && (millis() - lastFailedAttempt) < RETRY_COOLDOWN) {
+        unsigned long remainingCooldown = (RETRY_COOLDOWN - (millis() - lastFailedAttempt)) / 1000;
+        Serial.printf("Cannot trigger update: Still in cooldown period. %lu seconds remaining.\n", remainingCooldown);
+        mqtt.publish("everblu/cyble/status_message", 
+                     String("Cooldown active, " + String(remainingCooldown) + "s remaining").c_str(), true);
+        return;
+      }
 
       Serial.println("Update data from meter from MQTT trigger");
 
@@ -862,65 +906,65 @@ void onConnectionEstablished()
 
   // Publish Meter details discovery configuration
   delay(50);
-  mqtt.publish("homeassistant/sensor/water_meter_value/config", jsonDiscoveryReading, true);
+  mqtt.publish("homeassistant/sensor/water_meter_value/config", FPSTR(jsonDiscoveryReading), true);
   delay(50);
-  mqtt.publish("homeassistant/sensor/water_meter_counter/config", jsonDiscoveryReadCounter, true);
+  mqtt.publish("homeassistant/sensor/water_meter_counter/config", FPSTR(jsonDiscoveryReadCounter), true);
   delay(50);
-  mqtt.publish("homeassistant/sensor/water_meter_timestamp/config", jsonDiscoveryLastRead, true);
+  mqtt.publish("homeassistant/sensor/water_meter_timestamp/config", FPSTR(jsonDiscoveryLastRead), true);
   delay(50);
-  mqtt.publish("homeassistant/button/water_meter_request/config", jsonDiscoveryRequestReading, true);
+  mqtt.publish("homeassistant/button/water_meter_request/config", FPSTR(jsonDiscoveryRequestReading), true);
   delay(50);
 
   // Publish Wi-Fi details discovery configuration
-  mqtt.publish("homeassistant/sensor/water_meter_wifi_ip/config", jsonDiscoveryWifiIP, true);
+  mqtt.publish("homeassistant/sensor/water_meter_wifi_ip/config", FPSTR(jsonDiscoveryWifiIP), true);
   delay(50);
-  mqtt.publish("homeassistant/sensor/water_meter_wifi_rssi/config", jsonDiscoveryWifiRSSI, true);
+  mqtt.publish("homeassistant/sensor/water_meter_wifi_rssi/config", FPSTR(jsonDiscoveryWifiRSSI), true);
   delay(50);
-  mqtt.publish("homeassistant/sensor/water_meter_mac_address/config", jsonDiscoveryMacAddress, true);
+  mqtt.publish("homeassistant/sensor/water_meter_mac_address/config", FPSTR(jsonDiscoveryMacAddress), true);
   delay(50);
-  mqtt.publish("homeassistant/sensor/water_meter_wifi_ssid/config", jsonDiscoverySSID, true);
+  mqtt.publish("homeassistant/sensor/water_meter_wifi_ssid/config", FPSTR(jsonDiscoverySSID), true);
   delay(50);
-  mqtt.publish("homeassistant/sensor/water_meter_wifi_bssid/config", jsonDiscoveryBSSID, true);
+  mqtt.publish("homeassistant/sensor/water_meter_wifi_bssid/config", FPSTR(jsonDiscoveryBSSID), true);
   delay(50);
-  mqtt.publish("homeassistant/sensor/water_meter_uptime/config", jsonDiscoveryUptime, true);
+  mqtt.publish("homeassistant/sensor/water_meter_uptime/config", FPSTR(jsonDiscoveryUptime), true);
   delay(50);
-  mqtt.publish("homeassistant/sensor/water_meter_wifi_signal_percentage/config", jsonDiscoveryWifiSignalPercentage, true);
+  mqtt.publish("homeassistant/sensor/water_meter_wifi_signal_percentage/config", FPSTR(jsonDiscoveryWifiSignalPercentage), true);
   delay(50);
 
   // Publish MQTT discovery messages for the Restart Button
-  mqtt.publish("homeassistant/button/water_meter_restart/config", jsonDiscoveryRestartButton, true);
+  mqtt.publish("homeassistant/button/water_meter_restart/config", FPSTR(jsonDiscoveryRestartButton), true);
   delay(50);
 
   // Publish MQTT discovery message for the binary sensor
-  mqtt.publish("homeassistant/binary_sensor/water_meter_active_reading/config", jsonDiscoveryActiveReading, true);
+  mqtt.publish("homeassistant/binary_sensor/water_meter_active_reading/config", FPSTR(jsonDiscoveryActiveReading), true);
   delay(50);
 
   // Publish MQTT discovery messages for Meter Year, Serial
-  mqtt.publish("homeassistant/sensor/water_meter_year/config", jsonDiscoveryMeterYear, true);
+  mqtt.publish("homeassistant/sensor/water_meter_year/config", FPSTR(jsonDiscoveryMeterYear), true);
   delay(50);
-  mqtt.publish("homeassistant/sensor/water_meter_serial/config", jsonDiscoveryMeterSerial, true);
+  mqtt.publish("homeassistant/sensor/water_meter_serial/config", FPSTR(jsonDiscoveryMeterSerial), true);
   delay(50);
 
   // Publish JSON discovery for Reading Schedule
-  mqtt.publish("homeassistant/sensor/water_meter_reading_schedule/config", jsonDiscoveryReadingSchedule, true);
+  mqtt.publish("homeassistant/sensor/water_meter_reading_schedule/config", FPSTR(jsonDiscoveryReadingSchedule), true);
   delay(50);
 
   // Publish JSON discovery for Battery Months Left
-  mqtt.publish("homeassistant/sensor/water_meter_battery_months/config", jsonDiscoveryBatteryMonths, true);
+  mqtt.publish("homeassistant/sensor/water_meter_battery_months/config", FPSTR(jsonDiscoveryBatteryMonths), true);
   delay(50);
 
   // Publish JSON discovery for Meter RSSI (dBm), RSSI (%), and LQI (%)
-  mqtt.publish("homeassistant/sensor/water_meter_rssi_dbm/config", jsonDiscoveryMeterRSSIDBm, true);
+  mqtt.publish("homeassistant/sensor/water_meter_rssi_dbm/config", FPSTR(jsonDiscoveryMeterRSSIDBm), true);
   delay(50);
-  mqtt.publish("homeassistant/sensor/water_meter_rssi_percentage/config", jsonDiscoveryMeterRSSIPercentage, true);
+  mqtt.publish("homeassistant/sensor/water_meter_rssi_percentage/config", FPSTR(jsonDiscoveryMeterRSSIPercentage), true);
   delay(50);
-  mqtt.publish("homeassistant/sensor/water_meter_lqi_percentage/config", jsonDiscoveryLQIPercentage, true);
+  mqtt.publish("homeassistant/sensor/water_meter_lqi_percentage/config", FPSTR(jsonDiscoveryLQIPercentage), true);
   delay(50);
 
   // Publish JSON discovery for the times the meter wakes and sleeps
-  mqtt.publish("homeassistant/sensor/water_meter_time_start/config", jsonDiscoveryTimeStart, true);
+  mqtt.publish("homeassistant/sensor/water_meter_time_start/config", FPSTR(jsonDiscoveryTimeStart), true);
   delay(50);
-  mqtt.publish("homeassistant/sensor/water_meter_time_end/config", jsonDiscoveryTimeEnd, true);
+  mqtt.publish("homeassistant/sensor/water_meter_time_end/config", FPSTR(jsonDiscoveryTimeEnd), true);
   delay(50);
 
   // Set initial state for active reading
