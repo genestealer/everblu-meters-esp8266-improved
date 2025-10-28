@@ -7,7 +7,7 @@
  #include "everblu_meters.h"
  #include <config.h> // Configuration file (Wi-Fi, MQTT, meter settings)
  
- void show_in_hex(uint8_t* buffer, size_t len)
+ void show_in_hex(const uint8_t* buffer, size_t len)
  {
    int i=0;
 	 for (i=0 ; i<len ; i++) {
@@ -19,7 +19,7 @@
 	 printf("\n");
  }
  
- void show_in_hex_array(uint8_t* buffer, size_t len)
+ void show_in_hex_array(const uint8_t* buffer, size_t len)
  {
    int i=0;
 	 for (i=0 ; i<len ; i++) {
@@ -29,7 +29,7 @@
    Serial.println("");
  }
  
- void show_in_hex_one_line(uint8_t* buffer, size_t len)
+ void show_in_hex_one_line(const uint8_t* buffer, size_t len)
  {
    int i=0;
 	 for (i=0 ; i<len ; i++) {
@@ -37,7 +37,7 @@
 	 }
  }
  
- void show_in_hex_one_line_GET(uint8_t* buffer, size_t len)
+ void show_in_hex_one_line_GET(const uint8_t* buffer, size_t len)
  {
    int i=0;
 	 for (i=0 ; i<len ; i++) {
@@ -45,7 +45,7 @@
 	 }
  }
  
- void show_in_bin(uint8_t* buffer, size_t len)
+ void show_in_bin(const uint8_t* buffer, size_t len)
  {
 	 const uint8_t *ptr;
 	 uint8_t mask;
@@ -60,7 +60,7 @@
 	 printf("\n");
  }
  
- void echo_debug(T_BOOL l_flag,char *fmt, ...)
+ void echo_debug(T_BOOL l_flag,const char *fmt, ...)
  {
   if (l_flag)
   {

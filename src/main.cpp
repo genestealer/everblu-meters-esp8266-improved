@@ -20,8 +20,13 @@
 
 #include "config.h"         // Include private configuration (Wi-Fi, MQTT, etc.)
 #include "everblu_meters.h" // Include EverBlu meter communication library
+#if defined(ESP8266)
 #include <ESP8266WiFi.h>    // Wi-Fi library for ESP8266
 #include <ESP8266mDNS.h>    // mDNS library for ESP8266
+#elif defined(ESP32)
+#include <WiFi.h>           // Wi-Fi library for ESP32
+#include <ESPmDNS.h>        // mDNS library for ESP32
+#endif
 #include <Arduino.h>        // Core Arduino library
 #include <ArduinoOTA.h>     // OTA update library
 #include <EspMQTTClient.h>  // MQTT client library
@@ -42,6 +47,30 @@
 #ifndef DEFAULT_READING_SCHEDULE
 #define DEFAULT_READING_SCHEDULE "Monday-Friday"
 #endif
+
+// Optional: configurable daily read time in UTC (hour/minute)
+// If not defined in config.h, defaults to 10:00 UTC
+#ifndef DEFAULT_READING_HOUR_UTC
+#define DEFAULT_READING_HOUR_UTC 10
+#endif
+#ifndef DEFAULT_READING_MINUTE_UTC
+#define DEFAULT_READING_MINUTE_UTC 0
+#endif
+
+// Auto-align scheduled reading time to the meter's wake window (time_start/time_end)
+// 1 = enabled (default), 0 = disabled
+#ifndef AUTO_ALIGN_READING_TIME
+#define AUTO_ALIGN_READING_TIME 1
+#endif
+
+// Alignment strategy: 0 = use time_start, 1 = use midpoint of [time_start, time_end]
+#ifndef AUTO_ALIGN_USE_MIDPOINT
+#define AUTO_ALIGN_USE_MIDPOINT 1
+#endif
+
+// Resolved reading time (UTC) which may be updated dynamically after a successful read
+static int g_readHourUtc = DEFAULT_READING_HOUR_UTC;
+static int g_readMinuteUtc = DEFAULT_READING_MINUTE_UTC;
 
 // Define a default meter frequency if missing from config.h.
 // RADIAN protocol nominal center frequency for EverBlu is 433.82 MHz.
@@ -222,6 +251,34 @@ void onUpdateData()
   sprintf(json, jsonTemplate, meter_data.liters, meter_data.reads_counter, meter_data.battery_left, meter_data.rssi, iso8601);
   mqtt.publish("everblu/cyble/json", json, true);
 
+#if AUTO_ALIGN_READING_TIME
+  // Optionally auto-align the daily scheduled reading time to the meter's wake window
+  {
+    int timeStart = constrain(meter_data.time_start, 0, 23);
+    int timeEnd = constrain(meter_data.time_end, 0, 23);
+    int window = (timeEnd - timeStart + 24) % 24; // hours in window (0 means unknown/all-day)
+
+    if (window > 0) {
+#if AUTO_ALIGN_USE_MIDPOINT
+      int alignedHour = (timeStart + (window / 2)) % 24; // midpoint
+#else
+      int alignedHour = timeStart; // start of window
+#endif
+      // Update resolved schedule time (keep minutes as configured default)
+      g_readHourUtc = alignedHour;
+      g_readMinuteUtc = DEFAULT_READING_MINUTE_UTC;
+
+      // Publish updated reading_time HH:MM
+      char readingTimeFormatted2[6];
+      snprintf(readingTimeFormatted2, sizeof(readingTimeFormatted2), "%02d:%02d", g_readHourUtc, g_readMinuteUtc);
+      mqtt.publish("everblu/cyble/reading_time", readingTimeFormatted2, true);
+      delay(50);
+
+      Serial.printf("> Auto-aligned reading time to %02d:%02d UTC (window %02d-%02d)\n", g_readHourUtc, g_readMinuteUtc, timeStart, timeEnd);
+    }
+  }
+#endif
+
   // Notify MQTT that active reading has ended
   mqtt.publish("everblu/cyble/active_reading", "false", true);
   digitalWrite(LED_BUILTIN, HIGH); // Turn off LED to indicate completion
@@ -241,7 +298,7 @@ void onScheduled()
   struct tm *ptm = gmtime(&tnow);
 
   // Check if today is a valid reading day
-  if (isReadingDay(ptm) && ptm->tm_hour == 10 && ptm->tm_min == 0 && ptm->tm_sec == 0) {
+  if (isReadingDay(ptm) && ptm->tm_hour == g_readHourUtc && ptm->tm_min == g_readMinuteUtc && ptm->tm_sec == 0) {
     // Check if we're still in cooldown period after failed attempts
     if (lastFailedAttempt > 0 && (millis() - lastFailedAttempt) < RETRY_COOLDOWN) {
       unsigned long remainingCooldown = (RETRY_COOLDOWN - (millis() - lastFailedAttempt)) / 1000;
@@ -286,6 +343,7 @@ const char jsonDiscoveryReading[] PROGMEM = R"rawliteral(
   "dev_cla": "water",
   "stat_cla": "total_increasing",
   "qos": 0,
+  "sug_dsp_prc": 0,
   "avty_t": "everblu/cyble/status",
   "stat_t": "everblu/cyble/liters",
   "frc_upd": true,
@@ -400,6 +458,27 @@ const char jsonDiscoveryWifiIP[] PROGMEM = R"rawliteral(
   "ic": "mdi:ip-network-outline",
   "qos": 0,
   "stat_t": "everblu/cyble/wifi_ip",
+  "frc_upd": true,
+  "ent_cat": "diagnostic",
+  "dev": {
+    "ids": ["14071984"],
+    "name": "Water Meter",
+    "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
+    "mf": "Psykokwak [Forked by Genestealer]"
+  }
+}
+)rawliteral";
+
+// JSON Discovery for Reading Time (HH:MM, UTC)
+const char jsonDiscoveryReadingTime[] PROGMEM = R"rawliteral(
+{
+  "name": "Reading Time (UTC)",
+  "uniq_id": "water_meter_reading_time",
+  "obj_id": "water_meter_reading_time",
+  "ic": "mdi:clock-outline",
+  "qos": 0,
+  "avty_t": "everblu/cyble/status",
+  "stat_t": "everblu/cyble/reading_time",
   "frc_upd": true,
   "ent_cat": "diagnostic",
   "dev": {
@@ -703,12 +782,11 @@ const char jsonDiscoveryLQIPercentage[] PROGMEM = R"rawliteral(
     "obj_id": "water_meter_lqi_percentage",
     "ic": "mdi:signal-cellular-outline",
     "unit_of_meas": "%",
-  "stat_cla": "measurement",
+    "stat_cla": "measurement",
     "qos": 0,
     "avty_t": "everblu/cyble/status",
     "stat_t": "everblu/cyble/lqi_percentage",
     "frc_upd": true,
-    "ent_cat": "diagnostic",
     "dev": {
       "ids": ["14071984"],
       "name": "Water Meter",
@@ -815,6 +893,12 @@ void publishMeterSettings() {
 
   // Publish Reading Schedule
   mqtt.publish("everblu/cyble/reading_schedule", readingSchedule, true);
+  delay(50);
+
+  // Publish Reading Time (UTC) as HH:MM text (resolved time that may be auto-aligned)
+  char readingTimeFormatted[6];
+  snprintf(readingTimeFormatted, sizeof(readingTimeFormatted), "%02d:%02d", (int)g_readHourUtc, (int)g_readMinuteUtc);
+  mqtt.publish("everblu/cyble/reading_time", readingTimeFormatted, true);
   delay(50);
 
   Serial.println("> Meter settings published");
@@ -1009,12 +1093,16 @@ void setup()
   // Set the Last Will and Testament (LWT)
   mqtt.enableLastWillMessage("everblu/cyble/status", "offline", true);  // You can activate the retain flag by setting the third parameter to true
 
-  // Conditionally enable Wi-Fi PHY mode 11G.  Set this in private.h to 0 to disable.
-  #if ENABLE_WIFI_PHY_MODE_11G
-  WiFi.setPhyMode(WIFI_PHY_MODE_11G);
-  Serial.println("Wi-Fi PHY mode set to 11G.");
+  // Conditionally enable Wi-Fi PHY mode 11G (ESP8266 only).
+  #if defined(ESP8266)
+    #if ENABLE_WIFI_PHY_MODE_11G
+    WiFi.setPhyMode(WIFI_PHY_MODE_11G);
+    Serial.println("Wi-Fi PHY mode set to 11G.");
+    #else
+    Serial.println("> Wi-Fi PHY mode 11G is disabled.");
+    #endif
   #else
-  Serial.println("> Wi-Fi PHY mode 11G is disabled.");
+    Serial.println("> Wi-Fi PHY mode setting not applicable on this platform.");
   #endif
 
   // Validate and log the configured reading schedule

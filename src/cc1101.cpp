@@ -8,6 +8,21 @@
 #include "cc1101.h"         // Include the local cc1101 library for CC1101 functions
 #include <Arduino.h>        // Include the Arduino library for basic functions
 #include <SPI.h>            // Include the SPI library for SPI communication
+#if defined(ESP32)
+#include <esp_task_wdt.h>
+#endif
+
+// Cross-platform watchdog feed helper
+static inline void FEED_WDT() {
+#if defined(ESP8266)
+  ESP.wdtFeed();
+#elif defined(ESP32)
+  esp_task_wdt_reset();
+  yield();
+#else
+  (void)0;
+#endif
+}
 
 uint8_t RF_config_u8 = 0xFF;
 uint8_t RF_Test_u8 = 0;
@@ -537,7 +552,7 @@ uint8_t cc1101_wait_for_packet(int milliseconds)
   for (i = 0; i < milliseconds; i++)
   {
     delay(1); //in ms	
-    if (i % 100 == 0) ESP.wdtFeed(); // Feed watchdog every 100ms
+    if (i % 100 == 0) FEED_WDT(); // Feed watchdog every 100ms
     //echo_cc1101_MARCSTATE();
     if (cc1101_check_packet_received()) //delay till system has data available
     {
@@ -662,13 +677,13 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t*rxBuffer, int rxB
 
   while ((digitalRead(GDO0) == FALSE) && (l_tmo < rx_tmo_ms)) { 
     delay(1); l_tmo++; 
-    if (l_tmo % 50 == 0) ESP.wdtFeed(); // Feed watchdog every 50ms
+    if (l_tmo % 50 == 0) FEED_WDT(); // Feed watchdog every 50ms
   }
   if (l_tmo < rx_tmo_ms) echo_debug(debug_out, "GDO0! (0, %d) ", l_tmo); else return 0;
   while ((l_byte_in_rx == 0) && (l_tmo < rx_tmo_ms))
   {
     delay(5); l_tmo += 5; //wait for some byte received
-    ESP.wdtFeed(); // Feed watchdog during receive wait
+    FEED_WDT(); // Feed watchdog during receive wait
     l_byte_in_rx = (halRfReadReg(RXBYTES_ADDR) & RXBYTES_MASK);
     if (l_byte_in_rx)
     {
@@ -696,13 +711,13 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t*rxBuffer, int rxB
   l_byte_in_rx = 1;
   while ((digitalRead(GDO0) == FALSE) && (l_tmo < rx_tmo_ms)) { 
     delay(1); l_tmo++; 
-    if (l_tmo % 50 == 0) ESP.wdtFeed(); // Feed watchdog every 50ms
+    if (l_tmo % 50 == 0) FEED_WDT(); // Feed watchdog every 50ms
   }
   if (l_tmo < rx_tmo_ms) echo_debug(debug_out, "GDO0! (1, %d) ", l_tmo); else return 0;
   while ((l_total_byte < (l_radian_frame_size_byte * 4)) && (l_tmo < rx_tmo_ms))
   {
     delay(5); l_tmo += 5; //wait for some byte received
-    ESP.wdtFeed(); // Feed watchdog during frame receive
+    FEED_WDT(); // Feed watchdog during frame receive
     l_byte_in_rx = (halRfReadReg(RXBYTES_ADDR) & RXBYTES_MASK);
     if (l_byte_in_rx)
     {
@@ -776,7 +791,7 @@ struct tmeter_data get_meter_data(void)
   while ((CC1101_status_state == 0x02) && (tmo < TX_LOOP_OUT))					//in TX
   {
     // Feed watchdog to prevent reset during long operations
-    ESP.wdtFeed();
+  FEED_WDT();
     
     if (wup2send)
     {
@@ -785,7 +800,7 @@ struct tmeter_data get_meter_data(void)
         if (CC1101_status_FIFO_FreeByte <= 10)
         { //this gives 10+20ms from previous frame : 8*8/2.4k=26.6ms  time to send a wupbuffer
           delay(20);
-          ESP.wdtFeed(); // Feed watchdog after delay
+          FEED_WDT(); // Feed watchdog after delay
           tmo++; tmo++;
         }
         SPIWriteBurstReg(TX_FIFO_ADDR, wupbuffer, 8);
@@ -795,7 +810,7 @@ struct tmeter_data get_meter_data(void)
     else
     {
       delay(130); //130ms time to free 39bytes FIFO space
-      ESP.wdtFeed(); // Feed watchdog after long delay
+  FEED_WDT(); // Feed watchdog after long delay
       SPIWriteBurstReg(TX_FIFO_ADDR, txbuffer, 39);
       if (debug_out && 0) {
         echo_debug(debug_out, "txbuffer:\n");
@@ -804,7 +819,7 @@ struct tmeter_data get_meter_data(void)
       wup2send = 0xFF;
     }
     delay(10); tmo++;
-    ESP.wdtFeed(); // Feed watchdog in main loop
+  FEED_WDT(); // Feed watchdog in main loop
     marcstate = halRfReadReg(MARCSTATE_ADDR); //read out state of cc1100 to be sure in IDLE and TX is finished this update also CC1101_status_state
     //echo_debug(debug_out,"%ifree_byte:0x%02X sts:0x%02X\n",tmo,CC1101_status_FIFO_FreeByte,CC1101_status_state);			
   }
