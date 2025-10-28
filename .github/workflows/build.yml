@@ -1,0 +1,61 @@
+name: PlatformIO CI
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment:
+          - huzzah        # ESP8266 Adafruit HUZZAH
+          - esp32dev      # ESP32 DevKit
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Cache pip
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Cache PlatformIO
+      uses: actions/cache@v4
+      with:
+        path: ~/.platformio
+        key: ${{ runner.os }}-${{ hashFiles('**/lockfiles') }}
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install PlatformIO
+      run: |
+        python -m pip install --upgrade pip
+        pip install --upgrade platformio
+    
+    - name: Create config.h from example if missing
+      run: |
+        if [ ! -f include/config.h ]; then
+          cp include/config.example.h include/config.h
+          echo "Created config.h from config.example.h"
+        fi
+    
+    - name: Build PlatformIO Project for ${{ matrix.environment }}
+      run: pio run -e ${{ matrix.environment }}
+    
+    - name: Upload firmware artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: firmware-${{ matrix.environment }}
+        path: .pio/build/${{ matrix.environment }}/firmware.*
+        retention-days: 30
