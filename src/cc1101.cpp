@@ -534,21 +534,32 @@ uint8_t cc1101_wait_for_packet(int milliseconds)
 struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
 {
   struct tmeter_data data;
-  if (size >= 30)
-  {
-    //echo_debug(1,"\n%u/%u/20%u %u:%u:%u ",decoded_buffer[24],decoded_buffer[25],decoded_buffer[26],decoded_buffer[28],decoded_buffer[29],decoded_buffer[30]);
-    //echo_debug(1,"%u liters ",decoded_buffer[18]+decoded_buffer[19]*256 + decoded_buffer[20]*65536 + decoded_buffer[21]*16777216);
-
-    data.liters = decoded_buffer[18] + decoded_buffer[19] * 256 + decoded_buffer[20] * 65536 + decoded_buffer[21] * 16777216;
+  memset(&data, 0, sizeof(data)); // Initialize all fields to zero
+  
+  // Bounds check: ensure buffer is large enough for basic data
+  if (size < 30) {
+    echo_debug(1, "ERROR: Buffer too small for meter data (size=%d, need>=30)\n", size);
+    return data;
   }
-  if (size >= 48)
-  {
+  
+  // Extract liters using proper uint32_t handling to prevent overflow
+  // Byte order is LSB first: [18]=LSB, [19], [20], [21]=MSB
+  data.liters = ((uint32_t)decoded_buffer[18]) |
+                ((uint32_t)decoded_buffer[19] << 8) |
+                ((uint32_t)decoded_buffer[20] << 16) |
+                ((uint32_t)decoded_buffer[21] << 24);
+  
+  // Extract extended data if buffer is large enough
+  if (size >= 49) { // Need at least 49 bytes to safely access decoded_buffer[48]
     //echo_debug(1,"Num %u %u Mois %uh-%uh ",decoded_buffer[48], decoded_buffer[31],decoded_buffer[44],decoded_buffer[45]);
     data.reads_counter = decoded_buffer[48];
     data.battery_left = decoded_buffer[31];
     data.time_start = decoded_buffer[44];
     data.time_end = decoded_buffer[45];
+  } else {
+    echo_debug(1, "WARN: Buffer size %d < 49, extended data unavailable\n", size);
   }
+  
   return data;
 }
 
@@ -584,6 +595,7 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
 // 01234567 ###01234 567###01 234567## #0123456 (# -> Start/Stop bit)
 // is decoded to:
 // 76543210 76543210 76543210 76543210
+// Note: decoded_buffer must be at least l_total_byte/4 bytes in size
 uint8_t decode_4bitpbit_serial(uint8_t *rxBuffer, int l_total_byte, uint8_t* decoded_buffer)
 {
   uint16_t i, j, k;
@@ -593,6 +605,10 @@ uint8_t decode_4bitpbit_serial(uint8_t *rxBuffer, int l_total_byte, uint8_t* dec
   uint8_t dest_bit_cnt = 0;
   uint8_t dest_byte_cnt = 0;
   uint8_t current_Rx_Byte;
+  
+  // Maximum decoded buffer size (conservative estimate: input bytes / 4)
+  const uint8_t MAX_DECODED_SIZE = 200;
+  
   //show_in_hex(rxBuffer,l_total_byte);
   /*set 1st bit polarity*/
   bit_pol = (rxBuffer[0] & 0x80); //initialize with 1st bit state
@@ -619,17 +635,27 @@ uint8_t decode_4bitpbit_serial(uint8_t *rxBuffer, int l_total_byte, uint8_t* dec
         { // insert the number of decoded bit
           if (dest_bit_cnt < 8)
           { //if data byte
+            // Bounds check before writing to buffer
+            if (dest_byte_cnt >= MAX_DECODED_SIZE) {
+              echo_debug(debug_out, "ERROR: Decode buffer overflow at byte %d\n", dest_byte_cnt);
+              return dest_byte_cnt;
+            }
             decoded_buffer[dest_byte_cnt] = decoded_buffer[dest_byte_cnt] >> 1;
             decoded_buffer[dest_byte_cnt] |= bit_pol;
           }
           dest_bit_cnt++;
           //if ((dest_bit_cnt ==9) && (!bit_pol)){  echo_debug(debug_out,"stop bit error9"); return dest_byte_cnt;}
-          if ((dest_bit_cnt == 10) && (!bit_pol)) { echo_debug(debug_out, "stop bit error10"); return dest_byte_cnt; }
+          if ((dest_bit_cnt == 10) && (!bit_pol)) { echo_debug(debug_out, "ERROR: Stop bit error at bit 10\n"); return dest_byte_cnt; }
           if ((dest_bit_cnt >= 11) && (!bit_pol)) //start bit
           {
             dest_bit_cnt = 0;
             //echo_debug(debug_out, " dec[%i]=0x%02X \n", dest_byte_cnt, decoded_buffer[dest_byte_cnt]);
             dest_byte_cnt++;
+            // Additional bounds check before next iteration
+            if (dest_byte_cnt >= MAX_DECODED_SIZE) {
+              echo_debug(debug_out, "ERROR: Decode buffer size limit reached\n");
+              return dest_byte_cnt;
+            }
           }
         }
         bit_pol = current_Rx_Byte & 0x80;
@@ -738,7 +764,7 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t*rxBuffer, int rxB
   while ((l_total_byte < (l_radian_frame_size_byte * 4)) && (l_tmo < rx_tmo_ms))
   {
     delay(5); l_tmo += 5; //wait for some byte received
-    FEED_WDT(); // Feed watchdog during frame receive
+    if (l_tmo % 50 == 0) FEED_WDT(); // Feed watchdog every 50ms during frame receive
     l_byte_in_rx = (halRfReadReg(RXBYTES_ADDR) & RXBYTES_MASK);
     if (l_byte_in_rx)
     {
@@ -873,8 +899,8 @@ struct tmeter_data get_meter_data(void)
   echo_debug(debug_out, "MARCSTATE : raw:0x%02X  0x%02X free_byte:0x%02X sts:0x%02X sending 2s WUP...\n", marcstate, marcstate & 0x1F, CC1101_status_FIFO_FreeByte, CC1101_status_state);
   while ((CC1101_status_state == 0x02) && (tmo < TX_LOOP_OUT))					//in TX
   {
-    // Feed watchdog to prevent reset during long operations
-  FEED_WDT();
+    // Feed watchdog to prevent reset during long operations (every ~10ms in this loop)
+    FEED_WDT();
     
     if (wup2send)
     {
@@ -883,7 +909,6 @@ struct tmeter_data get_meter_data(void)
         if (CC1101_status_FIFO_FreeByte <= 10)
         { //this gives 10+20ms from previous frame : 8*8/2.4k=26.6ms  time to send a wupbuffer
           delay(20);
-          FEED_WDT(); // Feed watchdog after delay
           tmo++; tmo++;
         }
         SPIWriteBurstReg(TX_FIFO_ADDR, wupbuffer, 8);
@@ -893,7 +918,6 @@ struct tmeter_data get_meter_data(void)
     else
     {
       delay(130); //130ms time to free 39bytes FIFO space
-  FEED_WDT(); // Feed watchdog after long delay
       SPIWriteBurstReg(TX_FIFO_ADDR, txbuffer, 39);
       if (debug_out && 0) {
         echo_debug(debug_out, "txbuffer:\n");
@@ -902,7 +926,6 @@ struct tmeter_data get_meter_data(void)
       wup2send = 0xFF;
     }
     delay(10); tmo++;
-  FEED_WDT(); // Feed watchdog in main loop
     marcstate = halRfReadReg(MARCSTATE_ADDR); //read out state of cc1100 to be sure in IDLE and TX is finished this update also CC1101_status_state
     //echo_debug(debug_out,"%ifree_byte:0x%02X sts:0x%02X\n",tmo,CC1101_status_FIFO_FreeByte,CC1101_status_state);			
   }

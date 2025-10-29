@@ -28,11 +28,24 @@
 #include <WiFi.h>           // Wi-Fi library for ESP32
 #include <ESPmDNS.h>        // mDNS library for ESP32
 #include <Preferences.h>    // Preferences library for ESP32
+#include <esp_task_wdt.h>   // Watchdog timer for ESP32
 #endif
 #include <Arduino.h>        // Core Arduino library
 #include <ArduinoOTA.h>     // OTA update library
 #include <EspMQTTClient.h>  // MQTT client library
 #include <math.h>           // For floor/ceil during scan alignment
+
+// Cross-platform watchdog feed helper
+static inline void FEED_WDT() {
+#if defined(ESP8266)
+  ESP.wdtFeed();
+#elif defined(ESP32)
+  esp_task_wdt_reset();
+  yield();
+#else
+  (void)0;
+#endif
+}
 
 // Define the LED_BUILTIN pin if missing
 #ifndef LED_BUILTIN
@@ -221,17 +234,17 @@ void onUpdateData()
   if (meter_data.reads_counter == 0 || meter_data.liters == 0) {
     Serial.printf("Unable to retrieve data from meter (attempt %d/%d)\n", _retry + 1, MAX_RETRIES);
     
-    if (_retry < MAX_RETRIES - 1) {  // Changed: Allow retries up to MAX_RETRIES - 1
+    if (_retry < MAX_RETRIES - 1) {
+      // Schedule retry using callback instead of recursion to prevent stack overflow
       _retry++;
       lastErrorMessage = "Retry " + String(_retry) + "/" + String(MAX_RETRIES) + " - No data received";
-      Serial.printf("Retrying in 10 seconds... (next attempt %d/%d)\n", _retry + 1, MAX_RETRIES);
+      Serial.printf("Scheduling retry in 10 seconds... (next attempt %d/%d)\n", _retry + 1, MAX_RETRIES);
       mqtt.publish("everblu/cyble/active_reading", "false", true);
       mqtt.publish("everblu/cyble/cc1101_state", "Idle", true);
       mqtt.publish("everblu/cyble/last_error", lastErrorMessage.c_str(), true);
       digitalWrite(LED_BUILTIN, HIGH); // Turn off LED
-      // Schedule retry without recursion - use a simple delay approach
-      delay(10000); // Wait 10 seconds
-      onUpdateData(); // Try again
+      // Use non-blocking callback instead of recursive call
+      mqtt.executeDelayed(10000, onUpdateData);
     } else {
       // Max retries reached, enter cooldown period
       lastFailedAttempt = millis();
@@ -1088,35 +1101,52 @@ void onConnectionEstablished()
   Serial.println(WiFi.localIP());
 
   mqtt.subscribe("everblu/cyble/trigger", [](const String& message) {
-    if (message.length() > 0) {
-      // Check if we're in cooldown period
-      if (lastFailedAttempt > 0 && (millis() - lastFailedAttempt) < RETRY_COOLDOWN) {
-        unsigned long remainingCooldown = (RETRY_COOLDOWN - (millis() - lastFailedAttempt)) / 1000;
-        Serial.printf("Cannot trigger update: Still in cooldown period. %lu seconds remaining.\n", remainingCooldown);
-        mqtt.publish("everblu/cyble/status_message", 
-                     String("Cooldown active, " + String(remainingCooldown) + "s remaining").c_str(), true);
-        return;
-      }
-
-      Serial.println("Update data from meter from MQTT trigger");
-
-      _retry = 0;
-      onUpdateData();
+    // Input validation: only accept whitelisted commands
+    if (message != "update" && message != "read") {
+      Serial.printf("WARN: Invalid trigger command '%s' (expected 'update' or 'read')\n", message.c_str());
+      mqtt.publish("everblu/cyble/status_message", "Invalid trigger command", true);
+      return;
     }
+    
+    // Check if we're in cooldown period
+    if (lastFailedAttempt > 0 && (millis() - lastFailedAttempt) < RETRY_COOLDOWN) {
+      unsigned long remainingCooldown = (RETRY_COOLDOWN - (millis() - lastFailedAttempt)) / 1000;
+      Serial.printf("Cannot trigger update: Still in cooldown period. %lu seconds remaining.\n", remainingCooldown);
+      mqtt.publish("everblu/cyble/status_message", 
+                   String("Cooldown active, " + String(remainingCooldown) + "s remaining").c_str(), true);
+      return;
+    }
+
+    Serial.printf("Update data from meter from MQTT trigger (command: %s)\n", message.c_str());
+
+    _retry = 0;
+    onUpdateData();
   });
 
   mqtt.subscribe("everblu/cyble/restart", [](const String& message) {
-    if (message == "restart") {
-      Serial.println("Restart command received via MQTT. Restarting...");
-      ESP.restart(); // Restart the ESP device
+    // Input validation: only accept exact "restart" command
+    if (message != "restart") {
+      Serial.printf("WARN: Invalid restart command '%s' (expected 'restart')\n", message.c_str());
+      mqtt.publish("everblu/cyble/status_message", "Invalid restart command", true);
+      return;
     }
+    
+    Serial.println("Restart command received via MQTT. Restarting in 2 seconds...");
+    mqtt.publish("everblu/cyble/status_message", "Device restarting...", true);
+    delay(2000); // Give time for MQTT message to be sent
+    ESP.restart(); // Restart the ESP device
   });
 
   mqtt.subscribe("everblu/cyble/frequency_scan", [](const String& message) {
-    if (message == "scan") {
-      Serial.println("Frequency scan command received via MQTT");
-      performFrequencyScan();
+    // Input validation: only accept "scan" command
+    if (message != "scan") {
+      Serial.printf("WARN: Invalid frequency scan command '%s' (expected 'scan')\n", message.c_str());
+      mqtt.publish("everblu/cyble/status_message", "Invalid scan command", true);
+      return;
     }
+    
+    Serial.println("Frequency scan command received via MQTT");
+    performFrequencyScan();
   });
 
   Serial.println("> Send MQTT config for HA.");
@@ -1315,6 +1345,7 @@ void performFrequencyScan() {
   Serial.printf("> Scanning from %.6f to %.6f MHz (step: %.6f MHz)\n", scanStart, scanEnd, scanStep);
   
   for (float freq = scanStart; freq <= scanEnd; freq += scanStep) {
+    FEED_WDT(); // Feed watchdog for each frequency step
     // Reinitialize CC1101 with this frequency
     cc1101_init(freq);
     delay(50); // Allow time for frequency to settle
@@ -1373,6 +1404,7 @@ void performWideInitialScan() {
   Serial.println("> This may take 1-2 minutes on first boot...");
   
   for (float freq = scanStart; freq <= scanEnd; freq += scanStep) {
+    FEED_WDT(); // Feed watchdog for each frequency step
     cc1101_init(freq);
     delay(100); // Longer delay for frequency to settle during wide scan
     
@@ -1383,9 +1415,6 @@ void performWideInitialScan() {
       bestFreq = freq;
       Serial.printf("> Found signal at %.6f MHz: RSSI=%d dBm\n", freq, test_data.rssi_dbm);
     }
-    
-    // Feed watchdog during long scan
-    delay(10); // delay() also feeds the watchdog
   }
   
   if (bestRSSI > -120) {
@@ -1398,6 +1427,7 @@ void performWideInitialScan() {
     float fineBestFreq = bestFreq;
     
     for (float freq = fineStart; freq <= fineEnd; freq += fineStep) {
+      FEED_WDT(); // Feed watchdog for each frequency step
       cc1101_init(freq);
       delay(50);
       
@@ -1408,7 +1438,6 @@ void performWideInitialScan() {
         fineBestFreq = freq;
         Serial.printf("> Refined signal at %.6f MHz: RSSI=%d dBm\n", freq, test_data.rssi_dbm);
       }
-      delay(10); // delay() also feeds the watchdog
     }
     
     bestFreq = fineBestFreq;
