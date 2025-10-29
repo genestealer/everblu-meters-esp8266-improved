@@ -102,7 +102,7 @@ unsigned long lastWifiUpdate = 0;
 unsigned long totalReadAttempts = 0;
 unsigned long successfulReads = 0;
 unsigned long failedReads = 0;
-String lastErrorMessage = "None";
+const char* lastErrorMessage = "None";
 
 // Frequency offset storage
 #define EEPROM_SIZE 64
@@ -149,28 +149,30 @@ unsigned long lastFailedAttempt = 0; // Timestamp of last failed attempt
 const unsigned long RETRY_COOLDOWN = 3600000; // 1 hour cooldown in milliseconds
 
 // Global variable to store the reading schedule (default from config.h)
-String readingSchedule = DEFAULT_READING_SCHEDULE;
+const char* readingSchedule = DEFAULT_READING_SCHEDULE;
 
 // Helper: validate schedule string against supported options
-static bool isValidReadingSchedule(const String &s) {
-  return (s == "Monday-Friday" || s == "Monday-Saturday" || s == "Monday-Sunday");
+static bool isValidReadingSchedule(const char* s) {
+  return (strcmp(s, "Monday-Friday") == 0 || 
+          strcmp(s, "Monday-Saturday") == 0 || 
+          strcmp(s, "Monday-Sunday") == 0);
 }
 
 // Ensure schedule is valid; if not, fall back to a safe default and warn
 static void validateReadingSchedule() {
   if (!isValidReadingSchedule(readingSchedule)) {
-    Serial.printf("WARNING: Invalid reading schedule '%s'. Falling back to 'Monday-Friday'.\n", readingSchedule.c_str());
+    Serial.printf("WARNING: Invalid reading schedule '%s'. Falling back to 'Monday-Friday'.\n", readingSchedule);
     readingSchedule = "Monday-Friday";
   }
 }
 
 // Function to check if today is within the configured schedule
 bool isReadingDay(struct tm *ptm) {
-  if (readingSchedule == "Monday-Friday") {
+  if (strcmp(readingSchedule, "Monday-Friday") == 0) {
     return ptm->tm_wday >= 1 && ptm->tm_wday <= 5; // Monday to Friday
-  } else if (readingSchedule == "Monday-Saturday") {
+  } else if (strcmp(readingSchedule, "Monday-Saturday") == 0) {
     return ptm->tm_wday >= 1 && ptm->tm_wday <= 6; // Monday to Saturday
-  } else if (readingSchedule == "Monday-Sunday") {
+  } else if (strcmp(readingSchedule, "Monday-Sunday") == 0) {
     return true; // Every day
   }
   return false;
@@ -208,7 +210,7 @@ void onUpdateData()
 {
   Serial.printf("Updating data from meter...\n");
   Serial.printf("Retry count : %d\n", _retry);
-  Serial.printf("Reading schedule : %s\n", readingSchedule.c_str());
+  Serial.printf("Reading schedule : %s\n", readingSchedule);
 
   // Increment total attempts counter
   totalReadAttempts++;
@@ -225,7 +227,7 @@ void onUpdateData()
   // Get current UTC time
   time_t tnow = time(nullptr);
   struct tm *ptm = gmtime(&tnow);
-  Serial.printf("Current date (UTC) : %04d/%02d/%02d %02d:%02d/%02d - %s\n", ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, String(tnow, DEC).c_str());
+  Serial.printf("Current date (UTC) : %04d/%02d/%02d %02d:%02d/%02d - %ld\n", ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, (long)tnow);
 
   char iso8601[128];
   strftime(iso8601, sizeof iso8601, "%FT%TZ", gmtime(&tnow));
@@ -237,11 +239,13 @@ void onUpdateData()
     if (_retry < MAX_RETRIES - 1) {
       // Schedule retry using callback instead of recursion to prevent stack overflow
       _retry++;
-      lastErrorMessage = "Retry " + String(_retry) + "/" + String(MAX_RETRIES) + " - No data received";
+      static char errorMsg[64];
+      snprintf(errorMsg, sizeof(errorMsg), "Retry %d/%d - No data received", _retry, MAX_RETRIES);
+      lastErrorMessage = errorMsg;
       Serial.printf("Scheduling retry in 10 seconds... (next attempt %d/%d)\n", _retry + 1, MAX_RETRIES);
       mqtt.publish("everblu/cyble/active_reading", "false", true);
       mqtt.publish("everblu/cyble/cc1101_state", "Idle", true);
-      mqtt.publish("everblu/cyble/last_error", lastErrorMessage.c_str(), true);
+      mqtt.publish("everblu/cyble/last_error", lastErrorMessage, true);
       digitalWrite(LED_BUILTIN, HIGH); // Turn off LED
       // Use non-blocking callback instead of recursive call
       mqtt.executeDelayed(10000, onUpdateData);
@@ -254,9 +258,14 @@ void onUpdateData()
       mqtt.publish("everblu/cyble/active_reading", "false", true);
       mqtt.publish("everblu/cyble/cc1101_state", "Idle", true);
       mqtt.publish("everblu/cyble/status_message", "Failed after max retries, cooling down for 1 hour", true);
-      mqtt.publish("everblu/cyble/last_error", lastErrorMessage.c_str(), true);
-      mqtt.publish("everblu/cyble/failed_reads", String(failedReads, DEC), true);
-      mqtt.publish("everblu/cyble/total_attempts", String(totalReadAttempts, DEC), true);
+      mqtt.publish("everblu/cyble/last_error", lastErrorMessage, true);
+      
+      char buffer[16];
+      snprintf(buffer, sizeof(buffer), "%lu", failedReads);
+      mqtt.publish("everblu/cyble/failed_reads", buffer, true);
+      
+      snprintf(buffer, sizeof(buffer), "%lu", totalReadAttempts);
+      mqtt.publish("everblu/cyble/total_attempts", buffer, true);
       digitalWrite(LED_BUILTIN, HIGH); // Turn off LED
       _retry = 0; // Reset retry counter for next scheduled attempt
     }
@@ -279,18 +288,31 @@ void onUpdateData()
   Serial.printf("Signal quality (LQI) : %d\n", meter_data.lqi);
   Serial.printf("Signal quality (LQI percentage) : %d\n", calculateLQIToPercentage(meter_data.lqi));
 
-  // Publish meter data to MQTT
-  mqtt.publish("everblu/cyble/liters", String(meter_data.liters, DEC), true);
+  // Publish meter data to MQTT (using char buffers instead of String)
+  char valueBuffer[32];
+  
+  snprintf(valueBuffer, sizeof(valueBuffer), "%d", meter_data.liters);
+  mqtt.publish("everblu/cyble/liters", valueBuffer, true);
   delay(5);
-  mqtt.publish("everblu/cyble/counter", String(meter_data.reads_counter, DEC), true);
+  
+  snprintf(valueBuffer, sizeof(valueBuffer), "%d", meter_data.reads_counter);
+  mqtt.publish("everblu/cyble/counter", valueBuffer, true);
   delay(5);
-  mqtt.publish("everblu/cyble/battery", String(meter_data.battery_left, DEC), true);
+  
+  snprintf(valueBuffer, sizeof(valueBuffer), "%d", meter_data.battery_left);
+  mqtt.publish("everblu/cyble/battery", valueBuffer, true);
   delay(5);
-  mqtt.publish("everblu/cyble/rssi_dbm", String(meter_data.rssi_dbm, DEC), true);
+  
+  snprintf(valueBuffer, sizeof(valueBuffer), "%d", meter_data.rssi_dbm);
+  mqtt.publish("everblu/cyble/rssi_dbm", valueBuffer, true);
   delay(5);
-  mqtt.publish("everblu/cyble/rssi_percentage", String(calculateMeterdBmToPercentage(meter_data.rssi_dbm), DEC), true);
+  
+  snprintf(valueBuffer, sizeof(valueBuffer), "%d", calculateMeterdBmToPercentage(meter_data.rssi_dbm));
+  mqtt.publish("everblu/cyble/rssi_percentage", valueBuffer, true);
   delay(5);
-  mqtt.publish("everblu/cyble/lqi", String(meter_data.lqi, DEC), true); // Publish LQI
+  
+  snprintf(valueBuffer, sizeof(valueBuffer), "%d", meter_data.lqi);
+  mqtt.publish("everblu/cyble/lqi", valueBuffer, true);
   delay(5);
   mqtt.publish("everblu/cyble/time_start", timeStartFormatted, true);
   delay(5);
@@ -298,7 +320,9 @@ void onUpdateData()
   delay(5);
   mqtt.publish("everblu/cyble/timestamp", iso8601, true); // timestamp since epoch in UTC
   delay(5);
-  mqtt.publish("everblu/cyble/lqi_percentage", String(calculateLQIToPercentage(meter_data.lqi), DEC), true);   // Publish LQI percentage to MQTT
+  
+  snprintf(valueBuffer, sizeof(valueBuffer), "%d", calculateLQIToPercentage(meter_data.lqi));
+  mqtt.publish("everblu/cyble/lqi_percentage", valueBuffer, true);
   delay(5);
 
   // Publish all data as a JSON message as well this is redundant but may be useful for some
@@ -346,9 +370,15 @@ void onUpdateData()
   successfulReads++;
   lastErrorMessage = "None";
 
-  // Publish success metrics
-  mqtt.publish("everblu/cyble/successful_reads", String(successfulReads, DEC), true);
-  mqtt.publish("everblu/cyble/total_attempts", String(totalReadAttempts, DEC), true);
+  // Publish success metrics (using char buffers instead of String)
+  char metricBuffer[16];
+  
+  snprintf(metricBuffer, sizeof(metricBuffer), "%lu", successfulReads);
+  mqtt.publish("everblu/cyble/successful_reads", metricBuffer, true);
+  
+  snprintf(metricBuffer, sizeof(metricBuffer), "%lu", totalReadAttempts);
+  mqtt.publish("everblu/cyble/total_attempts", metricBuffer, true);
+  
   mqtt.publish("everblu/cyble/last_error", "None", true);
 
   // Perform adaptive frequency tracking based on FREQEST register
@@ -370,8 +400,10 @@ void onScheduled()
     if (lastFailedAttempt > 0 && (millis() - lastFailedAttempt) < RETRY_COOLDOWN) {
       unsigned long remainingCooldown = (RETRY_COOLDOWN - (millis() - lastFailedAttempt)) / 1000;
       Serial.printf("Still in cooldown period. %lu seconds remaining.\n", remainingCooldown);
-      mqtt.publish("everblu/cyble/status_message", 
-                   String("Cooldown active, " + String(remainingCooldown) + "s remaining").c_str(), true);
+      
+      char cooldownMsg[64];
+      snprintf(cooldownMsg, sizeof(cooldownMsg), "Cooldown active, %lus remaining", remainingCooldown);
+      mqtt.publish("everblu/cyble/status_message", cooldownMsg, true);
       mqtt.executeDelayed(500, onScheduled);
       return;
     }
@@ -945,7 +977,7 @@ const char jsonDiscoveryFreqOffset[] PROGMEM = R"rawliteral(
   "uniq_id": "water_meter_freq_offset",
   "obj_id": "water_meter_freq_offset",
   "ic": "mdi:sine-wave",
-  "unit_of_meas": "MHz",
+  "unit_of_meas": "kHz",
   "qos": 0,
   "avty_t": "everblu/cyble/status",
   "stat_t": "everblu/cyble/frequency_offset",
@@ -982,13 +1014,24 @@ const char jsonDiscoveryFreqScanButton[] PROGMEM = R"rawliteral(
 // Description: Publishes Wi-Fi diagnostics (IP, RSSI, signal strength, etc.) to MQTT.
 void publishWifiDetails() {
   Serial.println("> Publish Wi-Fi details");
-  String wifiIP = WiFi.localIP().toString();
+  
+  // Get WiFi details (use String for network functions that return String)
+  char wifiIP[16];
+  snprintf(wifiIP, sizeof(wifiIP), "%s", WiFi.localIP().toString().c_str());
+  
   int wifiRSSI = WiFi.RSSI();
-  int wifiSignalPercentage = calculateWiFiSignalStrengthPercentage(wifiRSSI); // Convert RSSI to percentage
-  String macAddress = WiFi.macAddress();
-  String wifiSSID = WiFi.SSID();
-  String wifiBSSID = WiFi.BSSIDstr();
-  String status = (WiFi.status() == WL_CONNECTED) ? "online" : "offline";
+  int wifiSignalPercentage = calculateWiFiSignalStrengthPercentage(wifiRSSI);
+  
+  char macAddress[18];
+  snprintf(macAddress, sizeof(macAddress), "%s", WiFi.macAddress().c_str());
+  
+  char wifiSSID[33];
+  snprintf(wifiSSID, sizeof(wifiSSID), "%s", WiFi.SSID().c_str());
+  
+  char wifiBSSID[18];
+  snprintf(wifiBSSID, sizeof(wifiBSSID), "%s", WiFi.BSSIDstr().c_str());
+  
+  const char* status = (WiFi.status() == WL_CONNECTED) ? "online" : "offline";
 
   // Uptime calculation
   unsigned long uptimeMillis = millis();
@@ -998,13 +1041,20 @@ void publishWifiDetails() {
   char uptimeISO[32];
   strftime(uptimeISO, sizeof(uptimeISO), "%FT%TZ", gmtime(&uptimeTimestamp));
 
-  // Publish diagnostic sensors
+  // Publish diagnostic sensors (using char buffers instead of String)
+  char valueBuffer[16];
+  
   mqtt.publish("everblu/cyble/wifi_ip", wifiIP, true);
   delay(5);
-  mqtt.publish("everblu/cyble/wifi_rssi", String(wifiRSSI, DEC), true);
+  
+  snprintf(valueBuffer, sizeof(valueBuffer), "%d", wifiRSSI);
+  mqtt.publish("everblu/cyble/wifi_rssi", valueBuffer, true);
   delay(5);
-  mqtt.publish("everblu/cyble/wifi_signal_percentage", String(wifiSignalPercentage, DEC), true);
+  
+  snprintf(valueBuffer, sizeof(valueBuffer), "%d", wifiSignalPercentage);
+  mqtt.publish("everblu/cyble/wifi_signal_percentage", valueBuffer, true);
   delay(5);
+  
   mqtt.publish("everblu/cyble/mac_address", macAddress, true);
   delay(5);
   mqtt.publish("everblu/cyble/ssid", wifiSSID, true);
@@ -1024,10 +1074,15 @@ void publishWifiDetails() {
 void publishMeterSettings() {
   Serial.println("> Publish meter settings");
 
-  // Publish Meter Year, Serial
-  mqtt.publish("everblu/cyble/water_meter_year", String(METER_YEAR, DEC), true);
+  // Publish Meter Year, Serial (using char buffers instead of String)
+  char valueBuffer[16];
+  
+  snprintf(valueBuffer, sizeof(valueBuffer), "%d", METER_YEAR);
+  mqtt.publish("everblu/cyble/water_meter_year", valueBuffer, true);
   delay(5);
-  mqtt.publish("everblu/cyble/water_meter_serial", String(METER_SERIAL, DEC), true);
+  
+  snprintf(valueBuffer, sizeof(valueBuffer), "%u", METER_SERIAL);
+  mqtt.publish("everblu/cyble/water_meter_serial", valueBuffer, true);
   delay(5);
 
   // Publish Reading Schedule
@@ -1056,7 +1111,7 @@ void onConnectionEstablished()
   delay(5000); // Give it a moment for the time to sync the print out the time
   time_t tnow = time(nullptr);
   struct tm *ptm = gmtime(&tnow);
-  Serial.printf("Current date (UTC) : %04d/%02d/%02d %02d:%02d/%02d - %s\n", ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, String(tnow, DEC).c_str());
+  Serial.printf("Current date (UTC) : %04d/%02d/%02d %02d:%02d/%02d - %ld\n", ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, (long)tnow);
   
   Serial.println("> Configure Arduino OTA flash.");
   ArduinoOTA.onStart([]() {
@@ -1112,8 +1167,10 @@ void onConnectionEstablished()
     if (lastFailedAttempt > 0 && (millis() - lastFailedAttempt) < RETRY_COOLDOWN) {
       unsigned long remainingCooldown = (RETRY_COOLDOWN - (millis() - lastFailedAttempt)) / 1000;
       Serial.printf("Cannot trigger update: Still in cooldown period. %lu seconds remaining.\n", remainingCooldown);
-      mqtt.publish("everblu/cyble/status_message", 
-                   String("Cooldown active, " + String(remainingCooldown) + "s remaining").c_str(), true);
+      
+      char cooldownMsg[64];
+      snprintf(cooldownMsg, sizeof(cooldownMsg), "Cooldown active, %lus remaining", remainingCooldown);
+      mqtt.publish("everblu/cyble/status_message", cooldownMsg, true);
       return;
     }
 
@@ -1234,18 +1291,29 @@ void onConnectionEstablished()
   mqtt.publish("everblu/cyble/active_reading", "false", true);
   delay(5);
   
-  // Publish initial diagnostic metrics
+  // Publish initial diagnostic metrics (using char buffers instead of String)
+  char metricBuffer[16];
+  
   mqtt.publish("everblu/cyble/cc1101_state", "Idle", true);
   delay(5);
-  mqtt.publish("everblu/cyble/total_attempts", String(totalReadAttempts, DEC), true);
+  
+  snprintf(metricBuffer, sizeof(metricBuffer), "%lu", totalReadAttempts);
+  mqtt.publish("everblu/cyble/total_attempts", metricBuffer, true);
   delay(5);
-  mqtt.publish("everblu/cyble/successful_reads", String(successfulReads, DEC), true);
+  
+  snprintf(metricBuffer, sizeof(metricBuffer), "%lu", successfulReads);
+  mqtt.publish("everblu/cyble/successful_reads", metricBuffer, true);
   delay(5);
-  mqtt.publish("everblu/cyble/failed_reads", String(failedReads, DEC), true);
+  
+  snprintf(metricBuffer, sizeof(metricBuffer), "%lu", failedReads);
+  mqtt.publish("everblu/cyble/failed_reads", metricBuffer, true);
   delay(5);
-  mqtt.publish("everblu/cyble/last_error", lastErrorMessage.c_str(), true);
+  mqtt.publish("everblu/cyble/last_error", lastErrorMessage, true);
   delay(5);
-  mqtt.publish("everblu/cyble/frequency_offset", String(storedFrequencyOffset, 6), true);
+  
+  char freqBuffer[16];
+  snprintf(freqBuffer, sizeof(freqBuffer), "%.3f", storedFrequencyOffset * 1000.0);  // Convert MHz to kHz
+  mqtt.publish("everblu/cyble/frequency_offset", freqBuffer, true);
   delay(5);
 
   Serial.println("> MQTT config sent");
@@ -1367,9 +1435,14 @@ void performFrequencyScan() {
   
   if (bestRSSI > -120) { // Only save if we found something
     saveFrequencyOffset(offset);
-    mqtt.publish("everblu/cyble/frequency_offset", String(offset, 6), true);
-    mqtt.publish("everblu/cyble/status_message", 
-                 String("Scan complete: offset " + String(offset, 6) + " MHz, RSSI " + String(bestRSSI) + " dBm").c_str(), true);
+    
+    char freqBuffer[16];
+    snprintf(freqBuffer, sizeof(freqBuffer), "%.3f", offset * 1000.0);  // Convert MHz to kHz
+    mqtt.publish("everblu/cyble/frequency_offset", freqBuffer, true);
+    
+    char statusMsg[128];
+    snprintf(statusMsg, sizeof(statusMsg), "Scan complete: offset %.3f kHz, RSSI %d dBm", offset * 1000.0, bestRSSI);
+    mqtt.publish("everblu/cyble/status_message", statusMsg, true);
     
     // Reinitialize with the best frequency
     cc1101_init(bestFreq);
@@ -1448,9 +1521,14 @@ void performWideInitialScan() {
                   bestFreq, offset, bestRSSI);
     
     saveFrequencyOffset(offset);
-    mqtt.publish("everblu/cyble/frequency_offset", String(offset, 6), true);
-    mqtt.publish("everblu/cyble/status_message", 
-                 String("Initial scan complete: offset " + String(offset, 6) + " MHz").c_str(), true);
+    
+    char freqBuffer[16];
+    snprintf(freqBuffer, sizeof(freqBuffer), "%.3f", offset * 1000.0);  // Convert MHz to kHz
+    mqtt.publish("everblu/cyble/frequency_offset", freqBuffer, true);
+    
+    char statusMsg[128];
+    snprintf(statusMsg, sizeof(statusMsg), "Initial scan complete: offset %.3f kHz", offset * 1000.0);
+    mqtt.publish("everblu/cyble/status_message", statusMsg, true);
     
     cc1101_init(bestFreq);
   } else {
@@ -1500,7 +1578,10 @@ void adaptiveFrequencyTracking(int8_t freqest) {
                     adjustment, storedFrequencyOffset);
       
       saveFrequencyOffset(storedFrequencyOffset);
-      mqtt.publish("everblu/cyble/frequency_offset", String(storedFrequencyOffset, 6), true);
+      
+      char freqBuffer[16];
+      snprintf(freqBuffer, sizeof(freqBuffer), "%.3f", storedFrequencyOffset * 1000.0);  // Convert MHz to kHz
+      mqtt.publish("everblu/cyble/frequency_offset", freqBuffer, true);
       
       // Reinitialize CC1101 with adjusted frequency
       cc1101_init(FREQUENCY + storedFrequencyOffset);
@@ -1515,17 +1596,89 @@ void adaptiveFrequencyTracking(int8_t freqest) {
 }
 
 
+// Function: validateConfiguration
+// Description: Validates configuration parameters at startup to fail fast on invalid settings
+bool validateConfiguration() {
+  bool valid = true;
+  
+  Serial.println("\n=== Configuration Validation ===");
+  
+  // Validate METER_YEAR (should be 0-99 for years 2000-2099)
+  if (METER_YEAR > 99) {
+    Serial.printf("ERROR: Invalid METER_YEAR=%d (expected 0-99)\n", METER_YEAR);
+    valid = false;
+  } else {
+    Serial.printf("✓ METER_YEAR: %d (20%02d)\n", METER_YEAR, METER_YEAR);
+  }
+  
+  // Validate METER_SERIAL (should not be 0)
+  if (METER_SERIAL == 0) {
+    Serial.println("ERROR: METER_SERIAL not configured (value is 0)");
+    Serial.println("       Update METER_SERIAL in config.h with your meter's serial number");
+    valid = false;
+  } else {
+    Serial.printf("✓ METER_SERIAL: %lu\n", (unsigned long)METER_SERIAL);
+  }
+  
+  // Validate FREQUENCY if defined (should be 300-500 MHz for 433 MHz band)
+  #ifdef FREQUENCY
+  if (FREQUENCY < 300.0 || FREQUENCY > 500.0) {
+    Serial.printf("ERROR: Invalid FREQUENCY=%.2f MHz (expected 300-500 MHz)\n", FREQUENCY);
+    valid = false;
+  } else {
+    Serial.printf("✓ FREQUENCY: %.6f MHz\n", FREQUENCY);
+  }
+  #else
+  Serial.println("✓ FREQUENCY: Using default 433.82 MHz (RADIAN protocol)");
+  #endif
+  
+  // Validate GDO0 pin (basic check - should be defined)
+  #ifdef GDO0
+  Serial.printf("✓ GDO0 Pin: GPIO %d\n", GDO0);
+  #else
+  Serial.println("ERROR: GDO0 pin not defined in config.h");
+  valid = false;
+  #endif
+  
+  // Validate reading schedule
+  if (!isValidReadingSchedule(readingSchedule)) {
+    Serial.printf("ERROR: Invalid reading schedule '%s'\n", readingSchedule);
+    Serial.println("       Expected: 'Monday-Friday', 'Monday-Saturday', or 'Monday-Sunday'");
+    valid = false;
+  } else {
+    Serial.printf("✓ Reading Schedule: %s\n", readingSchedule);
+  }
+  
+  Serial.println("================================\n");
+  
+  return valid;
+}
+
 // Function: setup
 // Description: Initializes the device, including serial communication, Wi-Fi, MQTT, and CC1101 radio with automatic calibration.
 void setup()
 {
   Serial.begin(115200);
   Serial.println("\n");
-  Serial.println("Everblu Meters ESP8266 Starting...");
+  Serial.println("Everblu Meters ESP8266/ESP32 Starting...");
   Serial.println("Water usage data for Home Assistant");
   Serial.println("https://github.com/genestealer/everblu-meters-esp8266-improved");
-  String meterinfo = "Target meter: " + String(METER_YEAR, DEC) + "-0" + String(METER_SERIAL, DEC) + "\n";
-  Serial.println(meterinfo);
+  Serial.printf("Target meter: 20%02d-%07lu\n\n", METER_YEAR, (unsigned long)METER_SERIAL);
+
+  // Validate configuration before proceeding
+  if (!validateConfiguration()) {
+    Serial.println("\n*** FATAL: Configuration validation failed! ***");
+    Serial.println("*** Fix the errors in config.h and reflash ***");
+    Serial.println("*** Device halted - will not continue ***\n");
+    while(1) {
+      digitalWrite(LED_BUILTIN, LOW);  // Blink LED to indicate error
+      delay(200);
+      digitalWrite(LED_BUILTIN, HIGH);
+      delay(200);
+    }
+  }
+  
+  Serial.println("✓ Configuration valid - proceeding with initialization\n");
 
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW); // turned on to start with
@@ -1577,9 +1730,9 @@ void setup()
   #endif
 
   // Validate and log the configured reading schedule
-  Serial.printf("> Reading schedule (configured): %s\n", readingSchedule.c_str());
+  Serial.printf("> Reading schedule (configured): %s\n", readingSchedule);
   validateReadingSchedule();
-  Serial.printf("> Reading schedule (effective): %s\n", readingSchedule.c_str());
+  Serial.printf("> Reading schedule (effective): %s\n", readingSchedule);
 
   // Log effective frequency and warn if default is used
   Serial.printf("> Frequency (effective): %.6f MHz\n", (double)FREQUENCY);

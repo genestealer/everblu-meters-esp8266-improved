@@ -180,7 +180,7 @@ The following MQTT topics are used to integrate the device with Home Assistant v
 |---------------------|---------------------------------|--------------------------------------------------------------------------------|
 | `Liters`            | `everblu/cyble/liters`          | Total water usage in liters.                                                   |
 | `Battery`           | `everblu/cyble/battery`         | Remaining battery life in months.                                              |
-| `Counter`           | `everblu/cyble/counter`         | Number of times the meter has been read.                                       |
+| `Counter`           | `everblu/cyble/counter`         | Number of times the meter has been read (wraps around 255→1).                  |
 | `RSSI`              | `everblu/cyble/rssi`            | Raw RSSI value of the meter's signal.                                          |
 | `RSSI (dBm)`        | `everblu/cyble/rssi_dbm`        | RSSI value converted to dBm.                                                   |
 | `RSSI (%)`          | `everblu/cyble/rssi_percentage` | RSSI value converted to a percentage.                                          |
@@ -224,18 +224,20 @@ The following MQTT topics are used to integrate the device with Home Assistant v
 4. **Perform Frequency Discovery (First-Time Setup)**  
   - Open `config.h` and set `SCAN_FREQUENCY_433MHZ` to `1` to enable frequency discovery.  
   - Compile and upload the code to your ESP device using PlatformIO. Use **PlatformIO > Upload and Monitor**.  
-  - Keep the device connected to your computer during this process. The serial monitor will display debug output as the device scans frequencies in the 433 MHz range.  
-  - Once the correct frequency is identified, update the `FREQUENCY` value in `config.h`.  
-  - Disable frequency discovery by setting `SCAN_FREQUENCY_433MHZ` back to `0` in `config.h`.  
-  - For best results, perform this step during local business hours. Refer to the "Frequency Adjustment" section below for additional guidance.
+  - **Keep the device connected to your computer during this process.** The serial monitor will display debug output as the device scans frequencies in the 433 MHz range.  
+  - **Important**: During the initial scan (first boot with no stored frequency offset), the device performs a wide frequency scan that takes approximately 2 minutes **before** connecting to MQTT. You will see no MQTT/Home Assistant activity during this time - this is normal. Monitor the serial output to see the scan progress. Once the scan completes and the optimal frequency is found, the device will connect to MQTT and publish telemetry data.
+  - Once the correct frequency is identified, update the `FREQUENCY` value in `config.h` if needed (the automatic scan stores the offset, so manual adjustment is usually not required).  
+  - Disable frequency discovery by setting `SCAN_FREQUENCY_433MHZ` back to `0` in `config.h` if you want to skip the initial scan on future reboots.  
+  - For best results, perform this step during local business hours when the meter is most likely to transmit. Refer to the "Frequency Adjustment" section below for additional guidance.
 
 5. **Compile and Flash the Code**  
   - Compile and upload the code to your ESP device using **PlatformIO > Upload and Monitor**.  
   - Keep the device connected to your computer during this process.
 
 6. **Verify Meter Data**  
-  - After a few seconds, the meter data should appear in the terminal (bottom panel) and be pushed to MQTT.  
+  - After WiFi and MQTT connection is established (or after the initial frequency scan completes), the meter data should appear in the terminal (bottom panel) and be pushed to MQTT.  
   - If Frequency Discovery is still enabled, its output will also be displayed during this step.
+  - **Note**: On first boot with no stored frequency offset, there will be a ~2 minute delay before any MQTT activity while the wide frequency scan runs. This is normal - monitor the serial output to see progress.
 
 7. **Automatic Meter Query**  
   - The device will automatically query the meter once every 24 hours. If the query fails, it will retry every hour until successful.
