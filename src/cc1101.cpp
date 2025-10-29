@@ -1,18 +1,29 @@
-/*  the radian_trx SW shall not be distributed  nor used for commercial product*/
-/*  it is exposed just to demonstrate CC1101 capability to reader water meter indexes */
-/*  there is no Warranty on radian_trx SW */
+/*  CC1101 radio interface for Itron EverBlu Cyble Enhanced water meters */
+/*  Implements RADIAN protocol communication over 433 MHz RF */
 
-#include "private.h"        // Include the local private file for passwords etc. not for GitHub. Generate your own private.h file with the same content as private_example.h
+#include "config.h"         // Include the local config file for passwords etc. not for GitHub. Generate your own config.h file with the same content as config.example.h
 #include "everblu_meters.h" // Include the local everblu_meters library
 #include "utils.h"          // Include the local utils library for utility functions
 #include "cc1101.h"         // Include the local cc1101 library for CC1101 functions
 #include <Arduino.h>        // Include the Arduino library for basic functions
 #include <SPI.h>            // Include the SPI library for SPI communication
+#if defined(ESP32)
+#include <esp_task_wdt.h>
+#endif
+
+// Cross-platform watchdog feed helper
+static inline void FEED_WDT() {
+#if defined(ESP8266)
+  ESP.wdtFeed();
+#elif defined(ESP32)
+  esp_task_wdt_reset();
+  yield();
+#else
+  (void)0;
+#endif
+}
 
 uint8_t RF_config_u8 = 0xFF;
-uint8_t RF_Test_u8 = 0;
-//                     +10,  +7,   5,   0, -10, -15, -20, -30
-uint8_t PA_Test[] = { 0xC0,0xC8,0x85,0x60,0x34,0x1D,0x0E,0x12, };
 uint8_t PA[] = { 0x60,0x00,0x00,0x00,0x00,0x00,0x00,0x00, };
 uint8_t CC1101_status_state = 0;
 uint8_t CC1101_status_FIFO_FreeByte = 0;
@@ -38,6 +49,86 @@ uint8_t debug_out = 0;
 #define IOCFG2  			0x00                                    // GDO2 output pin configuration
 #define IOCFG1  			0x01                                    // GDO1 output pin configuration
 #define IOCFG0  			0x02                                    // GDO0 output pin configuration
+
+/*-------------------------[CC1100 - Register Values]----------------------------*/
+// IOCFG2 - GDO2 Output Pin Configuration
+#define IOCFG2_SERIAL_DATA_OUTPUT       0x0D    // GDO2: Serial Data Output
+
+// IOCFG0 - GDO0 Output Pin Configuration  
+#define IOCFG0_SYNC_WORD_DETECT         0x06    // Asserts when sync word detected, deasserts at end of packet
+
+// FIFOTHR - RX FIFO and TX FIFO Thresholds
+#define FIFOTHR_FIFO_THR_33_32          0x47    // RX FIFO threshold: 33 bytes, TX FIFO threshold: 32 bytes
+
+// SYNC1/SYNC0 - Sync Word Configuration
+#define SYNC1_PATTERN_55                0x55    // Sync word pattern: 0x55 (01010101)
+#define SYNC0_PATTERN_00                0x00    // Sync word pattern: 0x00 (00000000)
+#define SYNC0_PATTERN_50                0x50    // Sync word pattern: 0x50 (01010000)
+#define SYNC1_PATTERN_FF                0xFF    // Sync word pattern: 0xFF (11111111)
+#define SYNC0_PATTERN_F0                0xF0    // Sync word pattern: 0xF0 (11110000)
+
+// PKTCTRL1 - Packet Automation Control
+#define PKTCTRL1_NO_ADDR_CHECK          0x00    // No address check, no status appended
+
+// PKTCTRL0 - Packet Automation Control
+#define PKTCTRL0_FIXED_LENGTH           0x00    // Fixed packet length mode
+#define PKTCTRL0_INFINITE_LENGTH        0x02    // Infinite packet length mode
+
+// FSCTRL1 - Frequency Synthesizer Control
+#define FSCTRL1_FREQ_IF                 0x08    // Intermediate frequency
+
+// MDMCFG4 - Modem Configuration
+#define MDMCFG4_RX_BW_58KHZ             0xF6    // RX filter bandwidth = 58 kHz
+#define MDMCFG4_RX_BW_58KHZ_9_6KBPS     0xF8    // RX filter bandwidth = 58 kHz, 9.6 kbps
+
+// MDMCFG3 - Modem Configuration (Data Rate)
+#define MDMCFG3_DRATE_2_4KBPS           0x83    // Data rate: 2.4 kbps (26M*((256+0x83)*2^6)/2^28)
+
+// MDMCFG2 - Modem Configuration (Modulation, Sync)
+#define MDMCFG2_2FSK_16_16_SYNC         0x02    // 2-FSK, no Manchester, 16/16 sync word bits
+#define MDMCFG2_NO_PREAMBLE_SYNC        0x00    // No preamble/sync transmission
+
+// MDMCFG1 - Modem Configuration (Preamble, Channel Spacing)
+#define MDMCFG1_NUM_PREAMBLE_2          0x00    // 2 preamble bytes, channel spacing exponent
+
+// MDMCFG0 - Modem Configuration (Channel Spacing)
+#define MDMCFG0_CHANSPC_25KHZ           0x00    // Channel spacing = 25 kHz
+
+// DEVIATN - Modem Deviation Setting
+#define DEVIATN_5_157KHZ                0x15    // Deviation = 5.157 kHz
+
+// MCSM1 - Main Radio Control State Machine
+#define MCSM1_CCA_ALWAYS_IDLE           0x00    // CCA always, idle on exit
+#define MCSM1_CCA_ALWAYS_RX             0x0F    // CCA always, RX on exit
+
+// MCSM0 - Main Radio Control State Machine
+#define MCSM0_FS_AUTOCAL_IDLE_TO_RXTX   0x18    // Auto-calibrate from IDLE to RX/TX
+
+// FOCCFG - Frequency Offset Compensation
+#define FOCCFG_FOC_4K_2K                0x1D    // FOC enabled, 4K before sync, K/2 after sync
+
+// BSCFG - Bit Synchronization Configuration
+#define BSCFG_BS_PRE_KI_2               0x1C    // Bit sync configuration
+
+// AGCCTRL2 - AGC Control
+#define AGCCTRL2_MAX_DVGA_LNA           0xC7    // Max DVGA and LNA gain
+
+// AGCCTRL1 - AGC Control
+#define AGCCTRL1_DEFAULT                0x00    // Default AGC control
+
+// AGCCTRL0 - AGC Control
+#define AGCCTRL0_FILTER_16              0xB2    // AGC filter length = 16 samples
+
+// WORCTRL - Wake On Radio Control
+#define WORCTRL_WOR_RES_1_8             0xFB    // WOR resolution 1/8 seconds
+
+// FREND1 - Front End RX Configuration
+#define FREND1_LNA_CURRENT              0xB6    // LNA current setting
+
+// TEST2/TEST1/TEST0 - Test Settings
+#define TEST2_RX_LOW_DATA_RATE          0x81    // Various test settings (RX low data rate)
+#define TEST1_RX_LOW_DATA_RATE          0x35    // Various test settings (RX low data rate)
+#define TEST0_RX_LOW_DATA_RATE          0x09    // Various test settings (RX low data rate)
 #define FIFOTHR  			0x03                                    // RX FIFO and TX FIFO thresholds
 #define SYNC1  			    0x04                                    // Sync word, high byte
 #define SYNC0  			    0x05                                    // Sync word, low byte
@@ -176,10 +267,7 @@ uint8_t halRfReadReg(uint8_t spi_instr)
   uint8_t rbuf[2] = { 0 };
   uint8_t len = 2;
 
-  //rbuf[0] = spi_instr | READ_SINGLE_BYTE;
-  //rbuf[1] = 0;
-  //wiringPiSPIDataRW (0, rbuf, len) ;
-  //errata Section 3. You have to make sure that you read the same value of the register twice in a row before you evaluate it otherwise you might read a value that is a mix of 2 state values.
+  // CC1101 Errata Note: Read register value to update status bytes
   rbuf[0] = spi_instr | READ_SINGLE_BYTE;
   rbuf[1] = 0;
   wiringPiSPIDataRW(0, rbuf, len);
@@ -251,27 +339,14 @@ void CC1101_CMD(uint8_t spi_instr)
 void echo_cc1101_version(void);
 void show_cc1101_registers_settings(void);
 
-//---------------[CC1100 reset functions "200us"]-----------------------
-void cc1101_reset(void)			// reset defined in cc1100 datasheet §19.1
-{// CS should be high from gpio load spi command
-  /* commented car ne fonctionne pas avec wiringPi a voir avec BCM2835 ..
-     digitalWrite(cc1101_CSn, 0);     		// CS low
-     pinMode (cc1101_CSn, OUTPUT);
-     delayMicroseconds(30);
-     digitalWrite(cc1101_CSn, 1);      	// CS high
-     delayMicroseconds(100);	 // min 40us
-  //Pull CSn low and wait for SO to go low
-  digitalWrite(cc1101_CSn, 0);     		// CS low
-  delayMicroseconds(30);
-  */
-
-  CC1101_CMD(SRES);	//GDO0 pin should output a clock signal with a frequency of CLK_XOSC/192.
-  //periode 1/7.417us= 134.8254k  * 192 --> 25.886477M
-  //10 periode 73.83 = 135.4463k *192 --> 26Mhz
-  delay(1); //1ms for getting chip to reset properly
-
-  CC1101_CMD(SFTX);   //flush the TX_fifo content -> a must for interrupt handling
-  CC1101_CMD(SFRX);	//flush the RX_fifo content -> a must for interrupt handling	
+//---------------[CC1100 reset function]-----------------------
+// Reset CC1101 via software reset strobe command (per datasheet §19.1)
+void cc1101_reset(void)
+{
+  CC1101_CMD(SRES);   // Send software reset strobe
+  delay(1);           // Wait 1ms for chip to reset properly
+  CC1101_CMD(SFTX);   // Flush TX FIFO - required for proper interrupt handling
+  CC1101_CMD(SFRX);   // Flush RX FIFO - required for proper interrupt handling
 }
 
 void setMHZ(float mhz) {
@@ -314,52 +389,39 @@ void cc1101_configureRF_0(float freq)
 {
   RF_config_u8 = 0;
   //
-  // Rf settings for CC1101
+  // RF settings for CC1101 - RADIAN protocol (Itron EverBlu)
   //
-  halRfWriteReg(IOCFG2, 0x0D);  //GDO2 Output Pin Configuration : Serial Data Output
-  halRfWriteReg(IOCFG0, 0x06);  //GDO0 Output Pin Configuration : Asserts when sync word has been sent / received, and de-asserts at the end of the packet.
-  halRfWriteReg(FIFOTHR, 0x47); //0x4? adc with bandwith< 325khz
-  halRfWriteReg(SYNC1, 0x55);   //01010101
-  halRfWriteReg(SYNC0, 0x00);   //00000000 
+  halRfWriteReg(IOCFG2, IOCFG2_SERIAL_DATA_OUTPUT);    // GDO2: Serial data output
+  halRfWriteReg(IOCFG0, IOCFG0_SYNC_WORD_DETECT);      // GDO0: Sync word detection
+  halRfWriteReg(FIFOTHR, FIFOTHR_FIFO_THR_33_32);      // FIFO thresholds
+  halRfWriteReg(SYNC1, SYNC1_PATTERN_55);              // Sync word MSB: 0x55
+  halRfWriteReg(SYNC0, SYNC0_PATTERN_00);              // Sync word LSB: 0x00
 
-  //halRfWriteReg(PKTCTRL1,0x80);//Preamble quality estimator threshold=16  ; APPEND_STATUS=0; no addr check
-  halRfWriteReg(PKTCTRL1, 0x00);//Preamble quality estimator threshold=0   ; APPEND_STATUS=0; no addr check
-  halRfWriteReg(PKTCTRL0, 0x00);//fix length , no CRC
-  halRfWriteReg(FSCTRL1, 0x08); //Frequency Synthesizer Control
+  halRfWriteReg(PKTCTRL1, PKTCTRL1_NO_ADDR_CHECK);     // No address check
+  halRfWriteReg(PKTCTRL0, PKTCTRL0_FIXED_LENGTH);      // Fixed packet length
+  halRfWriteReg(FSCTRL1, FSCTRL1_FREQ_IF);             // Frequency synthesizer IF
 
-  setMHZ(freq);
-  //halRfWriteReg(FREQ2,0x10);   //Frequency Control Word, High Byte  Base frequency = 433.82
-  //halRfWriteReg(FREQ1,0xAF);   //Frequency Control Word, Middle Byte
-  //halRfWriteReg(FREQ0, freq0);
-  //halRfWriteReg(FREQ0,0x75); //Frequency Control Word, Low Byte la fréquence reel etait 433.790 (centre)
-  //halRfWriteReg(FREQ0,0xC1); //Frequency Control Word, Low Byte rasmobo 814 824 (KO) ; minepi 810 820 (OK)
-  //halRfWriteReg(FREQ0,0x9B); //rasmobo 808.5  -16  pour -38
-  //halRfWriteReg(FREQ0,0xB7);   //rasmobo 810 819.5 OK
-  //mon compteur F1 : 433809500  F2 : 433820000   deviation +-5.25khz depuis 433.81475M
+  setMHZ(freq); // Configure frequency using helper function
 
-  halRfWriteReg(MDMCFG4, 0xF6); //Modem Configuration   RX filter BW = 58Khz
-  halRfWriteReg(MDMCFG3, 0x83); //Modem Configuration   26M*((256+83h)*2^6)/2^28 = 2.4kbps 
-  halRfWriteReg(MDMCFG2, 0x02); //Modem Configuration   2-FSK;  no Manchester ; 16/16 sync word bits detected
-  halRfWriteReg(MDMCFG1, 0x00); //Modem Configuration num preamble 2=>0 , Channel spacing_exp
-  halRfWriteReg(MDMCFG0, 0x00); /*# MDMCFG0 Channel spacing = 25Khz*/
-  halRfWriteReg(DEVIATN, 0x15);  //5.157471khz 
-  //halRfWriteReg(MCSM1,0x0F);   //CCA always ; default mode RX
-  halRfWriteReg(MCSM1, 0x00);   //CCA always ; default mode IDLE
-  halRfWriteReg(MCSM0, 0x18);   //Main Radio Control State Machine Configuration
-  halRfWriteReg(FOCCFG, 0x1D);  //Frequency Offset Compensation Configuration
-  halRfWriteReg(BSCFG, 0x1C);   //Bit Synchronization Configuration
-  halRfWriteReg(AGCCTRL2, 0xC7);//AGC Control
-  halRfWriteReg(AGCCTRL1, 0x00);//AGC Control
-  halRfWriteReg(AGCCTRL0, 0xB2);//AGC Control
-  halRfWriteReg(WORCTRL, 0xFB); //Wake On Radio Control
-  halRfWriteReg(FREND1, 0xB6);  //Front End RX Configuration
-  halRfWriteReg(FSCAL3, 0xE9);  //Frequency Synthesizer Calibration
-  halRfWriteReg(FSCAL2, 0x2A);  //Frequency Synthesizer Calibration
-  halRfWriteReg(FSCAL1, 0x00);  //Frequency Synthesizer Calibration
-  halRfWriteReg(FSCAL0, 0x1F);  //Frequency Synthesizer Calibration
-  halRfWriteReg(TEST2, 0x81);   //Various Test Settings link to adc retention
-  halRfWriteReg(TEST1, 0x35);   //Various Test Settings link to adc retention
-  halRfWriteReg(TEST0, 0x09);   //Various Test Settings link to adc retention
+  halRfWriteReg(MDMCFG4, MDMCFG4_RX_BW_58KHZ);         // RX bandwidth: 58 kHz
+  halRfWriteReg(MDMCFG3, MDMCFG3_DRATE_2_4KBPS);       // Data rate: 2.4 kbps
+  halRfWriteReg(MDMCFG2, MDMCFG2_2FSK_16_16_SYNC);     // 2-FSK, 16/16 sync bits
+  halRfWriteReg(MDMCFG1, MDMCFG1_NUM_PREAMBLE_2);      // Preamble: 2 bytes
+  halRfWriteReg(MDMCFG0, MDMCFG0_CHANSPC_25KHZ);       // Channel spacing: 25 kHz
+  halRfWriteReg(DEVIATN, DEVIATN_5_157KHZ);            // Deviation: 5.157 kHz
+  halRfWriteReg(MCSM1, MCSM1_CCA_ALWAYS_IDLE);         // CCA always, idle on exit
+  halRfWriteReg(MCSM0, MCSM0_FS_AUTOCAL_IDLE_TO_RXTX); // Auto-calibrate on IDLE→RX/TX
+  halRfWriteReg(FOCCFG, FOCCFG_FOC_4K_2K);             // Frequency offset compensation
+  halRfWriteReg(BSCFG, BSCFG_BS_PRE_KI_2);             // Bit synchronization
+  halRfWriteReg(AGCCTRL2, AGCCTRL2_MAX_DVGA_LNA);      // AGC: max gain
+  halRfWriteReg(AGCCTRL1, AGCCTRL1_DEFAULT);           // AGC: default
+  halRfWriteReg(AGCCTRL0, AGCCTRL0_FILTER_16);         // AGC: 16 samples
+  halRfWriteReg(WORCTRL, WORCTRL_WOR_RES_1_8);         // Wake-on-radio
+  halRfWriteReg(FREND1, FREND1_LNA_CURRENT);           // Front-end RX config
+  // Note: Static FSCAL3/2/1/0 register writes removed - automatic calibration handles these dynamically
+  halRfWriteReg(TEST2, TEST2_RX_LOW_DATA_RATE);        // Test settings for low data rate
+  halRfWriteReg(TEST1, TEST1_RX_LOW_DATA_RATE);        // Test settings for low data rate
+  halRfWriteReg(TEST0, TEST0_RX_LOW_DATA_RATE);        // Test settings for low data rate
 
   SPIWriteBurstReg(PATABLE_ADDR, PA, 8);
 }
@@ -368,17 +430,15 @@ bool cc1101_init(float freq)
 {
   pinMode(GDO0, INPUT_PULLUP);
 
-  // to use SPI pi@MinePi ~ $ gpio unload spi  then gpio load spi   
-  // sinon pas de MOSI ni pas de CSn , buffer de 4kB
-  if ((wiringPiSPISetup(0, 500000)) < 0)        // channel 0 100khz   min 500khz ds la doc ?
+  // Initialize SPI bus for CC1101 communication (500 kHz)
+  if ((wiringPiSPISetup(0, 500000)) < 0)
   {
-    //fprintf (stderr, "Can't open the SPI bus: %s\n", strerror (errno)) ;
-    printf("ERROR: Can't open the SPI bus - CC1101 radio NOT found!\n");
+    printf("ERROR: Failed to initialize SPI bus - check CC1101 wiring and connections\n");
     return false;
   }
   
   cc1101_reset();
-  delay(1); //1ms
+  delay(1);
   
   // Verify CC1101 is present by reading version register
   uint8_t partnum = halRfReadReg(PARTNUM_ADDR);
@@ -387,7 +447,8 @@ bool cc1101_init(float freq)
   // Check if version register returns a valid value (not 0x00 or 0xFF)
   // PARTNUM may be 0x00 on some variants, so we rely mainly on VERSION
   if (version == 0x00 || version == 0xFF) {
-    printf("ERROR: CC1101 radio NOT detected! (PARTNUM: 0x%02X, VERSION: 0x%02X)\n", partnum, version);
+    printf("ERROR: CC1101 radio not responding (PARTNUM: 0x%02X, VERSION: 0x%02X)\n", partnum, version);
+    printf("       Check: 1) Wiring connections 2) 3.3V power supply 3) SPI pins\n");
     return false;
   }
   
@@ -398,11 +459,15 @@ bool cc1101_init(float freq)
     s_reported_ok = true;
   }
   
-  //echo_cc1101_version();
-  //delay(1);
-  //show_cc1101_registers_settings();
-  //delay(1);
   cc1101_configureRF_0(freq);
+  
+  // Perform manual calibration after configuration
+  // This calibrates the frequency synthesizer for the current frequency
+  CC1101_CMD(SIDLE);  // Must be in IDLE state to calibrate
+  CC1101_CMD(SCAL);   // Calibrate frequency synthesizer and turn it off
+  delay(5);           // Wait for calibration to complete (typically <1ms, but we add margin)
+  
+  echo_debug(debug_out, "> Frequency synthesizer calibrated for %.6f MHz\n", freq);
   
   return true;
 }
@@ -532,6 +597,7 @@ uint8_t cc1101_wait_for_packet(int milliseconds)
   for (i = 0; i < milliseconds; i++)
   {
     delay(1); //in ms	
+    if (i % 100 == 0) FEED_WDT(); // Feed watchdog every 100ms
     //echo_cc1101_MARCSTATE();
     if (cc1101_check_packet_received()) //delay till system has data available
     {
@@ -549,28 +615,68 @@ uint8_t cc1101_wait_for_packet(int milliseconds)
 struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
 {
   struct tmeter_data data;
-  if (size >= 30)
-  {
-    //echo_debug(1,"\n%u/%u/20%u %u:%u:%u ",decoded_buffer[24],decoded_buffer[25],decoded_buffer[26],decoded_buffer[28],decoded_buffer[29],decoded_buffer[30]);
-    //echo_debug(1,"%u liters ",decoded_buffer[18]+decoded_buffer[19]*256 + decoded_buffer[20]*65536 + decoded_buffer[21]*16777216);
-
-    data.liters = decoded_buffer[18] + decoded_buffer[19] * 256 + decoded_buffer[20] * 65536 + decoded_buffer[21] * 16777216;
+  memset(&data, 0, sizeof(data)); // Initialize all fields to zero
+  
+  // Bounds check: ensure buffer is large enough for basic data
+  if (size < 30) {
+    echo_debug(1, "ERROR: Buffer too small for meter data (size=%d, need>=30)\n", size);
+    return data;
   }
-  if (size >= 48)
-  {
+  
+  // Extract liters using proper uint32_t handling to prevent overflow
+  // Byte order is LSB first: [18]=LSB, [19], [20], [21]=MSB
+  data.liters = ((uint32_t)decoded_buffer[18]) |
+                ((uint32_t)decoded_buffer[19] << 8) |
+                ((uint32_t)decoded_buffer[20] << 16) |
+                ((uint32_t)decoded_buffer[21] << 24);
+  
+  // Extract extended data if buffer is large enough
+  if (size >= 49) { // Need at least 49 bytes to safely access decoded_buffer[48]
     //echo_debug(1,"Num %u %u Mois %uh-%uh ",decoded_buffer[48], decoded_buffer[31],decoded_buffer[44],decoded_buffer[45]);
     data.reads_counter = decoded_buffer[48];
     data.battery_left = decoded_buffer[31];
     data.time_start = decoded_buffer[44];
     data.time_end = decoded_buffer[45];
+  } else {
+    echo_debug(1, "WARN: Buffer size %d < 49, extended data unavailable\n", size);
   }
+  
   return data;
 }
 
-// Remove the start- and stop-bits in the bitstream , also decode oversampled bit 0xF0 => 1,0
+// Function: decode_4bitpbit_serial
+// Description: Decodes RADIAN protocol's 4-bit-per-bit serial encoding to extract raw data bytes.
+//
+// RADIAN Protocol Serial Encoding:
+// ---------------------------------
+// Each data byte is transmitted with:
+// - 1 start bit (0)
+// - 8 data bits (LSB first)
+// - 3 stop bits (111)
+//
+// Additionally, each bit is oversampled 4x for noise immunity:
+// - Logical '1' → transmitted as 0xF0 (1111 0000 in binary)
+// - Logical '0' → transmitted as 0x0F (0000 1111 in binary)
+//
+// Example: Byte 0xA5 (10100101) would be transmitted as:
+// Start bit 0 → 0x0F
+// Bit 0 (1)   → 0xF0
+// Bit 1 (0)   → 0x0F
+// Bit 2 (1)   → 0xF0
+// ...and so on
+// Stop bits 111 → 0xF0 0xF0 0xF0
+//
+// This function:
+// 1. Detects bit polarity changes to identify logical bits
+// 2. Counts consecutive same-polarity samples (should be ~4 per bit)
+// 3. Extracts data bits and discards start/stop bits
+// 4. Reverses bit order (LSB first → MSB first for normal byte representation)
+//
+// Remove the start- and stop-bits in the bitstream, also decode oversampled bit 0xF0 => 1,0
 // 01234567 ###01234 567###01 234567## #0123456 (# -> Start/Stop bit)
 // is decoded to:
 // 76543210 76543210 76543210 76543210
+// Note: decoded_buffer must be at least l_total_byte/4 bytes in size
 uint8_t decode_4bitpbit_serial(uint8_t *rxBuffer, int l_total_byte, uint8_t* decoded_buffer)
 {
   uint16_t i, j, k;
@@ -580,6 +686,10 @@ uint8_t decode_4bitpbit_serial(uint8_t *rxBuffer, int l_total_byte, uint8_t* dec
   uint8_t dest_bit_cnt = 0;
   uint8_t dest_byte_cnt = 0;
   uint8_t current_Rx_Byte;
+  
+  // Maximum decoded buffer size (conservative estimate: input bytes / 4)
+  const uint8_t MAX_DECODED_SIZE = 200;
+  
   //show_in_hex(rxBuffer,l_total_byte);
   /*set 1st bit polarity*/
   bit_pol = (rxBuffer[0] & 0x80); //initialize with 1st bit state
@@ -606,17 +716,27 @@ uint8_t decode_4bitpbit_serial(uint8_t *rxBuffer, int l_total_byte, uint8_t* dec
         { // insert the number of decoded bit
           if (dest_bit_cnt < 8)
           { //if data byte
+            // Bounds check before writing to buffer
+            if (dest_byte_cnt >= MAX_DECODED_SIZE) {
+              echo_debug(debug_out, "ERROR: Decode buffer overflow at byte %d\n", dest_byte_cnt);
+              return dest_byte_cnt;
+            }
             decoded_buffer[dest_byte_cnt] = decoded_buffer[dest_byte_cnt] >> 1;
             decoded_buffer[dest_byte_cnt] |= bit_pol;
           }
           dest_bit_cnt++;
           //if ((dest_bit_cnt ==9) && (!bit_pol)){  echo_debug(debug_out,"stop bit error9"); return dest_byte_cnt;}
-          if ((dest_bit_cnt == 10) && (!bit_pol)) { echo_debug(debug_out, "stop bit error10"); return dest_byte_cnt; }
+          if ((dest_bit_cnt == 10) && (!bit_pol)) { echo_debug(debug_out, "ERROR: Stop bit error at bit 10\n"); return dest_byte_cnt; }
           if ((dest_bit_cnt >= 11) && (!bit_pol)) //start bit
           {
             dest_bit_cnt = 0;
             //echo_debug(debug_out, " dec[%i]=0x%02X \n", dest_byte_cnt, decoded_buffer[dest_byte_cnt]);
             dest_byte_cnt++;
+            // Additional bounds check before next iteration
+            if (dest_byte_cnt >= MAX_DECODED_SIZE) {
+              echo_debug(debug_out, "ERROR: Decode buffer size limit reached\n");
+              return dest_byte_cnt;
+            }
           }
         }
         bit_pol = current_Rx_Byte & 0x80;
@@ -629,9 +749,38 @@ uint8_t decode_4bitpbit_serial(uint8_t *rxBuffer, int l_total_byte, uint8_t* dec
 }
 
 /*
-   search for 0101010101010000b sync pattern then change data rate in order to get 4bit per bit
-   search for end of sync pattern with start bit 1111111111110000b
-   */
+   Function: receive_radian_frame
+   Description: Receives a RADIAN protocol frame using a two-stage sync detection approach.
+   
+   This function implements the RADIAN protocol's unique frame reception strategy:
+   
+   Stage 1: Initial Sync Detection (2.4 kbps)
+   ------------------------------------------
+   - Configures CC1101 to detect sync pattern 0x5550 (01010101 01010000)
+   - This is the preamble/sync that precedes the actual data
+   - Uses standard data rate (2.4 kbps) for reliable sync detection
+   - Waits for GDO0 pin to go high (indicates sync word detected)
+   
+   Stage 2: Frame Start and Data Reception (9.6 kbps)
+   ---------------------------------------------------
+   - Reconfigures CC1101 to detect 0xFFF0 (11111111 11110000)
+   - This pattern marks the end of sync and the start bit of the first data byte
+   - Switches to 4x data rate (9.6 kbps) to capture 4-bit-per-bit oversampling
+   - Receives the full frame into the buffer
+   
+   Parameters:
+   - size_byte: Expected size of the decoded frame (before serial encoding)
+   - rx_tmo_ms: Receive timeout in milliseconds
+   - rxBuffer: Buffer to store received raw data
+   - rxBuffer_size: Size of the receive buffer
+   
+   Returns:
+   - Number of bytes received (raw, encoded data)
+   - 0 if timeout or reception failed
+   
+   Note: The received data is 4x larger than the decoded size due to oversampling
+         and needs to be processed by decode_4bitpbit_serial() to extract actual data.
+*/
 int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t*rxBuffer, int rxBuffer_size)
 {
   uint8_t  l_byte_in_rx = 0;
@@ -644,21 +793,31 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t*rxBuffer, int rxB
 
   if (l_radian_frame_size_byte * 4 > rxBuffer_size) { echo_debug(debug_out, "buffer too small\n"); return 0; }
   CC1101_CMD(SFRX);
-  halRfWriteReg(MCSM1, 0x0F);   //CCA always ; default mode RX
-  halRfWriteReg(MDMCFG2, 0x02); //Modem Configuration   2-FSK;  no Manchester ; 16/16 sync word bits detected   
+  halRfWriteReg(MCSM1, MCSM1_CCA_ALWAYS_RX);           // CCA always, RX on exit
+  halRfWriteReg(MDMCFG2, MDMCFG2_2FSK_16_16_SYNC);     // 2-FSK, 16/16 sync bits
   /* configure to receive beginning of sync pattern */
-  halRfWriteReg(SYNC1, 0x55);   //01010101
-  halRfWriteReg(SYNC0, 0x50);   //01010000	
-  halRfWriteReg(MDMCFG4, 0xF6); //Modem Configuration   RX filter BW = 58Khz
-  halRfWriteReg(MDMCFG3, 0x83); //Modem Configuration   26M*((256+83h)*2^6)/2^28 = 2.4kbps	
-  halRfWriteReg(PKTLEN, 1); // just one byte of synch pattern
+  halRfWriteReg(SYNC1, SYNC1_PATTERN_55);              // Sync pattern: 0x55
+  halRfWriteReg(SYNC0, SYNC0_PATTERN_50);              // Sync pattern: 0x50
+  halRfWriteReg(MDMCFG4, MDMCFG4_RX_BW_58KHZ);         // RX BW: 58 kHz
+  halRfWriteReg(MDMCFG3, MDMCFG3_DRATE_2_4KBPS);       // Data rate: 2.4 kbps
+  halRfWriteReg(PKTLEN, 1);                            // Just one byte of sync pattern
   cc1101_rec_mode();
 
-  while ((digitalRead(GDO0) == FALSE) && (l_tmo < rx_tmo_ms)) { delay(1); l_tmo++; }
-  if (l_tmo < rx_tmo_ms) echo_debug(debug_out, "GDO0! (0, %d) ", l_tmo); else return 0;
+  while ((digitalRead(GDO0) == FALSE) && (l_tmo < rx_tmo_ms)) { 
+    delay(1); l_tmo++; 
+    if (l_tmo % 50 == 0) FEED_WDT(); // Feed watchdog every 50ms
+  }
+  if (l_tmo < rx_tmo_ms) {
+    echo_debug(debug_out, "> GDO0 triggered at %dms\n", l_tmo);
+  } else {
+    echo_debug(debug_out, "ERROR: Timeout waiting for GDO0 (sync detection)\n");
+    return 0;
+  }
+  
   while ((l_byte_in_rx == 0) && (l_tmo < rx_tmo_ms))
   {
     delay(5); l_tmo += 5; //wait for some byte received
+    FEED_WDT(); // Feed watchdog during receive wait
     l_byte_in_rx = (halRfReadReg(RXBYTES_ADDR) & RXBYTES_MASK);
     if (l_byte_in_rx)
     {
@@ -666,7 +825,13 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t*rxBuffer, int rxB
       //if (debug_out)show_in_hex_one_line(rxBuffer, l_byte_in_rx);
     }
   }
-  if (l_tmo < rx_tmo_ms && l_byte_in_rx > 0) echo_debug(debug_out, "1st synch received (%d) ", l_byte_in_rx); else return 0;
+  
+  if (l_tmo < rx_tmo_ms && l_byte_in_rx > 0) {
+    echo_debug(debug_out, "> First sync pattern received (%d bytes)\n", l_byte_in_rx);
+  } else {
+    echo_debug(debug_out, "ERROR: Timeout waiting for sync pattern bytes\n");
+    return 0;
+  }
 
   l_lqi = halRfReadReg(LQI_ADDR);
   l_freq_est = halRfReadReg(FREQEST_ADDR);
@@ -674,21 +839,30 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t*rxBuffer, int rxB
   echo_debug(debug_out, " rssi=%u lqi=%u F_est=%u \n", l_Rssi_dbm, l_lqi, l_freq_est);
 
   fflush(stdout);
-  halRfWriteReg(SYNC1, 0xFF);   //11111111
-  halRfWriteReg(SYNC0, 0xF0);   //11110000 la fin du synch pattern et le bit de start
-  halRfWriteReg(MDMCFG4, 0xF8); //Modem Configuration   RX filter BW = 58Khz
-  halRfWriteReg(MDMCFG3, 0x83); //Modem Configuration   26M*((256+83h)*2^8)/2^28 = 9.59kbps
-  halRfWriteReg(PKTCTRL0, 0x02); //infinite packet len
+  halRfWriteReg(SYNC1, SYNC1_PATTERN_FF);              // Sync word MSB: 0xFF
+  halRfWriteReg(SYNC0, SYNC0_PATTERN_F0);              // Sync word LSB: 0xF0 (frame start)
+  halRfWriteReg(MDMCFG4, MDMCFG4_RX_BW_58KHZ_9_6KBPS); // RX BW: 58 kHz, 9.6 kbps
+  halRfWriteReg(MDMCFG3, MDMCFG3_DRATE_2_4KBPS);       // Data rate config (9.6 kbps with MDMCFG4)
+  halRfWriteReg(PKTCTRL0, PKTCTRL0_INFINITE_LENGTH);   // Infinite packet length
   CC1101_CMD(SFRX);
   cc1101_rec_mode();
 
   l_total_byte = 0;
   l_byte_in_rx = 1;
-  while ((digitalRead(GDO0) == FALSE) && (l_tmo < rx_tmo_ms)) { delay(1); l_tmo++; }
-  if (l_tmo < rx_tmo_ms) echo_debug(debug_out, "GDO0! (1, %d) ", l_tmo); else return 0;
+  while ((digitalRead(GDO0) == FALSE) && (l_tmo < rx_tmo_ms)) { 
+    delay(1); l_tmo++; 
+    if (l_tmo % 50 == 0) FEED_WDT(); // Feed watchdog every 50ms
+  }
+  if (l_tmo < rx_tmo_ms) {
+    echo_debug(debug_out, "> GDO0 triggered for frame start at %dms\n", l_tmo);
+  } else {
+    echo_debug(debug_out, "ERROR: Timeout waiting for GDO0 (frame start)\n");
+    return 0;
+  }
   while ((l_total_byte < (l_radian_frame_size_byte * 4)) && (l_tmo < rx_tmo_ms))
   {
     delay(5); l_tmo += 5; //wait for some byte received
+    if (l_tmo % 50 == 0) FEED_WDT(); // Feed watchdog every 50ms during frame receive
     l_byte_in_rx = (halRfReadReg(RXBYTES_ADDR) & RXBYTES_MASK);
     if (l_byte_in_rx)
     {
@@ -699,40 +873,108 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t*rxBuffer, int rxB
       l_total_byte += l_byte_in_rx;
     }
   }
-  if (l_tmo < rx_tmo_ms && l_total_byte > 0) echo_debug(debug_out, "frame received (%d)\n", l_total_byte); else return 0;
+  
+  if (l_tmo < rx_tmo_ms && l_total_byte > 0) {
+    echo_debug(debug_out, "> Frame received successfully (%d bytes)\n", l_total_byte);
+  } else {
+    echo_debug(debug_out, "ERROR: Timeout or no data received (got %d bytes)\n", l_total_byte);
+    return 0;
+  }
 
   /*stop reception*/
   CC1101_CMD(SFRX);
   CC1101_CMD(SIDLE);
   //echo_debug(debug_out,"RAW buffer");
-  //show_in_hex_array(rxBuffer,l_total_byte); //16ms pour 124b->682b , 7ms pour 18b->99byte
-  /*restore default reg */
-  halRfWriteReg(MDMCFG4, 0xF6); //Modem Configuration   RX filter BW = 58Khz
-  halRfWriteReg(MDMCFG3, 0x83); //Modem Configuration   26M*((256+83h)*2^6)/2^28 = 2.4kbps
-  halRfWriteReg(PKTCTRL0, 0x00); //fix packet len
-  halRfWriteReg(PKTLEN, 38);
-  halRfWriteReg(SYNC1, 0x55);   //01010101
-  halRfWriteReg(SYNC0, 0x00);   //00000000
+  //show_in_hex_array(rxBuffer,l_total_byte); //16ms for 124b->682b , 7ms for 18b->99byte
+  /*restore default registers */
+  halRfWriteReg(MDMCFG4, MDMCFG4_RX_BW_58KHZ);         // Restore RX BW: 58 kHz, 2.4 kbps
+  halRfWriteReg(MDMCFG3, MDMCFG3_DRATE_2_4KBPS);       // Restore data rate: 2.4 kbps
+  halRfWriteReg(PKTCTRL0, PKTCTRL0_FIXED_LENGTH);      // Restore fixed packet length
+  halRfWriteReg(PKTLEN, 38);                           // Restore packet length
+  halRfWriteReg(SYNC1, SYNC1_PATTERN_55);              // Restore sync word MSB: 0x55
+  halRfWriteReg(SYNC0, SYNC0_PATTERN_00);              // Restore sync word LSB: 0x00
   return l_total_byte;
 }
 
 /*
-   scenario_releve
-   2s de WUP
-130ms : trame interrogation de l'outils de reléve   ______------|...............-----
-43ms de bruit
-34ms 0101...01
-14.25ms 000...000
-14ms 1111...11111
-83.5ms de data acquitement
-50ms de 111111
-34ms 0101...01
-14.25ms 000...000
-14ms 1111...11111
-582ms de data avec l'index
-
-l'outils de reléve doit normalement acquité
+   RADIAN Protocol Overview:
+   ========================
+   The RADIAN protocol is used by Itron EverBlu Cyble Enhanced water meters for RF communication.
+   
+   Key Protocol Characteristics:
+   - Frequency: 433.82 MHz (nominal center frequency)
+   - Modulation: 2-FSK (Frequency Shift Keying)
+   - Data Rate: 2.4 kbps (sync detection), 9.6 kbps (data reception with 4-bit oversampling)
+   - Deviation: ±5.157 kHz
+   - Sync Pattern: 0x5550 (for initial sync) / 0xFFF0 (for frame start detection)
+   - Packet Structure: Variable length with start/stop bits (serial-like encoding)
+   
+   Communication Sequence:
+   -----------------------
+   1. Wake-Up Phase (WUP):
+      - Master sends ~2 seconds of 0x55 bytes to wake up the meter
+      - This alerts the meter that a query is coming
+   
+   2. Interrogation Frame:
+      - Master sends a 130ms interrogation command containing:
+        * Meter year and serial number (identification)
+        * CRC for error detection
+      - Frame uses serial encoding: 1 start bit, 8 data bits, 3 stop bits
+   
+   3. Meter Response - Acknowledgement:
+      - 43ms of RF noise
+      - 34ms of sync pattern (0101...01)
+      - 14.25ms of zeros (000...000)
+      - 14ms of ones (1111...11111)
+      - 83.5ms of acknowledgement data
+   
+   4. Meter Response - Data Frame:
+      - 50ms of ones
+      - 34ms of sync pattern (0101...01)
+      - 14.25ms of zeros
+      - 14ms of ones
+      - 582ms of actual meter data including:
+        * Water consumption in liters
+        * Read counter
+        * Battery life remaining (in months)
+        * Wake/sleep schedule (time_start, time_end)
+        * Timestamp information
+   
+   Data Encoding:
+   --------------
+   The RADIAN protocol uses 4-bit-per-bit oversampling:
+   - Each logical '1' is transmitted as 0xF0 (1111 0000)
+   - Each logical '0' is transmitted as 0x0F (0000 1111)
+   - This provides noise immunity and clock recovery
+   
+   Serial Frame Format:
+   - Start bit: 0 (1 bit)
+   - Data: LSB first (8 bits)
+   - Stop bits: 111 (3 bits)
+   
+   The decode_4bitpbit_serial() function reverses this encoding to extract the original data.
 */
+
+/*
+   scenario_releve (Reading Scenario Timeline):
+   ============================================
+   2000ms : WUP (Wake-Up Pattern) - continuous 0x55 bytes
+   130ms  : Interrogation frame from master ______------|...............-----
+   43ms   : RF noise
+   34ms   : Sync pattern 0101...01
+   14.25ms: Zeros 000...000
+   14ms   : Ones 1111...11111
+   83.5ms : Acknowledgement data
+   50ms   : Ones 1111...11111
+   34ms   : Sync pattern 0101...01
+   14.25ms: Zeros 000...000
+   14ms   : Ones 1111...11111
+   582ms  : Full meter data (liters, battery, counter, schedule, etc.)
+   
+   Note: The master (this code) should normally send an acknowledgement back to the meter,
+   but for read-only operation, this is not required.
+*/
+
 struct tmeter_data get_meter_data(void)
 {
   struct tmeter_data sdata;
@@ -740,18 +982,20 @@ struct tmeter_data get_meter_data(void)
   uint8_t wupbuffer[] = { 0x55,0x55,0x55,0x55,0x55,0x55,0x55,0x55 };
   uint8_t wup2send = 77;
   uint16_t tmo = 0;
-  uint8_t rxBuffer[1000];
+  static uint8_t rxBuffer[1000]; // Make static to avoid stack overflow
   int rxBuffer_size;
-  uint8_t meter_data[200];
+  static uint8_t meter_data[200]; // Make static to avoid stack overflow
   uint8_t meter_data_size = 0;
 
   memset(&sdata, 0, sizeof(sdata));
+  memset(rxBuffer, 0, sizeof(rxBuffer)); // Clear static buffer
+  memset(meter_data, 0, sizeof(meter_data)); // Clear static buffer
 
   uint8_t txbuffer[100];
   Make_Radian_Master_req(txbuffer, METER_YEAR, METER_SERIAL);
 
-  halRfWriteReg(MDMCFG2, 0x00);  //clear MDMCFG2 to do not send preamble and sync
-  halRfWriteReg(PKTCTRL0, 0x02); //infinite packet len
+  halRfWriteReg(MDMCFG2, MDMCFG2_NO_PREAMBLE_SYNC);    // No preamble/sync for WUP
+  halRfWriteReg(PKTCTRL0, PKTCTRL0_INFINITE_LENGTH);   // Infinite packet length
   SPIWriteBurstReg(TX_FIFO_ADDR, wupbuffer, 8); wup2send--;
   CC1101_CMD(STX);	 //sends the data store into transmit buffer over the air
   delay(10); //to give time for calibration 
@@ -759,12 +1003,15 @@ struct tmeter_data get_meter_data(void)
   echo_debug(debug_out, "MARCSTATE : raw:0x%02X  0x%02X free_byte:0x%02X sts:0x%02X sending 2s WUP...\n", marcstate, marcstate & 0x1F, CC1101_status_FIFO_FreeByte, CC1101_status_state);
   while ((CC1101_status_state == 0x02) && (tmo < TX_LOOP_OUT))					//in TX
   {
+    // Feed watchdog to prevent reset during long operations (every ~10ms in this loop)
+    FEED_WDT();
+    
     if (wup2send)
     {
       if (wup2send < 0xFF)
       {
         if (CC1101_status_FIFO_FreeByte <= 10)
-        { //this give 10+20ms from previous frame : 8*8/2.4k=26.6ms  temps pour envoyer un wupbuffer
+        { //this gives 10+20ms from previous frame : 8*8/2.4k=26.6ms  time to send a wupbuffer
           delay(20);
           tmo++; tmo++;
         }
@@ -789,15 +1036,17 @@ struct tmeter_data get_meter_data(void)
   echo_debug(debug_out, "%i free_byte:0x%02X sts:0x%02X\n", tmo, CC1101_status_FIFO_FreeByte, CC1101_status_state);
   CC1101_CMD(SFTX); //flush the Tx_fifo content this clear the status state and put sate machin in IDLE
   //end of transition restore default register
-  halRfWriteReg(MDMCFG2, 0x02); //Modem Configuration   2-FSK;  no Manchester ; 16/16 sync word bits detected   
-  halRfWriteReg(PKTCTRL0, 0x00); //fix packet len
+  halRfWriteReg(MDMCFG2, MDMCFG2_2FSK_16_16_SYNC);     // Restore: 2-FSK, 16/16 sync bits
+  halRfWriteReg(PKTCTRL0, PKTCTRL0_FIXED_LENGTH);      // Restore: fixed packet length
 
   //delay(30); //43ms de bruit
   /*34ms 0101...01  14.25ms 000...000  14ms 1111...11111  83.5ms de data acquitement*/
-  if (!receive_radian_frame(0x12, 150, rxBuffer, sizeof(rxBuffer))) echo_debug(debug_out, "TMO on REC\n");
+  if (!receive_radian_frame(0x12, 150, rxBuffer, sizeof(rxBuffer))) {
+    echo_debug(debug_out, "ERROR: Timeout waiting for meter acknowledgement frame\n");
+  }
   //delay(30); //50ms de 111111  , mais on a 7+3ms de printf et xxms calculs
   /*34ms 0101...01  14.25ms 000...000  14ms 1111...11111  582ms de data avec l'index */
-  rxBuffer_size = receive_radian_frame(0x7C, 700, rxBuffer, sizeof(rxBuffer));
+  rxBuffer_size = receive_radian_frame(0x7C, 1000, rxBuffer, sizeof(rxBuffer)); // Increased from 700ms to 1000ms to allow full meter response
   if (rxBuffer_size)
   {
     if (debug_out) {
@@ -811,10 +1060,11 @@ struct tmeter_data get_meter_data(void)
   }
   else
   {
-    echo_debug(debug_out, "TMO on REC\n");
+    echo_debug(debug_out, "ERROR: Timeout waiting for meter data frame\n");
   }
   sdata.rssi = halRfReadReg(RSSI_ADDR); // Read RSSI value from CC1101
   sdata.rssi_dbm = cc1100_rssi_convert2dbm(halRfReadReg(RSSI_ADDR));  // Read RSSI value from CC1101 and convert to dBm
   sdata.lqi = halRfReadReg(LQI_ADDR); // Read LQI value from CC1101
+  sdata.freqest = (int8_t)halRfReadReg(FREQEST_ADDR); // Read frequency offset estimate for adaptive tracking
   return sdata;
 }

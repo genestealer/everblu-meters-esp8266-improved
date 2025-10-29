@@ -4,12 +4,12 @@
 
  #include <Arduino.h>
  
- void show_in_hex(uint8_t* buffer, size_t len);
- void show_in_hex_array(uint8_t* buffer, size_t len);
- void show_in_hex_one_line(uint8_t* buffer, size_t len);
- void show_in_hex_one_line_GET(uint8_t* buffer, size_t len);
- void show_in_bin(uint8_t* buffer, size_t len);
- void echo_debug(T_BOOL l_flag, char *fmt, ...);
+ void show_in_hex(const uint8_t* buffer, size_t len);
+ void show_in_hex_array(const uint8_t* buffer, size_t len);
+ void show_in_hex_one_line(const uint8_t* buffer, size_t len);
+ void show_in_hex_one_line_GET(const uint8_t* buffer, size_t len);
+ void show_in_bin(const uint8_t* buffer, size_t len);
+ void echo_debug(T_BOOL l_flag, const char *fmt, ...);
  void print_time(void);
  
  static void init_crc_tab(void);

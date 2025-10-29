@@ -5,47 +5,54 @@
  #include <Arduino.h>
 
  #include "everblu_meters.h"
- #include <private.h> // Passwords etc. not for GitHub
+ #include <config.h> // Configuration file (Wi-Fi, MQTT, meter settings)
  
- void show_in_hex(uint8_t* buffer, size_t len)
+ // Consolidated hex display function with optional formatting
+ // mode: 0=16 per line with newlines, 1=array format, 2=single line, 3=single line with 'S' separator
+ void show_in_hex_formatted(const uint8_t* buffer, size_t len, int mode)
  {
    int i=0;
-	 for (i=0 ; i<len ; i++) {
-		 if (!(i % 16))
-			 puts("");
- 
-		 printf("%02X ", buffer[i]);
-	 }
-	 printf("\n");
+   for (i=0 ; i<len ; i++) {
+     if (mode == 0) {
+       // Original show_in_hex: 16 bytes per line
+       if (!(i % 16))
+         puts("");
+       printf("%02X ", buffer[i]);
+     } else if (mode == 1) {
+       // Array format with 16 per line
+       if (!(i % 16) && i > 0) 
+         Serial.println("");
+       Serial.printf("0x%02X, ", buffer[i]);
+     } else if (mode == 2) {
+       // Single line format
+       Serial.printf("%02X ", buffer[i]);
+     } else if (mode == 3) {
+       // Single line with 'S' separator (for GET requests)
+       Serial.printf("%02XS", buffer[i]);
+     }
+   }
+   if (mode == 0) printf("\n");
+   if (mode == 1 || mode == 2) Serial.println("");
  }
  
- void show_in_hex_array(uint8_t* buffer, size_t len)
- {
-   int i=0;
-	 for (i=0 ; i<len ; i++) {
-	 if (!(i % 16) && i > 0) Serial.println(""); // printf("\n");
-	 Serial.printf("0x%02X, ", buffer[i]);
-	 }
-   Serial.println("");
+ // Legacy function wrappers for backwards compatibility
+ void show_in_hex(const uint8_t* buffer, size_t len) {
+   show_in_hex_formatted(buffer, len, 0);
  }
  
- void show_in_hex_one_line(uint8_t* buffer, size_t len)
- {
-   int i=0;
-	 for (i=0 ; i<len ; i++) {
-	 Serial.printf("%02X ", buffer[i]);
-	 }
+ void show_in_hex_array(const uint8_t* buffer, size_t len) {
+   show_in_hex_formatted(buffer, len, 1);
  }
  
- void show_in_hex_one_line_GET(uint8_t* buffer, size_t len)
- {
-   int i=0;
-	 for (i=0 ; i<len ; i++) {
-	 Serial.printf("%02XS", buffer[i]);
-	 }
+ void show_in_hex_one_line(const uint8_t* buffer, size_t len) {
+   show_in_hex_formatted(buffer, len, 2);
  }
  
- void show_in_bin(uint8_t* buffer, size_t len)
+ void show_in_hex_one_line_GET(const uint8_t* buffer, size_t len) {
+   show_in_hex_formatted(buffer, len, 3);
+ }
+ 
+ void show_in_bin(const uint8_t* buffer, size_t len)
  {
 	 const uint8_t *ptr;
 	 uint8_t mask;
@@ -60,7 +67,7 @@
 	 printf("\n");
  }
  
- void echo_debug(T_BOOL l_flag,char *fmt, ...)
+ void echo_debug(T_BOOL l_flag,const char *fmt, ...)
  {
   if (l_flag)
   {
@@ -258,7 +265,7 @@
  int Make_Radian_Master_req(uint8_t *outputBuffer,uint8_t year,uint32_t serial)
  { 
    uint16_t crc;
-   uint8_t to_encode[] ={0x13,0x10,0x00,0x45,0xFF,0xFF,0xFF,0xFF,0x00,0x45,0x20,0x0A,0x50,0x14,0x00,0x0A,0x40,0xFF,0xFF}; //les 2 derniers octet sont en reserve pour le CKS ainsi que le serial number
+   uint8_t to_encode[] ={0x13,0x10,0x00,0x45,0xFF,0xFF,0xFF,0xFF,0x00,0x45,0x20,0x0A,0x50,0x14,0x00,0x0A,0x40,0xFF,0xFF}; //the last 2 bytes are reserved for the CRC as well as the serial number
    uint8_t synch_pattern[] ={0x50,0x00,0x00,0x00,0x03,0xFF,0xFF,0xFF,0xFF};
    uint8_t TS_len_u8;
    
