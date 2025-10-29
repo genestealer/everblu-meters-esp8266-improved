@@ -1,6 +1,5 @@
-/*  the radian_trx SW shall not be distributed  nor used for commercial product*/
-/*  it is exposed just to demonstrate CC1101 capability to reader water meter indexes */
-/*  there is no Warranty on radian_trx SW */
+/*  CC1101 radio interface for Itron EverBlu Cyble Enhanced water meters */
+/*  Implements RADIAN protocol communication over 433 MHz RF */
 
 #include "config.h"         // Include the local config file for passwords etc. not for GitHub. Generate your own config.h file with the same content as config.example.h
 #include "everblu_meters.h" // Include the local everblu_meters library
@@ -188,10 +187,7 @@ uint8_t halRfReadReg(uint8_t spi_instr)
   uint8_t rbuf[2] = { 0 };
   uint8_t len = 2;
 
-  //rbuf[0] = spi_instr | READ_SINGLE_BYTE;
-  //rbuf[1] = 0;
-  //wiringPiSPIDataRW (0, rbuf, len) ;
-  //errata Section 3. You have to make sure that you read the same value of the register twice in a row before you evaluate it otherwise you might read a value that is a mix of 2 state values.
+  // CC1101 Errata Note: Read register value to update status bytes
   rbuf[0] = spi_instr | READ_SINGLE_BYTE;
   rbuf[1] = 0;
   wiringPiSPIDataRW(0, rbuf, len);
@@ -263,27 +259,14 @@ void CC1101_CMD(uint8_t spi_instr)
 void echo_cc1101_version(void);
 void show_cc1101_registers_settings(void);
 
-//---------------[CC1100 reset functions "200us"]-----------------------
-void cc1101_reset(void)			// reset defined in cc1100 datasheet §19.1
-{// CS should be high from gpio load spi command
-  /* commented car ne fonctionne pas avec wiringPi a voir avec BCM2835 ..
-     digitalWrite(cc1101_CSn, 0);     		// CS low
-     pinMode (cc1101_CSn, OUTPUT);
-     delayMicroseconds(30);
-     digitalWrite(cc1101_CSn, 1);      	// CS high
-     delayMicroseconds(100);	 // min 40us
-  //Pull CSn low and wait for SO to go low
-  digitalWrite(cc1101_CSn, 0);     		// CS low
-  delayMicroseconds(30);
-  */
-
-  CC1101_CMD(SRES);	//GDO0 pin should output a clock signal with a frequency of CLK_XOSC/192.
-  //periode 1/7.417us= 134.8254k  * 192 --> 25.886477M
-  //10 periode 73.83 = 135.4463k *192 --> 26Mhz
-  delay(1); //1ms for getting chip to reset properly
-
-  CC1101_CMD(SFTX);   //flush the TX_fifo content -> a must for interrupt handling
-  CC1101_CMD(SFRX);	//flush the RX_fifo content -> a must for interrupt handling	
+//---------------[CC1100 reset function]-----------------------
+// Reset CC1101 via software reset strobe command (per datasheet §19.1)
+void cc1101_reset(void)
+{
+  CC1101_CMD(SRES);   // Send software reset strobe
+  delay(1);           // Wait 1ms for chip to reset properly
+  CC1101_CMD(SFTX);   // Flush TX FIFO - required for proper interrupt handling
+  CC1101_CMD(SFRX);   // Flush RX FIFO - required for proper interrupt handling
 }
 
 void setMHZ(float mhz) {
@@ -334,31 +317,21 @@ void cc1101_configureRF_0(float freq)
   halRfWriteReg(SYNC1, 0x55);   //01010101
   halRfWriteReg(SYNC0, 0x00);   //00000000 
 
-  //halRfWriteReg(PKTCTRL1,0x80);//Preamble quality estimator threshold=16  ; APPEND_STATUS=0; no addr check
-  halRfWriteReg(PKTCTRL1, 0x00);//Preamble quality estimator threshold=0   ; APPEND_STATUS=0; no addr check
-  halRfWriteReg(PKTCTRL0, 0x00);//fix length , no CRC
+  halRfWriteReg(PKTCTRL1, 0x00);//Preamble quality estimator threshold=0; APPEND_STATUS=0; no addr check
+  halRfWriteReg(PKTCTRL0, 0x00);//Fixed length, no CRC
   halRfWriteReg(FSCTRL1, 0x08); //Frequency Synthesizer Control
 
-  setMHZ(freq);
-  //halRfWriteReg(FREQ2,0x10);   //Frequency Control Word, High Byte  Base frequency = 433.82
-  //halRfWriteReg(FREQ1,0xAF);   //Frequency Control Word, Middle Byte
-  //halRfWriteReg(FREQ0, freq0);
-  //halRfWriteReg(FREQ0,0x75); //Frequency Control Word, Low Byte the real frequency was 433.790 (centre)
-  //halRfWriteReg(FREQ0,0xC1); //Frequency Control Word, Low Byte rasmobo 814 824 (KO) ; minepi 810 820 (OK)
-  //halRfWriteReg(FREQ0,0x9B); //rasmobo 808.5  -16  for -38
-  //halRfWriteReg(FREQ0,0xB7);   //rasmobo 810 819.5 OK
-  //my meter F1 : 433809500  F2 : 433820000   deviation +-5.25khz from 433.81475M
+  setMHZ(freq); // Configure frequency using helper function
 
   halRfWriteReg(MDMCFG4, 0xF6); //Modem Configuration   RX filter BW = 58Khz
   halRfWriteReg(MDMCFG3, 0x83); //Modem Configuration   26M*((256+83h)*2^6)/2^28 = 2.4kbps 
   halRfWriteReg(MDMCFG2, 0x02); //Modem Configuration   2-FSK;  no Manchester ; 16/16 sync word bits detected
   halRfWriteReg(MDMCFG1, 0x00); //Modem Configuration num preamble 2=>0 , Channel spacing_exp
-  halRfWriteReg(MDMCFG0, 0x00); /*# MDMCFG0 Channel spacing = 25Khz*/
-  halRfWriteReg(DEVIATN, 0x15);  //5.157471khz 
-  //halRfWriteReg(MCSM1,0x0F);   //CCA always ; default mode RX
-  halRfWriteReg(MCSM1, 0x00);   //CCA always ; default mode IDLE
-  halRfWriteReg(MCSM0, 0x18);   //MCSM0: Auto-calibrate from IDLE->RX/TX (FS_AUTOCAL=01b), improves frequency accuracy
-  halRfWriteReg(FOCCFG, 0x1D);  //FOCCFG: Enable automatic frequency offset compensation (FOC) with 4K/2K gain for better reception
+  halRfWriteReg(MDMCFG0, 0x00); //Channel spacing = 25Khz
+  halRfWriteReg(DEVIATN, 0x15);  //Deviation = 5.157471 kHz
+  halRfWriteReg(MCSM1, 0x00);   //CCA always; default mode IDLE
+  halRfWriteReg(MCSM0, 0x18);   //Auto-calibrate from IDLE->RX/TX (FS_AUTOCAL=01b), improves frequency accuracy
+  halRfWriteReg(FOCCFG, 0x1D);  //Enable automatic frequency offset compensation (FOC) with 4K/2K gain for better reception
   halRfWriteReg(BSCFG, 0x1C);   //Bit Synchronization Configuration
   halRfWriteReg(AGCCTRL2, 0xC7);//AGC Control
   halRfWriteReg(AGCCTRL1, 0x00);//AGC Control
@@ -377,17 +350,15 @@ bool cc1101_init(float freq)
 {
   pinMode(GDO0, INPUT_PULLUP);
 
-  // to use SPI pi@MinePi ~ $ gpio unload spi  then gpio load spi   
-  // otherwise no MOSI nor CSn, buffer of 4kB
-  if ((wiringPiSPISetup(0, 500000)) < 0)        // channel 0 100khz   min 500khz in the doc ?
+  // Initialize SPI bus for CC1101 communication (500 kHz)
+  if ((wiringPiSPISetup(0, 500000)) < 0)
   {
-    //fprintf (stderr, "Can't open the SPI bus: %s\n", strerror (errno)) ;
     printf("ERROR: Can't open the SPI bus - CC1101 radio NOT found!\n");
     return false;
   }
   
   cc1101_reset();
-  delay(1); //1ms
+  delay(1);
   
   // Verify CC1101 is present by reading version register
   uint8_t partnum = halRfReadReg(PARTNUM_ADDR);
@@ -407,10 +378,6 @@ bool cc1101_init(float freq)
     s_reported_ok = true;
   }
   
-  //echo_cc1101_version();
-  //delay(1);
-  //show_cc1101_registers_settings();
-  //delay(1);
   cc1101_configureRF_0(freq);
   
   // Perform manual calibration after configuration
