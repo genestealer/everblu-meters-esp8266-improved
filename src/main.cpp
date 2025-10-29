@@ -151,6 +151,25 @@ const unsigned long RETRY_COOLDOWN = 3600000; // 1 hour cooldown in milliseconds
 // Global variable to store the reading schedule (default from config.h)
 const char* readingSchedule = DEFAULT_READING_SCHEDULE;
 
+// ----------------------
+// App State Machine Declarations (needed before use)
+// ----------------------
+enum AppState {
+  APP_IDLE = 0,
+  APP_WAIT_SCHEDULE,
+  APP_READ_REQUESTED,
+  APP_READING,
+  APP_RETRY_WAIT
+};
+
+static AppState appState = APP_WAIT_SCHEDULE;
+static unsigned long appNextActionAt = 0; // millis timestamp for next action
+
+// Forward declarations (implemented later in file)
+static void requestRead();
+static void scheduleTick();
+static void stateMachineTick();
+
 // Helper: validate schedule string against supported options
 static bool isValidReadingSchedule(const char* s) {
   return (strcmp(s, "Monday-Friday") == 0 || 
@@ -237,7 +256,7 @@ void onUpdateData()
     Serial.printf("Unable to retrieve data from meter (attempt %d/%d)\n", _retry + 1, MAX_RETRIES);
     
     if (_retry < MAX_RETRIES - 1) {
-      // Schedule retry using callback instead of recursion to prevent stack overflow
+      // Schedule retry using state machine (non-blocking)
       _retry++;
       static char errorMsg[64];
       snprintf(errorMsg, sizeof(errorMsg), "Retry %d/%d - No data received", _retry, MAX_RETRIES);
@@ -247,8 +266,9 @@ void onUpdateData()
       mqtt.publish("everblu/cyble/cc1101_state", "Idle", true);
       mqtt.publish("everblu/cyble/last_error", lastErrorMessage, true);
       digitalWrite(LED_BUILTIN, HIGH); // Turn off LED
-      // Use non-blocking callback instead of recursive call
-      mqtt.executeDelayed(10000, onUpdateData);
+      // Use state machine timer instead of library callback
+      appNextActionAt = millis() + 10000UL;
+      appState = APP_RETRY_WAIT;
     } else {
       // Max retries reached, enter cooldown period
       lastFailedAttempt = millis();
@@ -387,44 +407,8 @@ void onUpdateData()
   Serial.printf("Data update complete.\n\n");
 }
 
-// Function: onScheduled
-// Description: Schedules daily meter readings at 10:00 AM UTC.
-void onScheduled()
-{
-  time_t tnow = time(nullptr);
-  struct tm *ptm = gmtime(&tnow);
-
-  // Check if today is a valid reading day
-  if (isReadingDay(ptm) && ptm->tm_hour == g_readHourUtc && ptm->tm_min == g_readMinuteUtc && ptm->tm_sec == 0) {
-    // Check if we're still in cooldown period after failed attempts
-    if (lastFailedAttempt > 0 && (millis() - lastFailedAttempt) < RETRY_COOLDOWN) {
-      unsigned long remainingCooldown = (RETRY_COOLDOWN - (millis() - lastFailedAttempt)) / 1000;
-      Serial.printf("Still in cooldown period. %lu seconds remaining.\n", remainingCooldown);
-      
-      char cooldownMsg[64];
-      snprintf(cooldownMsg, sizeof(cooldownMsg), "Cooldown active, %lus remaining", remainingCooldown);
-      mqtt.publish("everblu/cyble/status_message", cooldownMsg, true);
-      mqtt.executeDelayed(500, onScheduled);
-      return;
-    }
-    
-    // Cooldown period is over, reset and proceed
-    lastFailedAttempt = 0;
-    
-    // Call back in 23 hours
-    mqtt.executeDelayed(1000 * 60 * 60 * 23, onScheduled);
-
-    Serial.println("It is time to update data from meter :)");
-
-    // Update data
-    _retry = 0;
-    onUpdateData();
-    return;
-  }
-
-  // Check every 500 ms
-  mqtt.executeDelayed(500, onScheduled);
-}
+// Deprecated: onScheduled() replaced by millis-based scheduleTick() in state machine
+void onScheduled() { /* no-op: preserved for backward compatibility */ }
 
 // Supported abbreviations in MQTT discovery messages for Home Assistant
 // Used to reduce the size of the JSON payload
@@ -1175,9 +1159,8 @@ void onConnectionEstablished()
     }
 
     Serial.printf("Update data from meter from MQTT trigger (command: %s)\n", message.c_str());
-
     _retry = 0;
-    onUpdateData();
+    requestRead();
   });
 
   mqtt.subscribe("everblu/cyble/restart", [](const String& message) {
@@ -1329,8 +1312,7 @@ void onConnectionEstablished()
 
   Serial.println("> Setup done");
   Serial.println("Ready to go...");
-
-  onScheduled();
+  // Scheduling now handled by state machine scheduleTick() from loop()
 }
 
 // Function: saveFrequencyOffset
@@ -1772,11 +1754,76 @@ void setup()
 
 }
 
+// ----------------------
+// Lightweight App State Machine (implementations)
+// ----------------------
+
+static void requestRead() {
+  if (appState == APP_READING) return; // already reading
+  appState = APP_READ_REQUESTED;
+}
+
+// Check once every ~500ms whether it's time to read (UTC window + cooldown)
+static void scheduleTick() {
+  static unsigned long lastCheck = 0;
+  if (millis() - lastCheck < 500) return;
+  lastCheck = millis();
+
+  time_t tnow = time(nullptr);
+  struct tm *ptm = gmtime(&tnow);
+
+  if (isReadingDay(ptm) && ptm->tm_hour == g_readHourUtc && ptm->tm_min == g_readMinuteUtc && ptm->tm_sec == 0) {
+    // Respect cooldown after a failed attempt
+    if (lastFailedAttempt > 0 && (millis() - lastFailedAttempt) < RETRY_COOLDOWN) {
+      unsigned long remainingCooldown = (RETRY_COOLDOWN - (millis() - lastFailedAttempt)) / 1000;
+      Serial.printf("Still in cooldown period. %lu seconds remaining.\n", remainingCooldown);
+      char cooldownMsg[64];
+      snprintf(cooldownMsg, sizeof(cooldownMsg), "Cooldown active, %lus remaining", remainingCooldown);
+      mqtt.publish("everblu/cyble/status_message", cooldownMsg, true);
+      return;
+    }
+
+    lastFailedAttempt = 0; // Cooldown over
+    Serial.println("It is time to update data from meter :) ");
+    _retry = 0;
+    requestRead();
+  }
+}
+
+static void stateMachineTick() {
+  // Periodic schedule checker when in idle/waiting state
+  if (appState == APP_IDLE || appState == APP_WAIT_SCHEDULE) {
+    scheduleTick();
+  }
+
+  switch (appState) {
+    case APP_READ_REQUESTED: {
+      // Start a read (synchronous call, but orchestrated here)
+      appState = APP_READING;
+      onUpdateData();
+      // onUpdateData() handles retries and publishing; when it returns, go idle/wait
+      appState = APP_WAIT_SCHEDULE;
+      break;
+    }
+    case APP_RETRY_WAIT: {
+      if (millis() >= appNextActionAt) {
+        appState = APP_READ_REQUESTED;
+      }
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 // Function: loop
-// Description: Main loop to handle MQTT and OTA operations, and update diagnostics periodically.
+// Description: Main loop to handle MQTT/OTA, state machine, and periodic diagnostics.
 void loop() {
   mqtt.loop();
   ArduinoOTA.handle();
+
+  // Drive non-blocking app state machine
+  stateMachineTick();
 
   // Update diagnostics and Wi-Fi details every 5 minutes
   if (millis() - lastWifiUpdate > 300000) { // 5 minutes in ms

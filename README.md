@@ -203,7 +203,7 @@ The following MQTT topics are used to integrate the device with Home Assistant v
   - Download and install [Visual Studio Code](https://code.visualstudio.com/).  
   - Install the [PlatformIO extension for VS Code](https://platformio.org/). This will install all required dependencies and may require restarting VS Code.
 
-2. **Prepare Configuration Files**  
+1. **Prepare Configuration Files**  
   - Copy `include/config.example.h` to `include/config.h`.  
   - Update the following details in `config.h`:
     - Wi-Fi and MQTT credentials. If your MQTT setup does not require a username and password, comment out those lines using `//`.  
@@ -211,7 +211,7 @@ The following MQTT topics are used to integrate the device with Home Assistant v
      ![Cyble Meter Label](docs/images/meter_label.png) ![Cyble Meter Label](docs/images/meter_label_21.png)
     - **Wi-Fi PHY Mode**: To enable 802.11g Wi-Fi PHY mode, set `ENABLE_WIFI_PHY_MODE_11G` to `1` in the `config.h` file. By default, it is set to `0` (disabled).
 
-3. **Update Platform Configuration**  
+1. **Update Platform Configuration**  
   - Select an environment in `platformio.ini`:
     - `env:huzzah` (ESP8266 Adafruit HUZZAH)
     - `env:esp32dev` (ESP32 DevKit)
@@ -221,7 +221,7 @@ The following MQTT topics are used to integrate the device with Home Assistant v
     - In VS Code, choose the `esp32dev` environment and run “Build” or “Upload and Monitor”.
   - OTA upload is configured only under `env:huzzah` by default. For ESP32, use serial upload unless you add OTA settings for your device’s IP.
 
-4. **Perform Frequency Discovery (First-Time Setup)**  
+1. **Perform Frequency Discovery (First-Time Setup)**  
   - Open `config.h` and set `SCAN_FREQUENCY_433MHZ` to `1` to enable frequency discovery.  
   - Compile and upload the code to your ESP device using PlatformIO. Use **PlatformIO > Upload and Monitor**.  
   - **Keep the device connected to your computer during this process.** The serial monitor will display debug output as the device scans frequencies in the 433 MHz range.  
@@ -230,16 +230,16 @@ The following MQTT topics are used to integrate the device with Home Assistant v
   - Disable frequency discovery by setting `SCAN_FREQUENCY_433MHZ` back to `0` in `config.h` if you want to skip the initial scan on future reboots.  
   - For best results, perform this step during local business hours when the meter is most likely to transmit. Refer to the "Frequency Adjustment" section below for additional guidance.
 
-5. **Compile and Flash the Code**  
+1. **Compile and Flash the Code**  
   - Compile and upload the code to your ESP device using **PlatformIO > Upload and Monitor**.  
   - Keep the device connected to your computer during this process.
 
-6. **Verify Meter Data**  
+1. **Verify Meter Data**  
   - After WiFi and MQTT connection is established (or after the initial frequency scan completes), the meter data should appear in the terminal (bottom panel) and be pushed to MQTT.  
   - If Frequency Discovery is still enabled, its output will also be displayed during this step.
   - **Note**: On first boot with no stored frequency offset, there will be a ~2 minute delay before any MQTT activity while the wide frequency scan runs. This is normal - monitor the serial output to see progress.
 
-7. **Automatic Meter Query**  
+1. **Automatic Meter Query**  
   - The device will automatically query the meter once every 24 hours. If the query fails, it will retry every hour until successful.
 
 ---
@@ -249,11 +249,13 @@ The following MQTT topics are used to integrate the device with Home Assistant v
 The **Reading Schedule** feature allows you to configure the days when the meter should be queried. By default, the schedule is set to `Monday-Friday`. You can change this in the `config.h` file by modifying the `DEFAULT_READING_SCHEDULE`.
 
 Available options:
+
 - `"Monday-Friday"`: Queries the meter only on weekdays.
 - `"Monday-Saturday"`: Queries the meter from Monday to Saturday.
 - `"Monday-Sunday"`: Queries the meter every day.
 
 Example configuration in `config.h`:
+
 ```cpp
 #define DEFAULT_READING_SCHEDULE "Monday-Saturday"
 ```
@@ -283,6 +285,7 @@ The firmware uses **automatic frequency calibration** on the CC1101 radio to ens
 #### Why This Approach?
 
 Previous versions required manual frequency scanning and static calibration values. The new approach:
+
 - **Simplifies setup**: Just set your frequency once in `config.h` (or use the default)
 - **Improves accuracy**: Automatic calibration adapts to temperature and voltage variations
 - **Reduces maintenance**: No need to manually determine and set `FSCAL` values
@@ -291,6 +294,7 @@ Previous versions required manual frequency scanning and static calibration valu
 #### Configuration Example
 
 In your `config.h`:
+
 ```cpp
 // Optional: Specify the meter's frequency in MHz
 // If not defined, defaults to 433.82 MHz (RADIAN protocol standard)
@@ -298,12 +302,14 @@ In your `config.h`:
 ```
 
 To find your meter's exact frequency, you can:
+
 1. Use the frequency scanning mode (set `SCAN_FREQUENCY_433MHZ` to `1`) during initial setup
 2. Use an RTL-SDR to measure the frequency while a utility reader is polling your meter
 3. Start with the default 433.82 MHz and adjust slightly if needed (typically ±0.01 MHz)
 
 The effective frequency is always displayed in the serial log during startup:
-```
+
+```text
 > Frequency (effective): 433.820000 MHz
 ```
 
@@ -330,11 +336,13 @@ The firmware includes **automatic frequency adaptation** features to work reliab
 **How to clear EEPROM:**
 
 In `include/config.h`, temporarily set:
+
 ```cpp
 #define CLEAR_EEPROM_ON_BOOT 1
 ```
 
 Upload firmware and wait for one boot cycle (wide scan will run automatically). Then set back to:
+ 
 ```cpp
 #define CLEAR_EEPROM_ON_BOOT 0
 ```
@@ -348,6 +356,7 @@ See `ADAPTIVE_FREQUENCY_FEATURES.md` for detailed technical documentation.
 ---
 
 ## Troubleshooting
+
 ### ESP32 build: ModuleNotFoundError: No module named 'intelhex'
 
 This is a PlatformIO tooling dependency used by `esptool.py` to build ESP32 bootloader/partition images. It is not a project file and isn’t committed to the repo. PlatformIO usually manages it automatically, but on some Windows setups it can be missing.
