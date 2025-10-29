@@ -307,6 +307,44 @@ The effective frequency is always displayed in the serial log during startup:
 
 ---
 
+### Adaptive Frequency Management
+
+The firmware includes **automatic frequency adaptation** features to work reliably with any CC1101 module:
+
+1. **Wide Initial Scan (First Boot)**: On first boot (when no frequency offset is stored), the firmware automatically scans ±100 kHz around the base frequency to find your meter. This takes ~1-2 minutes.
+
+2. **Adaptive Frequency Tracking**: After each successful meter read, the firmware monitors the CC1101's FREQEST register and accumulates frequency error. After 10 successful reads, if the average error exceeds 2 kHz, it automatically adjusts the stored frequency offset to compensate for CC1101 crystal drift.
+
+3. **Enhanced FOC**: The CC1101's Frequency Offset Compensation is configured for optimal performance with the EverBlu meter protocol.
+
+#### When to Clear EEPROM
+
+**Always clear EEPROM when you change hardware:**
+
+- **Replace ESP8266/ESP32 board** - Different boards may have slightly different characteristics
+- **Replace CC1101 radio module** - Each CC1101 has unique crystal tolerance (typically ±10-50 kHz)
+- **Move to a different meter** - Different meters may transmit on slightly different frequencies
+
+**How to clear EEPROM:**
+
+In `include/config.h`, temporarily set:
+```cpp
+#define CLEAR_EEPROM_ON_BOOT 1
+```
+
+Upload firmware and wait for one boot cycle (wide scan will run automatically). Then set back to:
+```cpp
+#define CLEAR_EEPROM_ON_BOOT 0
+```
+
+Upload again to preserve the discovered frequency.
+
+**Why this matters:** The stored frequency offset is specific to your CC1101 module. Using a different CC1101 with the old offset may prevent successful meter communication. Clearing EEPROM forces the firmware to rediscover the optimal frequency for your new hardware.
+
+See `ADAPTIVE_FREQUENCY_FEATURES.md` for detailed technical documentation.
+
+---
+
 ## Troubleshooting
 ### ESP32 build: ModuleNotFoundError: No module named 'intelhex'
 

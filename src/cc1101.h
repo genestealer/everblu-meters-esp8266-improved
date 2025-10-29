@@ -10,6 +10,7 @@ struct tmeter_data {
   int rssi; // Radio signal strength indicator
   int rssi_dbm; // RSSI in dBm
   int lqi; // Link quality indicator 0-255
+  int8_t freqest; // Frequency offset estimate from CC1101 (for adaptive tracking)
 };
 
 void setMHZ(float mhz);

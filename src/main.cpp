@@ -23,9 +23,11 @@
 #if defined(ESP8266)
 #include <ESP8266WiFi.h>    // Wi-Fi library for ESP8266
 #include <ESP8266mDNS.h>    // mDNS library for ESP8266
+#include <EEPROM.h>         // EEPROM library for ESP8266
 #elif defined(ESP32)
 #include <WiFi.h>           // Wi-Fi library for ESP32
 #include <ESPmDNS.h>        // mDNS library for ESP32
+#include <Preferences.h>    // Preferences library for ESP32
 #endif
 #include <Arduino.h>        // Core Arduino library
 #include <ArduinoOTA.h>     // OTA update library
@@ -82,6 +84,33 @@ static int g_readMinuteUtc = DEFAULT_READING_MINUTE_UTC;
 #endif
 
 unsigned long lastWifiUpdate = 0;
+
+// Read success/failure metrics
+unsigned long totalReadAttempts = 0;
+unsigned long successfulReads = 0;
+unsigned long failedReads = 0;
+String lastErrorMessage = "None";
+
+// Frequency offset storage
+#define EEPROM_SIZE 64
+#define FREQ_OFFSET_ADDR 0
+#define FREQ_OFFSET_MAGIC 0xABCD // Magic number to verify valid data
+float storedFrequencyOffset = 0.0;
+bool autoScanEnabled = true;       // Enable automatic scan on first boot if no offset found
+int successfulReadsBeforeAdapt = 0; // Track successful reads for adaptive tuning
+float cumulativeFreqError = 0.0;   // Accumulate FREQEST readings for adaptive adjustment
+const int ADAPT_THRESHOLD = 10;    // Adapt frequency after N successful reads
+
+#if defined(ESP32)
+Preferences preferences;
+#endif
+
+// Function prototypes for frequency management
+void saveFrequencyOffset(float offset);
+float loadFrequencyOffset();
+void performFrequencyScan();
+void performWideInitialScan();
+void adaptiveFrequencyTracking(int8_t freqest);
 
 // Secrets pulled from private.h file
 EspMQTTClient mqtt(
@@ -168,11 +197,15 @@ void onUpdateData()
   Serial.printf("Retry count : %d\n", _retry);
   Serial.printf("Reading schedule : %s\n", readingSchedule.c_str());
 
+  // Increment total attempts counter
+  totalReadAttempts++;
+
   // Indicate activity with LED
   digitalWrite(LED_BUILTIN, LOW); // Turn on LED to indicate activity
 
   // Notify MQTT that active reading has started
   mqtt.publish("everblu/cyble/active_reading", "true", true);
+  mqtt.publish("everblu/cyble/cc1101_state", "Reading", true);
 
   struct tmeter_data meter_data = get_meter_data(); // Fetch meter data
 
@@ -188,10 +221,13 @@ void onUpdateData()
   if (meter_data.reads_counter == 0 || meter_data.liters == 0) {
     Serial.printf("Unable to retrieve data from meter (attempt %d/%d)\n", _retry + 1, MAX_RETRIES);
     
-    if (_retry < MAX_RETRIES) {
+    if (_retry < MAX_RETRIES - 1) {  // Changed: Allow retries up to MAX_RETRIES - 1
       _retry++;
-      Serial.printf("Retrying in 10 seconds... (attempt %d/%d)\n", _retry + 1, MAX_RETRIES);
+      lastErrorMessage = "Retry " + String(_retry) + "/" + String(MAX_RETRIES) + " - No data received";
+      Serial.printf("Retrying in 10 seconds... (next attempt %d/%d)\n", _retry + 1, MAX_RETRIES);
       mqtt.publish("everblu/cyble/active_reading", "false", true);
+      mqtt.publish("everblu/cyble/cc1101_state", "Idle", true);
+      mqtt.publish("everblu/cyble/last_error", lastErrorMessage.c_str(), true);
       digitalWrite(LED_BUILTIN, HIGH); // Turn off LED
       // Schedule retry without recursion - use a simple delay approach
       delay(10000); // Wait 10 seconds
@@ -199,9 +235,15 @@ void onUpdateData()
     } else {
       // Max retries reached, enter cooldown period
       lastFailedAttempt = millis();
+      failedReads++;
+      lastErrorMessage = "Max retries reached - cooling down";
       Serial.printf("Max retries (%d) reached. Entering 1-hour cooldown period.\n", MAX_RETRIES);
       mqtt.publish("everblu/cyble/active_reading", "false", true);
+      mqtt.publish("everblu/cyble/cc1101_state", "Idle", true);
       mqtt.publish("everblu/cyble/status_message", "Failed after max retries, cooling down for 1 hour", true);
+      mqtt.publish("everblu/cyble/last_error", lastErrorMessage.c_str(), true);
+      mqtt.publish("everblu/cyble/failed_reads", String(failedReads, DEC), true);
+      mqtt.publish("everblu/cyble/total_attempts", String(totalReadAttempts, DEC), true);
       digitalWrite(LED_BUILTIN, HIGH); // Turn off LED
       _retry = 0; // Reset retry counter for next scheduled attempt
     }
@@ -226,30 +268,31 @@ void onUpdateData()
 
   // Publish meter data to MQTT
   mqtt.publish("everblu/cyble/liters", String(meter_data.liters, DEC), true);
-  delay(50);
+  delay(5);
   mqtt.publish("everblu/cyble/counter", String(meter_data.reads_counter, DEC), true);
-  delay(50);
+  delay(5);
   mqtt.publish("everblu/cyble/battery", String(meter_data.battery_left, DEC), true);
-  delay(50);
+  delay(5);
   mqtt.publish("everblu/cyble/rssi_dbm", String(meter_data.rssi_dbm, DEC), true);
-  delay(50);
+  delay(5);
   mqtt.publish("everblu/cyble/rssi_percentage", String(calculateMeterdBmToPercentage(meter_data.rssi_dbm), DEC), true);
-  delay(50);
+  delay(5);
   mqtt.publish("everblu/cyble/lqi", String(meter_data.lqi, DEC), true); // Publish LQI
-  delay(50);
+  delay(5);
   mqtt.publish("everblu/cyble/time_start", timeStartFormatted, true);
-  delay(50);
+  delay(5);
   mqtt.publish("everblu/cyble/time_end", timeEndFormatted, true);
-  delay(50);
+  delay(5);
   mqtt.publish("everblu/cyble/timestamp", iso8601, true); // timestamp since epoch in UTC
-  delay(50);
+  delay(5);
   mqtt.publish("everblu/cyble/lqi_percentage", String(calculateLQIToPercentage(meter_data.lqi), DEC), true);   // Publish LQI percentage to MQTT
-  delay(50);
+  delay(5);
 
   // Publish all data as a JSON message as well this is redundant but may be useful for some
   char json[512];
   sprintf(json, jsonTemplate, meter_data.liters, meter_data.reads_counter, meter_data.battery_left, meter_data.rssi, iso8601);
   mqtt.publish("everblu/cyble/json", json, true);
+  delay(5);
 
 #if AUTO_ALIGN_READING_TIME
   // Optionally auto-align the daily scheduled reading time to the meter's wake window
@@ -272,7 +315,7 @@ void onUpdateData()
       char readingTimeFormatted2[6];
       snprintf(readingTimeFormatted2, sizeof(readingTimeFormatted2), "%02d:%02d", g_readHourUtc, g_readMinuteUtc);
       mqtt.publish("everblu/cyble/reading_time", readingTimeFormatted2, true);
-      delay(50);
+      delay(5);
 
       Serial.printf("> Auto-aligned reading time to %02d:%02d UTC (window %02d-%02d)\n", g_readHourUtc, g_readMinuteUtc, timeStart, timeEnd);
     }
@@ -281,11 +324,22 @@ void onUpdateData()
 
   // Notify MQTT that active reading has ended
   mqtt.publish("everblu/cyble/active_reading", "false", true);
+  mqtt.publish("everblu/cyble/cc1101_state", "Idle", true);
   digitalWrite(LED_BUILTIN, HIGH); // Turn off LED to indicate completion
 
   // Reset retry counter and cooldown on successful read
   _retry = 0;
   lastFailedAttempt = 0;
+  successfulReads++;
+  lastErrorMessage = "None";
+
+  // Publish success metrics
+  mqtt.publish("everblu/cyble/successful_reads", String(successfulReads, DEC), true);
+  mqtt.publish("everblu/cyble/total_attempts", String(totalReadAttempts, DEC), true);
+  mqtt.publish("everblu/cyble/last_error", "None", true);
+
+  // Perform adaptive frequency tracking based on FREQEST register
+  adaptiveFrequencyTracking(meter_data.freqest);
 
   Serial.printf("Data update complete.\n\n");
 }
@@ -331,6 +385,14 @@ void onScheduled()
 // Used to reduce the size of the JSON payload
 // https://www.home-assistant.io/integrations/mqtt/#supported-abbreviations-in-mqtt-discovery-messages
 
+// Device information - reused in all discovery messages to reduce repetition
+// Macro to embed device info in discovery JSON strings
+#define DEVICE_JSON \
+    "\"ids\": [\"14071984\"],\n" \
+    "    \"name\": \"Water Meter\",\n" \
+    "    \"mdl\": \"Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32\",\n" \
+    "    \"mf\": \"Psykokwak [Forked by Genestealer]\""
+
 // JSON Discovery for Reading (Total)
 // This is used to show the total water usage in Home Assistant
 const char jsonDiscoveryReading[] PROGMEM = R"rawliteral(
@@ -348,10 +410,7 @@ const char jsonDiscoveryReading[] PROGMEM = R"rawliteral(
   "stat_t": "everblu/cyble/liters",
   "frc_upd": true,
   "dev": {
-    "ids": ["14071984"],
-    "name": "Water Meter",
-    "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
-    "mf": "Psykokwak [Forked by Genestealer]"
+    )rawliteral" DEVICE_JSON R"rawliteral(
   }
 }
 )rawliteral";
@@ -373,10 +432,7 @@ const char jsonDiscoveryReadCounter[] PROGMEM = R"rawliteral(
   "stat_t": "everblu/cyble/counter",
   "frc_upd": true,
   "dev": {
-    "ids": ["14071984"],
-    "name": "Water Meter",
-    "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
-    "mf": "Psykokwak [Forked by Genestealer]"
+    )rawliteral" DEVICE_JSON R"rawliteral(
   }
 }
 )rawliteral";
@@ -395,10 +451,7 @@ const char jsonDiscoveryLastRead[] PROGMEM = R"rawliteral(
   "stat_t": "everblu/cyble/timestamp",
   "frc_upd": true,
   "dev": {
-    "ids": ["14071984"],
-    "name": "Water Meter",
-    "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
-    "mf": "Psykokwak [Forked by Genestealer]"
+    )rawliteral" DEVICE_JSON R"rawliteral(
   }
 }
 )rawliteral";
@@ -418,10 +471,7 @@ const char jsonDiscoveryRequestReading[] PROGMEM = R"rawliteral(
   "pl_prs": "update",
   "frc_upd": true,
   "dev": {
-    "ids": ["14071984"],
-    "name": "Water Meter",
-    "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
-    "mf": "Psykokwak [Forked by Genestealer]"
+    )rawliteral" DEVICE_JSON R"rawliteral(
   }
 }
 )rawliteral";
@@ -440,10 +490,7 @@ const char jsonDiscoveryActiveReading[] PROGMEM = R"rawliteral(
   "pl_on": "true",
   "pl_off": "false",
   "dev": {
-    "ids": ["14071984"],
-    "name": "Water Meter",
-    "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
-    "mf": "Psykokwak [Forked by Genestealer]"
+    )rawliteral" DEVICE_JSON R"rawliteral(
   }
 }
 )rawliteral";
@@ -461,10 +508,7 @@ const char jsonDiscoveryWifiIP[] PROGMEM = R"rawliteral(
   "frc_upd": true,
   "ent_cat": "diagnostic",
   "dev": {
-    "ids": ["14071984"],
-    "name": "Water Meter",
-    "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
-    "mf": "Psykokwak [Forked by Genestealer]"
+    )rawliteral" DEVICE_JSON R"rawliteral(
   }
 }
 )rawliteral";
@@ -482,10 +526,7 @@ const char jsonDiscoveryReadingTime[] PROGMEM = R"rawliteral(
   "frc_upd": true,
   "ent_cat": "diagnostic",
   "dev": {
-    "ids": ["14071984"],
-    "name": "Water Meter",
-    "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
-    "mf": "Psykokwak [Forked by Genestealer]"
+    )rawliteral" DEVICE_JSON R"rawliteral(
   }
 }
 )rawliteral";
@@ -506,10 +547,7 @@ const char jsonDiscoveryWifiRSSI[] PROGMEM = R"rawliteral(
   "frc_upd": true,
   "ent_cat": "diagnostic",
   "dev": {
-    "ids": ["14071984"],
-    "name": "Water Meter",
-    "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
-    "mf": "Psykokwak [Forked by Genestealer]"
+    )rawliteral" DEVICE_JSON R"rawliteral(
   }
 }
 )rawliteral";
@@ -529,10 +567,7 @@ const char jsonDiscoveryWifiSignalPercentage[] PROGMEM = R"rawliteral(
   "frc_upd": true,
   "ent_cat": "diagnostic",
   "dev": {
-    "ids": ["14071984"],
-    "name": "Water Meter",
-    "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
-    "mf": "Psykokwak [Forked by Genestealer]"
+    )rawliteral" DEVICE_JSON R"rawliteral(
   }
 }
 )rawliteral";
@@ -550,10 +585,7 @@ const char jsonDiscoveryMacAddress[] PROGMEM = R"rawliteral(
   "frc_upd": true,
   "ent_cat": "diagnostic",
   "dev": {
-    "ids": ["14071984"],
-    "name": "Water Meter",
-    "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
-    "mf": "Psykokwak [Forked by Genestealer]"
+    )rawliteral" DEVICE_JSON R"rawliteral(
   }
 }
 )rawliteral";
@@ -571,10 +603,7 @@ const char jsonDiscoveryBSSID[] PROGMEM = R"rawliteral(
   "frc_upd": true,
   "ent_cat": "diagnostic",
   "dev": {
-    "ids": ["14071984"],
-    "name": "Water Meter",
-    "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
-    "mf": "Psykokwak [Forked by Genestealer]"
+    )rawliteral" DEVICE_JSON R"rawliteral(
   }
 }
 )rawliteral";
@@ -592,10 +621,7 @@ const char jsonDiscoverySSID[] PROGMEM = R"rawliteral(
   "frc_upd": true,
   "ent_cat": "diagnostic",
   "dev": {
-    "ids": ["14071984"],
-    "name": "Water Meter",
-    "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
-    "mf": "Psykokwak [Forked by Genestealer]"
+    )rawliteral" DEVICE_JSON R"rawliteral(
   }
 }
 )rawliteral";
@@ -614,10 +640,7 @@ const char jsonDiscoveryUptime[] PROGMEM = R"rawliteral(
   "frc_upd": true,
   "ent_cat": "diagnostic",
   "dev": {
-    "ids": ["14071984"],
-    "name": "Water Meter",
-    "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
-    "mf": "Psykokwak [Forked by Genestealer]"
+    )rawliteral" DEVICE_JSON R"rawliteral(
   }
 }
 )rawliteral";
@@ -635,10 +658,7 @@ const char jsonDiscoveryRestartButton[] PROGMEM = R"rawliteral(
   "pl_prs": "restart",
   "ent_cat": "config",
   "dev": {
-    "ids": ["14071984"],
-    "name": "Water Meter",
-    "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
-    "mf": "Psykokwak [Forked by Genestealer]"
+    )rawliteral" DEVICE_JSON R"rawliteral(
   }
 }
 )rawliteral";
@@ -656,10 +676,7 @@ const char jsonDiscoveryMeterYear[] PROGMEM = R"rawliteral(
   "frc_upd": true,
   "ent_cat": "diagnostic",
   "dev": {
-    "ids": ["14071984"],
-    "name": "Water Meter",
-    "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
-    "mf": "Psykokwak [Forked by Genestealer]"
+    )rawliteral" DEVICE_JSON R"rawliteral(
   }
 }
 )rawliteral";
@@ -677,10 +694,7 @@ const char jsonDiscoveryMeterSerial[] PROGMEM = R"rawliteral(
   "frc_upd": true,
   "ent_cat": "diagnostic",
   "dev": {
-    "ids": ["14071984"],
-    "name": "Water Meter",
-    "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
-    "mf": "Psykokwak [Forked by Genestealer]"
+    )rawliteral" DEVICE_JSON R"rawliteral(
   }
 }
 )rawliteral";
@@ -698,10 +712,7 @@ const char jsonDiscoveryReadingSchedule[] PROGMEM = R"rawliteral(
   "frc_upd": true,
   "ent_cat": "diagnostic",
   "dev": {
-    "ids": ["14071984"],
-    "name": "Water Meter",
-    "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
-    "mf": "Psykokwak [Forked by Genestealer]"
+    )rawliteral" DEVICE_JSON R"rawliteral(
   }
 }
 )rawliteral";
@@ -721,10 +732,7 @@ const char jsonDiscoveryBatteryMonths[] PROGMEM = R"rawliteral(
   "stat_t": "everblu/cyble/battery",
   "frc_upd": true,
   "dev": {
-    "ids": ["14071984"],
-    "name": "Water Meter",
-    "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
-    "mf": "Psykokwak [Forked by Genestealer]"
+    )rawliteral" DEVICE_JSON R"rawliteral(
   }
 }
 )rawliteral";
@@ -744,10 +752,7 @@ const char jsonDiscoveryMeterRSSIDBm[] PROGMEM = R"rawliteral(
   "stat_t": "everblu/cyble/rssi_dbm",
   "frc_upd": true,
   "dev": {
-    "ids": ["14071984"],
-    "name": "Water Meter",
-    "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
-    "mf": "Psykokwak [Forked by Genestealer]"
+    )rawliteral" DEVICE_JSON R"rawliteral(
   }
 }
 )rawliteral";
@@ -766,10 +771,7 @@ const char jsonDiscoveryMeterRSSIPercentage[] PROGMEM = R"rawliteral(
   "stat_t": "everblu/cyble/rssi_percentage",
   "frc_upd": true,
   "dev": {
-    "ids": ["14071984"],
-    "name": "Water Meter",
-    "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
-    "mf": "Psykokwak [Forked by Genestealer]"
+    )rawliteral" DEVICE_JSON R"rawliteral(
   }
 }
 )rawliteral";
@@ -808,10 +810,7 @@ const char jsonDiscoveryTimeStart[] PROGMEM = R"rawliteral(
   "stat_t": "everblu/cyble/time_start",
   "frc_upd": true,
   "dev": {
-    "ids": ["14071984"],
-    "name": "Water Meter",
-    "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
-    "mf": "Psykokwak [Forked by Genestealer]"
+    )rawliteral" DEVICE_JSON R"rawliteral(
   }
 }
 )rawliteral";
@@ -828,10 +827,137 @@ const char jsonDiscoveryTimeEnd[] PROGMEM = R"rawliteral(
   "stat_t": "everblu/cyble/time_end",
   "frc_upd": true,
   "dev": {
-    "ids": ["14071984"],
-    "name": "Water Meter",
-    "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
-    "mf": "Psykokwak [Forked by Genestealer]"
+    )rawliteral" DEVICE_JSON R"rawliteral(
+  }
+}
+)rawliteral";
+
+// JSON Discovery for Total Read Attempts
+const char jsonDiscoveryTotalAttempts[] PROGMEM = R"rawliteral(
+{
+  "name": "Total Read Attempts",
+  "uniq_id": "water_meter_total_attempts",
+  "obj_id": "water_meter_total_attempts",
+  "ic": "mdi:counter",
+  "stat_cla": "total_increasing",
+  "qos": 0,
+  "avty_t": "everblu/cyble/status",
+  "stat_t": "everblu/cyble/total_attempts",
+  "frc_upd": true,
+  "ent_cat": "diagnostic",
+  "dev": {
+    )rawliteral" DEVICE_JSON R"rawliteral(
+  }
+}
+)rawliteral";
+
+// JSON Discovery for Successful Reads
+const char jsonDiscoverySuccessfulReads[] PROGMEM = R"rawliteral(
+{
+  "name": "Successful Reads",
+  "uniq_id": "water_meter_successful_reads",
+  "obj_id": "water_meter_successful_reads",
+  "ic": "mdi:check-circle",
+  "stat_cla": "total_increasing",
+  "qos": 0,
+  "avty_t": "everblu/cyble/status",
+  "stat_t": "everblu/cyble/successful_reads",
+  "frc_upd": true,
+  "ent_cat": "diagnostic",
+  "dev": {
+    )rawliteral" DEVICE_JSON R"rawliteral(
+  }
+}
+)rawliteral";
+
+// JSON Discovery for Failed Reads
+const char jsonDiscoveryFailedReads[] PROGMEM = R"rawliteral(
+{
+  "name": "Failed Reads",
+  "uniq_id": "water_meter_failed_reads",
+  "obj_id": "water_meter_failed_reads",
+  "ic": "mdi:alert-circle",
+  "stat_cla": "total_increasing",
+  "qos": 0,
+  "avty_t": "everblu/cyble/status",
+  "stat_t": "everblu/cyble/failed_reads",
+  "frc_upd": true,
+  "ent_cat": "diagnostic",
+  "dev": {
+    )rawliteral" DEVICE_JSON R"rawliteral(
+  }
+}
+)rawliteral";
+
+// JSON Discovery for Last Error Message
+const char jsonDiscoveryLastError[] PROGMEM = R"rawliteral(
+{
+  "name": "Last Error",
+  "uniq_id": "water_meter_last_error",
+  "obj_id": "water_meter_last_error",
+  "ic": "mdi:alert",
+  "qos": 0,
+  "avty_t": "everblu/cyble/status",
+  "stat_t": "everblu/cyble/last_error",
+  "frc_upd": true,
+  "ent_cat": "diagnostic",
+  "dev": {
+    )rawliteral" DEVICE_JSON R"rawliteral(
+  }
+}
+)rawliteral";
+
+// JSON Discovery for CC1101 State
+const char jsonDiscoveryCC1101State[] PROGMEM = R"rawliteral(
+{
+  "name": "CC1101 State",
+  "uniq_id": "water_meter_cc1101_state",
+  "obj_id": "water_meter_cc1101_state",
+  "ic": "mdi:radio-tower",
+  "qos": 0,
+  "avty_t": "everblu/cyble/status",
+  "stat_t": "everblu/cyble/cc1101_state",
+  "frc_upd": true,
+  "ent_cat": "diagnostic",
+  "dev": {
+    )rawliteral" DEVICE_JSON R"rawliteral(
+  }
+}
+)rawliteral";
+
+// JSON Discovery for Frequency Offset
+const char jsonDiscoveryFreqOffset[] PROGMEM = R"rawliteral(
+{
+  "name": "Frequency Offset",
+  "uniq_id": "water_meter_freq_offset",
+  "obj_id": "water_meter_freq_offset",
+  "ic": "mdi:sine-wave",
+  "unit_of_meas": "MHz",
+  "qos": 0,
+  "avty_t": "everblu/cyble/status",
+  "stat_t": "everblu/cyble/frequency_offset",
+  "frc_upd": true,
+  "ent_cat": "diagnostic",
+  "dev": {
+    )rawliteral" DEVICE_JSON R"rawliteral(
+  }
+}
+)rawliteral";
+
+// JSON Discovery for Frequency Scan Button
+const char jsonDiscoveryFreqScanButton[] PROGMEM = R"rawliteral(
+{
+  "name": "Scan Frequency",
+  "uniq_id": "water_meter_freq_scan",
+  "obj_id": "water_meter_freq_scan",
+  "ic": "mdi:magnify-scan",
+  "qos": 0,
+  "avty_t": "everblu/cyble/status",
+  "cmd_t": "everblu/cyble/frequency_scan",
+  "pl_prs": "scan",
+  "ent_cat": "config",
+  "dev": {
+    )rawliteral" DEVICE_JSON R"rawliteral(
   }
 }
 )rawliteral";
@@ -861,21 +987,21 @@ void publishWifiDetails() {
 
   // Publish diagnostic sensors
   mqtt.publish("everblu/cyble/wifi_ip", wifiIP, true);
-  delay(50);
+  delay(5);
   mqtt.publish("everblu/cyble/wifi_rssi", String(wifiRSSI, DEC), true);
-  delay(50);
+  delay(5);
   mqtt.publish("everblu/cyble/wifi_signal_percentage", String(wifiSignalPercentage, DEC), true);
-  delay(50);
+  delay(5);
   mqtt.publish("everblu/cyble/mac_address", macAddress, true);
-  delay(50);
+  delay(5);
   mqtt.publish("everblu/cyble/ssid", wifiSSID, true);
-  delay(50);
+  delay(5);
   mqtt.publish("everblu/cyble/bssid", wifiBSSID, true);
-  delay(50);
+  delay(5);
   mqtt.publish("everblu/cyble/status", status, true);
-  delay(50);
+  delay(5);
   mqtt.publish("everblu/cyble/uptime", uptimeISO, true);
-  delay(50);
+  delay(5);
 
   Serial.println("> Wi-Fi details published");
 }
@@ -887,19 +1013,19 @@ void publishMeterSettings() {
 
   // Publish Meter Year, Serial
   mqtt.publish("everblu/cyble/water_meter_year", String(METER_YEAR, DEC), true);
-  delay(50);
+  delay(5);
   mqtt.publish("everblu/cyble/water_meter_serial", String(METER_SERIAL, DEC), true);
-  delay(50);
+  delay(5);
 
   // Publish Reading Schedule
   mqtt.publish("everblu/cyble/reading_schedule", readingSchedule, true);
-  delay(50);
+  delay(5);
 
   // Publish Reading Time (UTC) as HH:MM text (resolved time that may be auto-aligned)
   char readingTimeFormatted[6];
   snprintf(readingTimeFormatted, sizeof(readingTimeFormatted), "%02d:%02d", (int)g_readHourUtc, (int)g_readMinuteUtc);
   mqtt.publish("everblu/cyble/reading_time", readingTimeFormatted, true);
-  delay(50);
+  delay(5);
 
   Serial.println("> Meter settings published");
 }
@@ -986,74 +1112,111 @@ void onConnectionEstablished()
     }
   });
 
+  mqtt.subscribe("everblu/cyble/frequency_scan", [](const String& message) {
+    if (message == "scan") {
+      Serial.println("Frequency scan command received via MQTT");
+      performFrequencyScan();
+    }
+  });
+
   Serial.println("> Send MQTT config for HA.");
 
   // Publish Meter details discovery configuration
-  delay(50);
+  delay(5);
   mqtt.publish("homeassistant/sensor/water_meter_value/config", FPSTR(jsonDiscoveryReading), true);
-  delay(50);
+  delay(5);
   mqtt.publish("homeassistant/sensor/water_meter_counter/config", FPSTR(jsonDiscoveryReadCounter), true);
-  delay(50);
+  delay(5);
   mqtt.publish("homeassistant/sensor/water_meter_timestamp/config", FPSTR(jsonDiscoveryLastRead), true);
-  delay(50);
+  delay(5);
   mqtt.publish("homeassistant/button/water_meter_request/config", FPSTR(jsonDiscoveryRequestReading), true);
-  delay(50);
+  delay(5);
 
   // Publish Wi-Fi details discovery configuration
   mqtt.publish("homeassistant/sensor/water_meter_wifi_ip/config", FPSTR(jsonDiscoveryWifiIP), true);
-  delay(50);
+  delay(5);
   mqtt.publish("homeassistant/sensor/water_meter_wifi_rssi/config", FPSTR(jsonDiscoveryWifiRSSI), true);
-  delay(50);
+  delay(5);
   mqtt.publish("homeassistant/sensor/water_meter_mac_address/config", FPSTR(jsonDiscoveryMacAddress), true);
-  delay(50);
+  delay(5);
   mqtt.publish("homeassistant/sensor/water_meter_wifi_ssid/config", FPSTR(jsonDiscoverySSID), true);
-  delay(50);
+  delay(5);
   mqtt.publish("homeassistant/sensor/water_meter_wifi_bssid/config", FPSTR(jsonDiscoveryBSSID), true);
-  delay(50);
+  delay(5);
   mqtt.publish("homeassistant/sensor/water_meter_uptime/config", FPSTR(jsonDiscoveryUptime), true);
-  delay(50);
+  delay(5);
   mqtt.publish("homeassistant/sensor/water_meter_wifi_signal_percentage/config", FPSTR(jsonDiscoveryWifiSignalPercentage), true);
-  delay(50);
+  delay(5);
 
   // Publish MQTT discovery messages for the Restart Button
   mqtt.publish("homeassistant/button/water_meter_restart/config", FPSTR(jsonDiscoveryRestartButton), true);
-  delay(50);
+  delay(5);
 
   // Publish MQTT discovery message for the binary sensor
   mqtt.publish("homeassistant/binary_sensor/water_meter_active_reading/config", FPSTR(jsonDiscoveryActiveReading), true);
-  delay(50);
+  delay(5);
 
   // Publish MQTT discovery messages for Meter Year, Serial
   mqtt.publish("homeassistant/sensor/water_meter_year/config", FPSTR(jsonDiscoveryMeterYear), true);
-  delay(50);
+  delay(5);
   mqtt.publish("homeassistant/sensor/water_meter_serial/config", FPSTR(jsonDiscoveryMeterSerial), true);
-  delay(50);
+  delay(5);
 
   // Publish JSON discovery for Reading Schedule
   mqtt.publish("homeassistant/sensor/water_meter_reading_schedule/config", FPSTR(jsonDiscoveryReadingSchedule), true);
-  delay(50);
+  delay(5);
 
   // Publish JSON discovery for Battery Months Left
   mqtt.publish("homeassistant/sensor/water_meter_battery_months/config", FPSTR(jsonDiscoveryBatteryMonths), true);
-  delay(50);
+  delay(5);
 
   // Publish JSON discovery for Meter RSSI (dBm), RSSI (%), and LQI (%)
   mqtt.publish("homeassistant/sensor/water_meter_rssi_dbm/config", FPSTR(jsonDiscoveryMeterRSSIDBm), true);
-  delay(50);
+  delay(5);
   mqtt.publish("homeassistant/sensor/water_meter_rssi_percentage/config", FPSTR(jsonDiscoveryMeterRSSIPercentage), true);
-  delay(50);
+  delay(5);
   mqtt.publish("homeassistant/sensor/water_meter_lqi_percentage/config", FPSTR(jsonDiscoveryLQIPercentage), true);
-  delay(50);
+  delay(5);
 
   // Publish JSON discovery for the times the meter wakes and sleeps
   mqtt.publish("homeassistant/sensor/water_meter_time_start/config", FPSTR(jsonDiscoveryTimeStart), true);
-  delay(50);
+  delay(5);
   mqtt.publish("homeassistant/sensor/water_meter_time_end/config", FPSTR(jsonDiscoveryTimeEnd), true);
-  delay(50);
+  delay(5);
+
+  // Publish JSON discovery for diagnostics and metrics
+  mqtt.publish("homeassistant/sensor/water_meter_total_attempts/config", FPSTR(jsonDiscoveryTotalAttempts), true);
+  delay(5);
+  mqtt.publish("homeassistant/sensor/water_meter_successful_reads/config", FPSTR(jsonDiscoverySuccessfulReads), true);
+  delay(5);
+  mqtt.publish("homeassistant/sensor/water_meter_failed_reads/config", FPSTR(jsonDiscoveryFailedReads), true);
+  delay(5);
+  mqtt.publish("homeassistant/sensor/water_meter_last_error/config", FPSTR(jsonDiscoveryLastError), true);
+  delay(5);
+  mqtt.publish("homeassistant/sensor/water_meter_cc1101_state/config", FPSTR(jsonDiscoveryCC1101State), true);
+  delay(5);
+  mqtt.publish("homeassistant/sensor/water_meter_freq_offset/config", FPSTR(jsonDiscoveryFreqOffset), true);
+  delay(5);
+  mqtt.publish("homeassistant/button/water_meter_freq_scan/config", FPSTR(jsonDiscoveryFreqScanButton), true);
+  delay(5);
 
   // Set initial state for active reading
   mqtt.publish("everblu/cyble/active_reading", "false", true);
-  delay(50);
+  delay(5);
+  
+  // Publish initial diagnostic metrics
+  mqtt.publish("everblu/cyble/cc1101_state", "Idle", true);
+  delay(5);
+  mqtt.publish("everblu/cyble/total_attempts", String(totalReadAttempts, DEC), true);
+  delay(5);
+  mqtt.publish("everblu/cyble/successful_reads", String(successfulReads, DEC), true);
+  delay(5);
+  mqtt.publish("everblu/cyble/failed_reads", String(failedReads, DEC), true);
+  delay(5);
+  mqtt.publish("everblu/cyble/last_error", lastErrorMessage.c_str(), true);
+  delay(5);
+  mqtt.publish("everblu/cyble/frequency_offset", String(storedFrequencyOffset, 6), true);
+  delay(5);
 
   Serial.println("> MQTT config sent");
 
@@ -1072,6 +1235,257 @@ void onConnectionEstablished()
   onScheduled();
 }
 
+// Function: saveFrequencyOffset
+// Description: Saves the frequency offset to persistent storage (EEPROM for ESP8266, Preferences for ESP32)
+void saveFrequencyOffset(float offset) {
+#if defined(ESP8266)
+  // ESP8266: Use EEPROM
+  uint16_t magic = FREQ_OFFSET_MAGIC;
+  EEPROM.put(FREQ_OFFSET_ADDR, magic);
+  EEPROM.put(FREQ_OFFSET_ADDR + 2, offset);
+  EEPROM.commit();
+  Serial.printf("> Frequency offset %.6f MHz saved to EEPROM\n", offset);
+#elif defined(ESP32)
+  // ESP32: Use Preferences
+  preferences.begin("everblu", false);
+  preferences.putFloat("freq_offset", offset);
+  preferences.end();
+  Serial.printf("> Frequency offset %.6f MHz saved to Preferences\n", offset);
+#endif
+  storedFrequencyOffset = offset;
+}
+
+// Function: loadFrequencyOffset
+// Description: Loads the frequency offset from persistent storage, returns 0.0 if not found or invalid
+float loadFrequencyOffset() {
+#if defined(ESP8266)
+  // ESP8266: Use EEPROM
+  uint16_t magic = 0;
+  EEPROM.get(FREQ_OFFSET_ADDR, magic);
+  if (magic == FREQ_OFFSET_MAGIC) {
+    float offset = 0.0;
+    EEPROM.get(FREQ_OFFSET_ADDR + 2, offset);
+    // Sanity check: offset should be reasonable (within ±0.1 MHz)
+    if (offset >= -0.1 && offset <= 0.1) {
+      Serial.printf("> Loaded frequency offset %.6f MHz from EEPROM\n", offset);
+      return offset;
+    } else {
+      Serial.printf("> Invalid frequency offset %.6f MHz in EEPROM, using 0.0\n", offset);
+    }
+  } else {
+    Serial.println("> No valid frequency offset found in EEPROM");
+  }
+#elif defined(ESP32)
+  // ESP32: Use Preferences
+  preferences.begin("everblu", true); // Read-only
+  if (preferences.isKey("freq_offset")) {
+    float offset = preferences.getFloat("freq_offset", 0.0);
+    preferences.end();
+    // Sanity check: offset should be reasonable (within ±0.1 MHz)
+    if (offset >= -0.1 && offset <= 0.1) {
+      Serial.printf("> Loaded frequency offset %.6f MHz from Preferences\n", offset);
+      return offset;
+    } else {
+      Serial.printf("> Invalid frequency offset %.6f MHz in Preferences, using 0.0\n", offset);
+    }
+  } else {
+    Serial.println("> No frequency offset found in Preferences");
+    preferences.end();
+  }
+#endif
+  return 0.0;
+}
+
+// Function: performFrequencyScan
+// Description: Scans nearby frequencies to find the best signal and updates the offset
+void performFrequencyScan() {
+  Serial.println("> Starting frequency scan...");
+  mqtt.publish("everblu/cyble/cc1101_state", "Frequency Scanning", true);
+  mqtt.publish("everblu/cyble/status_message", "Performing frequency scan", true);
+  
+  float baseFreq = FREQUENCY;
+  float bestFreq = baseFreq;
+  int bestRSSI = -120; // Start with very low RSSI
+  
+  // Scan range: ±30 kHz in 5 kHz steps (±0.03 MHz in 0.005 MHz steps)
+  float scanStart = baseFreq - 0.03;
+  float scanEnd = baseFreq + 0.03;
+  float scanStep = 0.005;
+  
+  Serial.printf("> Scanning from %.6f to %.6f MHz (step: %.6f MHz)\n", scanStart, scanEnd, scanStep);
+  
+  for (float freq = scanStart; freq <= scanEnd; freq += scanStep) {
+    // Reinitialize CC1101 with this frequency
+    cc1101_init(freq);
+    delay(50); // Allow time for frequency to settle
+    
+    // Try to get meter data (with short timeout)
+    struct tmeter_data test_data = get_meter_data();
+    
+    if (test_data.rssi_dbm > bestRSSI && test_data.reads_counter > 0) {
+      bestRSSI = test_data.rssi_dbm;
+      bestFreq = freq;
+      Serial.printf("> Better signal at %.6f MHz: RSSI=%d dBm\n", freq, test_data.rssi_dbm);
+    }
+  }
+  
+  // Calculate and save the offset
+  float offset = bestFreq - baseFreq;
+  Serial.printf("> Frequency scan complete. Best frequency: %.6f MHz (offset: %.6f MHz, RSSI: %d dBm)\n", 
+                bestFreq, offset, bestRSSI);
+  
+  if (bestRSSI > -120) { // Only save if we found something
+    saveFrequencyOffset(offset);
+    mqtt.publish("everblu/cyble/frequency_offset", String(offset, 6), true);
+    mqtt.publish("everblu/cyble/status_message", 
+                 String("Scan complete: offset " + String(offset, 6) + " MHz, RSSI " + String(bestRSSI) + " dBm").c_str(), true);
+    
+    // Reinitialize with the best frequency
+    cc1101_init(bestFreq);
+  } else {
+    Serial.println("> Frequency scan failed - no valid signal found");
+    mqtt.publish("everblu/cyble/status_message", "Frequency scan failed - no signal", true);
+    // Restore original frequency
+    cc1101_init(baseFreq + storedFrequencyOffset);
+  }
+  
+  mqtt.publish("everblu/cyble/cc1101_state", "Idle", true);
+}
+
+// Function: performWideInitialScan
+// Description: Performs a wide-band scan on first boot to find meter frequency automatically
+//              Scans ±100 kHz around the configured frequency in larger steps for faster discovery
+void performWideInitialScan() {
+  Serial.println("> Performing wide initial scan (first boot - no saved offset)...");
+  mqtt.publish("everblu/cyble/cc1101_state", "Initial Frequency Scan", true);
+  mqtt.publish("everblu/cyble/status_message", "First boot: scanning for meter frequency", true);
+  
+  float baseFreq = FREQUENCY;
+  float bestFreq = baseFreq;
+  int bestRSSI = -120;
+  
+  // Wide scan: ±100 kHz in 10 kHz steps for faster initial discovery
+  float scanStart = baseFreq - 0.10;
+  float scanEnd = baseFreq + 0.10;
+  float scanStep = 0.010;
+  
+  Serial.printf("> Wide scan from %.6f to %.6f MHz (step: %.6f MHz)\n", scanStart, scanEnd, scanStep);
+  Serial.println("> This may take 1-2 minutes on first boot...");
+  
+  for (float freq = scanStart; freq <= scanEnd; freq += scanStep) {
+    cc1101_init(freq);
+    delay(100); // Longer delay for frequency to settle during wide scan
+    
+    struct tmeter_data test_data = get_meter_data();
+    
+    if (test_data.rssi_dbm > bestRSSI && test_data.reads_counter > 0) {
+      bestRSSI = test_data.rssi_dbm;
+      bestFreq = freq;
+      Serial.printf("> Found signal at %.6f MHz: RSSI=%d dBm\n", freq, test_data.rssi_dbm);
+    }
+    
+    // Feed watchdog during long scan
+    delay(10); // delay() also feeds the watchdog
+  }
+  
+  if (bestRSSI > -120) {
+    // Found a signal, now do a fine scan around it
+    Serial.printf("> Performing fine scan around %.6f MHz...\n", bestFreq);
+    float fineStart = bestFreq - 0.015;
+    float fineEnd = bestFreq + 0.015;
+    float fineStep = 0.003;
+    int fineBestRSSI = bestRSSI;
+    float fineBestFreq = bestFreq;
+    
+    for (float freq = fineStart; freq <= fineEnd; freq += fineStep) {
+      cc1101_init(freq);
+      delay(50);
+      
+      struct tmeter_data test_data = get_meter_data();
+      
+      if (test_data.rssi_dbm > fineBestRSSI && test_data.reads_counter > 0) {
+        fineBestRSSI = test_data.rssi_dbm;
+        fineBestFreq = freq;
+        Serial.printf("> Refined signal at %.6f MHz: RSSI=%d dBm\n", freq, test_data.rssi_dbm);
+      }
+      delay(10); // delay() also feeds the watchdog
+    }
+    
+    bestFreq = fineBestFreq;
+    bestRSSI = fineBestRSSI;
+    
+    float offset = bestFreq - baseFreq;
+    Serial.printf("> Initial scan complete! Best frequency: %.6f MHz (offset: %.6f MHz, RSSI: %d dBm)\n", 
+                  bestFreq, offset, bestRSSI);
+    
+    saveFrequencyOffset(offset);
+    mqtt.publish("everblu/cyble/frequency_offset", String(offset, 6), true);
+    mqtt.publish("everblu/cyble/status_message", 
+                 String("Initial scan complete: offset " + String(offset, 6) + " MHz").c_str(), true);
+    
+    cc1101_init(bestFreq);
+  } else {
+    Serial.println("> Wide scan failed - no meter signal found!");
+    Serial.println("> Please check:");
+    Serial.println(">  1. Meter is within range (< 50m typically)");
+    Serial.println(">  2. Antenna is connected to CC1101");
+    Serial.println(">  3. Meter serial/year are correct in config.h");
+    Serial.println(">  4. Current time is within meter's wake hours");
+    mqtt.publish("everblu/cyble/status_message", "Initial scan failed - check setup", true);
+    cc1101_init(baseFreq);
+  }
+  
+  mqtt.publish("everblu/cyble/cc1101_state", "Idle", true);
+}
+
+// Function: adaptiveFrequencyTracking
+// Description: Uses FREQEST register to adaptively adjust frequency offset over time
+//              Accumulates frequency error estimates and adjusts when threshold is reached
+void adaptiveFrequencyTracking(int8_t freqest) {
+  // FREQEST is a two's complement value representing frequency offset
+  // Resolution is approximately Fxosc/2^14 ≈ 1.59 kHz per LSB (for 26 MHz crystal)
+  const float FREQEST_TO_MHZ = 0.001587; // Conversion factor: ~1.59 kHz per LSB
+  
+  // Accumulate the frequency error
+  float freqErrorMHz = (float)freqest * FREQEST_TO_MHZ;
+  cumulativeFreqError += freqErrorMHz;
+  successfulReadsBeforeAdapt++;
+  
+  Serial.printf("> FREQEST: %d (%.4f kHz error), cumulative: %.4f kHz over %d reads\n", 
+                freqest, freqErrorMHz * 1000, cumulativeFreqError * 1000, successfulReadsBeforeAdapt);
+  
+  // Only adapt after N successful reads to avoid over-correcting on noise
+  if (successfulReadsBeforeAdapt >= ADAPT_THRESHOLD) {
+    float avgError = cumulativeFreqError / ADAPT_THRESHOLD;
+    
+    // Only adjust if average error is significant (> 2 kHz)
+    if (abs(avgError * 1000) > 2.0) {
+      Serial.printf("> Adaptive adjustment: average error %.4f kHz over %d reads\n", 
+                    avgError * 1000, ADAPT_THRESHOLD);
+      
+      // Adjust the stored offset (apply 50% of the measured error to avoid over-correction)
+      float adjustment = avgError * 0.5;
+      storedFrequencyOffset += adjustment;
+      
+      Serial.printf("> Adjusting frequency offset by %.6f MHz (new offset: %.6f MHz)\n", 
+                    adjustment, storedFrequencyOffset);
+      
+      saveFrequencyOffset(storedFrequencyOffset);
+      mqtt.publish("everblu/cyble/frequency_offset", String(storedFrequencyOffset, 6), true);
+      
+      // Reinitialize CC1101 with adjusted frequency
+      cc1101_init(FREQUENCY + storedFrequencyOffset);
+    } else {
+      Serial.printf("> Frequency stable (avg error %.4f kHz < 2 kHz threshold)\n", avgError * 1000);
+    }
+    
+    // Reset accumulators
+    cumulativeFreqError = 0.0;
+    successfulReadsBeforeAdapt = 0;
+  }
+}
+
+
 // Function: setup
 // Description: Initializes the device, including serial communication, Wi-Fi, MQTT, and CC1101 radio with automatic calibration.
 void setup()
@@ -1086,6 +1500,34 @@ void setup()
 
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW); // turned on to start with
+
+  // Initialize persistent storage
+#if defined(ESP8266)
+  EEPROM.begin(EEPROM_SIZE);
+  Serial.println("> EEPROM initialized");
+  
+  // Clear EEPROM if requested (set CLEAR_EEPROM_ON_BOOT=1 in config.h)
+  // Use this when replacing ESP board, CC1101 module, or moving to a different meter
+  #if CLEAR_EEPROM_ON_BOOT
+    Serial.println("> CLEARING EEPROM (CLEAR_EEPROM_ON_BOOT = 1)...");
+    for (int i = 0; i < EEPROM_SIZE; i++) {
+      EEPROM.write(i, 0xFF);
+    }
+    EEPROM.commit();
+    Serial.println("> EEPROM cleared. Remember to set CLEAR_EEPROM_ON_BOOT = 0 after testing!");
+  #endif
+#endif
+
+  // Load stored frequency offset
+  storedFrequencyOffset = loadFrequencyOffset();
+
+  // If no valid frequency offset found and auto-scan is enabled, perform wide initial scan
+  if (storedFrequencyOffset == 0.0 && autoScanEnabled) {
+    Serial.println("> No stored frequency offset found. Performing wide initial scan...");
+    performWideInitialScan();
+    // Reload the frequency offset after scan
+    storedFrequencyOffset = loadFrequencyOffset();
+  }
 
   // Increase the max packet size to handle large MQTT payloads
   mqtt.setMaxPacketSize(2048); // Set to a size larger than your longest payload
@@ -1121,7 +1563,12 @@ void setup()
 
   // Set CC1101 radio frequency with automatic calibration
   Serial.println("> Initializing CC1101 radio...");
-  if (!cc1101_init(FREQUENCY)) {
+  float effectiveFrequency = FREQUENCY + storedFrequencyOffset;
+  if (storedFrequencyOffset != 0.0) {
+    Serial.printf("> Applying stored frequency offset: %.6f MHz (effective: %.6f MHz)\n", 
+                  storedFrequencyOffset, effectiveFrequency);
+  }
+  if (!cc1101_init(effectiveFrequency)) {
     Serial.println("FATAL ERROR: CC1101 radio initialization failed!");
     Serial.println("Please check your wiring and connections.");
     while (true) {
@@ -1155,3 +1602,4 @@ void loop() {
     lastWifiUpdate = millis();
   }
 }
+

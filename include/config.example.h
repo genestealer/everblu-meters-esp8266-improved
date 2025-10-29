@@ -36,6 +36,16 @@
 #define METER_YEAR 21        // Last two digits of the year printed on the meter (e.g., 2019 is 19)
 #define METER_SERIAL 260123  // Meter Serial Number (omit leading zero)
 // #define FREQUENCY 433.820000 // Meter center frequency in MHz; defaults to 433.82 if not set
+
+// Clear EEPROM on next boot to force frequency re-discovery
+// IMPORTANT: Set to 1 and upload firmware when you:
+//  - Replace the ESP8266/ESP32 board
+//  - Replace the CC1101 radio module
+//  - Move to a different meter
+// After one boot with EEPROM cleared, set back to 0 to preserve the discovered frequency.
+// The firmware will automatically perform a wide frequency scan and save the optimal frequency.
+#define CLEAR_EEPROM_ON_BOOT 0
+
 // CC1101 GDO0 (data ready) pin connected to your MCU. Choose a valid GPIO for your board.
 // Examples:
 //  - ESP8266 HUZZAH / D1 mini: GPIO5 (D1)

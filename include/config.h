@@ -35,11 +35,23 @@
 // Meter-specific configuration
 #define METER_YEAR 20        // Last two digits of the year printed on the meter (e.g., 2019 is 19)
 #define METER_SERIAL 257750  // Meter Serial Number (omit leading zero)
-// #define FREQUENCY 433.820000 // Meter center frequency in MHz; defaults to 433.82 if not set
 
-// #define FREQUENCY 433.763031 // Frequency of the meter (discovered via test code)
-// >>> Found meter at frequency: 433.800049 MHz
-// >>> Fine scan chose frequency: 433.787018 MHz (RSSI -89 dBm)
+// Frequency discovered via scan - refined through multiple scans for optimal performance
+#define FREQUENCY 433.767029 // Refined scan frequency: 433.767029 MHz (RSSI -85 dBm)
+// Previous scan results:
+// >>> Initial scan: 433.787018 MHz (RSSI -89 dBm)
+// >>> Refined scan: 433.767029 MHz (RSSI -85 dBm) - Current best
+// >>> Default RADIAN frequency: 433.820000 MHz
+
+// Clear EEPROM on next boot to force frequency re-discovery
+// IMPORTANT: Set to 1 and upload firmware when you:
+//  - Replace the ESP8266/ESP32 board
+//  - Replace the CC1101 radio module
+//  - Move to a different meter
+// After one boot with EEPROM cleared, set back to 0 to preserve the discovered frequency.
+// The firmware will automatically perform a wide frequency scan and save the optimal frequency.
+#define CLEAR_EEPROM_ON_BOOT 0
+
 #define GDO0 5               // Pin on ESP8266 used for GDO0 (General Digital Output 0)
 
 

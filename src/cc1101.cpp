@@ -25,9 +25,6 @@ static inline void FEED_WDT() {
 }
 
 uint8_t RF_config_u8 = 0xFF;
-uint8_t RF_Test_u8 = 0;
-//                     +10,  +7,   5,   0, -10, -15, -20, -30
-uint8_t PA_Test[] = { 0xC0,0xC8,0x85,0x60,0x34,0x1D,0x0E,0x12, };
 uint8_t PA[] = { 0x60,0x00,0x00,0x00,0x00,0x00,0x00,0x00, };
 uint8_t CC1101_status_state = 0;
 uint8_t CC1101_status_FIFO_FreeByte = 0;
@@ -588,7 +585,35 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
   return data;
 }
 
-// Remove the start- and stop-bits in the bitstream , also decode oversampled bit 0xF0 => 1,0
+// Function: decode_4bitpbit_serial
+// Description: Decodes RADIAN protocol's 4-bit-per-bit serial encoding to extract raw data bytes.
+//
+// RADIAN Protocol Serial Encoding:
+// ---------------------------------
+// Each data byte is transmitted with:
+// - 1 start bit (0)
+// - 8 data bits (LSB first)
+// - 3 stop bits (111)
+//
+// Additionally, each bit is oversampled 4x for noise immunity:
+// - Logical '1' → transmitted as 0xF0 (1111 0000 in binary)
+// - Logical '0' → transmitted as 0x0F (0000 1111 in binary)
+//
+// Example: Byte 0xA5 (10100101) would be transmitted as:
+// Start bit 0 → 0x0F
+// Bit 0 (1)   → 0xF0
+// Bit 1 (0)   → 0x0F
+// Bit 2 (1)   → 0xF0
+// ...and so on
+// Stop bits 111 → 0xF0 0xF0 0xF0
+//
+// This function:
+// 1. Detects bit polarity changes to identify logical bits
+// 2. Counts consecutive same-polarity samples (should be ~4 per bit)
+// 3. Extracts data bits and discards start/stop bits
+// 4. Reverses bit order (LSB first → MSB first for normal byte representation)
+//
+// Remove the start- and stop-bits in the bitstream, also decode oversampled bit 0xF0 => 1,0
 // 01234567 ###01234 567###01 234567## #0123456 (# -> Start/Stop bit)
 // is decoded to:
 // 76543210 76543210 76543210 76543210
@@ -650,9 +675,38 @@ uint8_t decode_4bitpbit_serial(uint8_t *rxBuffer, int l_total_byte, uint8_t* dec
 }
 
 /*
-   search for 0101010101010000b sync pattern then change data rate in order to get 4bit per bit
-   search for end of sync pattern with start bit 1111111111110000b
-   */
+   Function: receive_radian_frame
+   Description: Receives a RADIAN protocol frame using a two-stage sync detection approach.
+   
+   This function implements the RADIAN protocol's unique frame reception strategy:
+   
+   Stage 1: Initial Sync Detection (2.4 kbps)
+   ------------------------------------------
+   - Configures CC1101 to detect sync pattern 0x5550 (01010101 01010000)
+   - This is the preamble/sync that precedes the actual data
+   - Uses standard data rate (2.4 kbps) for reliable sync detection
+   - Waits for GDO0 pin to go high (indicates sync word detected)
+   
+   Stage 2: Frame Start and Data Reception (9.6 kbps)
+   ---------------------------------------------------
+   - Reconfigures CC1101 to detect 0xFFF0 (11111111 11110000)
+   - This pattern marks the end of sync and the start bit of the first data byte
+   - Switches to 4x data rate (9.6 kbps) to capture 4-bit-per-bit oversampling
+   - Receives the full frame into the buffer
+   
+   Parameters:
+   - size_byte: Expected size of the decoded frame (before serial encoding)
+   - rx_tmo_ms: Receive timeout in milliseconds
+   - rxBuffer: Buffer to store received raw data
+   - rxBuffer_size: Size of the receive buffer
+   
+   Returns:
+   - Number of bytes received (raw, encoded data)
+   - 0 if timeout or reception failed
+   
+   Note: The received data is 4x larger than the decoded size due to oversampling
+         and needs to be processed by decode_4bitpbit_serial() to extract actual data.
+*/
 int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t*rxBuffer, int rxBuffer_size)
 {
   uint8_t  l_byte_in_rx = 0;
@@ -746,22 +800,84 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t*rxBuffer, int rxB
 }
 
 /*
-   scenario_releve
-   2s de WUP
-130ms : trame interrogation de l'outils de reléve   ______------|...............-----
-43ms de bruit
-34ms 0101...01
-14.25ms 000...000
-14ms 1111...11111
-83.5ms de data acquitement
-50ms de 111111
-34ms 0101...01
-14.25ms 000...000
-14ms 1111...11111
-582ms de data avec l'index
-
-l'outils de reléve doit normalement acquité
+   RADIAN Protocol Overview:
+   ========================
+   The RADIAN protocol is used by Itron EverBlu Cyble Enhanced water meters for RF communication.
+   
+   Key Protocol Characteristics:
+   - Frequency: 433.82 MHz (nominal center frequency)
+   - Modulation: 2-FSK (Frequency Shift Keying)
+   - Data Rate: 2.4 kbps (sync detection), 9.6 kbps (data reception with 4-bit oversampling)
+   - Deviation: ±5.157 kHz
+   - Sync Pattern: 0x5550 (for initial sync) / 0xFFF0 (for frame start detection)
+   - Packet Structure: Variable length with start/stop bits (serial-like encoding)
+   
+   Communication Sequence:
+   -----------------------
+   1. Wake-Up Phase (WUP):
+      - Master sends ~2 seconds of 0x55 bytes to wake up the meter
+      - This alerts the meter that a query is coming
+   
+   2. Interrogation Frame:
+      - Master sends a 130ms interrogation command containing:
+        * Meter year and serial number (identification)
+        * CRC for error detection
+      - Frame uses serial encoding: 1 start bit, 8 data bits, 3 stop bits
+   
+   3. Meter Response - Acknowledgement:
+      - 43ms of RF noise
+      - 34ms of sync pattern (0101...01)
+      - 14.25ms of zeros (000...000)
+      - 14ms of ones (1111...11111)
+      - 83.5ms of acknowledgement data
+   
+   4. Meter Response - Data Frame:
+      - 50ms of ones
+      - 34ms of sync pattern (0101...01)
+      - 14.25ms of zeros
+      - 14ms of ones
+      - 582ms of actual meter data including:
+        * Water consumption in liters
+        * Read counter
+        * Battery life remaining (in months)
+        * Wake/sleep schedule (time_start, time_end)
+        * Timestamp information
+   
+   Data Encoding:
+   --------------
+   The RADIAN protocol uses 4-bit-per-bit oversampling:
+   - Each logical '1' is transmitted as 0xF0 (1111 0000)
+   - Each logical '0' is transmitted as 0x0F (0000 1111)
+   - This provides noise immunity and clock recovery
+   
+   Serial Frame Format:
+   - Start bit: 0 (1 bit)
+   - Data: LSB first (8 bits)
+   - Stop bits: 111 (3 bits)
+   
+   The decode_4bitpbit_serial() function reverses this encoding to extract the original data.
 */
+
+/*
+   scenario_releve (Reading Scenario Timeline):
+   ============================================
+   2000ms : WUP (Wake-Up Pattern) - continuous 0x55 bytes
+   130ms  : Interrogation frame from master ______------|...............-----
+   43ms   : RF noise
+   34ms   : Sync pattern 0101...01
+   14.25ms: Zeros 000...000
+   14ms   : Ones 1111...11111
+   83.5ms : Acknowledgement data
+   50ms   : Ones 1111...11111
+   34ms   : Sync pattern 0101...01
+   14.25ms: Zeros 000...000
+   14ms   : Ones 1111...11111
+   582ms  : Full meter data (liters, battery, counter, schedule, etc.)
+   
+   Note: The master (this code) should normally send an acknowledgement back to the meter,
+   but for read-only operation, this is not required.
+*/
+
 struct tmeter_data get_meter_data(void)
 {
   struct tmeter_data sdata;
@@ -853,5 +969,6 @@ struct tmeter_data get_meter_data(void)
   sdata.rssi = halRfReadReg(RSSI_ADDR); // Read RSSI value from CC1101
   sdata.rssi_dbm = cc1100_rssi_convert2dbm(halRfReadReg(RSSI_ADDR));  // Read RSSI value from CC1101 and convert to dBm
   sdata.lqi = halRfReadReg(LQI_ADDR); // Read LQI value from CC1101
+  sdata.freqest = (int8_t)halRfReadReg(FREQEST_ADDR); // Read frequency offset estimate for adaptive tracking
   return sdata;
 }
