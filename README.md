@@ -1,5 +1,13 @@
 # everblu-meters-esp8266/esp32 - Itron EverBlu Cyble Enhanced RF RADIAN Water Usage Data for Home Assistant
 
+[![ESP8266 Build](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/build-esp8266.yml/badge.svg?branch=automatic-calibration)](https://github.com/genestealer/everblu-meters-esp8266-improved/actions?query=workflow%3A%22ESP8266+Build%22+branch%3Aautomatic-calibration)
+[![ESP32 Build](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/build-esp32.yml/badge.svg?branch=automatic-calibration)](https://github.com/genestealer/everblu-meters-esp8266-improved/actions?query=workflow%3A%22ESP32+Build%22+branch%3Aautomatic-calibration)
+
+These badges reflect GitHub Actions CI builds for each PlatformIO environment:
+- ESP8266 badge builds `env:huzzah`
+- ESP32 badge builds `env:esp32dev`
+Click a badge to see logs and download firmware artifacts from the latest run.
+
 Fetch water or gas usage data from Itron EverBlu Cyble Enhanced RF water meters using the RADIAN protocol (Sontex, Itron) on 433 MHz with an ESP32/ESP8266 and CC1101 transceiver. Integrated with Home Assistant via MQTT AutoDiscovery.
 
 According to the radio communication approval paperwork, this may also work with the following models, though they are untested:
