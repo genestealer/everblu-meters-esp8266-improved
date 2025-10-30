@@ -54,11 +54,11 @@ jobs:
         python -m pip install --upgrade pip
         pip install --upgrade platformio
     
-    - name: Create config.h from example if missing
+    - name: Create private.h from example if missing
       run: |
-        if [ ! -f include/config.h ]; then
-          cp include/config.example.h include/config.h
-          echo "Created config.h from config.example.h"
+        if [ ! -f include/private.h ]; then
+          cp include/private.example.h include/private.h
+          echo "Created private.h from private.example.h"
         fi
     
     - name: Build PlatformIO Project (${{ matrix.environment.board }})

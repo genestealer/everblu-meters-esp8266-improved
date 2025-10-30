@@ -18,7 +18,7 @@
  * For more details, refer to the README file.
  */
 
-#include "config.h"         // Include private configuration (Wi-Fi, MQTT, etc.)
+#include "private.h"         // Include private configuration (Wi-Fi, MQTT, etc.)
 #include "everblu_meters.h" // Include EverBlu meter communication library
 #if defined(ESP8266)
 #include <ESP8266WiFi.h>    // Wi-Fi library for ESP8266
@@ -64,7 +64,7 @@ static inline void FEED_WDT() {
 #endif
 
 // Optional: configurable daily read time in UTC (hour/minute)
-// If not defined in config.h, defaults to 10:00 UTC
+// If not defined in private.h, defaults to 10:00 UTC
 #ifndef DEFAULT_READING_HOUR_UTC
 #define DEFAULT_READING_HOUR_UTC 10
 #endif
@@ -87,7 +87,7 @@ static inline void FEED_WDT() {
 static int g_readHourUtc = DEFAULT_READING_HOUR_UTC;
 static int g_readMinuteUtc = DEFAULT_READING_MINUTE_UTC;
 
-// Define a default meter frequency if missing from config.h.
+// Define a default meter frequency if missing from private.h.
 // RADIAN protocol nominal center frequency for EverBlu is 433.82 MHz.
 #ifndef FREQUENCY
 #define FREQUENCY 433.82
@@ -148,7 +148,7 @@ const int MAX_RETRIES = 3; // Maximum number of retry attempts
 unsigned long lastFailedAttempt = 0; // Timestamp of last failed attempt
 const unsigned long RETRY_COOLDOWN = 3600000; // 1 hour cooldown in milliseconds
 
-// Global variable to store the reading schedule (default from config.h)
+// Global variable to store the reading schedule (default from private.h)
 const char* readingSchedule = DEFAULT_READING_SCHEDULE;
 
 // Helper: validate schedule string against supported options
@@ -1612,7 +1612,7 @@ void performWideInitialScan() {
     Serial.println("> Please check:");
     Serial.println(">  1. Meter is within range (< 50m typically)");
     Serial.println(">  2. Antenna is connected to CC1101");
-    Serial.println(">  3. Meter serial/year are correct in config.h");
+    Serial.println(">  3. Meter serial/year are correct in private.h");
     Serial.println(">  4. Current time is within meter's wake hours");
     mqtt.publish("everblu/cyble/status_message", "Initial scan failed - check setup", true);
     cc1101_init(baseFreq);
@@ -1690,7 +1690,7 @@ bool validateConfiguration() {
   // Validate METER_SERIAL (should not be 0)
   if (METER_SERIAL == 0) {
     Serial.println("ERROR: METER_SERIAL not configured (value is 0)");
-    Serial.println("       Update METER_SERIAL in config.h with your meter's serial number");
+    Serial.println("       Update METER_SERIAL in private.h with your meter's serial number");
     valid = false;
   } else {
     Serial.printf("✓ METER_SERIAL: %lu\n", (unsigned long)METER_SERIAL);
@@ -1712,7 +1712,7 @@ bool validateConfiguration() {
   #ifdef GDO0
   Serial.printf("✓ GDO0 Pin: GPIO %d\n", GDO0);
   #else
-  Serial.println("ERROR: GDO0 pin not defined in config.h");
+  Serial.println("ERROR: GDO0 pin not defined in private.h");
   valid = false;
   #endif
   
@@ -1744,7 +1744,7 @@ void setup()
   // Validate configuration before proceeding
   if (!validateConfiguration()) {
     Serial.println("\n*** FATAL: Configuration validation failed! ***");
-    Serial.println("*** Fix the errors in config.h and reflash ***");
+    Serial.println("*** Fix the errors in private.h and reflash ***");
     Serial.println("*** Device halted - will not continue ***\n");
     while(1) {
       digitalWrite(LED_BUILTIN, LOW);  // Blink LED to indicate error
@@ -1764,7 +1764,7 @@ void setup()
   EEPROM.begin(EEPROM_SIZE);
   Serial.println("> EEPROM initialized");
   
-  // Clear EEPROM if requested (set CLEAR_EEPROM_ON_BOOT=1 in config.h)
+  // Clear EEPROM if requested (set CLEAR_EEPROM_ON_BOOT=1 in private.h)
   // Use this when replacing ESP board, CC1101 module, or moving to a different meter
   #if CLEAR_EEPROM_ON_BOOT
     Serial.println("> CLEARING EEPROM (CLEAR_EEPROM_ON_BOOT = 1)...");
@@ -1813,7 +1813,7 @@ void setup()
   // Log effective frequency and warn if default is used
   Serial.printf("> Frequency (effective): %.6f MHz\n", (double)FREQUENCY);
 #if FREQUENCY_DEFINED_DEFAULT
-  Serial.println("WARNING: FREQUENCY not set in config.h; using default 433.820000 MHz (RADIAN).");
+  Serial.println("WARNING: FREQUENCY not set in private.h; using default 433.820000 MHz (RADIAN).");
 #endif
 
   // Optional functionalities of EspMQTTClient

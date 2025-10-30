@@ -51,8 +51,13 @@ secrets1
 Private
 Private.h
 private.h
+Config.h
+config.h
 
 .vscode/c_cpp_properties.json
 .vscode/extensions.json
 .vscode/launch.json
 include/config.h
+include/private.h
+include/secrets.h
+

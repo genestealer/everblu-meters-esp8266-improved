@@ -5,7 +5,7 @@
  #include <Arduino.h>
 
  #include "everblu_meters.h"
- #include <config.h> // Configuration file (Wi-Fi, MQTT, meter settings)
+ #include <private.h> // Configuration file (Wi-Fi, MQTT, meter settings)
  
  // Consolidated hex display function with optional formatting
  // mode: 0=16 per line with newlines, 1=array format, 2=single line, 3=single line with 'S' separator

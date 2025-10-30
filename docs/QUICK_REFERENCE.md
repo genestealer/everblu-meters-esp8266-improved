@@ -235,7 +235,7 @@ prefs.end();
 ## Configuration Notes
 
 ### Frequency Settings
-The base frequency is defined in `config.h`:
+The base frequency is defined in `private.h`:
 ```cpp
 #define FREQUENCY 433.82  // Base frequency in MHz
 ```

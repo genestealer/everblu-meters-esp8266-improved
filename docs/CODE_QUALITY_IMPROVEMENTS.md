@@ -188,7 +188,7 @@ void setup() {
 ### Impact:
 - **Safety:** Invalid configurations caught before RF transmission (regulatory compliance)
 - **Debugging:** Configuration errors identified immediately at startup
-- **User Experience:** Clear error messages guide users to fix config.h
+- **User Experience:** Clear error messages guide users to fix private.h
 - **Reliability:** Prevents silent failures due to invalid parameters
 
 ### Files Modified:

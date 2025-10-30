@@ -66,11 +66,11 @@ jobs:
         python -m pip install --upgrade pip
         pip install --upgrade platformio
     
-    - name: Create config.h from example if missing
+    - name: Create private.h from example if missing
       run: |
-        if [ ! -f include/config.h ]; then
-          cp include/config.example.h include/config.h
-          echo "Created config.h from config.example.h"
+        if [ ! -f include/private.h ]; then
+          cp include/private.example.h include/private.h
+          echo "Created private.h from private.example.h"
         fi
     
     - name: Build PlatformIO Project
@@ -168,7 +168,7 @@ jobs:
         echo "" >> release-notes.md
         echo "1. Download the appropriate \`.bin\` file for your board" >> release-notes.md
         echo "2. Flash using esptool.py or PlatformIO" >> release-notes.md
-        echo "3. Configure your meter settings in \`config.h\`" >> release-notes.md
+        echo "3. Configure your meter settings in \`private.h\`" >> release-notes.md
         echo "4. Upload and enjoy!" >> release-notes.md
         echo "" >> release-notes.md
         echo "## Documentation" >> release-notes.md
