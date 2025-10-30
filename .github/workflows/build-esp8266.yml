@@ -1,0 +1,59 @@
+name: ESP8266 Build
+
+on:
+  push:
+    branches: [ main, master, develop, automatic-calibration ]
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Cache pip
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Cache PlatformIO
+      uses: actions/cache@v4
+      with:
+        path: ~/.platformio
+        key: ${{ runner.os }}-${{ hashFiles('**/lockfiles') }}
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install PlatformIO
+      run: |
+        python -m pip install --upgrade pip
+        pip install --upgrade platformio
+    
+    - name: Create config.h from example if missing
+      run: |
+        if [ ! -f include/config.h ]; then
+          cp include/config.example.h include/config.h
+          echo "Created config.h from config.example.h"
+        fi
+    
+    - name: Build PlatformIO Project (ESP8266 - huzzah)
+      run: pio run -e huzzah
+    
+    - name: Upload firmware artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: firmware-esp8266-huzzah
+        path: .pio/build/huzzah/firmware.*
+        retention-days: 30

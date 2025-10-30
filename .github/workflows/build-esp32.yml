@@ -1,8 +1,8 @@
-name: PlatformIO CI
+name: ESP32 Build
 
 on:
   push:
-    branches: [ main, master, develop ]
+    branches: [ main, master, develop, automatic-calibration ]
   pull_request:
     branches: [ main, master, develop ]
   workflow_dispatch:
@@ -13,11 +13,6 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        environment:
-          - huzzah        # ESP8266 Adafruit HUZZAH
-          - esp32dev      # ESP32 DevKit
     
     steps:
     - uses: actions/checkout@v4
@@ -53,12 +48,12 @@ jobs:
           echo "Created config.h from config.example.h"
         fi
     
-    - name: Build PlatformIO Project for ${{ matrix.environment }}
-      run: pio run -e ${{ matrix.environment }}
+    - name: Build PlatformIO Project (ESP32 - esp32dev)
+      run: pio run -e esp32dev
     
     - name: Upload firmware artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: firmware-${{ matrix.environment }}
-        path: .pio/build/${{ matrix.environment }}/firmware.*
+        name: firmware-esp32-esp32dev
+        path: .pio/build/esp32dev/firmware.*
         retention-days: 30
