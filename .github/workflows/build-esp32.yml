@@ -13,6 +13,13 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment:
+          - name: esp32dev
+            board: ESP32 DevKit
+    
+    name: Build ${{ matrix.environment.board }}
     
     steps:
     - uses: actions/checkout@v4
@@ -29,7 +36,9 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ~/.platformio
-        key: ${{ runner.os }}-${{ hashFiles('**/lockfiles') }}
+        key: ${{ runner.os }}-pio-esp32-${{ hashFiles('**/platformio.ini') }}
+        restore-keys: |
+          ${{ runner.os }}-pio-esp32-
     
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -52,12 +61,12 @@ jobs:
           echo "Created config.h from config.example.h"
         fi
     
-    - name: Build PlatformIO Project (ESP32 - esp32dev)
-      run: pio run -e esp32dev
+    - name: Build PlatformIO Project (${{ matrix.environment.board }})
+      run: pio run -e ${{ matrix.environment.name }}
     
     - name: Upload firmware artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: firmware-esp32-esp32dev
-        path: .pio/build/esp32dev/firmware.*
+        name: firmware-esp32-${{ matrix.environment.name }}
+        path: .pio/build/${{ matrix.environment.name }}/firmware.*
         retention-days: 30

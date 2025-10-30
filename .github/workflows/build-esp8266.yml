@@ -13,6 +13,17 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment:
+          - name: huzzah
+            board: Adafruit HUZZAH ESP8266
+          - name: d1_mini_pro
+            board: WeMos D1 Mini Pro
+          - name: nodemcuv2
+            board: NodeMCU v2
+    
+    name: Build ${{ matrix.environment.board }}
     
     steps:
     - uses: actions/checkout@v4
@@ -29,7 +40,9 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ~/.platformio
-        key: ${{ runner.os }}-${{ hashFiles('**/lockfiles') }}
+        key: ${{ runner.os }}-pio-esp8266-${{ hashFiles('**/platformio.ini') }}
+        restore-keys: |
+          ${{ runner.os }}-pio-esp8266-
     
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -48,12 +61,12 @@ jobs:
           echo "Created config.h from config.example.h"
         fi
     
-    - name: Build PlatformIO Project (ESP8266 - huzzah)
-      run: pio run -e huzzah
+    - name: Build PlatformIO Project (${{ matrix.environment.board }})
+      run: pio run -e ${{ matrix.environment.name }}
     
     - name: Upload firmware artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: firmware-esp8266-huzzah
-        path: .pio/build/huzzah/firmware.*
+        name: firmware-esp8266-${{ matrix.environment.name }}
+        path: .pio/build/${{ matrix.environment.name }}/firmware.*
         retention-days: 30
