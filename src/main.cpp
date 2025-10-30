@@ -295,6 +295,81 @@ void onUpdateData()
   mqtt.publish("everblu/cyble/liters", valueBuffer, true);
   delay(5);
   
+  // Publish historical data as JSON attributes for Home Assistant
+  // This provides 13 months of historical volume readings that can be accessed as attributes
+  // in Home Assistant. Each value represents the total volume at the end of that month.
+  // The meter stores these internally with timestamps, but the RADIAN protocol only
+  // returns the volume values without dates.
+  if (meter_data.history_available) {
+    // Count valid historical values (non-zero)
+    int num_history = 0;
+    for (int i = 0; i < 13; i++) {
+      if (meter_data.history[i] == 0) break;
+      num_history++;
+    }
+    
+    Serial.printf("\n=== Historical Data (%d months) ===\n", num_history);
+    Serial.println("Month  Volume (L)  Usage (L)");
+    Serial.println("-----  ----------  ---------");
+    
+    // Calculate monthly consumption from the historical data
+    // Format: {"history": [oldest_volume, ..., newest_volume], "monthly_usage": [month1_usage, ..., month13_usage]}
+    char historyJson[800];
+    int pos = 0;
+    
+    // Start JSON object
+    pos += snprintf(historyJson + pos, sizeof(historyJson) - pos, "{\"history\":[");
+    
+    // Add historical volumes and print to serial
+    for (int i = 0; i < num_history; i++) {
+      pos += snprintf(historyJson + pos, sizeof(historyJson) - pos, "%s%u", 
+                      (i > 0 ? "," : ""), meter_data.history[i]);
+      
+      // Calculate and display monthly usage
+      uint32_t usage = 0;
+      if (i > 0 && meter_data.history[i] > meter_data.history[i - 1]) {
+        usage = meter_data.history[i] - meter_data.history[i - 1];
+      }
+      Serial.printf(" -%02d   %10u  %9u\n", num_history-i, meter_data.history[i], usage);
+    }
+    
+    // Calculate current month usage (difference from most recent historical reading)
+    uint32_t currentMonthUsage = 0;
+    if (num_history > 0 && meter_data.liters > meter_data.history[num_history - 1]) {
+      currentMonthUsage = meter_data.liters - meter_data.history[num_history - 1];
+    }
+    Serial.printf("  Now  %10d  %9u (current month)\n", meter_data.liters, currentMonthUsage);
+    Serial.println("===================================\n");
+    
+    // Add monthly usage calculations to JSON
+    pos += snprintf(historyJson + pos, sizeof(historyJson) - pos, "],\"monthly_usage\":[");
+    for (int i = 0; i < num_history; i++) {
+      uint32_t usage;
+      if (i == 0) {
+        // For oldest month, we can't calculate usage without an older baseline
+        usage = 0;
+      } else if (meter_data.history[i] > meter_data.history[i - 1]) {
+        // Calculate consumption as difference between consecutive months
+        usage = meter_data.history[i] - meter_data.history[i - 1];
+      } else {
+        usage = 0; // Sanity check - shouldn't go backwards
+      }
+      pos += snprintf(historyJson + pos, sizeof(historyJson) - pos, "%s%u", 
+                      (i > 0 ? "," : ""), usage);
+    }
+    
+    pos += snprintf(historyJson + pos, sizeof(historyJson) - pos, 
+                    "],\"current_month_usage\":%u,\"months_available\":%d}", 
+                    currentMonthUsage, num_history);
+    
+    Serial.printf("Publishing JSON attributes (%d bytes): %s\n\n", strlen(historyJson), historyJson);
+    mqtt.publish("everblu/cyble/liters_attributes", historyJson, true);
+    delay(5);
+    
+    Serial.printf("> Published %d months historical data (current month usage: %u L)\n", 
+                  num_history, currentMonthUsage);
+  }
+  
   snprintf(valueBuffer, sizeof(valueBuffer), "%d", meter_data.reads_counter);
   mqtt.publish("everblu/cyble/counter", valueBuffer, true);
   delay(5);
@@ -453,6 +528,7 @@ const char jsonDiscoveryReading[] PROGMEM = R"rawliteral(
   "sug_dsp_prc": 0,
   "avty_t": "everblu/cyble/status",
   "stat_t": "everblu/cyble/liters",
+  "json_attr_t": "everblu/cyble/liters_attributes",
   "frc_upd": true,
   "dev": {
     )rawliteral" DEVICE_JSON R"rawliteral(

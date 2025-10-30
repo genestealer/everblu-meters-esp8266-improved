@@ -1,0 +1,68 @@
+name: Dependency Check
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  schedule:
+    # Run weekly on Mondays at 00:00 UTC
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  dependency-scan:
+    runs-on: ubuntu-latest
+    name: Scan Dependencies for Vulnerabilities
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install PlatformIO
+      run: |
+        python -m pip install --upgrade pip
+        pip install --upgrade platformio
+    
+    - name: Install safety (Python security scanner)
+      run: pip install safety
+    
+    - name: Check Python dependencies
+      run: |
+        pip list --format=json > pip-packages.json
+        safety check --json || true
+      continue-on-error: true
+    
+    - name: Check PlatformIO libraries
+      run: |
+        pio pkg list --only-libraries --json-output > pio-libraries.json || true
+        echo "=== PlatformIO Libraries ==="
+        pio pkg list --only-libraries || true
+      continue-on-error: true
+    
+    - name: Upload dependency lists
+      uses: actions/upload-artifact@v4
+      with:
+        name: dependency-lists
+        path: |
+          pip-packages.json
+          pio-libraries.json
+        retention-days: 30
+    
+    - name: Summary
+      run: |
+        echo "### Dependency Scan Complete" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "#### PlatformIO Libraries" >> $GITHUB_STEP_SUMMARY
+        pio pkg list --only-libraries >> $GITHUB_STEP_SUMMARY || true
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "See artifacts for full dependency lists" >> $GITHUB_STEP_SUMMARY
+
