@@ -28,7 +28,9 @@ uint8_t PA[] = { 0x60,0x00,0x00,0x00,0x00,0x00,0x00,0x00, };
 uint8_t CC1101_status_state = 0;
 uint8_t CC1101_status_FIFO_FreeByte = 0;
 uint8_t CC1101_status_FIFO_ReadByte = 0;
-uint8_t debug_out = 0;
+// Enable detailed CC1101 / RADIAN debug output when set to 1
+// Set to 0 for normal operation
+uint8_t debug_out = 1;
 
 #ifndef TRUE
 #define TRUE true
@@ -641,6 +643,59 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
     echo_debug(1, "WARN: Buffer size %d < 49, extended data unavailable\n", size);
   }
   
+  // Extract 12 months of historical volume data if buffer is large enough
+  // Historical data is stored as consecutive uint32_t values (LSB first) starting at byte 70
+  // Each represents the total volume reading at the end of that month
+  // Buffer is typically 120 bytes, which gives us 12 complete historical values (70 + 12*4 = 118)
+  // Index 0 = oldest month (12 months ago), Index 11 = most recent month boundary
+  if (size >= 118) { // Need at least 118 bytes for 12 complete historical values
+    // Determine how many complete 4-byte values we can safely read
+    int available_bytes = size - 70;
+    int max_values = available_bytes / 4;
+    int num_values = (max_values < 13) ? max_values : 13; // Cap at 13 in case future meters send more
+    
+    if (num_values > 0) {
+      data.history_available = true;
+      echo_debug(debug_out, "\n> Extracting historical data from buffer (size=%d):\n", size);
+      echo_debug(debug_out, "> Starting at byte 70: %d bytes available, %d complete values\n", 
+                 available_bytes, num_values);
+      
+      for (int i = 0; i < num_values; i++) {
+        int offset = 70 + (i * 4); // Start at byte 70, each value is 4 bytes
+        
+        // Safety check - ensure we don't read past buffer
+        if (offset + 3 >= size) {
+          echo_debug(debug_out, "  Stopping at value %d (would read past buffer at byte %d)\n", i, offset);
+          break;
+        }
+        
+        data.history[i] = ((uint32_t)decoded_buffer[offset]) |
+                          ((uint32_t)decoded_buffer[offset + 1] << 8) |
+                          ((uint32_t)decoded_buffer[offset + 2] << 16) |
+                          ((uint32_t)decoded_buffer[offset + 3] << 24);
+        echo_debug(debug_out, "  Month -%02d [bytes %3d-%3d]: %02X %02X %02X %02X = %u L\n", 
+                   num_values-i, offset, offset+3,
+                   decoded_buffer[offset], decoded_buffer[offset+1], 
+                   decoded_buffer[offset+2], decoded_buffer[offset+3],
+                   data.history[i]);
+      }
+      
+      // Fill remaining slots with zeros
+      for (int i = num_values; i < 13; i++) {
+        data.history[i] = 0;
+      }
+      
+      echo_debug(debug_out, "> Extracted %d historical values: %u L (oldest) → %u L (newest)\n", 
+                 num_values, data.history[0], data.history[num_values-1]);
+    } else {
+      data.history_available = false;
+      echo_debug(1, "WARN: Not enough data for historical values (only %d bytes from offset 70)\n", available_bytes);
+    }
+  } else {
+    data.history_available = false;
+    echo_debug(debug_out, "> Buffer size %d < 118, historical data unavailable\n", size);
+  }
+  
   return data;
 }
 
@@ -1056,6 +1111,11 @@ struct tmeter_data get_meter_data(void)
 
     meter_data_size = decode_4bitpbit_serial(rxBuffer, rxBuffer_size, meter_data);
     // show_in_hex(meter_data,meter_data_size);
+    // If debug enabled, print the decoded (post-serial-decoding) meter data so we can inspect fields (timestamp etc.)
+    if (debug_out) {
+      echo_debug(debug_out, "> Decoded meter data size = %d\n", meter_data_size);
+      show_in_hex_one_line(meter_data, meter_data_size);
+    }
     sdata = parse_meter_report(meter_data, meter_data_size);
   }
   else

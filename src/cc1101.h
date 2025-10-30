@@ -11,6 +11,8 @@ struct tmeter_data {
   int rssi_dbm; // RSSI in dBm
   int lqi; // Link quality indicator 0-255
   int8_t freqest; // Frequency offset estimate from CC1101 (for adaptive tracking)
+  uint32_t history[13]; // Monthly historical readings (13 months), index 0 = oldest, 12 = most recent
+  bool history_available; // True if historical data was successfully extracted
 };
 
 void setMHZ(float mhz);
