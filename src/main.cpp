@@ -118,12 +118,105 @@ const int ADAPT_THRESHOLD = 10;    // Adapt frequency after N successful reads
 Preferences preferences;
 #endif
 
-// Function prototypes for frequency management
+// ============================================================================
+// Frequency Management API
+// ============================================================================
+
+/**
+ * @brief Save frequency offset to persistent storage
+ * 
+ * Stores the frequency offset value to EEPROM (ESP8266) or Preferences (ESP32)
+ * with a magic number for validation. This offset is applied on next boot.
+ * 
+ * @param offset Frequency offset in MHz to be added to base frequency
+ */
 void saveFrequencyOffset(float offset);
+
+/**
+ * @brief Load frequency offset from persistent storage
+ * 
+ * Retrieves previously saved frequency offset from EEPROM (ESP8266) or 
+ * Preferences (ESP32). Validates data integrity using magic number.
+ * 
+ * @return Frequency offset in MHz, or 0.0 if no valid data found
+ */
 float loadFrequencyOffset();
+
+/**
+ * @brief Perform narrow-range frequency scan
+ * 
+ * Scans a narrow frequency range (±0.003 MHz around current frequency)
+ * with fine step resolution (0.0005 MHz) to find optimal meter frequency.
+ * Used for fine-tuning when close to correct frequency.
+ * 
+ * Updates global frequency offset if better frequency is found.
+ */
 void performFrequencyScan();
+
+/**
+ * @brief Perform wide-range initial frequency scan
+ * 
+ * Performs comprehensive frequency scan over wider range (±0.030 MHz)
+ * with coarser step resolution (0.001 MHz). Used on first boot or when
+ * no stored offset exists. More time-consuming but covers larger uncertainty.
+ * 
+ * Saves discovered offset to persistent storage on success.
+ */
 void performWideInitialScan();
+
+/**
+ * @brief Adaptive frequency tracking using FREQEST
+ * 
+ * Accumulates frequency offset estimates from successful meter reads and
+ * gradually adjusts radio frequency to track meter drift. Applies adjustment
+ * after ADAPT_THRESHOLD successful reads to ensure statistical reliability.
+ * 
+ * @param freqest Frequency offset estimate from CC1101 FREQEST register (-128 to +127)
+ */
 void adaptiveFrequencyTracking(int8_t freqest);
+
+// ============================================================================
+// State Machine Forward Declarations
+// ============================================================================
+
+/**
+ * @enum SystemState
+ * @brief State machine states for meter reading operation
+ */
+enum SystemState {
+  STATE_INIT,
+  STATE_IDLE,
+  STATE_CHECK_SCHEDULE,
+  STATE_COOLDOWN_WAIT,
+  STATE_START_READING,
+  STATE_READING_IN_PROGRESS,
+  STATE_RETRY_WAIT,
+  STATE_PUBLISH_SUCCESS,
+  STATE_PUBLISH_FAILURE
+};
+
+/**
+ * @brief Transition to new state
+ * @param newState State to transition to
+ */
+void enterState(SystemState newState);
+
+/**
+ * @brief Check if current time matches scheduled reading time
+ * @return true if current time is exactly the scheduled reading time
+ */
+bool isScheduledReadingTime();
+
+/**
+ * @brief Check if system is in cooldown period
+ * @return true if currently in cooldown period
+ */
+bool isInCooldownPeriod();
+
+/**
+ * @brief Execute state machine logic
+ */
+void handleStateMachine();
 
 // Secrets pulled from private.h file
 EspMQTTClient mqtt(
@@ -151,14 +244,28 @@ const unsigned long RETRY_COOLDOWN = 3600000; // 1 hour cooldown in milliseconds
 // Global variable to store the reading schedule (default from config.h)
 const char* readingSchedule = DEFAULT_READING_SCHEDULE;
 
-// Helper: validate schedule string against supported options
+// ============================================================================
+// Schedule Validation API
+// ============================================================================
+
+/**
+ * @brief Validate reading schedule string
+ * 
+ * @param s Schedule string to validate
+ * @return true if schedule is one of: "Monday-Friday", "Monday-Saturday", "Monday-Sunday"
+ */
 static bool isValidReadingSchedule(const char* s) {
   return (strcmp(s, "Monday-Friday") == 0 || 
           strcmp(s, "Monday-Saturday") == 0 || 
           strcmp(s, "Monday-Sunday") == 0);
 }
 
-// Ensure schedule is valid; if not, fall back to a safe default and warn
+/**
+ * @brief Validate and correct reading schedule
+ * 
+ * Checks if current reading schedule is valid. If invalid, falls back
+ * to safe default ("Monday-Friday") and logs a warning.
+ */
 static void validateReadingSchedule() {
   if (!isValidReadingSchedule(readingSchedule)) {
     Serial.printf("WARNING: Invalid reading schedule '%s'. Falling back to 'Monday-Friday'.\n", readingSchedule);
@@ -166,7 +273,15 @@ static void validateReadingSchedule() {
   }
 }
 
-// Function to check if today is within the configured schedule
+/**
+ * @brief Check if today is a scheduled reading day
+ * 
+ * Evaluates whether the current day (based on tm structure) falls within
+ * the configured reading schedule.
+ * 
+ * @param ptm Pointer to tm structure with current date/time
+ * @return true if today is a reading day according to schedule
+ */
 bool isReadingDay(struct tm *ptm) {
   if (strcmp(readingSchedule, "Monday-Friday") == 0) {
     return ptm->tm_wday >= 1 && ptm->tm_wday <= 5; // Monday to Friday
@@ -178,15 +293,33 @@ bool isReadingDay(struct tm *ptm) {
   return false;
 }
 
-// Function: calculateWiFiSignalStrengthPercentage
-// Description: Converts RSSI to a percentage value (0-100%).
+// ============================================================================
+// Signal Quality Conversion API
+// ============================================================================
+
+/**
+ * @brief Convert WiFi RSSI to percentage
+ * 
+ * Maps WiFi RSSI value to 0-100% scale for user-friendly display.
+ * Clamps input to reasonable range (-100 to -50 dBm).
+ * 
+ * @param rssi WiFi RSSI in dBm (typically -100 to -50)
+ * @return Signal strength as percentage (0-100)
+ */
 int calculateWiFiSignalStrengthPercentage(int rssi) {
   int strength = constrain(rssi, -100, -50); // Clamp RSSI to a reasonable range
   return map(strength, -100, -50, 0, 100);   // Map RSSI to percentage (0-100%)
 }
 
-// Function: calculateMeterdBmToPercentage
-// Description: Converts 433 MHz RSSI (dBm) to a percentage (0-100%).
+/**
+ * @brief Convert 433 MHz meter RSSI to percentage
+ * 
+ * Converts CC1101 RSSI measurement (in dBm) to 0-100% scale.
+ * Uses wider range (-120 to -40 dBm) appropriate for sub-GHz band.
+ * 
+ * @param rssi_dbm Meter RSSI in dBm (typically -120 to -40)
+ * @return Signal strength as percentage (0-100)
+ */
 int calculateMeterdBmToPercentage(int rssi_dbm) {
   // Clamp RSSI to a reasonable range (e.g., -120 dBm to -40 dBm)
   int clamped_rssi = constrain(rssi_dbm, -120, -40);
@@ -195,8 +328,15 @@ int calculateMeterdBmToPercentage(int rssi_dbm) {
   return map(clamped_rssi, -120, -40, 0, 100);
 }
 
-// Function: calculateLQIToPercentage
-// Description: Converts LQI (Link Quality Indicator) to a percentage (0-100%).
+/**
+ * @brief Convert LQI to percentage
+ * 
+ * Converts CC1101 Link Quality Indicator (0-255) to 0-100% scale.
+ * LQI represents overall link quality including interference effects.
+ * 
+ * @param lqi Link Quality Indicator (0-255, higher is better)
+ * @return Link quality as percentage (0-100)
+ */
 int calculateLQIToPercentage(int lqi) {
   int strength = constrain(lqi, 0, 255); // Clamp LQI to valid range
   return map(strength, 0, 255, 0, 100);  // Map LQI to percentage
@@ -1085,9 +1225,22 @@ const char jsonDiscoveryFreqScanButton[] PROGMEM = R"rawliteral(
 
 
 
+// ============================================================================
+// MQTT Publishing Functions
+// ============================================================================
 
-// Function: publishWifiDetails
-// Description: Publishes Wi-Fi diagnostics (IP, RSSI, signal strength, etc.) to MQTT.
+/**
+ * @brief Publish WiFi diagnostics to MQTT
+ * 
+ * Publishes comprehensive WiFi connection details including:
+ * - SSID and BSSID
+ * - RSSI (raw and percentage)
+ * - IP address and MAC address
+ * - System uptime
+ * - Connection status
+ * 
+ * Called periodically from loop() (every 5 minutes).
+ */
 void publishWifiDetails() {
   Serial.println("> Publish Wi-Fi details");
   
@@ -1145,8 +1298,16 @@ void publishWifiDetails() {
   Serial.println("> Wi-Fi details published");
 }
 
-// Function: publishMeterSettings
-// Description: Publishes meter configuration (year, serial, frequency) to MQTT.
+/**
+ * @brief Publish meter configuration to MQTT
+ * 
+ * Publishes static meter configuration including:
+ * - Meter year and serial number
+ * - Reading schedule (days of week)
+ * - Reading time (UTC, HH:MM format)
+ * 
+ * Called once during connection establishment.
+ */
 void publishMeterSettings() {
   Serial.println("> Publish meter settings");
 
@@ -1174,8 +1335,18 @@ void publishMeterSettings() {
   Serial.println("> Meter settings published");
 }
 
-// Function: onConnectionEstablished
-// Description: Handles MQTT connection establishment, including Home Assistant discovery and OTA setup.
+/**
+ * @brief MQTT connection established callback
+ * 
+ * Called when MQTT connection is successfully established. Performs:
+ * 1. NTP time synchronization
+ * 2. Arduino OTA initialization
+ * 3. Home Assistant MQTT Discovery publishing
+ * 4. MQTT topic subscriptions (trigger, frequency_scan)
+ * 5. Initial WiFi and meter settings publishing
+ * 
+ * Also sets up MQTT callbacks for manual trigger and frequency scan commands.
+ */
 void onConnectionEstablished()
 {
   Serial.println("Connected to MQTT Broker :)");
@@ -1252,8 +1423,9 @@ void onConnectionEstablished()
 
     Serial.printf("Update data from meter from MQTT trigger (command: %s)\n", message.c_str());
 
+    // Trigger state machine to start reading
     _retry = 0;
-    onUpdateData();
+    enterState(STATE_START_READING);
   });
 
   mqtt.subscribe("everblu/cyble/restart", [](const String& message) {
@@ -1406,7 +1578,8 @@ void onConnectionEstablished()
   Serial.println("> Setup done");
   Serial.println("Ready to go...");
 
-  onScheduled();
+  // State machine will handle scheduling - no need to call onScheduled()
+  // The state machine starts in STATE_INIT and will transition to STATE_IDLE
 }
 
 // Function: saveFrequencyOffset
@@ -1621,9 +1794,29 @@ void performWideInitialScan() {
   mqtt.publish("everblu/cyble/cc1101_state", "Idle", true);
 }
 
-// Function: adaptiveFrequencyTracking
-// Description: Uses FREQEST register to adaptively adjust frequency offset over time
-//              Accumulates frequency error estimates and adjusts when threshold is reached
+// ============================================================================
+// Frequency Management Implementation
+// ============================================================================
+
+/**
+ * @brief Adaptive frequency tracking using FREQEST
+ * 
+ * Accumulates frequency offset estimates from successful reads and gradually
+ * adjusts radio frequency to track meter drift. Uses statistical averaging
+ * (ADAPT_THRESHOLD reads) to avoid over-correction on noise.
+ * 
+ * FREQEST register provides frequency error estimate in 2's complement format,
+ * with resolution ~1.59 kHz per LSB (26 MHz crystal).
+ * 
+ * Adjustment logic:
+ * - Accumulate FREQEST over multiple reads
+ * - After threshold reads, calculate average error
+ * - If average > 2 kHz, apply 50% correction to avoid oscillation
+ * - Save new offset to persistent storage
+ * - Reinitialize CC1101 with corrected frequency
+ * 
+ * @param freqest Frequency offset estimate from CC1101 FREQEST register (-128 to +127)
+ */
 void adaptiveFrequencyTracking(int8_t freqest) {
   // FREQEST is a two's complement value representing frequency offset
   // Resolution is approximately Fxosc/2^14 ≈ 1.59 kHz per LSB (for 26 MHz crystal)
@@ -1672,8 +1865,21 @@ void adaptiveFrequencyTracking(int8_t freqest) {
 }
 
 
-// Function: validateConfiguration
-// Description: Validates configuration parameters at startup to fail fast on invalid settings
+/**
+ * @brief Validate configuration parameters
+ * 
+ * Performs startup validation of configuration parameters to fail fast
+ * on invalid settings. Checks:
+ * - METER_YEAR (must be 0-99)
+ * - METER_SERIAL (must be non-zero)
+ * - FREQUENCY (must be 300-500 MHz if defined)
+ * - READING_HOUR/MINUTE (must be valid time)
+ * - Reading schedule string format
+ * 
+ * Logs validation results to serial console with ✓ or ERROR markers.
+ * 
+ * @return true if all validations passed, false if any parameter is invalid
+ */
 bool validateConfiguration() {
   bool valid = true;
   
@@ -1848,11 +2054,356 @@ void setup()
 
 }
 
-// Function: loop
-// Description: Main loop to handle MQTT and OTA operations, and update diagnostics periodically.
+// ============================================================================
+// Main Loop
+// ============================================================================
+
+/**
+ * @brief Main loop function
+ * 
+ * Handles MQTT communication, OTA updates, state machine execution,
+ * and periodic WiFi diagnostics publishing.
+ */
+
+// ============================================================================
+// State Machine Implementation
+// ============================================================================
+
+// State machine variables (enum declared at top of file)
+static SystemState currentState = STATE_INIT;     ///< Current state
+static unsigned long stateEntryTime = 0;          ///< Timestamp when state was entered
+static unsigned long nextScheduleCheck = 0;       ///< Next scheduled check time
+static unsigned long retryDelayUntil = 0;         ///< Retry delay expiration time
+static struct tmeter_data pendingMeterData;       ///< Data from ongoing read
+static bool readingInProgress = false;            ///< Flag for read operation
+
+/**
+ * @brief Transition to new state
+ * 
+ * Updates current state, records entry timestamp, and logs transition
+ * for debugging purposes.
+ * 
+ * @param newState State to transition to
+ */
+void enterState(SystemState newState) {
+  currentState = newState;
+  stateEntryTime = millis();
+  
+  // Debug state transitions
+  const char* stateNames[] = {
+    "INIT", "IDLE", "CHECK_SCHEDULE", "COOLDOWN_WAIT",
+    "START_READING", "READING_IN_PROGRESS", "RETRY_WAIT",
+    "PUBLISH_SUCCESS", "PUBLISH_FAILURE"
+  };
+  Serial.printf("[STATE] Entering: %s\n", stateNames[newState]);
+}
+
+/**
+ * @brief Check if current time matches scheduled reading time
+ * 
+ * Evaluates whether current time (UTC) matches the configured reading
+ * schedule (day of week and exact hour:minute:00).
+ * 
+ * @return true if current time is exactly the scheduled reading time
+ */
+bool isScheduledReadingTime() {
+  time_t tnow = time(nullptr);
+  struct tm *ptm = gmtime(&tnow);
+  
+  // Check if today is a valid reading day and it's the exact scheduled time
+  return isReadingDay(ptm) && 
+         ptm->tm_hour == g_readHourUtc && 
+         ptm->tm_min == g_readMinuteUtc && 
+         ptm->tm_sec == 0;
+}
+
+/**
+ * @brief Check if system is in cooldown period
+ * 
+ * After max retries are exhausted, system enters 1-hour cooldown period
+ * to avoid hammering the meter. This function checks if cooldown is active.
+ * 
+ * @return true if currently in cooldown period
+ */
+bool isInCooldownPeriod() {
+  return lastFailedAttempt > 0 && 
+         (millis() - lastFailedAttempt) < RETRY_COOLDOWN;
+}
+
+/**
+ * @brief Execute state machine logic
+ * 
+ * Main state machine handler called from loop(). Implements non-blocking
+ * meter reading with:
+ * - Schedule checking every 500ms
+ * - Retry logic with exponential backoff
+ * - 1-hour cooldown after max retries
+ * - MQTT status publishing
+ * - Adaptive frequency tracking
+ * 
+ * Must be called frequently from loop() for proper operation.
+ */
+void handleStateMachine() {
+  unsigned long now = millis();
+  
+  switch (currentState) {
+    case STATE_INIT:
+      // After setup completes, transition to idle
+      Serial.println("[STATE] Initialization complete, entering IDLE");
+      nextScheduleCheck = now;
+      enterState(STATE_IDLE);
+      break;
+      
+    case STATE_IDLE:
+      // Check schedule every 500ms
+      if (now >= nextScheduleCheck) {
+        nextScheduleCheck = now + 500;
+        enterState(STATE_CHECK_SCHEDULE);
+      }
+      break;
+      
+    case STATE_CHECK_SCHEDULE:
+      if (isScheduledReadingTime()) {
+        if (isInCooldownPeriod()) {
+          enterState(STATE_COOLDOWN_WAIT);
+        } else {
+          // Reset retry counter and start reading
+          _retry = 0;
+          lastFailedAttempt = 0;
+          Serial.println("It is time to update data from meter :)");
+          enterState(STATE_START_READING);
+        }
+      } else {
+        // Not time yet, return to idle
+        enterState(STATE_IDLE);
+      }
+      break;
+      
+    case STATE_COOLDOWN_WAIT:
+      if (isInCooldownPeriod()) {
+        unsigned long remainingCooldown = (RETRY_COOLDOWN - (millis() - lastFailedAttempt)) / 1000;
+        if (now - stateEntryTime >= 5000) { // Log every 5 seconds
+          Serial.printf("Still in cooldown period. %lu seconds remaining.\n", remainingCooldown);
+          char cooldownMsg[64];
+          snprintf(cooldownMsg, sizeof(cooldownMsg), "Cooldown active, %lus remaining", remainingCooldown);
+          mqtt.publish("everblu/cyble/status_message", cooldownMsg, true);
+          stateEntryTime = now; // Reset for next log
+        }
+        // Stay in this state until cooldown ends
+        enterState(STATE_CHECK_SCHEDULE); // Recheck next cycle
+      } else {
+        // Cooldown expired, can proceed
+        lastFailedAttempt = 0;
+        _retry = 0;
+        enterState(STATE_START_READING);
+      }
+      break;
+      
+    case STATE_START_READING:
+      Serial.printf("Updating data from meter...\n");
+      Serial.printf("Retry count : %d\n", _retry);
+      Serial.printf("Reading schedule : %s\n", readingSchedule);
+      
+      totalReadAttempts++;
+      digitalWrite(LED_BUILTIN, LOW); // Turn on LED
+      mqtt.publish("everblu/cyble/active_reading", "true", true);
+      mqtt.publish("everblu/cyble/cc1101_state", "Reading", true);
+      
+      readingInProgress = true;
+      enterState(STATE_READING_IN_PROGRESS);
+      break;
+      
+    case STATE_READING_IN_PROGRESS:
+      // Perform the actual meter read (this is blocking, but we track it)
+      if (readingInProgress) {
+        pendingMeterData = get_meter_data();
+        readingInProgress = false;
+        
+        // Get current time
+        time_t tnow = time(nullptr);
+        struct tm *ptm = gmtime(&tnow);
+        Serial.printf("Current date (UTC) : %04d/%02d/%02d %02d:%02d/%02d - %ld\n", 
+                      ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, 
+                      ptm->tm_hour, ptm->tm_min, ptm->tm_sec, (long)tnow);
+        
+        // Check if we got valid data
+        if (pendingMeterData.reads_counter == 0 || pendingMeterData.liters == 0) {
+          Serial.printf("Unable to retrieve data from meter (attempt %d/%d)\n", _retry + 1, MAX_RETRIES);
+          enterState(STATE_PUBLISH_FAILURE);
+        } else {
+          enterState(STATE_PUBLISH_SUCCESS);
+        }
+      }
+      break;
+      
+    case STATE_RETRY_WAIT:
+      // Wait for retry delay
+      if (now >= retryDelayUntil) {
+        Serial.printf("Retry delay complete, attempting read again\n");
+        enterState(STATE_START_READING);
+      }
+      break;
+      
+    case STATE_PUBLISH_FAILURE:
+      digitalWrite(LED_BUILTIN, HIGH); // Turn off LED
+      mqtt.publish("everblu/cyble/active_reading", "false", true);
+      mqtt.publish("everblu/cyble/cc1101_state", "Idle", true);
+      
+      if (_retry < MAX_RETRIES - 1) {
+        // Schedule retry
+        _retry++;
+        static char errorMsg[64];
+        snprintf(errorMsg, sizeof(errorMsg), "Retry %d/%d - No data received", _retry, MAX_RETRIES);
+        lastErrorMessage = errorMsg;
+        Serial.printf("Scheduling retry in 10 seconds... (next attempt %d/%d)\n", _retry + 1, MAX_RETRIES);
+        mqtt.publish("everblu/cyble/last_error", lastErrorMessage, true);
+        
+        retryDelayUntil = now + 10000; // 10 second delay
+        enterState(STATE_RETRY_WAIT);
+      } else {
+        // Max retries reached
+        lastFailedAttempt = now;
+        failedReads++;
+        lastErrorMessage = "Max retries reached - cooling down";
+        
+        Serial.printf("Max retries reached. Entering %lu second cooldown period.\n", RETRY_COOLDOWN / 1000);
+        mqtt.publish("everblu/cyble/last_error", lastErrorMessage, true);
+        mqtt.publish("everblu/cyble/status_message", "Max retries - cooldown active", true);
+        
+        char buffer[16];
+        snprintf(buffer, sizeof(buffer), "%lu", failedReads);
+        mqtt.publish("everblu/cyble/failed_reads", buffer, true);
+        
+        snprintf(buffer, sizeof(buffer), "%lu", totalReadAttempts);
+        mqtt.publish("everblu/cyble/total_attempts", buffer, true);
+        
+        // Return to idle after cooldown
+        enterState(STATE_IDLE);
+      }
+      break;
+      
+    case STATE_PUBLISH_SUCCESS:
+      // Publish all meter data
+      {
+        char valueBuffer[32];
+        time_t tnow = time(nullptr);
+        char iso8601[128];
+        strftime(iso8601, sizeof iso8601, "%FT%TZ", gmtime(&tnow));
+        
+        // Format time_start and time_end
+        char timeStartFormatted[6], timeEndFormatted[6];
+        snprintf(timeStartFormatted, sizeof(timeStartFormatted), "%02d:00", pendingMeterData.time_start);
+        snprintf(timeEndFormatted, sizeof(timeEndFormatted), "%02d:00", pendingMeterData.time_end);
+        
+        Serial.printf("Data from meter:\n");
+        Serial.printf("Liters : %d\nBattery (in months) : %d\nCounter : %d\nRSSI : %d\nTime start : %s\nTime end : %s\n\n",
+                      pendingMeterData.liters, pendingMeterData.battery_left, pendingMeterData.reads_counter,
+                      pendingMeterData.rssi, timeStartFormatted, timeEndFormatted);
+        
+        Serial.printf("RSSI (dBm) : %d\n", pendingMeterData.rssi_dbm);
+        Serial.printf("RSSI (percentage) : %d\n", calculateMeterdBmToPercentage(pendingMeterData.rssi_dbm));
+        Serial.printf("Signal quality (LQI) : %d\n", pendingMeterData.lqi);
+        Serial.printf("Signal quality (LQI percentage) : %d\n", calculateLQIToPercentage(pendingMeterData.lqi));
+        
+        // Publish meter data
+        snprintf(valueBuffer, sizeof(valueBuffer), "%d", pendingMeterData.liters);
+        mqtt.publish("everblu/cyble/liters", valueBuffer, true);
+        delay(5);
+        
+        snprintf(valueBuffer, sizeof(valueBuffer), "%d", pendingMeterData.reads_counter);
+        mqtt.publish("everblu/cyble/counter", valueBuffer, true);
+        delay(5);
+        
+        snprintf(valueBuffer, sizeof(valueBuffer), "%d", pendingMeterData.battery_left);
+        mqtt.publish("everblu/cyble/battery", valueBuffer, true);
+        delay(5);
+        
+        snprintf(valueBuffer, sizeof(valueBuffer), "%d", pendingMeterData.rssi_dbm);
+        mqtt.publish("everblu/cyble/rssi_dbm", valueBuffer, true);
+        delay(5);
+        
+        snprintf(valueBuffer, sizeof(valueBuffer), "%d", calculateMeterdBmToPercentage(pendingMeterData.rssi_dbm));
+        mqtt.publish("everblu/cyble/rssi_percentage", valueBuffer, true);
+        delay(5);
+        
+        snprintf(valueBuffer, sizeof(valueBuffer), "%d", pendingMeterData.lqi);
+        mqtt.publish("everblu/cyble/lqi", valueBuffer, true);
+        delay(5);
+        
+        mqtt.publish("everblu/cyble/timestamp", iso8601, true);
+        delay(5);
+        
+        snprintf(valueBuffer, sizeof(valueBuffer), "%d", calculateLQIToPercentage(pendingMeterData.lqi));
+        mqtt.publish("everblu/cyble/lqi_percentage", valueBuffer, true);
+        delay(5);
+        
+        // Publish JSON
+        char json[512];
+        const char* jsonTemplate = "{\"liters\":%d,\"counter\":%d,\"battery\":%d,\"rssi\":%d,\"timestamp\":\"%s\"}";
+        sprintf(json, jsonTemplate, pendingMeterData.liters, pendingMeterData.reads_counter,
+                pendingMeterData.battery_left, pendingMeterData.rssi, iso8601);
+        mqtt.publish("everblu/cyble/json", json, true);
+        delay(5);
+        
+        // Auto-align reading time if enabled
+        if (AUTO_ALIGN_READING_TIME) {
+          int timeStart = pendingMeterData.time_start;
+          int timeEnd = pendingMeterData.time_end;
+          int centerHour = (timeStart + timeEnd) / 2;
+          int alignedHour = (centerHour >= 12) ? 12 : centerHour;
+          
+          if (g_readHourUtc != alignedHour) {
+            g_readHourUtc = alignedHour;
+            g_readMinuteUtc = DEFAULT_READING_MINUTE_UTC;
+            
+            char readingTimeFormatted2[6];
+            snprintf(readingTimeFormatted2, sizeof(readingTimeFormatted2), "%02d:%02d", g_readHourUtc, g_readMinuteUtc);
+            mqtt.publish("everblu/cyble/reading_time", readingTimeFormatted2, true);
+            delay(5);
+            
+            Serial.printf("> Auto-aligned reading time to %02d:%02d UTC (window %02d-%02d)\n",
+                         g_readHourUtc, g_readMinuteUtc, timeStart, timeEnd);
+          }
+        }
+        
+        mqtt.publish("everblu/cyble/active_reading", "false", true);
+        mqtt.publish("everblu/cyble/cc1101_state", "Idle", true);
+        digitalWrite(LED_BUILTIN, HIGH); // Turn off LED
+        
+        // Reset retry counter and cooldown
+        _retry = 0;
+        lastFailedAttempt = 0;
+        successfulReads++;
+        lastErrorMessage = "None";
+        
+        // Publish success metrics
+        char metricBuffer[16];
+        snprintf(metricBuffer, sizeof(metricBuffer), "%lu", successfulReads);
+        mqtt.publish("everblu/cyble/successful_reads", metricBuffer, true);
+        
+        snprintf(metricBuffer, sizeof(metricBuffer), "%lu", totalReadAttempts);
+        mqtt.publish("everblu/cyble/total_attempts", metricBuffer, true);
+        
+        mqtt.publish("everblu/cyble/last_error", "None", true);
+        
+        // Perform adaptive frequency tracking
+        adaptiveFrequencyTracking(pendingMeterData.freqest);
+        
+        Serial.printf("Data update complete.\n\n");
+        
+        // Return to idle
+        enterState(STATE_IDLE);
+      }
+      break;
+  }
+}
+
 void loop() {
   mqtt.loop();
   ArduinoOTA.handle();
+
+  // State machine handler
+  handleStateMachine();
 
   // Update diagnostics and Wi-Fi details every 5 minutes
   if (millis() - lastWifiUpdate > 300000) { // 5 minutes in ms
