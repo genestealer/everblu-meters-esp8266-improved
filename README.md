@@ -2,6 +2,7 @@
 
 [![ESP8266 Build](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/build-esp8266.yml/badge.svg)](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/build-esp8266.yml)
 [![ESP32 Build](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/build-esp32.yml/badge.svg)](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/build-esp32.yml)
+[![Code Quality](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/code-quality.yml/badge.svg)](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/code-quality.yml)
 
 Fetch water or gas usage data from Itron EverBlu Cyble Enhanced RF water meters using the RADIAN protocol (Sontex, Itron) on 433 MHz with an ESP32/ESP8266 and CC1101 transceiver. Integrated with Home Assistant via MQTT AutoDiscovery.
 
@@ -204,15 +205,15 @@ The following MQTT topics are used to integrate the device with Home Assistant v
 
 ### Continuous Integration
 
-This project uses GitHub Actions for automated building and testing. Every push and pull request triggers builds for both ESP8266 (huzzah) and ESP32 (esp32dev) environments to ensure code quality and compatibility.
+This project uses GitHub Actions for automated building, testing, and code quality checks. Every push and pull request triggers builds and quality checks to ensure code quality and compatibility.
 
-The CI workflow:
-- Builds the project for both ESP8266 and ESP32 platforms
-- Validates that the code compiles successfully
-- Caches dependencies for faster builds
-- Uploads firmware artifacts for successful builds
+The CI workflows include:
+- **Build Workflows**: Builds the project for both ESP8266 (huzzah) and ESP32 (esp32dev) platforms to validate that the code compiles successfully
+- **Code Quality**: Runs static analysis using cppcheck and formatting checks with clang-format to identify potential issues and maintain code consistency
+- **Dependency Caching**: Caches dependencies for faster builds
+- **Artifact Upload**: Uploads firmware artifacts and quality reports for successful builds
 
-You can view the build status at the top of this README or in the [Actions tab](https://github.com/genestealer/everblu-meters-esp8266-improved/actions).
+You can view the build and quality status at the top of this README or in the [Actions tab](https://github.com/genestealer/everblu-meters-esp8266-improved/actions).
 
 ### Local Development Setup
 

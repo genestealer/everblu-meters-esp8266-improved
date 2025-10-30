@@ -1,0 +1,155 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cppcheck:
+    runs-on: ubuntu-latest
+    name: Static Analysis with cppcheck
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cppcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cppcheck
+
+      - name: Create config.h from example if missing
+        run: |
+          if [ ! -f include/config.h ]; then
+            cp include/config.example.h include/config.h
+            echo "Created config.h from config.example.h"
+          fi
+
+      - name: Run cppcheck
+        run: |
+          cppcheck --enable=all \
+            --suppress=missingIncludeSystem \
+            --suppress=unusedFunction \
+            --suppress=unmatchedSuppression \
+            --inline-suppr \
+            --error-exitcode=0 \
+            --std=c++11 \
+            -I include \
+            -I /usr/include \
+            --platform=unix64 \
+            --xml \
+            --xml-version=2 \
+            src/ 2> cppcheck-report.xml
+
+      - name: Generate cppcheck report
+        run: |
+          echo "## cppcheck Results" > cppcheck-summary.txt
+          if [ -s cppcheck-report.xml ]; then
+            errors=$(grep -c 'severity="error"' cppcheck-report.xml || true)
+            warnings=$(grep -c 'severity="warning"' cppcheck-report.xml || true)
+            style=$(grep -c 'severity="style"' cppcheck-report.xml || true)
+            performance=$(grep -c 'severity="performance"' cppcheck-report.xml || true)
+            portability=$(grep -c 'severity="portability"' cppcheck-report.xml || true)
+            information=$(grep -c 'severity="information"' cppcheck-report.xml || true)
+
+            echo "### Summary" >> cppcheck-summary.txt
+            echo "- Errors: $errors" >> cppcheck-summary.txt
+            echo "- Warnings: $warnings" >> cppcheck-summary.txt
+            echo "- Style issues: $style" >> cppcheck-summary.txt
+            echo "- Performance issues: $performance" >> cppcheck-summary.txt
+            echo "- Portability issues: $portability" >> cppcheck-summary.txt
+            echo "- Information: $information" >> cppcheck-summary.txt
+            echo "" >> cppcheck-summary.txt
+
+            total=$((errors + warnings + style + performance + portability))
+            echo "**Total issues: $total**" >> cppcheck-summary.txt
+
+            critical=$((errors + warnings))
+            if [ $critical -eq 0 ]; then
+              score=100
+            elif [ $critical -lt 5 ]; then
+              score=$((100 - critical * 5))
+            elif [ $critical -lt 10 ]; then
+              score=$((80 - (critical - 5) * 3))
+            else
+              score=$((65 - critical))
+              if [ $score -lt 0 ]; then
+                score=0
+              fi
+            fi
+
+            echo "**Quality Score: $score/100**" >> cppcheck-summary.txt
+          else
+            echo "No issues found!" >> cppcheck-summary.txt
+            echo "**Quality Score: 100/100**" >> cppcheck-summary.txt
+          fi
+
+          cat cppcheck-summary.txt
+
+      - name: Upload cppcheck results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cppcheck-results
+          path: |
+            cppcheck-report.xml
+            cppcheck-summary.txt
+          retention-days: 30
+
+  formatting:
+    runs-on: ubuntu-latest
+    name: Code Formatting Check
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install clang-format
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format
+
+      - name: Check code formatting
+        run: |
+          if [ ! -f .clang-format ]; then
+            cat > .clang-format << 'EOF'
+          Language: Cpp
+          BasedOnStyle: Google
+          IndentWidth: 2
+          TabWidth: 2
+          UseTab: Never
+          ColumnLimit: 120
+          AllowShortFunctionsOnASingleLine: Inline
+          AllowShortIfStatementsOnASingleLine: false
+          AllowShortLoopsOnASingleLine: false
+          BreakBeforeBraces: Attach
+          IndentCaseLabels: true
+          PointerAlignment: Left
+          SpaceAfterCStyleCast: false
+          SpacesBeforeTrailingComments: 2
+          EOF
+          fi
+
+          find src include -name "*.cpp" -o -name "*.h" | \
+            xargs clang-format -style=file -dry-run -Werror 2>&1 | \
+            tee format-check.log || true
+
+          if [ -s format-check.log ]; then
+            echo "Code formatting issues found."
+            echo "Run 'clang-format -i' on the files above to fix."
+            echo "Formatting check completed with warnings."
+          else
+            echo "All files are properly formatted!"
+          fi
+
+      - name: Upload formatting results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: formatting-results
+          path: format-check.log
+          retention-days: 30
