@@ -77,7 +77,10 @@ jobs:
             elif [ $critical -lt 10 ]; then
               score=$((80 - (critical - 5) * 3))
             else
-              score=50
+              score=$((65 - critical))
+              if [ $score -lt 0 ]; then
+                score=0
+              fi
             fi
 
             echo "**Quality Score: $score/100**" >> cppcheck-summary.txt
@@ -113,7 +116,7 @@ jobs:
       - name: Check code formatting
         run: |
           if [ ! -f .clang-format ]; then
-            cat > .clang-format << 'CLANGFMT'
+            cat > .clang-format << 'EOF'
           Language: Cpp
           BasedOnStyle: Google
           IndentWidth: 2
@@ -128,7 +131,7 @@ jobs:
           PointerAlignment: Left
           SpaceAfterCStyleCast: false
           SpacesBeforeTrailingComments: 2
-          CLANGFMT
+          EOF
           fi
 
           find src include -name "*.cpp" -o -name "*.h" | \
