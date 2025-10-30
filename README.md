@@ -207,6 +207,20 @@ The following MQTT topics are used to integrate the device with Home Assistant v
 
 ## Configuration
 
+### Continuous Integration
+
+This project uses GitHub Actions for automated building and testing. Every push and pull request triggers builds for both ESP8266 (huzzah) and ESP32 (esp32dev) environments to ensure code quality and compatibility.
+
+The CI workflow:
+- Builds the project for both ESP8266 and ESP32 platforms
+- Validates that the code compiles successfully
+- Caches dependencies for faster builds
+- Uploads firmware artifacts for successful builds
+
+You can view the build status at the top of this README or in the [Actions tab](https://github.com/genestealer/everblu-meters-esp8266-improved/actions).
+
+### Local Development Setup
+
 1. **Install Required Tools**  
   - Download and install [Visual Studio Code](https://code.visualstudio.com/).  
   - Install the [PlatformIO extension for VS Code](https://platformio.org/). This will install all required dependencies and may require restarting VS Code.
