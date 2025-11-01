@@ -43,7 +43,7 @@ static const uint8_t debug_out = (uint8_t)(DEBUG_CC1101);
 #endif
 
 #ifndef FALSE
-#define FALSE true
+#define FALSE false
 #endif
 
 #define TX_LOOP_OUT 300
@@ -787,7 +787,25 @@ uint8_t decode_4bitpbit_serial(uint8_t *rxBuffer, int l_total_byte, uint8_t* dec
           }
           dest_bit_cnt++;
           //if ((dest_bit_cnt ==9) && (!bit_pol)){  echo_debug(debug_out,"stop bit error9"); return dest_byte_cnt;}
-          if ((dest_bit_cnt == 10) && (!bit_pol)) { echo_debug(debug_out, "ERROR: Stop bit error at bit 10\n"); return dest_byte_cnt; }
+          if ((dest_bit_cnt == 10) && (!bit_pol)) {
+            // A stop-bit mismatch was detected. Instead of aborting the whole
+            // decode (which produces tiny decoded outputs and breaks parsing),
+            // log the error, skip the current malformed byte and continue
+            // decoding. This makes the decoder more tolerant to single-bit
+            // corruption or brief polarity glitches on the air.
+            echo_debug(debug_out, "ERROR: Stop bit error at bit 10 - skipping malformed byte\n");
+            // Reset the bit counter to align on the next byte boundary and
+            // advance to the next destination byte slot so we don't overwrite
+            // the current (corrupted) byte.
+            dest_bit_cnt = 0;
+            dest_byte_cnt++;
+            if (dest_byte_cnt >= MAX_DECODED_SIZE) {
+              echo_debug(debug_out, "ERROR: Decode buffer size limit reached while skipping malformed byte\n");
+              return dest_byte_cnt;
+            }
+            // Continue processing remaining samples
+            continue;
+          }
           if ((dest_bit_cnt >= 11) && (!bit_pol)) //start bit
           {
             dest_bit_cnt = 0;
