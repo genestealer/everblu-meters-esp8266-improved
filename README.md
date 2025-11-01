@@ -288,6 +288,32 @@ Example configuration in `private.h`:
 #define DEFAULT_READING_SCHEDULE "Monday-Saturday"
 ```
 
+### Time zone offset and wake-up window (simple)
+
+Meters often have a local wake window (Time Start/End). The firmware keeps its clock in UTC and applies a simple offset:
+
+Configuration (in `include/private.h`):
+
+```cpp
+// Minutes from UTC. Examples: 0 (UTC), 60 (UTC+1), -300 (UTC-5)
+#define TIMEZONE_OFFSET_MINUTES 0
+```
+
+Behavior:
+
+- The device schedules reads using UTC+offset (your local time). The default read time is 10:00 (local by offset).
+- Auto-align can shift the read hour to the meter's wake window (midpoint by default) in local-offset time; the UTC publish is derived from that.
+
+MQTT topics exposed:
+
+- `everblu/cyble/reading_time` – scheduled time in UTC (HH:MM)
+
+In serial logs at startup you’ll see:
+
+- The UTC time pulled from the time server
+- The configured offset (minutes)
+- The offsetted (UTC+offset) time
+
 ---
 
 ### Frequency Configuration

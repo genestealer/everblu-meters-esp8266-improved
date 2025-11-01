@@ -52,6 +52,18 @@ static inline void FEED_WDT() {
 #define LED_BUILTIN 2 // Change this pin if needed
 #endif
 
+// ------------------------------
+// Connectivity watchdog settings
+// ------------------------------
+// Maximum time to wait for Wi-Fi to connect before forcing a retry
+static const unsigned long WIFI_CONNECT_TIMEOUT_MS = 30000UL;   // 30s
+// Maximum time to wait for MQTT to connect (with Wi-Fi up) before logging a warning
+static const unsigned long MQTT_CONNECT_TIMEOUT_MS = 30000UL;   // 30s
+// If the device stays offline for too long, perform a safety reboot (set to 0 to disable)
+static const unsigned long OFFLINE_REBOOT_AFTER_MS = 6UL * 60UL * 60UL * 1000UL; // 6 hours
+// LED blink while offline (visual feedback)
+static const unsigned long OFFLINE_LED_BLINK_MS = 500UL;
+
 // Define the Wi-Fi PHY mode if missing from the private.h file
 #ifndef ENABLE_WIFI_PHY_MODE_11G
 #define ENABLE_WIFI_PHY_MODE_11G 0  // Set to 1 to enable 11G PHY mode
@@ -72,6 +84,11 @@ static inline void FEED_WDT() {
 #define DEFAULT_READING_MINUTE_UTC 0
 #endif
 
+// Simple time zone offset (minutes from UTC). Positive for east of UTC, negative for west.
+#ifndef TIMEZONE_OFFSET_MINUTES
+#define TIMEZONE_OFFSET_MINUTES 0
+#endif
+
 // Auto-align scheduled reading time to the meter's wake window (time_start/time_end)
 // 1 = enabled (default), 0 = disabled
 #ifndef AUTO_ALIGN_READING_TIME
@@ -84,8 +101,14 @@ static inline void FEED_WDT() {
 #endif
 
 // Resolved reading time (UTC) which may be updated dynamically after a successful read
+// Resolved reading time:
+// - UTC fields: scheduled time in UTC
+// - Local fields: scheduled time in UTC+offset (TIMEZONE_OFFSET_MINUTES)
+// These may be updated dynamically after a successful read (auto-align).
 static int g_readHourUtc = DEFAULT_READING_HOUR_UTC;
 static int g_readMinuteUtc = DEFAULT_READING_MINUTE_UTC;
+static int g_readHourLocal = DEFAULT_READING_HOUR_UTC;
+static int g_readMinuteLocal = DEFAULT_READING_MINUTE_UTC;
 
 // Define a default meter frequency if missing from private.h.
 // RADIAN protocol nominal center frequency for EverBlu is 433.82 MHz.
@@ -200,6 +223,37 @@ int calculateMeterdBmToPercentage(int rssi_dbm) {
 int calculateLQIToPercentage(int lqi) {
   int strength = constrain(lqi, 0, 255); // Clamp LQI to valid range
   return map(strength, 0, 255, 0, 100);  // Map LQI to percentage
+}
+
+// ------------------------------
+// Connectivity watchdog state
+// ------------------------------
+static unsigned long g_bootMillis = 0;
+static unsigned long g_wifiAttemptStartMs = 0;
+static unsigned long g_mqttAttemptStartMs = 0;
+static unsigned long g_wifiOfflineSince = 0;
+static unsigned long g_mqttOfflineSince = 0;
+static unsigned long g_lastConnLogMs = 0;
+static unsigned long g_lastLedBlinkMs = 0;
+static bool g_ledState = false;
+static bool g_prevWifiUp = false;
+static bool g_prevMqttUp = false;
+
+// Helper: translate Wi-Fi wl_status_t to readable string
+static const char* wifiStatusToString(wl_status_t st) {
+  switch (st) {
+    case WL_IDLE_STATUS:      return "IDLE (starting up)";
+    case WL_NO_SSID_AVAIL:    return "NO_SSID_AVAIL (SSID not found)";
+    case WL_SCAN_COMPLETED:   return "SCAN_COMPLETED";
+    case WL_CONNECTED:        return "CONNECTED";
+    case WL_CONNECT_FAILED:   return "CONNECT_FAILED";
+    case WL_CONNECTION_LOST:  return "CONNECTION_LOST";
+    case WL_DISCONNECTED:     return "DISCONNECTED";
+    #ifdef WL_WRONG_PASSWORD
+    case WL_WRONG_PASSWORD:   return "WRONG_PASSWORD";
+    #endif
+    default:                  return "UNKNOWN";
+  }
 }
 
 
@@ -415,13 +469,19 @@ void onUpdateData()
 
     if (window > 0) {
 #if AUTO_ALIGN_USE_MIDPOINT
-      int alignedHour = (timeStart + (window / 2)) % 24; // midpoint
+  int alignedHourLocal = (timeStart + (window / 2)) % 24; // midpoint (interpreted as local-offset time)
 #else
-      int alignedHour = timeStart; // start of window
+  int alignedHourLocal = timeStart; // start of window (local-offset time)
 #endif
-      // Update resolved schedule time (keep minutes as configured default)
-      g_readHourUtc = alignedHour;
-      g_readMinuteUtc = DEFAULT_READING_MINUTE_UTC;
+  // Update resolved schedule time in LOCAL and derive UTC equivalent
+  g_readHourLocal = alignedHourLocal;
+  g_readMinuteLocal = DEFAULT_READING_MINUTE_UTC;
+  // Simple conversion: UTC = Local - offset
+  int totalLocalMin = g_readHourLocal * 60 + g_readMinuteLocal;
+  int utcMin = (totalLocalMin - TIMEZONE_OFFSET_MINUTES) % (24 * 60);
+  if (utcMin < 0) utcMin += 24 * 60;
+  g_readHourUtc = utcMin / 60;
+  g_readMinuteUtc = utcMin % 60;
 
       // Publish updated reading_time HH:MM
       char readingTimeFormatted2[6];
@@ -429,7 +489,8 @@ void onUpdateData()
       mqtt.publish("everblu/cyble/reading_time", readingTimeFormatted2, true);
       delay(5);
 
-      Serial.printf("> Auto-aligned reading time to %02d:%02d UTC (window %02d-%02d)\n", g_readHourUtc, g_readMinuteUtc, timeStart, timeEnd);
+      Serial.printf("> Auto-aligned reading time to %02d:%02d local-offset (%02d:%02d UTC) (window %02d-%02d local)\n",
+                    g_readHourLocal, g_readMinuteLocal, g_readHourUtc, g_readMinuteUtc, timeStart, timeEnd);
     }
   }
 #endif
@@ -463,14 +524,19 @@ void onUpdateData()
 }
 
 // Function: onScheduled
-// Description: Schedules daily meter readings at 10:00 AM UTC.
+// Function: onScheduled
+// Description: Schedules daily meter readings at the configured local-offset time.
 void onScheduled()
 {
   time_t tnow = time(nullptr);
-  struct tm *ptm = gmtime(&tnow);
+  // Compute local-offset time by adding offset minutes to UTC epoch
+  time_t tlocal = tnow + (time_t)TIMEZONE_OFFSET_MINUTES * 60;
+  struct tm *ptm = gmtime(&tlocal);
 
   // Check if today is a valid reading day
-  if (isReadingDay(ptm) && ptm->tm_hour == g_readHourUtc && ptm->tm_min == g_readMinuteUtc && ptm->tm_sec == 0) {
+  const bool timeMatch = (ptm->tm_hour == g_readHourLocal && ptm->tm_min == g_readMinuteLocal);
+
+  if (isReadingDay(ptm) && timeMatch && ptm->tm_sec == 0) {
     // Check if we're still in cooldown period after failed attempts
     if (lastFailedAttempt > 0 && (millis() - lastFailedAttempt) < RETRY_COOLDOWN) {
       unsigned long remainingCooldown = (RETRY_COOLDOWN - (millis() - lastFailedAttempt)) / 1000;
@@ -635,6 +701,7 @@ const char jsonDiscoveryWifiIP[] PROGMEM = R"rawliteral(
 )rawliteral";
 
 // JSON Discovery for Reading Time (HH:MM, UTC)
+// JSON Discovery for Reading Time (UTC)
 const char jsonDiscoveryReadingTime[] PROGMEM = R"rawliteral(
 {
   "name": "Reading Time (UTC)",
@@ -1188,6 +1255,23 @@ void onConnectionEstablished()
   time_t tnow = time(nullptr);
   struct tm *ptm = gmtime(&tnow);
   Serial.printf("Current date (UTC) : %04d/%02d/%02d %02d:%02d/%02d - %ld\n", ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, (long)tnow);
+  // Print simple offset and derived local time for debugging
+  int offsetMin = TIMEZONE_OFFSET_MINUTES;
+  time_t tlocal = tnow + (time_t)offsetMin * 60;
+  struct tm *plocal = gmtime(&tlocal);
+  Serial.printf("Configured UTC offset: %+d minutes\n", offsetMin);
+  Serial.printf("Current date (UTC+offset): %04d/%02d/%02d %02d:%02d/%02d - %ld\n",
+                plocal->tm_year + 1900, plocal->tm_mon + 1, plocal->tm_mday,
+                plocal->tm_hour, plocal->tm_min, plocal->tm_sec, (long)tlocal);
+
+  // Initialize schedule: start with defaults as LOCAL (offset) time and compute UTC for publishing
+  g_readHourLocal = DEFAULT_READING_HOUR_UTC;
+  g_readMinuteLocal = DEFAULT_READING_MINUTE_UTC;
+  int totalLocalMin = g_readHourLocal * 60 + g_readMinuteLocal;
+  int utcMin = (totalLocalMin - TIMEZONE_OFFSET_MINUTES) % (24 * 60);
+  if (utcMin < 0) utcMin += 24 * 60;
+  g_readHourUtc = utcMin / 60;
+  g_readMinuteUtc = utcMin % 60;
   
   Serial.println("> Configure Arduino OTA flash.");
   ArduinoOTA.onStart([]() {
@@ -1297,6 +1381,7 @@ void onConnectionEstablished()
 
   // Publish Wi-Fi details discovery configuration
   mqtt.publish("homeassistant/sensor/water_meter_wifi_ip/config", FPSTR(jsonDiscoveryWifiIP), true);
+  mqtt.publish("homeassistant/sensor/water_meter_reading_schedule/config", FPSTR(jsonDiscoveryReadingSchedule), true);
   delay(5);
   mqtt.publish("homeassistant/sensor/water_meter_wifi_rssi/config", FPSTR(jsonDiscoveryWifiRSSI), true);
   delay(5);
@@ -1310,7 +1395,9 @@ void onConnectionEstablished()
   delay(5);
   mqtt.publish("homeassistant/sensor/water_meter_wifi_signal_percentage/config", FPSTR(jsonDiscoveryWifiSignalPercentage), true);
   delay(5);
-
+  // Publish JSON discovery for reading time (UTC)
+  mqtt.publish("homeassistant/sensor/water_meter_reading_time/config", FPSTR(jsonDiscoveryReadingTime), true);
+  delay(5);
   // Publish MQTT discovery messages for the Restart Button
   mqtt.publish("homeassistant/button/water_meter_restart/config", FPSTR(jsonDiscoveryRestartButton), true);
   delay(5);
@@ -1793,6 +1880,12 @@ void setup()
   // Set the Last Will and Testament (LWT)
   mqtt.enableLastWillMessage("everblu/cyble/status", "offline", true);  // You can activate the retain flag by setting the third parameter to true
 
+  // Make reconnection attempts faster and deterministic
+  mqtt.setWifiReconnectionAttemptDelay(15000); // try every 15s
+  mqtt.setMqttReconnectionAttemptDelay(15000); // try every 15s
+  // In rare cases where the board wedges during connection attempts, allow drastic reset
+  mqtt.enableDrasticResetOnConnectionFailures();
+
   // Conditionally enable Wi-Fi PHY mode 11G (ESP8266 only).
   #if defined(ESP8266)
     #if ENABLE_WIFI_PHY_MODE_11G
@@ -1846,6 +1939,17 @@ void setup()
   while (42);
   */
 
+  // Initialize connectivity watchdog timers
+  g_bootMillis = millis();
+  g_wifiAttemptStartMs = g_bootMillis;
+  g_mqttAttemptStartMs = 0; // will start once Wi-Fi is up
+  g_wifiOfflineSince = 0;
+  g_mqttOfflineSince = 0;
+  g_lastConnLogMs = 0;
+  g_lastLedBlinkMs = millis();
+
+  Serial.println("> Waiting for Wi-Fi/MQTT... timeouts enabled (Wi-Fi 30s, MQTT 30s). Will retry automatically.");
+
 }
 
 // Function: loop
@@ -1858,6 +1962,104 @@ void loop() {
   if (millis() - lastWifiUpdate > 300000) { // 5 minutes in ms
     publishWifiDetails();
     lastWifiUpdate = millis();
+  }
+
+  // ------------------------------
+  // Connectivity watchdog & LED feedback
+  // ------------------------------
+  const bool wifiUp = mqtt.isWifiConnected();
+  const bool mqttUp = mqtt.isMqttConnected();
+
+  // Log transitions to connected state (one-time per connect)
+  if (wifiUp && !g_prevWifiUp) {
+    Serial.printf("[Wi-Fi] Connected to '%s' (IP: %s, RSSI: %d dBm)\n",
+                  WiFi.SSID().c_str(), WiFi.localIP().toString().c_str(), WiFi.RSSI());
+  }
+  if (mqttUp && !g_prevMqttUp) {
+    Serial.printf("[MQTT] Connected to %s:%d as '%s'\n",
+                  mqtt.getMqttServerIp(), (int)mqtt.getMqttServerPort(), mqtt.getMqttClientName());
+  }
+  g_prevWifiUp = wifiUp;
+  g_prevMqttUp = mqttUp;
+
+  // Blink LED while offline (Wi-Fi or MQTT down)
+  if (!(wifiUp && mqttUp)) {
+    if (millis() - g_lastLedBlinkMs >= OFFLINE_LED_BLINK_MS) {
+      g_ledState = !g_ledState;
+      digitalWrite(LED_BUILTIN, g_ledState ? LOW : HIGH); // active-low on many boards
+      g_lastLedBlinkMs = millis();
+    }
+  }
+
+  // Wi-Fi timeout and retry hinting (EspMQTTClient already retries; we add logs/force retry after timeout)
+  if (!wifiUp) {
+    if (g_wifiOfflineSince == 0) g_wifiOfflineSince = millis();
+    // Start (or continue) Wi-Fi attempt timer
+    if (g_wifiAttemptStartMs == 0) g_wifiAttemptStartMs = millis();
+
+    // Periodic status log every ~5s so it doesn't look hung
+    if (g_lastConnLogMs == 0 || millis() - g_lastConnLogMs > 5000) {
+      wl_status_t st = WiFi.status();
+      Serial.printf("[Wi-Fi] Connecting to '%s'... (status=%d: %s)\n", secret_wifi_ssid, (int)st, wifiStatusToString(st));
+      g_lastConnLogMs = millis();
+    }
+
+    // If a single attempt seems to stall for too long, force a fresh begin
+    if (millis() - g_wifiAttemptStartMs > WIFI_CONNECT_TIMEOUT_MS) {
+      Serial.println("[Wi-Fi] Connection attempt timed out. Forcing reconnect...");
+      // Try a clean reconnect without blocking
+      WiFi.disconnect(true);
+      delay(50);
+      WiFi.mode(WIFI_STA);
+      WiFi.begin(secret_wifi_ssid, secret_wifi_password);
+      g_wifiAttemptStartMs = millis();
+    }
+
+    // Safety reboot if offline too long (optional)
+    if (OFFLINE_REBOOT_AFTER_MS > 0 && (millis() - g_wifiOfflineSince) > OFFLINE_REBOOT_AFTER_MS) {
+      Serial.println("[Wi-Fi] Offline too long. Rebooting device to recover...");
+      delay(200);
+      ESP.restart();
+    }
+    // No further checks if Wi-Fi is down
+    return;
+  } else {
+    // Wi-Fi is up
+    g_wifiAttemptStartMs = 0;
+    g_wifiOfflineSince = 0;
+  }
+
+  // MQTT timeout and status logging
+  if (!mqttUp) {
+    if (g_mqttOfflineSince == 0) g_mqttOfflineSince = millis();
+    if (g_mqttAttemptStartMs == 0) g_mqttAttemptStartMs = millis();
+
+    if (g_lastConnLogMs == 0 || millis() - g_lastConnLogMs > 5000) {
+      Serial.printf("[MQTT] Connecting to %s:%d as '%s'...\n", mqtt.getMqttServerIp(), (int)mqtt.getMqttServerPort(), mqtt.getMqttClientName());
+      g_lastConnLogMs = millis();
+    }
+
+    if (millis() - g_mqttAttemptStartMs > MQTT_CONNECT_TIMEOUT_MS) {
+      Serial.println("[MQTT] Connection attempt seems slow. Will keep retrying in background.");
+      // We don't force reconnect here because EspMQTTClient handles the schedule; just reset our timer for logging cadence
+      g_mqttAttemptStartMs = millis();
+    }
+
+    if (OFFLINE_REBOOT_AFTER_MS > 0 && (millis() - g_mqttOfflineSince) > OFFLINE_REBOOT_AFTER_MS) {
+      Serial.println("[MQTT] Offline too long. Rebooting device to recover...");
+      delay(200);
+      ESP.restart();
+    }
+    return;
+  } else {
+    // Both Wi-Fi and MQTT are up — ensure LED is steady off and reset timers
+    if (!g_ledState) {
+      digitalWrite(LED_BUILTIN, HIGH); // off
+    }
+    g_ledState = false;
+    g_mqttAttemptStartMs = 0;
+    g_mqttOfflineSince = 0;
+    g_lastConnLogMs = 0;
   }
 }
 
