@@ -24,10 +24,10 @@ jobs:
             board: Adafruit HUZZAH ESP8266
           - name: d1_mini_pro
             board: WeMos D1 Mini Pro
-          - name: d1_mini
-            board: WeMos D1 Mini
           - name: nodemcuv2
             board: NodeMCU v2
+          - name: esp32dev
+            board: ESP32 Dev Module
     
     name: Build Release for ${{ matrix.environment.board }}
     
