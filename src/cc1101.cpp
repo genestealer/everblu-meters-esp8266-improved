@@ -28,9 +28,15 @@ uint8_t PA[] = { 0x60,0x00,0x00,0x00,0x00,0x00,0x00,0x00, };
 uint8_t CC1101_status_state = 0;
 uint8_t CC1101_status_FIFO_FreeByte = 0;
 uint8_t CC1101_status_FIFO_ReadByte = 0;
-// Enable detailed CC1101 / RADIAN debug output when set to 1
-// Set to 0 for normal operation
-uint8_t debug_out = 1;
+// Enable detailed CC1101 / RADIAN debug output when set to 1.
+// This value may be configured in your `include/private.h` by setting
+// `#define DEBUG_CC1101 0` (disable) or `#define DEBUG_CC1101 1` (enable).
+// If not defined in private.h, fall back to enabled (1) to preserve
+// the previous default behaviour.
+#ifndef DEBUG_CC1101
+#define DEBUG_CC1101 0
+#endif
+static const uint8_t debug_out = (uint8_t)(DEBUG_CC1101);
 
 #ifndef TRUE
 #define TRUE true

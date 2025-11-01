@@ -51,3 +51,8 @@
 //  - ESP8266 HUZZAH / D1 mini: GPIO5 (D1)
 //  - ESP32 DevKit: GPIO4 or GPIO27 are common choices
 #define GDO0 5
+// Enable CC1101 / RADIAN protocol debug output printed to serial.
+// Set to 1 to enable verbose radio debug messages (helpful for frequency scanning
+// and packet debugging). Set to 0 to disable radio debug prints.
+// Copy this file to `include/private.h` and change the value as needed.
+#define DEBUG_CC1101 0

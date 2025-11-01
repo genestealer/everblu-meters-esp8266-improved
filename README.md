@@ -237,6 +237,9 @@ You can view the build and quality status at the top of this README or in the [A
     - Meter serial number (omit the leading 0) and production year. This information is printed on the meter label:  
      ![Cyble Meter Label](docs/images/meter_label.png) ![Cyble Meter Label](docs/images/meter_label_21.png)
     - **Wi-Fi PHY Mode**: To enable 802.11g Wi-Fi PHY mode, set `ENABLE_WIFI_PHY_MODE_11G` to `1` in the `private.h` file. By default, it is set to `0` (disabled).
+    - Radio debug: control verbose CC1101/RADIAN debug output with `DEBUG_CC1101` in `private.h`.
+      - `#define DEBUG_CC1101 1` enables verbose radio debugging (default in the example file).
+      - `#define DEBUG_CC1101 0` disables verbose radio debugging.
 
 3. **Update Platform Configuration**  
   - Select an environment in `platformio.ini`:
