@@ -1696,10 +1696,14 @@ bool validateConfiguration() {
     Serial.printf("✓ METER_SERIAL: %lu\n", (unsigned long)METER_SERIAL);
   }
   
-  // Validate FREQUENCY if defined (should be 300-500 MHz for 433 MHz band)
+  // Validate FREQUENCY if defined. Supported bands:
+  //  - 433 MHz band (approx. 300-500 MHz)
+  //  - 868/915 MHz bands (approx. 800-1000 MHz)
   #ifdef FREQUENCY
-  if (FREQUENCY < 300.0 || FREQUENCY > 500.0) {
-    Serial.printf("ERROR: Invalid FREQUENCY=%.2f MHz (expected 300-500 MHz)\n", FREQUENCY);
+  bool in433Band = (FREQUENCY >= 300.0 && FREQUENCY <= 500.0);
+  bool in868915Band = (FREQUENCY >= 800.0 && FREQUENCY <= 1000.0);
+  if (!in433Band && !in868915Band) {
+    Serial.printf("ERROR: Invalid FREQUENCY=%.2f MHz (expected 300-500 or 800-1000 MHz)\n", FREQUENCY);
     valid = false;
   } else {
     Serial.printf("✓ FREQUENCY: %.6f MHz\n", FREQUENCY);
@@ -1812,6 +1816,11 @@ void setup()
 
   // Log effective frequency and warn if default is used
   Serial.printf("> Frequency (effective): %.6f MHz\n", (double)FREQUENCY);
+  if (FREQUENCY >= 800.0) {
+    Serial.println("> Detected high-band configuration (868/915 MHz). Ensure your CC1101 module and antenna support this band.");
+  } else {
+    Serial.println("> Detected 433 MHz band configuration.");
+  }
 #if FREQUENCY_DEFINED_DEFAULT
   Serial.println("WARNING: FREQUENCY not set in private.h; using default 433.820000 MHz (RADIAN).");
 #endif

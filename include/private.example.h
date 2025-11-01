@@ -33,9 +33,13 @@
 
 // Meter-specific configuration
 // Note: If FREQUENCY is omitted, the firmware defaults to 433.82 MHz (RADIAN).
+// To use 868/915 MHz bands (e.g., 866.0 MHz), set FREQUENCY accordingly and ensure
+// your CC1101 module and antenna support that band.
 #define METER_YEAR 21        // Last two digits of the year printed on the meter (e.g., 2019 is 19)
 #define METER_SERIAL 260123  // Meter Serial Number (omit leading zero)
-// #define FREQUENCY 433.820000 // Meter center frequency in MHz; defaults to 433.82 if not set
+// Examples:
+// #define FREQUENCY 433.820000 // 433 MHz band (default if not set)
+// #define FREQUENCY 866.000000 // 868/915 MHz bands (ensure correct hardware)
 
 // Clear EEPROM on next boot to force frequency re-discovery
 // IMPORTANT: Set to 1 and upload firmware when you:

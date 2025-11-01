@@ -296,7 +296,7 @@ The firmware uses **automatic frequency calibration** on the CC1101 radio to ens
 
 #### How It Works
 
-1. **Compile-Time Configuration**: The operating frequency is set via the `FREQUENCY` define in `private.h` (e.g., `#define FREQUENCY 433.82`).
+1. **Compile-Time Configuration**: The operating frequency is set via the `FREQUENCY` define in `private.h` (e.g., `#define FREQUENCY 433.82`). The firmware supports both the 433 MHz band and the 868/915 MHz bands. Pick a value in either 300–500 MHz (433 band) or 800–1000 MHz (868/915 band) and ensure your CC1101 module and antenna match the chosen band.
 
 2. **Default Frequency**: If you don't specify `FREQUENCY` in your config file, the firmware will automatically default to **433.82 MHz**, which is the standard RADIAN protocol center frequency for EverBlu meters. A warning will be logged at startup if the default is used.
 
@@ -327,6 +327,11 @@ In your `private.h`:
 #define FREQUENCY 433.82
 ```
 
+Or for 868/915 MHz band deployments (e.g., 866 MHz):
+```cpp
+#define FREQUENCY 866.00
+```
+
 To find your meter's exact frequency, you can:
 1. Use the frequency scanning mode (set `SCAN_FREQUENCY_433MHZ` to `1`) during initial setup
 2. Use an RTL-SDR to measure the frequency while a utility reader is polling your meter
@@ -336,6 +341,7 @@ The effective frequency is always displayed in the serial log during startup:
 ```
 > Frequency (effective): 433.820000 MHz
 ```
+If you select a high-band frequency (>= 800 MHz), the log will indicate a high-band configuration. Make sure your CC1101 board and antenna are the 868/915 MHz variant.
 
 ---
 
