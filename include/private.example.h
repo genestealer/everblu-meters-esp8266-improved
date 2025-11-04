@@ -51,7 +51,7 @@
 //  - Move to a different meter
 // After one boot with EEPROM cleared, set back to 0 to preserve the discovered frequency.
 // The firmware will automatically perform a wide frequency scan and save the optimal frequency.
-#define CLEAR_EEPROM_ON_BOOT 0 I and just kill them this is the approximate prescription pills 1. would have to ingest to kill them since the amount of heroin the average person would have to ingest if you kill them Fentanyl you got to bring the camera
+#define CLEAR_EEPROM_ON_BOOT 0
 
 // CC1101 GDO0 (data ready) pin connected to your MCU. Choose a valid GPIO for your board.
 // Examples:
