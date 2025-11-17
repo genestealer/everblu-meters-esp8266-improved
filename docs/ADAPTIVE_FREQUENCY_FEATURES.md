@@ -141,7 +141,7 @@ adaptiveFrequencyTracking(meter_data.freqest);
 ## Configuration Options
 
 ### Disable Auto-Scan
-Set in `config.h`:
+Set in `private.h`:
 ```cpp
 #define AUTO_SCAN_ENABLED false  // Disable automatic wide initial scan
 ```
@@ -172,7 +172,7 @@ mosquitto_pub -t "everblu/cyble/frequency_scan" -m "START"
 
 **How to clear EEPROM:**
 
-In `include/config.h`, set:
+In `include/private.h`, set:
 ```cpp
 #define CLEAR_EEPROM_ON_BOOT 1
 ```
@@ -189,7 +189,7 @@ Upload again to preserve the discovered frequency.
 ## Testing Recommendations
 
 ### Test 1: First Boot Behavior
-1. Set `CLEAR_EEPROM_ON_BOOT = 1` in `config.h`
+1. Set `CLEAR_EEPROM_ON_BOOT = 1` in `private.h`
 2. Upload firmware and power on ESP8266
 3. Watch serial monitor for wide scan progress (~1-2 minutes)
 4. Verify frequency offset is saved to EEPROM

@@ -72,7 +72,7 @@ The project uses the ESP8266/ESP32's **hardware SPI pins** to communicate with t
 - **MISO (Master In Slave Out)**: GPIO 12
 - **MOSI (Master Out Slave In)**: GPIO 13
 - **CS/SS (Chip Select)**: GPIO 15
-- **GDO0 (CC1101 Data Ready)**: GPIO 5 (configurable in `config.h`)
+- **GDO0 (CC1101 Data Ready)**: GPIO 5 (configurable in `private.h`)
 
 #### Wiring Table
 
@@ -86,14 +86,14 @@ Pin wiring for the [Wemos D1 Mini](https://www.wemos.cc/en/latest/d1/index.html)
 | **MISO**       | SPI Data In  | GPIO 12          | D6                | #12                | GPIO 19        | MISO             | Also labeled as GDO1 on some CC1101 modules |
 | **MOSI**       | SPI Data Out | GPIO 13          | D7                | #13                | GPIO 23        | MOSI             | Hardware SPI MOSI |
 | **CSN/CS**     | Chip Select  | GPIO 15          | D8                | #15                | GPIO 5         | SS               | SPI chip select |
-| **GDO0**       | Data Ready   | GPIO 5           | D1                | #5                 | GPIO 4         | GPIO 4           | Digital interrupt pin (configurable in `config.h`) |
+| **GDO0**       | Data Ready   | GPIO 5           | D1                | #5                 | GPIO 4         | GPIO 4           | Digital interrupt pin (configurable in `private.h`) |
 | **GDO2**       | Not used     | -                | -                 | -                  | -              | -                | Leave disconnected (optional) |
 
 #### Important Notes
 
 - **Voltage:** The CC1101 operates at **3.3V only**. Do not connect to 5V or you will damage the module.
 - **Hardware SPI:** This project uses the ESP8266/ESP32's hardware SPI interface for reliable, high-speed communication.
-- **GDO0 Pin:** Default is GPIO 5 for ESP8266, GPIO 4 for ESP32. You can change this in your `config.h` file if needed.
+- **GDO0 Pin:** Default is GPIO 5 for ESP8266, GPIO 4 for ESP32. You can change this in your `private.h` file if needed.
 - **Wemos D1 Mini Labels:** The Wemos board uses "D" labels (D1, D5, D6, etc.) which correspond to specific GPIO numbers. See the table above for the mapping.
 - **HUZZAH Pinout:** The Adafruit HUZZAH uses GPIO numbers directly on the silkscreen (no "D" labels). The table shows the corresponding GPIO numbers.
 - **ESP32 DevKit:** Most ESP32 DevKit boards use standard hardware SPI pins (SCK=18, MISO=19, MOSI=23, CS=5). The silkscreen typically labels these with their function names.
@@ -134,12 +134,12 @@ SCK    → SCK (GPIO 18 on most DevKit boards)
 MISO   → MISO (GPIO 19)
 MOSI   → MOSI (GPIO 23)
 CSN    → SS (GPIO 5 by default on many boards)
-GDO0   → GPIO 4 (or GPIO 27)  ← set this in include/config.h as GDO0
+GDO0   → GPIO 4 (or GPIO 27)  ← set this in include/private.h as GDO0
 ```
 
 Notes for ESP32
 - Use the board’s hardware SPI pins (SCK/MISO/MOSI/SS). The defaults are provided by the Arduino core and used automatically by this project.
-- Choose a free GPIO for GDO0 (e.g., 4 or 27) and set `#define GDO0 <pin>` in `include/config.h`.
+- Choose a free GPIO for GDO0 (e.g., 4 or 27) and set `#define GDO0 <pin>` in `include/private.h`.
 - Power the CC1101 from 3.3V only.
 
 #### Adafruit Feather HUZZAH Silkscreen Labels
@@ -157,7 +157,7 @@ To make wiring dead-simple on the HUZZAH, here’s the exact silkscreen text nex
   - Board label: "SS / #15"   → CC1101 CSN (Chip Select)
 
 - CC1101 interrupt (data ready)
-  - Board label: "#5" → CC1101 GDO0  (default; configurable via `config.h`)
+  - Board label: "#5" → CC1101 GDO0  (default; configurable via `private.h`)
 
 Notes
 - On the HUZZAH, many pins show both the function and the GPIO number, e.g. "SCK / #14". You can use either reference when wiring.
@@ -231,12 +231,12 @@ You can view the build and quality status at the top of this README or in the [A
   - Install the [PlatformIO extension for VS Code](https://platformio.org/). This will install all required dependencies and may require restarting VS Code.
 
 2. **Prepare Configuration Files**  
-  - Copy `include/config.example.h` to `include/config.h`.  
-  - Update the following details in `config.h`:
+  - Copy `include/config.example.h` to `include/private.h`.  
+  - Update the following details in `private.h`:
     - Wi-Fi and MQTT credentials. If your MQTT setup does not require a username and password, comment out those lines using `//`.  
     - Meter serial number (omit the leading 0) and production year. This information is printed on the meter label:  
      ![Cyble Meter Label](docs/images/meter_label.png) ![Cyble Meter Label](docs/images/meter_label_21.png)
-    - **Wi-Fi PHY Mode**: To enable 802.11g Wi-Fi PHY mode, set `ENABLE_WIFI_PHY_MODE_11G` to `1` in the `config.h` file. By default, it is set to `0` (disabled).
+    - **Wi-Fi PHY Mode**: To enable 802.11g Wi-Fi PHY mode, set `ENABLE_WIFI_PHY_MODE_11G` to `1` in the `private.h` file. By default, it is set to `0` (disabled).
 
 3. **Update Platform Configuration**  
   - Select an environment in `platformio.ini`:
@@ -249,12 +249,12 @@ You can view the build and quality status at the top of this README or in the [A
   - OTA upload is configured only under `env:huzzah` by default. For ESP32, use serial upload unless you add OTA settings for your device’s IP.
 
 4. **Perform Frequency Discovery (First-Time Setup)**  
-  - Open `config.h` and set `SCAN_FREQUENCY_433MHZ` to `1` to enable frequency discovery.  
+  - Open `private.h` and set `SCAN_FREQUENCY_433MHZ` to `1` to enable frequency discovery.  
   - Compile and upload the code to your ESP device using PlatformIO. Use **PlatformIO > Upload and Monitor**.  
   - **Keep the device connected to your computer during this process.** The serial monitor will display debug output as the device scans frequencies in the 433 MHz range.  
   - **Important**: During the initial scan (first boot with no stored frequency offset), the device performs a wide frequency scan that takes approximately 2 minutes **before** connecting to MQTT. You will see no MQTT/Home Assistant activity during this time - this is normal. Monitor the serial output to see the scan progress. Once the scan completes and the optimal frequency is found, the device will connect to MQTT and publish telemetry data.
-  - Once the correct frequency is identified, update the `FREQUENCY` value in `config.h` if needed (the automatic scan stores the offset, so manual adjustment is usually not required).  
-  - Disable frequency discovery by setting `SCAN_FREQUENCY_433MHZ` back to `0` in `config.h` if you want to skip the initial scan on future reboots.  
+  - Once the correct frequency is identified, update the `FREQUENCY` value in `private.h` if needed (the automatic scan stores the offset, so manual adjustment is usually not required).  
+  - Disable frequency discovery by setting `SCAN_FREQUENCY_433MHZ` back to `0` in `private.h` if you want to skip the initial scan on future reboots.  
   - For best results, perform this step during local business hours when the meter is most likely to transmit. Refer to the "Frequency Adjustment" section below for additional guidance.
 
 5. **Compile and Flash the Code**  
@@ -273,14 +273,14 @@ You can view the build and quality status at the top of this README or in the [A
 
 ### Reading Schedule
 
-The **Reading Schedule** feature allows you to configure the days when the meter should be queried. By default, the schedule is set to `Monday-Friday`. You can change this in the `config.h` file by modifying the `DEFAULT_READING_SCHEDULE`.
+The **Reading Schedule** feature allows you to configure the days when the meter should be queried. By default, the schedule is set to `Monday-Friday`. You can change this in the `private.h` file by modifying the `DEFAULT_READING_SCHEDULE`.
 
 Available options:
 - `"Monday-Friday"`: Queries the meter only on weekdays.
 - `"Monday-Saturday"`: Queries the meter from Monday to Saturday.
 - `"Monday-Sunday"`: Queries the meter every day.
 
-Example configuration in `config.h`:
+Example configuration in `private.h`:
 ```cpp
 #define DEFAULT_READING_SCHEDULE "Monday-Saturday"
 ```
@@ -289,11 +289,11 @@ Example configuration in `config.h`:
 
 ### Frequency Configuration
 
-The firmware uses **automatic frequency calibration** on the CC1101 radio to ensure accurate communication with your meter. The frequency is configured at compile time in your `config.h` file.
+The firmware uses **automatic frequency calibration** on the CC1101 radio to ensure accurate communication with your meter. The frequency is configured at compile time in your `private.h` file.
 
 #### How It Works
 
-1. **Compile-Time Configuration**: The operating frequency is set via the `FREQUENCY` define in `config.h` (e.g., `#define FREQUENCY 433.82`).
+1. **Compile-Time Configuration**: The operating frequency is set via the `FREQUENCY` define in `private.h` (e.g., `#define FREQUENCY 433.82`).
 
 2. **Default Frequency**: If you don't specify `FREQUENCY` in your config file, the firmware will automatically default to **433.82 MHz**, which is the standard RADIAN protocol center frequency for EverBlu meters. A warning will be logged at startup if the default is used.
 
@@ -310,14 +310,14 @@ The firmware uses **automatic frequency calibration** on the CC1101 radio to ens
 #### Why This Approach?
 
 Previous versions required manual frequency scanning and static calibration values. The new approach:
-- **Simplifies setup**: Just set your frequency once in `config.h` (or use the default)
+- **Simplifies setup**: Just set your frequency once in `private.h` (or use the default)
 - **Improves accuracy**: Automatic calibration adapts to temperature and voltage variations
 - **Reduces maintenance**: No need to manually determine and set `FSCAL` values
 - **Enhances reliability**: FOC compensates for small frequency errors during reception
 
 #### Configuration Example
 
-In your `config.h`:
+In your `private.h`:
 ```cpp
 // Optional: Specify the meter's frequency in MHz
 // If not defined, defaults to 433.82 MHz (RADIAN protocol standard)
@@ -356,7 +356,7 @@ The firmware includes **automatic frequency adaptation** features to work reliab
 
 **How to clear EEPROM:**
 
-In `include/config.h`, temporarily set:
+In `include/private.h`, temporarily set:
 ```cpp
 #define CLEAR_EEPROM_ON_BOOT 1
 ```

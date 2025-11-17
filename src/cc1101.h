@@ -19,17 +19,17 @@
  * and battery information.
  */
 struct tmeter_data {
-  int liters;                 ///< Current water consumption reading in liters
-  int reads_counter;          ///< Number of times meter has been read (wraps around 255→1)
-  int battery_left;           ///< Estimated battery life remaining in months
-  int time_start;             ///< Reading window start time (24-hour format, e.g., 8 = 8am)
-  int time_end;               ///< Reading window end time (24-hour format, e.g., 18 = 6pm)
-  int rssi;                   ///< Radio Signal Strength Indicator (raw value)
-  int rssi_dbm;               ///< RSSI converted to dBm
-  int lqi;                    ///< Link Quality Indicator (0-255, higher is better)
-  int8_t freqest;             ///< Frequency offset estimate from CC1101 for adaptive tracking
-  uint32_t history[13];       ///< Monthly historical readings (13 months), index 0 = oldest, 12 = most recent
-  bool history_available;     ///< True if historical data was successfully extracted
+  int liters;                 // Current water consumption reading in liters
+  int reads_counter;          // Number of times meter has been read (wraps around 255→1)
+  int battery_left;           // Estimated battery life remaining in months
+  int time_start;             // Reading window start time (24-hour format, e.g., 8 = 8am)
+  int time_end;               // Reading window end time (24-hour format, e.g., 18 = 6pm)
+  int rssi;                   // Radio Signal Strength Indicator (raw value)
+  int rssi_dbm;               // RSSI converted to dBm
+  int lqi;                    // Link Quality Indicator (0-255, higher is better)
+  int8_t freqest;             // Frequency offset estimate from CC1101 for adaptive tracking
+  uint32_t history[13];       // Monthly historical readings (13 months), index 0 = oldest, 12 = most recent
+  bool history_available;     // True if historical data was successfully extracted
 };
 
 /**

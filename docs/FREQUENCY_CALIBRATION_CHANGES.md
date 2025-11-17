@@ -14,7 +14,7 @@ This document details the changes made to transition from manual frequency scann
 - **Added**: Automatic frequency synthesizer calibration via `MCSM0.FS_AUTOCAL`
 - **Added**: Manual calibration strobe (`SCAL`) immediately after frequency configuration
 - **Added**: Frequency Offset Compensation (FOC) enabled via `FOCCFG`
-- **Added**: Default frequency fallback (433.82 MHz) if not defined in `config.h`
+- **Added**: Default frequency fallback (433.82 MHz) if not defined in `private.h`
 - **Improved**: Compile-time frequency configuration with startup logging
 
 ### Why These Changes Were Made
@@ -22,7 +22,7 @@ This document details the changes made to transition from manual frequency scann
 
 2. **Automatic calibration is more reliable**: The CC1101's automatic frequency synthesizer calibration adapts to temperature and voltage variations in real-time, providing better accuracy than static calibration values.
 
-3. **Simplifies configuration**: Users now only need to set the frequency once in `config.h` (or accept the default), rather than running scans and manually copying calibration values.
+3. **Simplifies configuration**: Users now only need to set the frequency once in `private.h` (or accept the default), rather than running scans and manually copying calibration values.
 
 4. **Aligns with datasheet recommendations**: Texas Instruments' CC1101 datasheet recommends using `FS_AUTOCAL` for applications requiring frequency stability.
 
@@ -133,7 +133,7 @@ halRfWriteReg(FOCCFG, 0x16);  // Default FOC configuration with tracking enabled
 Serial.printf("> Frequency (effective): %.6f MHz\n", (double)FREQUENCY);
 
 #if FREQUENCY_DEFINED_DEFAULT
-  Serial.println("WARNING: FREQUENCY not set in config.h; using default 433.820000 MHz (RADIAN).");
+  Serial.println("WARNING: FREQUENCY not set in private.h; using default 433.820000 MHz (RADIAN).");
 #endif
 ```
 
@@ -143,7 +143,7 @@ Serial.printf("> Frequency (effective): %.6f MHz\n", (double)FREQUENCY);
 
 **Added to `src/main.cpp`**:
 ```cpp
-// Define a default meter frequency if missing from config.h.
+// Define a default meter frequency if missing from private.h.
 // RADIAN protocol nominal center frequency for EverBlu is 433.82 MHz.
 #ifndef FREQUENCY
 #define FREQUENCY 433.82
@@ -184,7 +184,7 @@ Serial.printf("> Frequency (effective): %.6f MHz\n", (double)FREQUENCY);
 1. **Option A (Quick Start)**: Skip frequency config entirely—use default 433.82 MHz
 2. **Option B (Precise)**: 
    - Use frequency scanning mode to find optimal frequency
-   - Set `FREQUENCY` in `config.h`
+   - Set `FREQUENCY` in `private.h`
    - Compile and upload
 3. Done—automatic calibration handles the rest
 
@@ -255,7 +255,7 @@ The CC1101 uses a PLL (Phase-Locked Loop) frequency synthesizer that requires pe
 
 If you have an existing configuration with manual frequency and calibration values:
 
-**Old `config.h`**:
+**Old `private.h`**:
 ```cpp
 #define FREQUENCY 433.82
 #define FSCAL3 0xE9  // Delete these
@@ -265,7 +265,7 @@ If you have an existing configuration with manual frequency and calibration valu
 #define SCAN_FREQUENCY_433MHZ 0
 ```
 
-**New `config.h`**:
+**New `private.h`**:
 ```cpp
 #define FREQUENCY 433.82  // Keep this
 // Remove all FSCAL defines—no longer needed
@@ -274,7 +274,7 @@ If you have an existing configuration with manual frequency and calibration valu
 
 ### For New Users
 
-**Minimal `config.h`** (uses default frequency):
+**Minimal `private.h`** (uses default frequency):
 ```cpp
 // Wi-Fi and MQTT config...
 #define METER_SERIAL 12345678
@@ -282,7 +282,7 @@ If you have an existing configuration with manual frequency and calibration valu
 // Frequency will default to 433.82 MHz—no FREQUENCY define needed
 ```
 
-**Optimized `config.h`** (custom frequency):
+**Optimized `private.h`** (custom frequency):
 ```cpp
 // Wi-Fi and MQTT config...
 #define METER_SERIAL 12345678
@@ -311,10 +311,10 @@ If you have an existing configuration with manual frequency and calibration valu
 ## Troubleshooting
 
 ### Issue: "Meter not responding after update"
-**Solution**: Your optimal frequency may differ slightly from the default. Run frequency scanning mode once to determine your exact frequency, then set it in `config.h`.
+**Solution**: Your optimal frequency may differ slightly from the default. Run frequency scanning mode once to determine your exact frequency, then set it in `private.h`.
 
-### Issue: "Warning: FREQUENCY not set in config.h"
-**Solution**: This is informational. If 433.82 MHz works for you, ignore it. To silence the warning, add `#define FREQUENCY 433.82` to your `config.h`.
+### Issue: "Warning: FREQUENCY not set in private.h"
+**Solution**: This is informational. If 433.82 MHz works for you, ignore it. To silence the warning, add `#define FREQUENCY 433.82` to your `private.h`.
 
 ### Issue: "Want to revert to manual calibration"
 **Solution**: Not recommended, but if needed, you can disable `FS_AUTOCAL` by changing:
