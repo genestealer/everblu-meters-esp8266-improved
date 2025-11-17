@@ -167,7 +167,7 @@ const char jsonTemplate[] = "{ "
                             "\"timestamp\" : \"%s\" }";
 
 int _retry = 0;
-const int MAX_RETRIES = 3; // Maximum number of retry attempts
+const int MAX_RETRIES = 5; // Maximum number of retry attempts
 unsigned long lastFailedAttempt = 0; // Timestamp of last failed attempt
 const unsigned long RETRY_COOLDOWN = 3600000; // 1 hour cooldown in milliseconds
 
@@ -389,8 +389,9 @@ void onUpdateData()
     
     // Calculate current month usage (difference from most recent historical reading)
     uint32_t currentMonthUsage = 0;
-    if (num_history > 0 && meter_data.liters > meter_data.history[num_history - 1]) {
-      currentMonthUsage = meter_data.liters - meter_data.history[num_history - 1];
+    uint32_t currentLiters = static_cast<uint32_t>(meter_data.liters);
+    if (num_history > 0 && currentLiters > meter_data.history[num_history - 1]) {
+      currentMonthUsage = currentLiters - meter_data.history[num_history - 1];
     }
     Serial.printf("  Now  %10d  %9u (current month)\n", meter_data.liters, currentMonthUsage);
     Serial.println("===================================\n");
@@ -1578,6 +1579,7 @@ float loadFrequencyOffset() {
 // Description: Scans nearby frequencies to find the best signal and updates the offset
 void performFrequencyScan() {
   Serial.println("> Starting frequency scan...");
+  Serial.println("> NOTE: Wi-Fi/MQTT connections may temporarily drop and reconnect while the scan is running. This is expected.");
   mqtt.publish("everblu/cyble/cc1101_state", "Frequency Scanning", true);
   mqtt.publish("everblu/cyble/status_message", "Performing frequency scan", true);
   
