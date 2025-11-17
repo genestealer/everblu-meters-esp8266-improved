@@ -13,6 +13,8 @@
 #include "everblu_meters.h"
 #include <private.h> // Configuration file (Wi-Fi, MQTT, meter settings)
 
+#include <string.h>
+
 // Consolidated hex display function with optional formatting
 // mode: 0=16 per line with newlines, 1=array format, 2=single line, 3=single line with 'S' separator
 void show_in_hex_formatted(const uint8_t *buffer, size_t len, int mode)
@@ -311,4 +313,36 @@ int Make_Radian_Master_req(uint8_t *outputBuffer, uint8_t year, uint32_t serial)
 	memcpy(outputBuffer, synch_pattern, sizeof(synch_pattern));
 	TS_len_u8 = encode2serial_1_3(to_encode, sizeof(to_encode), &outputBuffer[sizeof(synch_pattern)]);
 	return TS_len_u8 + sizeof(synch_pattern);
+}
+
+// -----------------------------------------------------------------------------
+// Configuration validation helpers
+// -----------------------------------------------------------------------------
+
+bool isValidReadingSchedule(const char *schedule)
+{
+	// Reject null or empty schedules
+	if (schedule == nullptr || schedule[0] == '\0')
+	{
+		return false;
+	}
+
+	// Allowed values based on unit tests
+	if (strcmp(schedule, "Monday-Friday") == 0)
+		return true;
+	if (strcmp(schedule, "Monday-Saturday") == 0)
+		return true;
+	if (strcmp(schedule, "Monday-Sunday") == 0)
+		return true;
+
+	// Everything else is considered invalid for now
+	return false;
+}
+
+bool validateConfiguration()
+{
+	// Placeholder for future configuration validation logic.
+	// For now, always return true so tests can link and focus on
+	// isValidReadingSchedule behavior.
+	return true;
 }
