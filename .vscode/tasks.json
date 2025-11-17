@@ -9,6 +9,12 @@
 				"$platformio"
 			],
 			"group": "build"
+		},
+		{
+			"label": "PlatformIO: Build",
+			"type": "shell",
+			"command": "pio run",
+			"group": "build"
 		}
 	]
 }

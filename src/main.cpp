@@ -20,6 +20,7 @@
 
 #include "private.h"         // Include private configuration (Wi-Fi, MQTT, etc.)
 #include "everblu_meters.h" // Include EverBlu meter communication library
+#include "version.h"        // Firmware version definition
 #if defined(ESP8266)
 #include <ESP8266WiFi.h>    // Wi-Fi library for ESP8266
 #include <ESP8266mDNS.h>    // mDNS library for ESP8266
@@ -575,11 +576,18 @@ void onScheduled()
 
 // Device information - reused in all discovery messages to reduce repetition
 // Macro to embed device info in discovery JSON strings
+// Note: 'sw' (software version) is added so Home Assistant shows firmware
+// version in the Device Info panel. EVERBLU_FW_VERSION comes from version.h
+// and should be kept in sync with CHANGELOG.md and Git tags.
+// 'cu' (configuration URL) links directly to the GitHub repository so the
+// code and documentation are easily accessible from Home Assistant.
 #define DEVICE_JSON \
-    "\"ids\": [\"14071984\"],\n" \
-    "    \"name\": \"Water Meter\",\n" \
-    "    \"mdl\": \"Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32\",\n" \
-    "    \"mf\": \"Psykokwak [Forked by Genestealer]\""
+  "\"ids\": [\"14071984\"],\n" \
+  "    \"name\": \"Water Meter\",\n" \
+  "    \"mdl\": \"Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32\",\n" \
+  "    \"mf\": \"Genestealer\",\n" \
+  "    \"sw\": \"" EVERBLU_FW_VERSION "\",\n" \
+  "    \"cu\": \"https://github.com/genestealer/everblu-meters-esp8266-improved\""
 
 // JSON Discovery for Reading (Total)
 // This is used to show the total water usage in Home Assistant
@@ -983,7 +991,7 @@ const char jsonDiscoveryLQIPercentage[] PROGMEM = R"rawliteral(
       "ids": ["14071984"],
       "name": "Water Meter",
       "mdl": "Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32",
-      "mf": "Psykokwak [Forked by Genestealer]"
+      "mf": "Genestealer"
     }
   }
   )rawliteral";
@@ -1843,6 +1851,16 @@ void setup()
 {
   Serial.begin(115200);
   Serial.println("\n");
+  // Give Serial a moment to initialize
+  delay(100);
+
+  // On platforms with native USB Serial (e.g. some ESP32 cores) wait briefly for host to open the port
+  #if defined(ESP32)
+  unsigned long __serial_wait_start = millis();
+  while (!Serial && millis() - __serial_wait_start < 1000) {
+    delay(10);
+  }
+  #endif
   Serial.println("Everblu Meters ESP8266/ESP32 Starting...");
   Serial.println("Water usage data for Home Assistant");
   Serial.println("https://github.com/genestealer/everblu-meters-esp8266-improved");

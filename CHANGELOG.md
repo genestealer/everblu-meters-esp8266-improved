@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The release process is automated via GitHub Actions and is triggered by tags matching `v*.*.*`. See `.github/workflows/release.yml`.
 
+## [v1.1.0] - 2025-11-17
+
+What's changed since v1.0.1:
+
+- Add first-layer protection against corrupted RADIAN frames (decode-quality and plausibility checks)
+- Prevent obviously invalid meter data from being published to MQTT
+- Surface firmware version (`EVERBLU_FW_VERSION` from `version.h`) as Home Assistant device software version via MQTT discovery
+
 ## [v1.0.1] - 2025-11-01
 
 What's changed since v1.0.0:
