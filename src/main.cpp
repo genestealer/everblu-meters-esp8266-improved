@@ -286,7 +286,8 @@ void onUpdateData()
   char iso8601[128];
   strftime(iso8601, sizeof iso8601, "%FT%TZ", gmtime(&tnow));
 
-  // Handle data retrieval failure
+  // Handle data retrieval failure (including first-layer protection rejecting
+  // corrupted frames and returning zeros).
   if (meter_data.reads_counter == 0 || meter_data.liters == 0) {
     Serial.printf("Unable to retrieve data from meter (attempt %d/%d)\n", _retry + 1, MAX_RETRIES);
     

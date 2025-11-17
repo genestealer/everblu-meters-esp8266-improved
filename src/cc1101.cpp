@@ -637,6 +637,16 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
                 ((uint32_t)decoded_buffer[19] << 8) |
                 ((uint32_t)decoded_buffer[20] << 16) |
                 ((uint32_t)decoded_buffer[21] << 24);
+
+  // Basic plausibility checks for primary fields. These are deliberately
+  // conservative so we only reject clearly bogus frames while keeping the
+  // behaviour compatible with good data.
+  if (data.liters == 0 || data.liters == 0xFFFFFFFFUL) {
+    echo_debug(1, "ERROR: Parsed liters value is invalid (0x%08lX) - discarding frame\n",
+               (unsigned long)data.liters);
+    memset(&data, 0, sizeof(data));
+    return data;
+  }
   
   // Extract extended data if buffer is large enough
   if (size >= 49) { // Need at least 49 bytes to safely access decoded_buffer[48]
@@ -645,6 +655,21 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
     data.battery_left = decoded_buffer[31];
     data.time_start = decoded_buffer[44];
     data.time_end = decoded_buffer[45];
+
+    // Sanity checks on extended fields: time window must be within 0-23,
+    // and battery_left should not be 0xFF (usually reserved / invalid).
+    if (data.time_start > 23 || data.time_end > 23) {
+      echo_debug(1, "ERROR: Invalid wake window %u-%u (expected 0-23) - discarding frame\n",
+                 data.time_start, data.time_end);
+      memset(&data, 0, sizeof(data));
+      return data;
+    }
+
+    if (data.battery_left == 0xFF) {
+      echo_debug(1, "ERROR: Invalid battery_left value 0xFF - discarding frame\n");
+      memset(&data, 0, sizeof(data));
+      return data;
+    }
   } else {
     echo_debug(1, "WARN: Buffer size %d < 49, extended data unavailable\n", size);
   }
@@ -750,6 +775,8 @@ uint8_t decode_4bitpbit_serial(uint8_t *rxBuffer, int l_total_byte, uint8_t* dec
   
   // Maximum decoded buffer size (conservative estimate: input bytes / 4)
   const uint8_t MAX_DECODED_SIZE = 200;
+  // Track framing/stop-bit errors so we can reject extremely corrupted frames.
+  uint8_t framing_error_count = 0;
   
   //show_in_hex(rxBuffer,l_total_byte);
   /*set 1st bit polarity*/
@@ -794,6 +821,9 @@ uint8_t decode_4bitpbit_serial(uint8_t *rxBuffer, int l_total_byte, uint8_t* dec
             // decoding. This makes the decoder more tolerant to single-bit
             // corruption or brief polarity glitches on the air.
             echo_debug(debug_out, "ERROR: Stop bit error at bit 10 - skipping malformed byte\n");
+            if (framing_error_count < 255) {
+              framing_error_count++;
+            }
             // Reset the bit counter to align on the next byte boundary and
             // advance to the next destination byte slot so we don't overwrite
             // the current (corrupted) byte.
@@ -824,6 +854,17 @@ uint8_t decode_4bitpbit_serial(uint8_t *rxBuffer, int l_total_byte, uint8_t* dec
       current_Rx_Byte = current_Rx_Byte << 1;
     }//scan TX_bit
   }//scan TX_byte
+
+  // If we saw many framing errors compared to the number of bytes we managed
+  // to decode, treat the whole frame as unusable. This prevents obviously
+  // corrupted frames from being interpreted as valid meter data.
+  if (dest_byte_cnt > 0 && framing_error_count > (dest_byte_cnt / 2)) {
+    echo_debug(debug_out,
+               "ERROR: Decode quality too low (decoded=%u, framing_errors=%u) - discarding frame\n",
+               dest_byte_cnt, framing_error_count);
+    return 0;
+  }
+
   return dest_byte_cnt;
 }
 
