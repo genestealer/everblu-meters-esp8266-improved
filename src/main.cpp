@@ -652,7 +652,7 @@ const char jsonDiscoveryRequestReading[] PROGMEM = R"rawliteral(
   "obj_id": "water_meter_request",
   "qos": 0,
   "avty_t": "everblu/cyble/status",
-  "cmd_t": "everblu/cyble/trigger",
+  "cmd_t": "everblu/cyble/trigger_force",
   "pl_avail": "online",
   "pl_not_avail": "offline",
   "pl_prs": "update",
@@ -1336,6 +1336,23 @@ void onConnectionEstablished()
 
     Serial.printf("Update data from meter from MQTT trigger (command: %s)\n", message.c_str());
 
+    _retry = 0;
+    onUpdateData();
+  });
+
+  // Force trigger: an alternate topic that bypasses the cooldown period.
+  // This is intended for Home Assistant buttons that should override cooldown.
+  mqtt.subscribe("everblu/cyble/trigger_force", [](const String& message) {
+    // Input validation: accept same commands as the normal trigger
+    if (message != "update" && message != "read") {
+      Serial.printf("WARN: Invalid force-trigger command '%s' (expected 'update' or 'read')\n", message.c_str());
+      mqtt.publish("everblu/cyble/status_message", "Invalid trigger command", true);
+      return;
+    }
+
+    Serial.printf("Force update requested via MQTT (command: %s) - overriding cooldown\n", message.c_str());
+
+    // Immediately attempt to update, ignoring any cooldown state
     _retry = 0;
     onUpdateData();
   });
