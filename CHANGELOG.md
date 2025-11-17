@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The release process is automated via GitHub Actions and is triggered by tags matching `v*.*.*`. See `.github/workflows/release.yml`.
 
+## [v1.1.1] - 2025-11-17
+
+What's changed since v1.1.0:
+
+- Add additional plausibility checks for parsed meter readings (liters) to reject clearly impossible totals before publishing
+- Harden historical volume validation to discard inconsistent history blocks while keeping valid primary meter fields
+- Make historical attributes JSON generation more robust by using a larger buffer, tracking remaining space, and avoiding malformed payloads on truncation
+
 ## [v1.1.0] - 2025-11-17
 
 What's changed since v1.0.1:
