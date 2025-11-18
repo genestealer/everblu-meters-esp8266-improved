@@ -277,6 +277,44 @@ static void validateReadingSchedule()
 }
 
 /**
+ * @brief Update cached schedule times based on a local (UTC+offset) time
+ */
+static void updateResolvedScheduleFromLocal(int hourLocal, int minuteLocal)
+{
+  int normalizedHour = constrain(hourLocal, 0, 23);
+  int normalizedMinute = constrain(minuteLocal, 0, 59);
+
+  g_readHourLocal = normalizedHour;
+  g_readMinuteLocal = normalizedMinute;
+
+  int totalLocalMin = normalizedHour * 60 + normalizedMinute;
+  int utcMin = (totalLocalMin - TIMEZONE_OFFSET_MINUTES) % (24 * 60);
+  if (utcMin < 0)
+    utcMin += 24 * 60;
+  g_readHourUtc = utcMin / 60;
+  g_readMinuteUtc = utcMin % 60;
+}
+
+/**
+ * @brief Update cached schedule times based on a UTC time
+ */
+static void updateResolvedScheduleFromUtc(int hourUtc, int minuteUtc)
+{
+  int normalizedHour = constrain(hourUtc, 0, 23);
+  int normalizedMinute = constrain(minuteUtc, 0, 59);
+
+  g_readHourUtc = normalizedHour;
+  g_readMinuteUtc = normalizedMinute;
+
+  int totalUtcMin = normalizedHour * 60 + normalizedMinute;
+  int localMin = (totalUtcMin + TIMEZONE_OFFSET_MINUTES) % (24 * 60);
+  if (localMin < 0)
+    localMin += 24 * 60;
+  g_readHourLocal = localMin / 60;
+  g_readMinuteLocal = localMin % 60;
+}
+
+/**
  * @brief Check if today is a scheduled reading day
  *
  * Evaluates whether the current day (based on tm structure) falls within
@@ -697,16 +735,8 @@ skip_history_publish:;
 #else
       int alignedHourLocal = timeStart; // start of window (local-offset time)
 #endif
-      // Update resolved schedule time in LOCAL and derive UTC equivalent
-      g_readHourLocal = alignedHourLocal;
-      g_readMinuteLocal = DEFAULT_READING_MINUTE_UTC;
-      // Simple conversion: UTC = Local - offset
-      int totalLocalMin = g_readHourLocal * 60 + g_readMinuteLocal;
-      int utcMin = (totalLocalMin - TIMEZONE_OFFSET_MINUTES) % (24 * 60);
-      if (utcMin < 0)
-        utcMin += 24 * 60;
-      g_readHourUtc = utcMin / 60;
-      g_readMinuteUtc = utcMin % 60;
+      int alignedMinuteLocal = g_readMinuteLocal;
+      updateResolvedScheduleFromLocal(alignedHourLocal, alignedMinuteLocal);
 
       // Publish updated reading_time HH:MM
       char readingTimeFormatted2[6];
@@ -1497,15 +1527,8 @@ void onConnectionEstablished()
                 plocal->tm_year + 1900, plocal->tm_mon + 1, plocal->tm_mday,
                 plocal->tm_hour, plocal->tm_min, plocal->tm_sec, (long)tlocal);
 
-  // Initialize schedule: start with defaults as LOCAL (offset) time and compute UTC for publishing
-  g_readHourLocal = DEFAULT_READING_HOUR_UTC;
-  g_readMinuteLocal = DEFAULT_READING_MINUTE_UTC;
-  int totalLocalMin = g_readHourLocal * 60 + g_readMinuteLocal;
-  int utcMin = (totalLocalMin - TIMEZONE_OFFSET_MINUTES) % (24 * 60);
-  if (utcMin < 0)
-    utcMin += 24 * 60;
-  g_readHourUtc = utcMin / 60;
-  g_readMinuteUtc = utcMin % 60;
+  // Initialize schedule caches using validated UTC defaults
+  updateResolvedScheduleFromUtc(DEFAULT_READING_HOUR_UTC, DEFAULT_READING_MINUTE_UTC);
 
   Serial.println("> Configure Arduino OTA flash.");
   ArduinoOTA.onStart([]()
@@ -2102,6 +2125,22 @@ bool validateConfiguration()
   Serial.println("✓ FREQUENCY: Using default 433.82 MHz (RADIAN protocol)");
 #endif
 
+  // Validate reading time defaults (UTC)
+  if (DEFAULT_READING_HOUR_UTC < 0 || DEFAULT_READING_HOUR_UTC > 23)
+  {
+    Serial.printf("ERROR: Invalid DEFAULT_READING_HOUR_UTC=%d (expected 0-23)\n", DEFAULT_READING_HOUR_UTC);
+    valid = false;
+  }
+  else if (DEFAULT_READING_MINUTE_UTC < 0 || DEFAULT_READING_MINUTE_UTC > 59)
+  {
+    Serial.printf("ERROR: Invalid DEFAULT_READING_MINUTE_UTC=%d (expected 0-59)\n", DEFAULT_READING_MINUTE_UTC);
+    valid = false;
+  }
+  else
+  {
+    Serial.printf("✓ Reading Time (UTC): %02d:%02d\n", DEFAULT_READING_HOUR_UTC, DEFAULT_READING_MINUTE_UTC);
+  }
+
 // Validate GDO0 pin (basic check - should be defined)
 #ifdef GDO0
   Serial.printf("✓ GDO0 Pin: GPIO %d\n", GDO0);
@@ -2113,9 +2152,8 @@ bool validateConfiguration()
   // Validate reading schedule
   if (!isValidReadingSchedule(readingSchedule))
   {
-    Serial.printf("ERROR: Invalid reading schedule '%s'\n", readingSchedule);
-    Serial.println("       Expected: 'Monday-Friday', 'Monday-Saturday', or 'Monday-Sunday'");
-    valid = false;
+    Serial.printf("WARNING: Invalid reading schedule '%s'. Will fall back to 'Monday-Friday'.\n", readingSchedule);
+    Serial.println("         Expected: 'Monday-Friday', 'Monday-Saturday', or 'Monday-Sunday'");
   }
   else
   {
@@ -2163,6 +2201,9 @@ void setup()
       delay(200);
     }
   }
+
+  // Initialize resolved schedule caches using UTC defaults and configured timezone offset
+  updateResolvedScheduleFromUtc(DEFAULT_READING_HOUR_UTC, DEFAULT_READING_MINUTE_UTC);
 
   Serial.println("✓ Configuration valid - proceeding with initialization\n");
 
