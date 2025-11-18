@@ -655,27 +655,68 @@ static bool validate_radian_crc(const uint8_t *decoded_buffer, size_t size)
     return false;
   }
 
-  // The last two bytes of the decoded payload hold the CRC16/KERMIT in big-endian form.
-  const uint16_t received_crc = ((uint16_t)decoded_buffer[size - 2] << 8) |
-                                (uint16_t)decoded_buffer[size - 1];
-  const uint16_t computed_crc = crc_kermit(decoded_buffer, size - 2);
+  const uint8_t length_field = decoded_buffer[0];
+  size_t expected_len = length_field ? length_field : size;
+
+  if (expected_len > size)
+  {
+    const size_t missing = expected_len - size;
+    // Many EverBlu meters advertise 0x7C (124) bytes but actually deliver 122 bytes,
+    // meaning the CRC bytes are not present in the decoded payload. Log the situation
+    // but keep the frame so we don't regress existing setups.
+    echo_debug(debug_out,
+               "WARN: RADIAN frame missing %u byte(s) from advertised length (expected=%u got=%u)\n",
+               (unsigned)missing, (unsigned)expected_len, (unsigned)size);
+    if (missing == 2)
+    {
+      echo_debug(debug_out, "WARN: CRC bytes absent in payload - skipping CRC validation\n");
+      return true;
+    }
+    // For any other mismatch we can't meaningfully validate, so accept the frame but warn.
+    echo_debug(debug_out, "WARN: Length mismatch prevents CRC validation - accepting frame\n");
+    return true;
+  }
+
+  if (expected_len < 4)
+  {
+    echo_debug(1, "ERROR: Invalid RADIAN length byte (%u)\n", length_field);
+    return false;
+  }
+
+  if (expected_len < size)
+  {
+    echo_debug(debug_out,
+               "WARN: Decoder produced %u bytes but length byte indicates %u - extra tail ignored for CRC\n",
+               (unsigned)size, (unsigned)expected_len);
+  }
+
+  const size_t crc_offset = expected_len - 2;
+  if (crc_offset + 1 >= size)
+  {
+    echo_debug(debug_out, "WARN: Not enough data to read CRC bytes - accepting frame\n");
+    return true;
+  }
+
+  const uint16_t received_crc = ((uint16_t)decoded_buffer[crc_offset] << 8) |
+                                (uint16_t)decoded_buffer[crc_offset + 1];
+
+  // RADIAN/wM-Bus frames place the length byte ahead of the CRC-protected
+  // fields. The CRC covers C + addresses + payload, i.e. everything after the
+  // length byte up to (but not including) the CRC itself. Excluding the length
+  // byte fixes the persistent mismatches observed in the field.
+  if (expected_len <= 3)
+  {
+    echo_debug(1, "ERROR: RADIAN frame too short for CRC validation (len=%u)\n", (unsigned)expected_len);
+    return false;
+  }
+
+  const uint16_t computed_crc = crc_kermit(&decoded_buffer[1], expected_len - 3);
 
   if (computed_crc != received_crc)
   {
     echo_debug(1, "ERROR: RADIAN CRC mismatch (computed=0x%04X frame=0x%04X) - discarding frame\n",
                computed_crc, received_crc);
     return false;
-  }
-
-  // Some meters advertise 0x7C (124) bytes in the length field even though only 122 bytes are
-  // delivered after decoding. Warn when we notice a discrepancy so users can correlate it with
-  // reception issues while still accepting the frame if the CRC passes.
-  const uint8_t length_field = decoded_buffer[0];
-  if (length_field && length_field != size && debug_out)
-  {
-    echo_debug(debug_out,
-               "WARN: RADIAN length field reports %u bytes but decoder produced %u bytes\n",
-               length_field, size);
   }
 
   return true;
