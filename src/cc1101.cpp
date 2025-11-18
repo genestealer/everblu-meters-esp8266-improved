@@ -647,6 +647,40 @@ uint8_t cc1101_wait_for_packet(int milliseconds)
   return TRUE;
 }
 
+static bool validate_radian_crc(const uint8_t *decoded_buffer, size_t size)
+{
+  if (size < 4)
+  {
+    echo_debug(1, "ERROR: Decoded frame too small for CRC validation (size=%u)\n", size);
+    return false;
+  }
+
+  // The last two bytes of the decoded payload hold the CRC16/KERMIT in big-endian form.
+  const uint16_t received_crc = ((uint16_t)decoded_buffer[size - 2] << 8) |
+                                (uint16_t)decoded_buffer[size - 1];
+  const uint16_t computed_crc = crc_kermit(decoded_buffer, size - 2);
+
+  if (computed_crc != received_crc)
+  {
+    echo_debug(1, "ERROR: RADIAN CRC mismatch (computed=0x%04X frame=0x%04X) - discarding frame\n",
+               computed_crc, received_crc);
+    return false;
+  }
+
+  // Some meters advertise 0x7C (124) bytes in the length field even though only 122 bytes are
+  // delivered after decoding. Warn when we notice a discrepancy so users can correlate it with
+  // reception issues while still accepting the frame if the CRC passes.
+  const uint8_t length_field = decoded_buffer[0];
+  if (length_field && length_field != size && debug_out)
+  {
+    echo_debug(debug_out,
+               "WARN: RADIAN length field reports %u bytes but decoder produced %u bytes\n",
+               length_field, size);
+  }
+
+  return true;
+}
+
 struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
 {
   struct tmeter_data data;
@@ -1331,7 +1365,15 @@ struct tmeter_data get_meter_data(void)
       echo_debug(debug_out, "> Decoded meter data size = %d\n", meter_data_size);
       show_in_hex_one_line(meter_data, meter_data_size);
     }
-    sdata = parse_meter_report(meter_data, meter_data_size);
+
+    if (validate_radian_crc(meter_data, meter_data_size))
+    {
+      sdata = parse_meter_report(meter_data, meter_data_size);
+    }
+    else
+    {
+      meter_data_size = 0;
+    }
   }
   else
   {
