@@ -339,10 +339,3 @@ bool isValidReadingSchedule(const char *schedule)
 	return false;
 }
 
-bool validateConfiguration()
-{
-	// Placeholder for future configuration validation logic.
-	// For now, always return true so tests can link and focus on
-	// isValidReadingSchedule behavior.
-	return true;
-}
