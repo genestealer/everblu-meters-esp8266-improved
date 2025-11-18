@@ -39,6 +39,7 @@ Supported meters:
 - MQTT integration for Home Assistant with AutoDiscovery.
 - Automatic CC1101 frequency calibration with manual fallback.
 - Wi-Fi diagnostics and OTA updates.
+- Built-in CRC-16/KERMIT verification to discard corrupted RADIAN frames before publishing data.
 - Reading Schedule Configuration: Configure the days when the meter should be queried (e.g., Monday-Friday, Monday-Saturday, or Monday-Sunday).
 - Daily scheduled meter readings.
 
@@ -97,6 +98,10 @@ Pin wiring for the [Wemos D1 Mini](https://www.wemos.cc/en/latest/d1/index.html)
 - **Wemos D1 Mini Labels:** The Wemos board uses "D" labels (D1, D5, D6, etc.) which correspond to specific GPIO numbers. See the table above for the mapping.
 - **HUZZAH Pinout:** The Adafruit HUZZAH uses GPIO numbers directly on the silkscreen (no "D" labels). The table shows the corresponding GPIO numbers.
 - **ESP32 DevKit:** Most ESP32 DevKit boards use standard hardware SPI pins (SCK=18, MISO=19, MOSI=23, CS=5). The silkscreen typically labels these with their function names.
+
+#### Regulatory Notes
+
+The EU declaration of conformity for the Cyble RF family (Cyble NRF, Cyble NRF HT, Cyble OMS wM-Bus 434) specifies operation in the 434 MHz ISM band with ≤ 10 mW radiated power. The CC1101 settings used in this project stay within that envelope, but ensure your antenna choice and deployment follow local regulations.
 
 #### Quick Reference: Wemos D1 Mini
 
