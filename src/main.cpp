@@ -102,6 +102,12 @@ static const unsigned long OFFLINE_LED_BLINK_MS = 500UL;
 #define AUTO_ALIGN_USE_MIDPOINT 1
 #endif
 
+// Control whether the firmware performs the wide-band auto scan on first boot
+// 1 = enabled (default), 0 = disabled
+#ifndef AUTO_SCAN_ENABLED
+#define AUTO_SCAN_ENABLED 1
+#endif
+
 // Resolved reading time (UTC) which may be updated dynamically after a successful read
 // Resolved reading time:
 // - UTC fields: scheduled time in UTC
@@ -134,7 +140,7 @@ const char *lastErrorMessage = "None";
 #define FREQ_OFFSET_ADDR 0
 #define FREQ_OFFSET_MAGIC 0xABCD // Magic number to verify valid data
 float storedFrequencyOffset = 0.0;
-bool autoScanEnabled = true;        // Enable automatic scan on first boot if no offset found
+bool autoScanEnabled = (AUTO_SCAN_ENABLED != 0); // Enable automatic scan on first boot if no offset found
 int successfulReadsBeforeAdapt = 0; // Track successful reads for adaptive tuning
 float cumulativeFreqError = 0.0;    // Accumulate FREQEST readings for adaptive adjustment
 const int ADAPT_THRESHOLD = 10;     // Adapt frequency after N successful reads
@@ -2231,13 +2237,19 @@ void setup()
   // Load stored frequency offset
   storedFrequencyOffset = loadFrequencyOffset();
 
+  const bool noStoredOffset = (storedFrequencyOffset == 0.0f);
+
   // If no valid frequency offset found and auto-scan is enabled, perform wide initial scan
-  if (storedFrequencyOffset == 0.0 && autoScanEnabled)
+  if (noStoredOffset && autoScanEnabled)
   {
     Serial.println("> No stored frequency offset found. Performing wide initial scan...");
     performWideInitialScan();
     // Reload the frequency offset after scan
     storedFrequencyOffset = loadFrequencyOffset();
+  }
+  else if (noStoredOffset)
+  {
+    Serial.println("> AUTO_SCAN_ENABLED=0; skipping automatic frequency scan (offset remains 0.0 MHz).");
   }
 
   // Increase the max packet size to handle large MQTT payloads

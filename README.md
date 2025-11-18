@@ -252,12 +252,13 @@ You can view the build and quality status at the top of this README or in the [A
   - OTA upload is configured only under `env:huzzah` by default. For ESP32, use serial upload unless you add OTA settings for your device’s IP.
 
 4. **Perform Frequency Discovery (First-Time Setup)**  
-  - Open `private.h` and set `SCAN_FREQUENCY_433MHZ` to `1` to enable frequency discovery.  
+  - On the very first boot (or anytime there is no stored frequency offset), the firmware automatically launches a wide scan while `AUTO_SCAN_ENABLED` is set to `1` (default).  
+  - If you need to skip the scan during development (for example, when you already know the meter's frequency), add `#define AUTO_SCAN_ENABLED 0` to your `include/private.h`.  
   - Compile and upload the code to your ESP device using PlatformIO. Use **PlatformIO > Upload and Monitor**.  
   - **Keep the device connected to your computer during this process.** The serial monitor will display debug output as the device scans frequencies in the 433 MHz range.  
   - **Important**: During the initial scan (first boot with no stored frequency offset), the device performs a wide frequency scan that takes approximately 2 minutes **before** connecting to MQTT. You will see no MQTT/Home Assistant activity during this time - this is normal. Monitor the serial output to see the scan progress. Once the scan completes and the optimal frequency is found, the device will connect to MQTT and publish telemetry data.
   - Once the correct frequency is identified, update the `FREQUENCY` value in `private.h` if needed (the automatic scan stores the offset, so manual adjustment is usually not required).  
-  - Disable frequency discovery by setting `SCAN_FREQUENCY_433MHZ` back to `0` in `private.h` if you want to skip the initial scan on future reboots.  
+  - To re-run the wide scan later, either set `CLEAR_EEPROM_ON_BOOT` to `1` for a single boot cycle or re-enable `AUTO_SCAN_ENABLED`.  
   - For best results, perform this step during local business hours when the meter is most likely to transmit. Refer to the "Frequency Adjustment" section below for additional guidance.
 
 5. **Compile and Flash the Code**  
@@ -354,7 +355,7 @@ In your `private.h`:
 ```
 
 To find your meter's exact frequency, you can:
-1. Use the frequency scanning mode (set `SCAN_FREQUENCY_433MHZ` to `1`) during initial setup
+1. Allow the automatic wide scan to run on the first boot (`AUTO_SCAN_ENABLED` defaults to `1`, and clearing EEPROM will force it to run again when needed)
 2. Use an RTL-SDR to measure the frequency while a utility reader is polling your meter
 3. Start with the default 433.82 MHz and adjust slightly if needed (typically ±0.01 MHz)
 

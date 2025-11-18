@@ -53,6 +53,10 @@
 // The firmware will automatically perform a wide frequency scan and save the optimal frequency.
 #define CLEAR_EEPROM_ON_BOOT 0
 
+// Optional: disable the automatic wide frequency scan when no offset is stored.
+// Leave enabled (default) for the very first boot so the firmware can discover your meter.
+// #define AUTO_SCAN_ENABLED 0
+
 // CC1101 GDO0 (data ready) pin connected to your MCU. Choose a valid GPIO for your board.
 // Examples:
 //  - ESP8266 HUZZAH / D1 mini: GPIO5 (D1)
