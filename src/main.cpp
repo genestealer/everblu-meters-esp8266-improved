@@ -238,8 +238,8 @@ EspMQTTClient mqtt(
 
 // Base MQTT topic prefix for all EverBlu Cyble entities
 // Centralising this avoids repeating "everblu/cyble/" all over the code.
-// MQTT_BASE_TOPIC is now dynamically set in mqttBaseTopic based on METER_SERIAL
-// See global variable mqttBaseTopic initialized in setup()
+// mqttBaseTopic is initialized at global scope using compile-time string
+// concatenation with METER_SERIAL (via TOSTRING) and is only printed in setup().
 
 const char jsonTemplate[] = "{ "
                             "\"liters\": %d, "
