@@ -71,6 +71,11 @@ static const unsigned long OFFLINE_LED_BLINK_MS = 500UL;
 #define ENABLE_WIFI_PHY_MODE_11G 0 // Set to 1 to enable 11G PHY mode
 #endif
 
+// Define MQTT debugging if missing from the private.h file
+#ifndef ENABLE_MQTT_DEBUGGING
+#define ENABLE_MQTT_DEBUGGING 0 // Set to 1 to enable MQTT debugging messages
+#endif
+
 // Define the default reading schedule if missing from the private.h file.
 // Options: "Monday-Friday", "Monday-Saturday", or "Monday-Sunday"
 #ifndef DEFAULT_READING_SCHEDULE
@@ -252,10 +257,14 @@ const unsigned long RETRY_COOLDOWN = 3600000; // 1 hour cooldown in milliseconds
 const char *readingSchedule = DEFAULT_READING_SCHEDULE;
 
 // Helper variables for generating serial-prefixed MQTT topics and entity IDs
-// These are set once during setup() and reused throughout the code.
-char meterSerialStr[16];      // String representation of METER_SERIAL
-char mqttBaseTopic[64];       // Base MQTT topic: everblu/cyble/{serial}
-char mqttDiscoveryPrefix[64]; // Discovery prefix: homeassistant/{type}/{serial}_{entity}
+// These must be initialized before EspMQTTClient is constructed (for LWT topic)
+// Format: everblu/cyble/{METER_SERIAL}
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+char meterSerialStr[16] = TOSTRING(METER_SERIAL);                          // String representation of METER_SERIAL
+char mqttBaseTopic[64] = "everblu/cyble/" TOSTRING(METER_SERIAL);          // Base MQTT topic
+char mqttLwtTopic[80] = "everblu/cyble/" TOSTRING(METER_SERIAL) "/status"; // LWT status topic with serial number
+char mqttDiscoveryPrefix[64];                                              // Discovery prefix: homeassistant/{type}/{serial}_{entity}
 
 // ============================================================================
 // Schedule Validation API
@@ -942,10 +951,10 @@ void publishWifiDetails()
   snprintf(topicBuffer, sizeof(topicBuffer), "%s/mac_address", mqttBaseTopic);
   mqtt.publish(topicBuffer, macAddress, true);
   delay(5);
-  snprintf(topicBuffer, sizeof(topicBuffer), "%s/ssid", mqttBaseTopic);
+  snprintf(topicBuffer, sizeof(topicBuffer), "%s/wifi_ssid", mqttBaseTopic);
   mqtt.publish(topicBuffer, wifiSSID, true);
   delay(5);
-  snprintf(topicBuffer, sizeof(topicBuffer), "%s/bssid", mqttBaseTopic);
+  snprintf(topicBuffer, sizeof(topicBuffer), "%s/wifi_bssid", mqttBaseTopic);
   mqtt.publish(topicBuffer, wifiBSSID, true);
   delay(5);
   snprintf(topicBuffer, sizeof(topicBuffer), "%s/status", mqttBaseTopic);
@@ -1031,18 +1040,18 @@ void publishHADiscovery()
   publishDiscovery("sensor", "water_meter_timestamp", json);
 
   // Request Reading Button
-  json = "{\\n";
-  json += "  \"name\": \"Request Reading Now\",\\n";
-  json += "  \"uniq_id\": \"" + String(METER_SERIAL) + "_water_meter_request\",\\n";
-  json += "  \"obj_id\": \"" + String(METER_SERIAL) + "_water_meter_request\",\\n";
-  json += "  \"qos\": 0,\\n";
-  json += "  \"avty_t\": \"" + String(mqttBaseTopic) + "/status\",\\n";
-  json += "  \"cmd_t\": \"" + String(mqttBaseTopic) + "/trigger_force\",\\n";
-  json += "  \"pl_avail\": \"online\",\\n";
-  json += "  \"pl_not_avail\": \"offline\",\\n";
-  json += "  \"pl_prs\": \"update\",\\n";
-  json += "  \"frc_upd\": true,\\n";
-  json += "  \"dev\": {\\n    " + buildDeviceJson() + "\\n  }\\n";
+  json = "{\n";
+  json += "  \"name\": \"Request Reading Now\",\n";
+  json += "  \"uniq_id\": \"" + String(METER_SERIAL) + "_water_meter_request\",\n";
+  json += "  \"obj_id\": \"" + String(METER_SERIAL) + "_water_meter_request\",\n";
+  json += "  \"qos\": 0,\n";
+  json += "  \"avty_t\": \"" + String(mqttBaseTopic) + "/status\",\n";
+  json += "  \"cmd_t\": \"" + String(mqttBaseTopic) + "/trigger_force\",\n";
+  json += "  \"pl_avail\": \"online\",\n";
+  json += "  \"pl_not_avail\": \"offline\",\n";
+  json += "  \"pl_prs\": \"update\",\n";
+  json += "  \"frc_upd\": true,\n";
+  json += "  \"dev\": {\n    " + buildDeviceJson() + "\n  }\n";
   json += "}";
   publishDiscovery("button", "water_meter_request", json);
 
@@ -1072,45 +1081,45 @@ void publishHADiscovery()
   publishDiscovery("sensor", "water_meter_freq_offset", buildDiscoveryJson("Frequency Offset", "frequency_offset", "mdi:sine-wave", "kHz", nullptr, nullptr, "diagnostic"));
 
   // Buttons
-  json = "{\\n";
-  json += "  \"name\": \"Restart Device\",\\n";
-  json += "  \"uniq_id\": \"" + String(METER_SERIAL) + "_water_meter_restart\",\\n";
-  json += "  \"obj_id\": \"" + String(METER_SERIAL) + "_water_meter_restart\",\\n";
-  json += "  \"qos\": 0,\\n";
-  json += "  \"avty_t\": \"" + String(mqttBaseTopic) + "/status\",\\n";
-  json += "  \"cmd_t\": \"" + String(mqttBaseTopic) + "/restart\",\\n";
-  json += "  \"pl_prs\": \"restart\",\\n";
-  json += "  \"ent_cat\": \"config\",\\n";
-  json += "  \"dev\": {\\n    " + buildDeviceJson() + "\\n  }\\n";
+  json = "{\n";
+  json += "  \"name\": \"Restart Device\",\n";
+  json += "  \"uniq_id\": \"" + String(METER_SERIAL) + "_water_meter_restart\",\n";
+  json += "  \"obj_id\": \"" + String(METER_SERIAL) + "_water_meter_restart\",\n";
+  json += "  \"qos\": 0,\n";
+  json += "  \"avty_t\": \"" + String(mqttBaseTopic) + "/status\",\n";
+  json += "  \"cmd_t\": \"" + String(mqttBaseTopic) + "/restart\",\n";
+  json += "  \"pl_prs\": \"restart\",\n";
+  json += "  \"ent_cat\": \"config\",\n";
+  json += "  \"dev\": {\n    " + buildDeviceJson() + "\n  }\n";
   json += "}";
   publishDiscovery("button", "water_meter_restart", json);
 
-  json = "{\\n";
-  json += "  \"name\": \"Scan Frequency\",\\n";
-  json += "  \"uniq_id\": \"" + String(METER_SERIAL) + "_water_meter_freq_scan\",\\n";
-  json += "  \"obj_id\": \"" + String(METER_SERIAL) + "_water_meter_freq_scan\",\\n";
-  json += "  \"ic\": \"mdi:magnify-scan\",\\n";
-  json += "  \"qos\": 0,\\n";
-  json += "  \"avty_t\": \"" + String(mqttBaseTopic) + "/status\",\\n";
-  json += "  \"cmd_t\": \"" + String(mqttBaseTopic) + "/frequency_scan\",\\n";
-  json += "  \"pl_prs\": \"scan\",\\n";
-  json += "  \"ent_cat\": \"config\",\\n";
-  json += "  \"dev\": {\\n    " + buildDeviceJson() + "\\n  }\\n";
+  json = "{\n";
+  json += "  \"name\": \"Scan Frequency\",\n";
+  json += "  \"uniq_id\": \"" + String(METER_SERIAL) + "_water_meter_freq_scan\",\n";
+  json += "  \"obj_id\": \"" + String(METER_SERIAL) + "_water_meter_freq_scan\",\n";
+  json += "  \"ic\": \"mdi:magnify-scan\",\n";
+  json += "  \"qos\": 0,\n";
+  json += "  \"avty_t\": \"" + String(mqttBaseTopic) + "/status\",\n";
+  json += "  \"cmd_t\": \"" + String(mqttBaseTopic) + "/frequency_scan\",\n";
+  json += "  \"pl_prs\": \"scan\",\n";
+  json += "  \"ent_cat\": \"config\",\n";
+  json += "  \"dev\": {\n    " + buildDeviceJson() + "\n  }\n";
   json += "}";
   publishDiscovery("button", "water_meter_freq_scan", json);
 
   // Binary sensor for active reading
-  json = "{\\n";
-  json += "  \"name\": \"Active Reading\",\\n";
-  json += "  \"uniq_id\": \"" + String(METER_SERIAL) + "_water_meter_active_reading\",\\n";
-  json += "  \"obj_id\": \"" + String(METER_SERIAL) + "_water_meter_active_reading\",\\n";
-  json += "  \"dev_cla\": \"running\",\\n";
-  json += "  \"qos\": 0,\\n";
-  json += "  \"avty_t\": \"" + String(mqttBaseTopic) + "/status\",\\n";
-  json += "  \"stat_t\": \"" + String(mqttBaseTopic) + "/active_reading\",\\n";
-  json += "  \"pl_on\": \"true\",\\n";
-  json += "  \"pl_off\": \"false\",\\n";
-  json += "  \"dev\": {\\n    " + buildDeviceJson() + "\\n  }\\n";
+  json = "{\n";
+  json += "  \"name\": \"Active Reading\",\n";
+  json += "  \"uniq_id\": \"" + String(METER_SERIAL) + "_water_meter_active_reading\",\n";
+  json += "  \"obj_id\": \"" + String(METER_SERIAL) + "_water_meter_active_reading\",\n";
+  json += "  \"dev_cla\": \"running\",\n";
+  json += "  \"qos\": 0,\n";
+  json += "  \"avty_t\": \"" + String(mqttBaseTopic) + "/status\",\n";
+  json += "  \"stat_t\": \"" + String(mqttBaseTopic) + "/active_reading\",\n";
+  json += "  \"pl_on\": \"true\",\n";
+  json += "  \"pl_off\": \"false\",\n";
+  json += "  \"dev\": {\n    " + buildDeviceJson() + "\n  }\n";
   json += "}";
   publishDiscovery("binary_sensor", "water_meter_active_reading", json);
 
@@ -1785,10 +1794,11 @@ void setup()
 
   Serial.println("✓ Configuration valid - proceeding with initialization\n");
 
-  // Initialize MQTT topic strings with METER_SERIAL
-  snprintf(meterSerialStr, sizeof(meterSerialStr), "%lu", (unsigned long)METER_SERIAL);
-  snprintf(mqttBaseTopic, sizeof(mqttBaseTopic), "everblu/cyble/%lu", (unsigned long)METER_SERIAL);
+  // Note: mqttBaseTopic and meterSerialStr are initialized at global scope
+  // to ensure they're ready when EspMQTTClient constructor runs
   Serial.printf("> MQTT base topic: %s\n", mqttBaseTopic);
+  Serial.printf("> Meter serial string: %s\n", meterSerialStr);
+  Serial.printf("> mqttBaseTopic length: %d\n", strlen(mqttBaseTopic));
 
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW); // turned on to start with
@@ -1833,9 +1843,8 @@ void setup()
   mqtt.setMaxPacketSize(2048); // Set to a size larger than your longest payload
 
   // Set the Last Will and Testament (LWT) with serial-specific topic
-  char lwtTopic[80];
-  snprintf(lwtTopic, sizeof(lwtTopic), "%s/status", mqttBaseTopic);
-  mqtt.enableLastWillMessage(lwtTopic, "offline", true); // You can activate the retain flag by setting the third parameter to true
+  // Note: mqttLwtTopic is initialized at global scope to ensure it's ready before MQTT client connects
+  mqtt.enableLastWillMessage(mqttLwtTopic, "offline", true); // You can activate the retain flag by setting the third parameter to true
 
   // Make reconnection attempts faster and deterministic
   mqtt.setWifiReconnectionAttemptDelay(15000); // try every 15s
@@ -1867,7 +1876,10 @@ void setup()
 #endif
 
   // Optional functionalities of EspMQTTClient
-  // mqtt.enableDebuggingMessages(true); // Enable debugging messages sent to serial output
+#if ENABLE_MQTT_DEBUGGING
+  mqtt.enableDebuggingMessages(true); // Enable debugging messages sent to serial output
+  Serial.println(">> MQTT debugging enabled");
+#endif
 
   // Set CC1101 radio frequency with automatic calibration
   Serial.println("> Initializing CC1101 radio...");
