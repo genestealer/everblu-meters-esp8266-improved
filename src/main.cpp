@@ -1022,11 +1022,24 @@ void publishHADiscovery()
   };
 
   // Reading (Total) - Main water sensor
-  json = buildDiscoveryJson("Reading (Total)", "water_meter_value", "mdi:water", "L", "water", "total_increasing", nullptr);
-  json.replace("\"stat_t\":", "\"stat_t\": \"" + String(mqttBaseTopic) + "/liters\",\n  \"json_attr_t\":");
-  json.replace("\"json_attr_t\":", "\"json_attr_t\": \"" + String(mqttBaseTopic) + "/liters_attributes\",\n  \"sug_dsp_prc\":");
-  json.replace("\"sug_dsp_prc\":", "\"sug_dsp_prc\": 0,\n  \"qos\":");
-  json.replace("\"stat_t\": \"" + String(mqttBaseTopic) + "/water_meter_value\",", "\"stat_t\": \"" + String(mqttBaseTopic) + "/liters\",");
+  Serial.println("> Publishing Water Usage sensor discovery...");
+  json = "{\n";
+  json += "  \"name\": \"Reading (Total)\",\n";
+  json += "  \"uniq_id\": \"" + String(METER_SERIAL) + "_water_meter_value\",\n";
+  json += "  \"obj_id\": \"" + String(METER_SERIAL) + "_water_meter_value\",\n";
+  json += "  \"ic\": \"mdi:water\",\n";
+  json += "  \"unit_of_meas\": \"L\",\n";
+  json += "  \"dev_cla\": \"water\",\n";
+  json += "  \"stat_cla\": \"total_increasing\",\n";
+  json += "  \"qos\": 0,\n";
+  json += "  \"avty_t\": \"" + String(mqttBaseTopic) + "/status\",\n";
+  json += "  \"stat_t\": \"" + String(mqttBaseTopic) + "/liters\",\n";
+  Serial.printf("> Water Usage state topic: %s/liters\n", mqttBaseTopic);
+  json += "  \"json_attr_t\": \"" + String(mqttBaseTopic) + "/liters_attributes\",\n";
+  json += "  \"sug_dsp_prc\": 0,\n";
+  json += "  \"frc_upd\": true,\n";
+  json += "  \"dev\": {\n    " + buildDeviceJson() + "\n  }\n";
+  json += "}";
   publishDiscovery("sensor", "water_meter_value", json);
 
   // Read Counter
