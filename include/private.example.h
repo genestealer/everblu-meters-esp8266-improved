@@ -1,14 +1,14 @@
 // WiFi credentials
-#define secret_wifi_ssid "xxxx"          // WiFi SSID (Network Name)
-#define secret_wifi_password "xxxxxxx"  // WiFi Password
+#define secret_wifi_ssid "xxxx"        // WiFi SSID (Network Name)
+#define secret_wifi_password "xxxxxxx" // WiFi Password
 
 // MQTT server configuration
 #define secret_mqtt_server "192.168.xxx.xxx" // MQTT Server IP Address
-#define secret_clientName "everbluMeters"   // MQTT Client Name
+#define secret_clientName "everbluMeters"    // MQTT Client Name
 
 // MQTT authentication
-#define secret_mqtt_username "xxxxxxxxx"        // MQTT Username
-#define secret_mqtt_password "xxxxxxxxxxxxxxx"  // MQTT Password
+#define secret_mqtt_username "xxxxxxxxx"       // MQTT Username
+#define secret_mqtt_password "xxxxxxxxxxxxxxx" // MQTT Password
 
 // NTP server for time synchronization
 #define secret_local_timeclock_server "pool.ntp.org" // NTP Server Address
@@ -40,8 +40,8 @@
 
 // Meter-specific configuration
 // Note: If FREQUENCY is omitted, the firmware defaults to 433.82 MHz (RADIAN).
-#define METER_YEAR 21        // Last two digits of the year printed on the meter (e.g., 2019 is 19)
-#define METER_SERIAL 260123  // Meter Serial Number (omit leading zero)
+#define METER_YEAR 21       // Last two digits of the year printed on the meter (e.g., 2019 is 19)
+#define METER_SERIAL 260123 // Meter Serial Number (omit leading zero)
 // #define FREQUENCY 433.820000 // Meter center frequency in MHz; defaults to 433.82 if not set
 
 // Clear EEPROM on next boot to force frequency re-discovery
@@ -62,8 +62,14 @@
 //  - ESP8266 HUZZAH / D1 mini: GPIO5 (D1)
 //  - ESP32 DevKit: GPIO4 or GPIO27 are common choices
 #define GDO0 5
+
 // Enable CC1101 / RADIAN protocol debug output printed to serial.
 // Set to 1 to enable verbose radio debug messages (helpful for frequency scanning
 // and packet debugging). Set to 0 to disable radio debug prints.
 // Copy this file to `include/private.h` and change the value as needed.
 #define DEBUG_CC1101 0
+
+// Enable MQTT debugging messages printed to serial.
+// Set to 1 to enable verbose MQTT connection and message debug output.
+// Set to 0 to disable MQTT debug messages (default).
+// #define ENABLE_MQTT_DEBUGGING 0
