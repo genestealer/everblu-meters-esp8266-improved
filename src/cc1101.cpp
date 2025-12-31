@@ -777,6 +777,13 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
       memset(&data, 0, sizeof(data));
       return data;
     }
+
+    if (data.reads_counter == 0xFF)
+    {
+      echo_debug(1, "ERROR: Invalid reads_counter value 0xFF (255) - discarding frame\n");
+      memset(&data, 0, sizeof(data));
+      return data;
+    }
   }
   else
   {
