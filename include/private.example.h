@@ -80,8 +80,8 @@
 //   - Including the suffix
 //   - Keeping leading zeros in the serial
 //
-#define METER_YEAR 23
-#define METER_SERIAL 1875247
+#define METER_YEAR xx
+#define METER_SERIAL xxxxxxx
 
 // ============================================================================
 // RADIO / CC1101 CONFIGURATION

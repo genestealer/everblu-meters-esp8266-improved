@@ -227,13 +227,13 @@ void adaptiveFrequencyTracking(int8_t freqest);
 
 // Secrets pulled from private.h file
 EspMQTTClient mqtt(
-    secret_wifi_ssid,     // Your Wifi SSID
-    secret_wifi_password, // Your WiFi key
-    secret_mqtt_server,   // MQTT Broker server ip
-    secret_mqtt_username, // MQTT Username Can be omitted if not needed
-    secret_mqtt_password, // MQTT Password Can be omitted if not needed
-    secret_clientName,    // MQTT Client name that uniquely identify your device
-    1883                  // MQTT Broker server port
+    SECRET_WIFI_SSID,      // Your Wifi SSID
+    SECRET_WIFI_PASSWORD,  // Your WiFi key
+    SECRET_MQTT_SERVER,    // MQTT Broker server ip
+    SECRET_MQTT_USERNAME,  // MQTT Username Can be omitted if not needed
+    SECRET_MQTT_PASSWORD,  // MQTT Password Can be omitted if not needed
+    SECRET_MQTT_CLIENT_ID, // MQTT Client name that uniquely identify your device
+    1883                   // MQTT Broker server port
 );
 
 // Base MQTT topic prefix for all EverBlu Cyble entities
@@ -1205,7 +1205,7 @@ void onConnectionEstablished()
 
   Serial.println("> Configure time from NTP server. Please wait...");
   // Note, my VLAN has no WAN/internet, so I am useing Home Assistant Community Add-on: chrony to proxy the time
-  configTzTime("UTC0", secret_local_timeclock_server);
+  configTzTime("UTC0", SECRET_NTP_SERVER);
 
   delay(5000); // Give it a moment for the time to sync the print out the time
   time_t tnow = time(nullptr);
@@ -2096,7 +2096,7 @@ void loop()
     if (g_lastConnLogMs == 0 || millis() - g_lastConnLogMs > 5000)
     {
       wl_status_t st = WiFi.status();
-      Serial.printf("[Wi-Fi] Connecting to '%s'... (status=%d: %s)\n", secret_wifi_ssid, (int)st, wifiStatusToString(st));
+      Serial.printf("[Wi-Fi] Connecting to '%s'... (status=%d: %s)\n", SECRET_WIFI_SSID, (int)st, wifiStatusToString(st));
       g_lastConnLogMs = millis();
     }
 
@@ -2108,7 +2108,7 @@ void loop()
       WiFi.disconnect(true);
       delay(50);
       WiFi.mode(WIFI_STA);
-      WiFi.begin(secret_wifi_ssid, secret_wifi_password);
+      WiFi.begin(SECRET_WIFI_SSID, SECRET_WIFI_PASSWORD);
       g_wifiAttemptStartMs = millis();
     }
 
