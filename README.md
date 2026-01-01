@@ -251,7 +251,7 @@ You can view the build and quality status at the top of this README or in the [A
       #define METER_YEAR 23       // First part
       #define METER_SERIAL 1875247 // Middle part only
       ```
-     ![Cyble Meter Label](docs/images/meter_label.png) ![Cyble Meter Label](docs/images/meter_label_21.png)
+     ![Cyble Meter Label](docs/images/meter_label.png)
     - **Wi-Fi PHY Mode**: To enable 802.11g Wi-Fi PHY mode, set `ENABLE_WIFI_PHY_MODE_11G` to `1` in the `private.h` file. By default, it is set to `0` (disabled).
     - Radio debug: control verbose CC1101/RADIAN debug output with `DEBUG_CC1101` in `private.h`.
       - `#define DEBUG_CC1101 1` enables verbose radio debugging (default in the example file).
