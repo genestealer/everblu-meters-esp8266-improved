@@ -96,8 +96,8 @@ static const uint8_t debug_out = (uint8_t)(DEBUG_CC1101);
 #define FSCTRL1_FREQ_IF 0x08 // Intermediate frequency
 
 // MDMCFG4 - Modem Configuration
-#define MDMCFG4_RX_BW_58KHZ 0xF6         // RX filter bandwidth = 58 kHz
-#define MDMCFG4_RX_BW_58KHZ_9_6KBPS 0xF8 // RX filter bandwidth = 58 kHz, 9.6 kbps
+#define MDMCFG4_RX_BW_58KHZ 0xF6         // RX filter bandwidth = 58 kHz, 2.4 kbps
+#define MDMCFG4_RX_BW_58KHZ_9_6KBPS 0xF8 // RX filter bandwidth = 58 kHz, 9.6 kbps (4x oversampling)
 
 // MDMCFG3 - Modem Configuration (Data Rate)
 #define MDMCFG3_DRATE_2_4KBPS 0x83 // Data rate: 2.4 kbps (26M*((256+0x83)*2^6)/2^28)
@@ -984,18 +984,18 @@ uint8_t decode_4bitpbit_serial(uint8_t *rxBuffer, int l_total_byte, uint8_t *dec
       if ((current_Rx_Byte & 0x80) == bit_pol)
         bit_cnt++;
       else if (bit_cnt == 1)
-      {                                   // previous bit was a glich so bit has not really change
+      {                                   // previous bit was a glitch so bit has not really changed
         bit_pol = current_Rx_Byte & 0x80; // restore correct bit polarity
         bit_cnt = bit_cnt_flush_S8 + 1;   // hope that previous bit was correctly decoded
       }
       else
-      { // bit polarity has change
+      { // bit polarity has changed
         bit_cnt_flush_S8 = bit_cnt;
         bit_cnt = (bit_cnt + 2) / 4;
         bit_cnt_flush_S8 = bit_cnt_flush_S8 - (bit_cnt * 4);
 
         for (k = 0; k < bit_cnt; k++)
-        { // insert the number of decoded bit
+        { // insert the number of decoded bits
           if (dest_bit_cnt < 8)
           { // if data byte
             // Bounds check before writing to buffer
@@ -1081,12 +1081,68 @@ uint8_t decode_4bitpbit_serial(uint8_t *rxBuffer, int l_total_byte, uint8_t *dec
    - Uses standard data rate (2.4 kbps) for reliable sync detection
    - Waits for GDO0 pin to go high (indicates sync word detected)
 
-   Stage 2: Frame Start and Data Reception (9.6 kbps)
-   ---------------------------------------------------
+   Stage 2: Frame Start and Data Reception (9.6 kbps with 4x oversampling)
+   -----------------------------------------------------------------------
    - Reconfigures CC1101 to detect 0xFFF0 (11111111 11110000)
    - This pattern marks the end of sync and the start bit of the first data byte
-   - Switches to 4x data rate (9.6 kbps) to capture 4-bit-per-bit oversampling
+   - Switches to 4x data rate (9.6 kbps) to capture multiple samples per bit
    - Receives the full frame into the buffer
+   - Uses decode_4bitpbit_serial() to extract actual data from oversampled stream
+
+   Why 4x Oversampling (9.6 kbps for 2.4 kbps data)?
+   ================================================
+   The meter officially transmits at 2400 baud, but the actual demodulation requires
+   4x oversampling for several critical reasons:
+
+   1. BIT BOUNDARY IDENTIFICATION
+      - At 2400 baud with 26MHz crystal, each bit is ~10,800 clock cycles
+      - Phase errors and jitter can cause misalignment
+      - 4x oversampling provides 4 decision points per bit
+      - Decoder can interpolate correct bit boundaries
+
+   2. NOISE AND INTERFERENCE IMMUNITY
+      - 433.82 MHz ISM band has other devices (fencing, doorbells, etc.)
+      - 4 samples per bit allow voting/filtering logic
+      - Reduces false edge detection from RF noise
+      - Improves packet error rate significantly
+
+   3. FREQUENCY OFFSET TOLERANCE
+      - Meter oscillator may have ±50 ppm tolerance
+      - With 2400 baud: Each bit ~417 µs, offset could be ±20 µs per bit
+      - 4x oversampling: Each sample ~104 µs, 20 µs offset is manageable
+      - Decoder can track frequency drift across the frame
+
+   4. PHASE ALIGNMENT
+      - Multiple clock domains (ESP8266 26MHz vs meter oscillator)
+      - Phase differences accumulate over ~1000+ bit frame
+      - Extra samples allow locking to true bit edges
+      - Prevents cumulative timing errors
+
+   EMPIRICAL VALIDATION (January 1, 2026)
+   ======================================
+   Dredzik suggested removing 4x oversampling (native 2.4 kbps RX throughout).
+   Test result: FAILED - Sync detected but frame reception timed out on all 5 attempts.
+
+   Conclusion: 4x oversampling is NOT redundant optimization—it is essential.
+   See docs/DREDZIK_IMPROVEMENTS_TEST_RESULTS.md for complete test details.
+
+   Technical Details:
+   - MDMCFG4 register controls both RX bandwidth (58 kHz) and effective data rate
+   - MDMCFG3 nominally labeled "2.4 kbps" but actual rate set by MDMCFG4 value
+   - decode_4bitpbit_serial() expects 4 FSK/samples per original data bit
+   - Changing to 2.4 kbps RX breaks the ratio needed for proper decoding
+
+   Meter Hardware Details:
+   - Device: Itron EverBlu Cyble Enhanced
+   - Serial: 2020-0257750
+   - Frequency: 433.82 MHz ±0.05 ppm
+   - Modulation: 2-FSK with 5 kHz shift
+   - Preamble: 0x55 repeated (01010101...)
+   - Sync: 0x5550 (stage 1) → 0xFFF0 (stage 2)
+
+   References:
+   - Datasheet: docs/datasheets/water_counter_wiki_maison_simon.md
+   - Test Results: docs/DREDZIK_IMPROVEMENTS_TEST_RESULTS.md (Improvement #4)
 
    Parameters:
    - size_byte: Expected size of the decoded frame (before serial encoding)
@@ -1099,7 +1155,7 @@ uint8_t decode_4bitpbit_serial(uint8_t *rxBuffer, int l_total_byte, uint8_t *dec
    - 0 if timeout or reception failed
 
    Note: The received data is 4x larger than the decoded size due to oversampling
-         and needs to be processed by decode_4bitpbit_serial() to extract actual data.
+   and needs to be processed by decode_4bitpbit_serial() to extract actual data.
 */
 int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rxBuffer_size)
 {
@@ -1173,11 +1229,42 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
   echo_debug(debug_out, " rssi=%u lqi=%u F_est=%u \n", l_Rssi_dbm, l_lqi, l_freq_est);
 
   fflush(stdout);
+
+  // ========== CRITICAL BAUD RATE EXPLANATION ==========
+  // The Itron EverBlu Cyble meter officially transmits at 2400 baud.
+  // However, the actual implementation requires 4x oversampling (9600 baud RX)
+  // for reliable frame reception. This was empirically validated on 2026-01-01.
+  //
+  // Why is oversampling necessary?
+  // 1. Timing Margin: Provides buffer for bit boundary identification
+  // 2. Noise Immunity: Multiple samples per bit enable RF noise filtering
+  // 3. Frequency Tolerance: Compensates for oscillator drift/frequency offset
+  // 4. Phase Alignment: Helps lock to actual bit edges despite jitter
+  //
+  // IMPORTANT: 8x Oversampling Does NOT Help
+  // =========================================
+  // Attempted 8x oversampling (19.2 kbps) on 2026-01-01, but it made results WORSE.
+  // Reason: The meter transmits with 4x-oversampled encoding built-in.
+  // When RX rate is 8x, we over-sample the already 4x-encoded bits,
+  // causing bit boundary detection to fail (misaligned by 2x).
+  //
+  // This is a fundamental limitation: You can't improve 4x-encoded data
+  // by sampling faster - the encoding format itself is fixed by the meter.
+  // Better approaches to improve frame quality:
+  // - Wider RX bandwidth (tradeoff: more noise)
+  // - Better sync detection/alignment logic
+  // - Improved error correction in decode_4bitpbit_serial()
+  // - Adaptive frequency tracking (already implemented)
+  // - Multiple consecutive reads with voting
+  //
+  // See: docs/DREDZIK_IMPROVEMENTS_TEST_RESULTS.md for full details
+  // =================================================================
+
   halRfWriteReg(SYNC1, SYNC1_PATTERN_FF);              // Sync word MSB: 0xFF
-  halRfWriteReg(SYNC0, SYNC0_PATTERN_F0);              // Sync word LSB: 0xF0 (frame start)
-  halRfWriteReg(MDMCFG4, MDMCFG4_RX_BW_58KHZ_9_6KBPS); // RX BW: 58 kHz, 9.6 kbps
-  halRfWriteReg(MDMCFG3, MDMCFG3_DRATE_2_4KBPS);       // Data rate config (9.6 kbps with MDMCFG4)
-  halRfWriteReg(PKTCTRL0, PKTCTRL0_INFINITE_LENGTH);   // Infinite packet length
+  halRfWriteReg(SYNC0, SYNC0_PATTERN_F0);              // Sync word LSB: 0xF0 (frame start marker)
+  halRfWriteReg(MDMCFG4, MDMCFG4_RX_BW_58KHZ_9_6KBPS); // RX BW: 58 kHz with 9.6 kbps rate (4x oversampling)
+  halRfWriteReg(MDMCFG3, MDMCFG3_DRATE_2_4KBPS);       // Data rate label (controlled by MDMCFG4)
+  halRfWriteReg(PKTCTRL0, PKTCTRL0_INFINITE_LENGTH);   // Infinite packet length for variable-size frames
   CC1101_CMD(SFRX);
   cc1101_rec_mode();
 

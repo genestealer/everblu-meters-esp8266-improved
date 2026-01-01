@@ -72,4 +72,4 @@
 // Enable MQTT debugging messages printed to serial.
 // Set to 1 to enable verbose MQTT connection and message debug output.
 // Set to 0 to disable MQTT debug messages (default).
-// #define ENABLE_MQTT_DEBUGGING 0
+#define ENABLE_MQTT_DEBUGGING 0
