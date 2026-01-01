@@ -655,7 +655,7 @@ void onUpdateData()
     {
       currentMonthUsage = currentLiters - meter_data.history[num_history - 1];
     }
-    Serial.printf("  Now  %10d  %9u (current month)\n", meter_data.liters, currentMonthUsage);
+    Serial.printf("  Now  %10d  %9u (current month usage: %u L)\n", meter_data.liters, currentMonthUsage);
     Serial.println("===================================\n");
 
     // Add monthly usage calculations to JSON
@@ -1752,7 +1752,7 @@ bool validateConfiguration()
     if (METER_YEAR >= 2000 && METER_YEAR <= 2099)
     {
       Serial.printf("ERROR: METER_YEAR=%d appears to be a 4-digit year\n", METER_YEAR);
-      Serial.printf("       Use the first part of serial only: %d (not %d)\n", METER_YEAR - 2000, METER_YEAR);
+      Serial.printf("       Use 2-digit year format: %d (not %d)\n", METER_YEAR - 2000, METER_YEAR);
       Serial.println("       Example: Serial '23-1875247-234' → use 23");
     }
     else
@@ -1763,9 +1763,9 @@ bool validateConfiguration()
   }
   else if (METER_YEAR < 10)
   {
-    Serial.printf("WARNING: METER_YEAR=%d seems unusually old (200%d)\n", METER_YEAR, METER_YEAR);
-    Serial.printf("         If your serial starts with %02d, this is correct.\n", METER_YEAR);
-    Serial.printf("✓ METER_YEAR: %d (20%02d)\n", METER_YEAR, METER_YEAR);
+    Serial.printf("⚠ METER_YEAR: %d (20%02d) - unusually old meter\n", METER_YEAR, METER_YEAR);
+    Serial.printf("  If your serial starts with %02d, this is correct.\n", METER_YEAR);
+    Serial.println("  Otherwise, check for missing leading zero in private.h");
   }
   else
   {
@@ -1793,7 +1793,7 @@ bool validateConfiguration()
   {
     Serial.printf("WARNING: METER_SERIAL=%lu is very short (<2 digits)\n", (unsigned long)METER_SERIAL);
     Serial.println("         Double-check you entered the complete middle part");
-    Serial.printf("✓ METER_SERIAL: %lu\n", (unsigned long)METER_SERIAL);
+    Serial.printf("⚠ METER_SERIAL: %lu\n", (unsigned long)METER_SERIAL);
   }
   else if (METER_SERIAL < 1000UL) // Possibly correct if serial had leading zeros
   {
@@ -1915,8 +1915,8 @@ void setup()
   EEPROM.begin(EEPROM_SIZE);
   Serial.println("> EEPROM initialized");
 
-// Clear EEPROM if requested (set CLEAR_EEPROM_ON_BOOT=1 in private.h)
-// Use this when replacing ESP board, CC1101 module, or moving to a different meter
+  // Clear EEPROM if requested (set CLEAR_EEPROM_ON_BOOT=1 in private.h)
+  // Use this when replacing ESP board, CC1101 module, or moving to a different meter
 #if CLEAR_EEPROM_ON_BOOT
   Serial.println("> CLEARING EEPROM (CLEAR_EEPROM_ON_BOOT = 1)...");
   for (int i = 0; i < EEPROM_SIZE; i++)
