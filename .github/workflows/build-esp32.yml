@@ -2,9 +2,9 @@ name: ESP32 Build
 
 on:
   push:
-    branches: [ main, master, develop, automatic-calibration ]
+    branches: [main, master, develop, automatic-calibration]
   pull_request:
-    branches: [ main, master, develop ]
+    branches: [main, master, develop]
   workflow_dispatch:
 
 permissions:
@@ -18,55 +18,61 @@ jobs:
         environment:
           - name: esp32dev
             board: ESP32 DevKit
-    
+
     name: Build ${{ matrix.environment.board }}
-    
+
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Cache pip
-      uses: actions/cache@v4
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
-    
-    - name: Cache PlatformIO
-      uses: actions/cache@v4
-      with:
-        path: ~/.platformio
-        key: ${{ runner.os }}-pio-esp32-${{ hashFiles('**/platformio.ini') }}
-        restore-keys: |
-          ${{ runner.os }}-pio-esp32-
-    
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-    
-    - name: Install PlatformIO
-      run: |
-        python -m pip install --upgrade pip
-        pip install --upgrade platformio
-    
-    - name: Install intelhex (required for ESP32 esptool)
-      run: |
-        pip install intelhex
-    
-    - name: Create private.h from example if missing
-      run: |
-        if [ ! -f include/private.h ]; then
-          cp include/private.example.h include/private.h
-          echo "Created private.h from private.example.h"
-        fi
-    
-    - name: Build PlatformIO Project (${{ matrix.environment.board }})
-      run: pio run -e ${{ matrix.environment.name }}
-    
-    - name: Upload firmware artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: firmware-esp32-${{ matrix.environment.name }}
-        path: .pio/build/${{ matrix.environment.name }}/firmware.*
-        retention-days: 30
+      - uses: actions/checkout@v4
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: ${{ runner.os }}-pio-esp32-${{ hashFiles('**/platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-esp32-
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install PlatformIO
+        run: |
+          python -m pip install --upgrade pip
+          pip install --upgrade platformio
+
+      - name: Install intelhex (required for ESP32 esptool)
+        run: |
+          pip install intelhex
+
+      - name: Create private.h from example if missing
+        run: |
+          if [ ! -f include/private.h ]; then
+            cp include/private.example.h include/private.h
+            echo "Created private.h from private.example.h"
+          fi
+
+      - name: Inject dummy values for CI build
+        run: |
+          sed -i 's/#define METER_YEAR xx/#define METER_YEAR 99/g' include/private.h
+          sed -i 's/#define METER_SERIAL xxxxxxx/#define METER_SERIAL 9999999/g' include/private.h
+          echo "Injected dummy METER_YEAR=99 and METER_SERIAL=9999999 for CI build"
+
+      - name: Build PlatformIO Project (${{ matrix.environment.board }})
+        run: pio run -e ${{ matrix.environment.name }}
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-esp32-${{ matrix.environment.name }}
+          path: .pio/build/${{ matrix.environment.name }}/firmware.*
+          retention-days: 30
