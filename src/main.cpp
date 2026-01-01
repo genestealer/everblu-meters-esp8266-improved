@@ -1746,22 +1746,53 @@ bool validateConfiguration()
   Serial.println("\n=== Configuration Validation ===");
 
   // Validate METER_YEAR (should be 0-99 for years 2000-2099)
+  // Common mistake: entering 4-digit year (e.g., 2023 instead of 23)
   if (METER_YEAR > 99)
   {
-    Serial.printf("ERROR: Invalid METER_YEAR=%d (expected 0-99)\n", METER_YEAR);
+    if (METER_YEAR >= 2000 && METER_YEAR <= 2099)
+    {
+      Serial.printf("ERROR: METER_YEAR=%d appears to be a 4-digit year\n", METER_YEAR);
+      Serial.printf("       Use the first part of serial only: %d (not %d)\n", METER_YEAR - 2000, METER_YEAR);
+      Serial.println("       Example: Serial '23-1875247-234' → use 23");
+    }
+    else
+    {
+      Serial.printf("ERROR: Invalid METER_YEAR=%d (expected 0-99)\n", METER_YEAR);
+    }
     valid = false;
+  }
+  else if (METER_YEAR < 10)
+  {
+    Serial.printf("WARNING: METER_YEAR=%d seems unusually old (200%d)\n", METER_YEAR, METER_YEAR);
+    Serial.printf("         If your serial starts with %02d, this is correct.\n", METER_YEAR);
+    Serial.printf("✓ METER_YEAR: %d (20%02d)\n", METER_YEAR, METER_YEAR);
   }
   else
   {
     Serial.printf("✓ METER_YEAR: %d (20%02d)\n", METER_YEAR, METER_YEAR);
   }
 
-  // Validate METER_SERIAL (should not be 0)
+  // Validate METER_SERIAL (should not be 0, and should be reasonable length)
+  // Serial format on meter: XX-YYYYYYY-ZZZ (use only middle part YYYYYYY)
   if (METER_SERIAL == 0)
   {
     Serial.println("ERROR: METER_SERIAL not configured (value is 0)");
-    Serial.println("       Update METER_SERIAL in private.h with your meter's serial number");
+    Serial.println("       Use the middle part of your meter's serial number");
+    Serial.println("       Example: Serial '23-1875247-234' → use 1875247");
     valid = false;
+  }
+  else if (METER_SERIAL > 99999999UL) // 8 digits max (most serials are 6-7 digits)
+  {
+    Serial.printf("ERROR: METER_SERIAL=%lu seems too long (>8 digits)\n", (unsigned long)METER_SERIAL);
+    Serial.println("       Use only the middle part of the serial (ignore last part)");
+    Serial.println("       Example: Serial '23-1875247-234' → use 1875247 (not 1875247234)");
+    valid = false;
+  }
+  else if (METER_SERIAL < 100UL) // Suspiciously short (< 3 digits)
+  {
+    Serial.printf("WARNING: METER_SERIAL=%lu seems unusually short (<3 digits)\n", (unsigned long)METER_SERIAL);
+    Serial.println("         Make sure you used the complete middle part (usually 6-7 digits)");
+    Serial.printf("✓ METER_SERIAL: %lu\n", (unsigned long)METER_SERIAL);
   }
   else
   {
