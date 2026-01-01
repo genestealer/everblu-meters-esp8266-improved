@@ -38,10 +38,24 @@
 // Strategy: 0 = time_start, 1 = midpoint of [time_start, time_end] (default)
 // #define AUTO_ALIGN_USE_MIDPOINT 1
 
-// Meter-specific configuration
-// Note: If FREQUENCY is omitted, the firmware defaults to 433.82 MHz (RADIAN).
-#define METER_YEAR 21       // Last two digits of the year printed on the meter (e.g., 2019 is 19)
-#define METER_SERIAL 260123 // Meter Serial Number (omit leading zero)
+// ============================================================================
+// METER CONFIGURATION
+// ============================================================================
+// Find the serial number on your meter (ignore the manufacturing date below it).
+// Serial format: XX-YYYYYYY-ZZZ  (e.g., "23-1875247-234")
+//                ↓   ↓        ↓
+//              Year  Serial   (ignore last part)
+//
+// Example: Serial "23-1875247-234" becomes:
+//   #define METER_YEAR 23       ← First part (2-digit year)
+//   #define METER_SERIAL 1875247 ← Middle part only
+//
+// ⚠️ Common mistakes:
+//   ✗ Using 4-digit year (2023 instead of 23)
+//   ✗ Including last part (1875247234 instead of 1875247)
+// ============================================================================
+#define METER_YEAR 23        // First part of serial (2-digit year)
+#define METER_SERIAL 1875247 // Middle part of serial only
 // #define FREQUENCY 433.820000 // Meter center frequency in MHz; defaults to 433.82 if not set
 
 // Clear EEPROM on next boot to force frequency re-discovery

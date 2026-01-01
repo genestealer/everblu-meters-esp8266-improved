@@ -239,7 +239,18 @@ You can view the build and quality status at the top of this README or in the [A
   - Copy `include/private.example.h` to `include/private.h`.  
   - Update the following details in `private.h`:
     - Wi-Fi and MQTT credentials. If your MQTT setup does not require a username and password, comment out those lines using `//`.  
-    - Meter serial number (omit the leading 0) and production year. This information is printed on the meter label:  
+    - **Meter Serial Number** - Find the serial on your meter label (ignore the manufacturing date):
+      - Format: `XX-YYYYYYY-ZZZ` (e.g., "23-1875247-234")
+      - Use **first part** for `METER_YEAR` (e.g., 23)
+      - Use **middle part** for `METER_SERIAL` (e.g., 1875247)
+      - **Ignore the last part** (e.g., ignore -234)
+      
+      Example:
+      ```cpp
+      // Serial on meter: 23-1875247-234
+      #define METER_YEAR 23       // First part
+      #define METER_SERIAL 1875247 // Middle part only
+      ```
      ![Cyble Meter Label](docs/images/meter_label.png) ![Cyble Meter Label](docs/images/meter_label_21.png)
     - **Wi-Fi PHY Mode**: To enable 802.11g Wi-Fi PHY mode, set `ENABLE_WIFI_PHY_MODE_11G` to `1` in the `private.h` file. By default, it is set to `0` (disabled).
     - Radio debug: control verbose CC1101/RADIAN debug output with `DEBUG_CC1101` in `private.h`.
