@@ -299,10 +299,34 @@ uint8_t halRfReadReg(uint8_t spi_instr)
 #define PATABLE_ADDR 0x3E // Pa Table Adress
 #define TX_FIFO_ADDR 0x3F
 #define RX_FIFO_ADDR 0xBF
+
+// Maximum SPI burst transfer size (should be >= largest expected transfer)
+// RADIAN protocol can receive ~682 bytes (4x oversampled 170-byte frame)
+#define MAX_SPI_BURST_SIZE 1024
+
 void SPIReadBurstReg(uint8_t spi_instr, uint8_t *pArr, uint8_t len)
 {
-  uint8_t rbuf[len + 1];
+  // Use static buffer to avoid stack overflow on ESP8266 (stack ~4KB only)
+  // VLA (variable-length array) on stack was causing silent memory corruption
+  // NOTE: Static buffer is safe in this single-threaded application where SPI
+  // operations are serialized and never called from interrupt context.
+  // SPI transactions are protected by beginTransaction() which disables interrupts.
+  static uint8_t rbuf[MAX_SPI_BURST_SIZE + 1];
   uint8_t i = 0;
+
+  // Bounds check to prevent buffer overflow
+  if (len > MAX_SPI_BURST_SIZE)
+  {
+    echo_debug(1, "ERROR: SPI burst read too large (%u > %u)\n", (unsigned)len, (unsigned)MAX_SPI_BURST_SIZE);
+    return;
+  }
+
+  // Feed watchdog before long operations to prevent timeout
+  if (len > 64)
+  {
+    FEED_WDT();
+  }
+
   memset(rbuf, 0, len + 1);
   rbuf[0] = spi_instr | READ_BURST;
   wiringPiSPIDataRW(0, rbuf, len + 1);
@@ -317,8 +341,27 @@ void SPIReadBurstReg(uint8_t spi_instr, uint8_t *pArr, uint8_t len)
 
 void SPIWriteBurstReg(uint8_t spi_instr, uint8_t *pArr, uint8_t len)
 {
-  uint8_t tbuf[len + 1];
+  // Use static buffer to avoid stack overflow on ESP8266 (stack ~4KB only)
+  // VLA (variable-length array) on stack was causing silent memory corruption
+  // NOTE: Static buffer is safe in this single-threaded application where SPI
+  // operations are serialized and never called from interrupt context.
+  // SPI transactions are protected by beginTransaction() which disables interrupts.
+  static uint8_t tbuf[MAX_SPI_BURST_SIZE + 1];
   uint8_t i = 0;
+
+  // Bounds check to prevent buffer overflow
+  if (len > MAX_SPI_BURST_SIZE)
+  {
+    echo_debug(1, "ERROR: SPI burst write too large (%u > %u)\n", (unsigned)len, (unsigned)MAX_SPI_BURST_SIZE);
+    return;
+  }
+
+  // Feed watchdog before long operations to prevent timeout
+  if (len > 64)
+  {
+    FEED_WDT();
+  }
+
   tbuf[0] = spi_instr | WRITE_BURST;
   for (i = 0; i < len; i++)
   {
@@ -599,12 +642,29 @@ uint8_t cc1101_check_packet_received(void)
 
     while (digitalRead(GDO0) == TRUE)
     {
-      delay(5); // wait for some byte received
-      l_nb_byte = (halRfReadReg(RXBYTES_ADDR) & RXBYTES_MASK);
-      if ((l_nb_byte) && ((pktLen + l_nb_byte) < 100))
+      delay(2); // Reduced from 5ms to 2ms for faster FIFO reading (prevents overflow)
+
+      // Check for FIFO overflow (bit 7 of RXBYTES register)
+      uint8_t rxbytes_reg = halRfReadReg(RXBYTES_ADDR);
+      if (rxbytes_reg & 0x80)
+      {
+        echo_debug(1, "ERROR: RX FIFO overflow detected - data corrupted\n");
+        CC1101_CMD(SFRX); // Flush RX FIFO to recover
+        return FALSE;
+      }
+
+      l_nb_byte = rxbytes_reg & RXBYTES_MASK;
+
+      // Bounds check before reading to prevent buffer overflow
+      if ((l_nb_byte) && ((pktLen + l_nb_byte) <= 100))
       {
         SPIReadBurstReg(RX_FIFO_ADDR, &rxBuffer[pktLen], l_nb_byte); // Pull data
         pktLen += l_nb_byte;
+      }
+      else if (l_nb_byte && ((pktLen + l_nb_byte) > 100))
+      {
+        echo_debug(1, "ERROR: Would overflow rxBuffer (pktLen=%u + l_nb_byte=%u > 100)\n", pktLen, l_nb_byte);
+        break;
       }
     }
     if (is_look_like_radian_frame(rxBuffer, pktLen))
