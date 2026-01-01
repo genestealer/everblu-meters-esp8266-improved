@@ -308,13 +308,16 @@ void SPIReadBurstReg(uint8_t spi_instr, uint8_t *pArr, uint8_t len)
 {
   // Use static buffer to avoid stack overflow on ESP8266 (stack ~4KB only)
   // VLA (variable-length array) on stack was causing silent memory corruption
+  // NOTE: Static buffer is safe in this single-threaded application where SPI
+  // operations are serialized and never called from interrupt context.
+  // SPI transactions are protected by beginTransaction() which disables interrupts.
   static uint8_t rbuf[MAX_SPI_BURST_SIZE + 1];
   uint8_t i = 0;
 
   // Bounds check to prevent buffer overflow
   if (len > MAX_SPI_BURST_SIZE)
   {
-    echo_debug(1, "ERROR: SPI burst read too large (%d > %d)\n", len, MAX_SPI_BURST_SIZE);
+    echo_debug(1, "ERROR: SPI burst read too large (%u > %u)\n", (unsigned)len, (unsigned)MAX_SPI_BURST_SIZE);
     return;
   }
 
@@ -340,13 +343,16 @@ void SPIWriteBurstReg(uint8_t spi_instr, uint8_t *pArr, uint8_t len)
 {
   // Use static buffer to avoid stack overflow on ESP8266 (stack ~4KB only)
   // VLA (variable-length array) on stack was causing silent memory corruption
+  // NOTE: Static buffer is safe in this single-threaded application where SPI
+  // operations are serialized and never called from interrupt context.
+  // SPI transactions are protected by beginTransaction() which disables interrupts.
   static uint8_t tbuf[MAX_SPI_BURST_SIZE + 1];
   uint8_t i = 0;
 
   // Bounds check to prevent buffer overflow
   if (len > MAX_SPI_BURST_SIZE)
   {
-    echo_debug(1, "ERROR: SPI burst write too large (%d > %d)\n", len, MAX_SPI_BURST_SIZE);
+    echo_debug(1, "ERROR: SPI burst write too large (%u > %u)\n", (unsigned)len, (unsigned)MAX_SPI_BURST_SIZE);
     return;
   }
 
@@ -657,7 +663,7 @@ uint8_t cc1101_check_packet_received(void)
       }
       else if (l_nb_byte && ((pktLen + l_nb_byte) > 100))
       {
-        echo_debug(1, "ERROR: Would overflow rxBuffer (pktLen=%d + l_nb_byte=%d > 100)\n", pktLen, l_nb_byte);
+        echo_debug(1, "ERROR: Would overflow rxBuffer (pktLen=%u + l_nb_byte=%u > 100)\n", pktLen, l_nb_byte);
         break;
       }
     }

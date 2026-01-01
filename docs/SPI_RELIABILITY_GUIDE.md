@@ -85,7 +85,7 @@ void SPIReadBurstReg(uint8_t spi_instr, uint8_t *pArr, uint8_t len)
 
 #### Implementation (Already Applied to Your Code):
 ```cpp
-#define MAX_SPI_BURST_SIZE 256
+#define MAX_SPI_BURST_SIZE 1024
 
 void SPIReadBurstReg(uint8_t spi_instr, uint8_t *pArr, uint8_t len)
 {
