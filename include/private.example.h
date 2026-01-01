@@ -1,89 +1,120 @@
-// WiFi credentials
-#define secret_wifi_ssid "xxxx"        // WiFi SSID (Network Name)
-#define secret_wifi_password "xxxxxxx" // WiFi Password
+// ============================================================================
+// NETWORK CONFIGURATION
+// ============================================================================
 
-// MQTT server configuration
-#define secret_mqtt_server "192.168.xxx.xxx" // MQTT Server IP Address
-#define secret_clientName "everbluMeters"    // MQTT Client Name
+// Wi-Fi credentials
+#define SECRET_WIFI_SSID "xxxx"        // Wi-Fi SSID (network name)
+#define SECRET_WIFI_PASSWORD "xxxxxxx" // Wi-Fi password
 
-// MQTT authentication
-#define secret_mqtt_username "xxxxxxxxx"       // MQTT Username
-#define secret_mqtt_password "xxxxxxxxxxxxxxx" // MQTT Password
-
-// NTP server for time synchronization
-#define secret_local_timeclock_server "pool.ntp.org" // NTP Server Address
-
-// Simple time zone offset (minutes from UTC). Examples:
-//  0     = UTC
-//  60    = UTC+1
-//  -300  = UTC-5
-// If omitted, defaults to 0 (UTC).
-// #define TIMEZONE_OFFSET_MINUTES 0
-
-// Enable 11G Wi-Fi PHY mode (set to 1 to enable, 0 to disable)
+// Optional: force 802.11g PHY mode
+// 1 = enable 11g mode
+// 0 = use default PHY selection
 #define ENABLE_WIFI_PHY_MODE_11G 0
 
-// Reading schedule: one of "Monday-Friday", "Monday-Saturday", or "Monday-Sunday"
-// If omitted or invalid, the firmware falls back to "Monday-Friday" and logs a warning.
-// #define DEFAULT_READING_SCHEDULE "Monday-Friday"
+// ============================================================================
+// MQTT CONFIGURATION
+// ============================================================================
 
-// Optional: daily read time in UTC (hour/minute)
-// If omitted, defaults to 10:00 UTC
-// #define DEFAULT_READING_HOUR_UTC 10
-// #define DEFAULT_READING_MINUTE_UTC 0
+// Broker connection
+#define SECRET_MQTT_SERVER "192.168.xxx.xxx"  // Broker IP or hostname
+#define SECRET_MQTT_CLIENT_ID "everbluMeters" // Client identifier
 
-// Optional: auto-align reading time to meter wake window
-// 1 = enabled (default), 0 = disabled
-// #define AUTO_ALIGN_READING_TIME 1
-// Strategy: 0 = time_start, 1 = midpoint of [time_start, time_end] (default)
-// #define AUTO_ALIGN_USE_MIDPOINT 1
+// Authentication
+#define SECRET_MQTT_USERNAME "xxxxxxxxx"
+#define SECRET_MQTT_PASSWORD "xxxxxxxxxxxxxxx"
+
+// Debugging
+// 1 = enable verbose MQTT output on serial
+// 0 = disable (default)
+#define ENABLE_MQTT_DEBUGGING 0
 
 // ============================================================================
-// METER CONFIGURATION
+// TIME AND SCHEDULING
 // ============================================================================
-// Find the serial number on your meter (ignore the manufacturing date below it).
-// Serial format: XX-YYYYYYY-ZZZ  (e.g., "23-1875247-234")
-//                ↓   ↓        ↓
-//              Year  Serial   (ignore last part)
+
+// NTP server for time synchronisation
+#define SECRET_NTP_SERVER "pool.ntp.org"
+
+// Time zone offset in minutes relative to UTC
+// Examples: 0 = UTC, 60 = UTC+1, -300 = UTC-5
+#define TIMEZONE_OFFSET_MINUTES 0
+
+// Reading schedule
+// Supported values:
+//   "Monday-Friday"
+//   "Monday-Saturday"
+//   "Monday-Sunday"
+// Invalid or missing values fall back to "Monday-Friday".
+#define DEFAULT_READING_SCHEDULE "Monday-Friday"
+
+// Default daily read time (UTC)
+#define DEFAULT_READING_HOUR_UTC 10
+#define DEFAULT_READING_MINUTE_UTC 0
+
+// Automatically align reading time to meter wake window
+// 1 = enabled (recommended)
+// 0 = disabled
+#define AUTO_ALIGN_READING_TIME 1
+
+// Alignment strategy when auto-alignment is enabled
+// 0 = align to time_start
+// 1 = align to midpoint of [time_start, time_end]
+#define AUTO_ALIGN_USE_MIDPOINT 0
+
+// ============================================================================
+// METER IDENTIFICATION
+// ============================================================================
 //
-// Example: Serial "23-1875247-234" becomes:
-//   #define METER_YEAR 23       ← First part (2-digit year)
-//   #define METER_SERIAL 1875247 ← Middle part only
+// Serial format: XX-YYYYYYY-ZZZ
+//   - Use the 2-digit year (XX)
+//   - Use the middle section only (YYYYYYY)
+//   - Ignore the suffix (-ZZZ)
 //
-// ⚠️ Common mistakes:
-//   ✗ Using 4-digit year (2023 instead of 23)
-//   ✗ Including last part (1875247234 instead of 1875247)
-// ============================================================================
-#define METER_YEAR 23        // First part of serial (2-digit year)
-#define METER_SERIAL 1875247 // Middle part of serial only
-// #define FREQUENCY 433.820000 // Meter center frequency in MHz; defaults to 433.82 if not set
+// Example:
+//   Serial: 23-1875247-234
+//     METER_YEAR   = 23
+//     METER_SERIAL = 1875247
+//
+// Common mistakes:
+//   - Using a 4-digit year
+//   - Including the suffix
+//   - Keeping leading zeros in the serial
+//
+#define METER_YEAR 23
+#define METER_SERIAL 1875247
 
-// Clear EEPROM on next boot to force frequency re-discovery
-// IMPORTANT: Set to 1 and upload firmware when you:
-//  - Replace the ESP8266/ESP32 board
-//  - Replace the CC1101 radio module
-//  - Move to a different meter
-// After one boot with EEPROM cleared, set back to 0 to preserve the discovered frequency.
-// The firmware will automatically perform a wide frequency scan and save the optimal frequency.
+// ============================================================================
+// RADIO / CC1101 CONFIGURATION
+// ============================================================================
+
+// Optional: manually set meter centre frequency (MHz)
+// Defaults to 433.82 MHz if not defined
+// #define FREQUENCY                 433.820000
+
+// Optional: clear EEPROM on next boot to force frequency rediscovery
+//
+// Set to 1 for a single boot if you:
+//   - Replace the ESP8266 / ESP32
+//   - Replace the CC1101 module
+//   - Move to a different meter
+//
+// After one successful boot, set back to 0 to retain the stored frequency.
 #define CLEAR_EEPROM_ON_BOOT 0
 
-// Optional: disable the automatic wide frequency scan when no offset is stored.
-// Leave enabled (default) for the very first boot so the firmware can discover your meter.
-// #define AUTO_SCAN_ENABLED 0
+// Enable wide frequency scan when no stored offset exists
+//
+// 1 (default): Perform ~2 minute scan before MQTT connection
+// 0:           Skip scan even if no offset is stored
+//
+// To re-run the scan, set CLEAR_EEPROM_ON_BOOT to 1 or re-enable this.
+#define AUTO_SCAN_ENABLED 1
 
-// CC1101 GDO0 (data ready) pin connected to your MCU. Choose a valid GPIO for your board.
-// Examples:
-//  - ESP8266 HUZZAH / D1 mini: GPIO5 (D1)
-//  - ESP32 DevKit: GPIO4 or GPIO27 are common choices
+// CC1101 GDO0 (data-ready) pin assignment
+// ESP8266 (D1 mini / HUZZAH): GPIO5 (D1)
+// ESP32 DevKit: GPIO4 or GPIO27
 #define GDO0 5
 
-// Enable CC1101 / RADIAN protocol debug output printed to serial.
-// Set to 1 to enable verbose radio debug messages (helpful for frequency scanning
-// and packet debugging). Set to 0 to disable radio debug prints.
-// Copy this file to `include/private.h` and change the value as needed.
+// Radio protocol debug output
+// 1 = enable verbose CC1101 / RADIAN logging
+// 0 = disable (default)
 #define DEBUG_CC1101 0
-
-// Enable MQTT debugging messages printed to serial.
-// Set to 1 to enable verbose MQTT connection and message debug output.
-// Set to 0 to disable MQTT debug messages (default).
-#define ENABLE_MQTT_DEBUGGING 0

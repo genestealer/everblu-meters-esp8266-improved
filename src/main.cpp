@@ -1774,6 +1774,7 @@ bool validateConfiguration()
 
   // Validate METER_SERIAL (should not be 0, and should be reasonable length)
   // Serial format on meter: XX-YYYYYYY-ZZZ (use only middle part YYYYYYY)
+  // Note: If middle part starts with 0, omit leading zeros (e.g., 0123456 → 123456)
   if (METER_SERIAL == 0)
   {
     Serial.println("ERROR: METER_SERIAL not configured (value is 0)");
@@ -1788,11 +1789,15 @@ bool validateConfiguration()
     Serial.println("       Example: Serial '23-1875247-234' → use 1875247 (not 1875247234)");
     valid = false;
   }
-  else if (METER_SERIAL < 100UL) // Suspiciously short (< 3 digits)
+  else if (METER_SERIAL < 10UL) // Very suspiciously short (< 2 digits)
   {
-    Serial.printf("WARNING: METER_SERIAL=%lu seems unusually short (<3 digits)\n", (unsigned long)METER_SERIAL);
-    Serial.println("         Make sure you used the complete middle part (usually 6-7 digits)");
+    Serial.printf("WARNING: METER_SERIAL=%lu is very short (<2 digits)\n", (unsigned long)METER_SERIAL);
+    Serial.println("         Double-check you entered the complete middle part");
     Serial.printf("✓ METER_SERIAL: %lu\n", (unsigned long)METER_SERIAL);
+  }
+  else if (METER_SERIAL < 1000UL) // Possibly correct if serial had leading zeros
+  {
+    Serial.printf("✓ METER_SERIAL: %lu (if your serial started with zeros, this is correct)\n", (unsigned long)METER_SERIAL);
   }
   else
   {
