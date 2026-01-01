@@ -1,0 +1,95 @@
+EverBlu Cyble
+Enhanced
+EverBlu Cyble Enhanced has been designed to fulfi ll requirements of all water management utilities
+willing to remote read their water & gas meters by radio a fi xed network to improve their productivity
+and sell extra services to their customers.
+The EverBlu wireless fi xed data collection EverBlu Cyble Enhanced Working » Tampering alarms
+system is suitable for any meter type Technologies » End of battery lifetime indicator
+(Water, Gas, Heat and Cooling) and for » The Itron patented and proven Cyble
+» Water intelligence alarms:
+various site topologies, either in urban, technology guarantees the transmitted
+• meter oversized
+suburban or rural environments. index reliability.
+• meter undersized
+EverBlu Cyble Enhanced creates a set » The RADIAN technology is the most
+of granular data that is automatically open radio protocol, resulting from the • meter blocked
+communicated daily to the utility back- work of a European user group. • peakfl ow
+offi ce server. Its radio function remains
+Data from EverBlu Cyble Enhanced
+on duty during working hours to reply to Ease of Installation
+can also be collected using AnyQuest,
+on-request reads from utility operators. The EverBlu Cyble Enhanced is the Itron mobile reading solution. Thus
+To secure data transmission and completely compatible with all Itron water allowing dual-mode collection systems
+avoid radio signal collisions, the meters (from15 to 500 mm) & gas meters or free migration from walk-by to fi xed
+EverBlu MIU combines special equipped with a Cyble target register. network systems.
+communication algorithms and daily clock This compact module can be easily fi xed
+synchronization with the network. In case directly on the meter, without requiring Consistent Reliability
+of communication failure caused by radio any wiring nor wall mounting. » The Cyble concept ensures the perfect
+disturbances, the EverBlu MIU stores
+It can be shipped from the factory already correlation between the meter register
+meter information and automatically re-
+mounted (and confi gured) on to the and the internal electronic index (taking
+attempts data transmission several times
+meter. As a stand alone it can be quickly accidental backfl ows into account).
+during the current day and the next day.
+retrofi tted to meters installed in the fi eld » The electronic unit is encapsulated to
+without breaking any seals. protect it from harsh environment and
+BENEFITS OF WIRELESS SOLUTION
+water immersion effects.
+» Automatic radio meter reading Advanced Functions
+» The EverBlu Cyble Enhanced case is
+increases the reading reliability and
+EverBlu Cyble Enhanced provides made of carbon fi bers, which makes it
+signifi cantly enhances the data
+powerful smart functions, adding value for resistant to shocks and UV-light.
+acquisition speed.
+your customers:
+» The RADIAN technology gives the
+» The radio reading also opens
+» Daily 24 hourly index. best radio communication even in
+accessibility to all meters even if the
+» Daily leakage alarm congested areas.
+customer is absent or in hard to read
+locations. » Daily backfl ow alarm
+SYSTEM knowledge to shape your future
+
+Radio Frequency Features
+Protocol RADIAN / EverBlu
+Modulation Frequency Shift Keying
+Frequency carrier 433.82 MHz
+Radiated power ≤ 10 mW
+Transmission Symetrical 2-way communication
+Functional Specifi cations
+Dimensions 92 x 57 x 50 mm
+Power source Lithium batterie
+Battery typical lifetime* 15 years / 10 years in fi xed network mode
+Case protection IP68
+Relative humidity 0 to 100% - submersible EverBlu Cyble Enhanced fi tted on Residential
+Operating temperature** -10°C / +55°C*** water meter
+Accidental temperature -20°C / +70°C
+Conformity certifi ed, in accordance with the European R&TTE directive
+(1999/5/EC)
+* Under normal applications within the specifi ed operating temperature range.
+** High Temperature (HT) version also available on request.
+*** Operation: +5°C to +35°C / Storage: +5°C to +35°C / Transport: Min. -20°C (< 24 hours continuous), Max. +70°C (< 24 hours
+continuous) / Min. operational temperature: -10°C (< 15 days/years) / Max. operational temperature: +55°C (< 15 days/years).
+Application
+The EverBlu Cyble Enhanced is suited to various applications for residential, commercial and
+industrial uses.
+EverBlu Cyble Enhanced fi tted on
+Commercial and Industrial water meter
+FTP Server EverBlu Software Billing system / Data Center
+Our company is the world’s leading provider of smart metering, data collection and utility software systems, with over
+8,000 utilities worldwide relying on our technology to optimize the delivery and use of energy and water.
+To realize your smarter energy and water future, start here: www.itron.com
+For more information, contact your local sales representative or agency: ITRON WATER METERING
+9, rue Ampère
+71031 Mâcon cedex
+France
+Phone: +33 3 85 29 39 00
+Fax: +33 3 85 29 38 58
+While Itron strives to make the content of its marketing materials as timely and accurate as possible, Itron makes no claims, promises, or guarantees about the accuracy, completeness,
+or adequacy of, and expressly disclaims liability for errors and omissions in, such materials. No warranty of any kind, implied, expressed, or statutory, including but not limited to
+the warranties of non-infringement of third party rights, title, merchantability, and fitness for a particular purpose, is given with respect to the content of these marketing materials.
+© Copyright 2011, Itron. All rights reserved. SYS-0024.3-EN-09.11
+

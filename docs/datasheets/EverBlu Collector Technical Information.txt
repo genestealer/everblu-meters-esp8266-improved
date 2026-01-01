@@ -1,0 +1,103 @@
+2. EverBlu Collector Technical Information
+2.1. EverBlu Collector principle
+EverBlu Collector extends the coverage of the concentrators allowing them to achieve higher ranges.
+Its main purpose is to receive and store the information coming from the allocated EverBlu MIUs and
+send this information to the EverBlu Access Point
+Ajoutter schema
+Flash
+Expansion Expansion
+Board Board
+921MHz 433MHz
+µC 1 µC 2
++ +
+RSSI RSSI
+Battery
+• The internal battery supplies power to all the internal electronic components.
+2.2. Network
+Storage network data : 10 days
+Network Sizing :
+Manage upto 50 EverBlu Cybles.
+Relay data from upto 200 EverBlu Cybles.
+Manage upto 15 Child EverBlu Collectors.
+Upto 4 chain relay EverBlu Collectors.
+EverBlu Technical Information 921 Mhz Page 7
+
+2.3. Radio Frequency Features
+Conformity CE marking (in accordance with the R&TTE directive)
+MFD (RADIAN user group) (433MHz)
+Protocol
+Proprietary (921MHz)
+Modulation Frequency Shift Keying
+Frequency carrier 433.82 MHz / 921 MHz
+Transmission Symmetrical 2-way communication
+none for 433MHz (master)
+Wake-up period
+every 4 seconds for 921
+2.3.1. Modulation & Frequency band
+Frequency band = 433.82 MHz
+Compared to the usual 433.92 MHz (car doors, toys, garage gates...), our frequency is slightly shifted
+in order to avoid RF noises in congested areas.
+Modulation = Frequency Shift Keying (= frequency modulation)
+Transmission = symmetrical 2-way (= the EverBlu Cyble is both a receiver and an emitter)
+Radiated power < 10mW (in compliance with the European regulation)
+Frequency band = 921MHz
+Modulation = Frequency Shift Keying (= frequency modulation)
+Transmission = symmetrical 2-way (= the EverBlu Access Point.is both a receiver and an emitter)
+Radiated power ≈ 200mW (in compliance with the European regulation)
+2.3.2. Protocol
+For frequency band = 433MHz
+Same specifications as for the EverBly Cyble
+For frequency band = 921Mhz
+This protocol is proprietary.
+Communication speed = 38400 bauds
+2.3.3. Wake up profile
+In order to save power consumption, the RF receiver does not remain ON all the time long.
+It is then woken up for a short duration (10 ms), every given period (4 seconds).
+This period is then the maximum time duration that the reader will have to wait until the Cyble RF is able to answer.
+EverBlu Technical Information 921 Mhz Page 8
+
+2.4. Functional Specifications
+Dimensions 12 x 7,4 x 22,4
+Power source 2 lithium batteries + 1 boost battery
+Battery typical lifetime 10 years
+Case protection IP 65
+Operating temperatures -10°C / +40°C
+Storage temperatures -20°C / +70°C
+2.4.1. Dimensions
+12 cm
+7,4 cm
+22,4 cm
+2.4.2. Protection
+The degree of protection of the EverBlu collector is IP65 . It is protected against water jets and dust
+but in no case must be submerged. The product is systematically completely potted with resin.
+It can be installed indoor or outdoor.
+2.4.3. Temperature range
+-Operating temperature : -10°C / 40°C
+Min operating temp : -20°C (<15 days/year)
+Max operating temp : 55°C (<15 days/year)
+Storage Temperature : -10°C / 50°C
+Min storage temp : -20°C (<24 hours)
+Max storage temp : 70°C (<24 hours)
+2.4.4. Battery
+The battery includes 2 lithium cells and one boost battery
+The battery is not replaceable.
+It provides the product with a 10 years lifetime .
+EverBlu Technical Information 921 Mhz Page 9
+
+2.4.5. Reading Distances
+Reading distance mainly depends on the environment and on the reading system.
+We highly recommend that a trial should be carried out with the customer using the EverBlu
+Site Survey Tools in order to find out the real reading distance in your customer's sites.
+2.5. Product Identification
+The product label includes the following data:
+• Name of the product
+• Numeric / bar-coded serial number
+• Manufacturing date
+• CE marking
+• EverBlu Collector version
+• Lithium battery
+• Logo cross out trash bin
+The product housing includes the following information:
+• Actaris logo
+EverBlu Technical Information 921 Mhz Page 10
+

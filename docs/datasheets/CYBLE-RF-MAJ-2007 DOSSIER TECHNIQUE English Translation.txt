@@ -1,0 +1,261 @@
+Machine Translated by Google
+TECHNICAL F ILE
+Product
+RF Cyble
+Confidential 06/2007 LM MARKETING FRANCE 8 pages
+1. PRESENTATION
+The C yble RF i s a c ompact radio m odule d esigned for r eading w ater m eters.
+The Cyble RF 4 33 M Hz complies w ith current
+radio f requency regulations in France and
+meets t he requirements of m arket p layers
+(local a uthorities, service companies, p rivate
+distributors) w ho w ish t o develop radio
+frequency r emote reading o f water meters
+to i mprove their p roductivity and offer n ew
+services to t heir c ustomers.
+INSTALLATION F LEXIBILITY
+The C yble R F i s placed d irectly on the m eter. T he concept o f a c ompact r adio m odule makes
+installation e asier b ecause it a voids a ny wiring and w all mounting.
+The C yble R F i s compatible w ith the entire r ange o f Actaris w ater m eters pre-equipped w ith t he
+target n eedle (from DN 1 5 to D N 500).
+The C yble R F c an b e delivered f rom the f actory, already installed on the m eter a nd p rogrammed t o save
+time during c ommissioning. Commissioning is then l imited to installation o n the p ipe.
+The C yble R F, alone, can b e fitted t o m eters a lready installed without r equiring a ny change, removal
+or unsealing o f t he meter.
+The C yble R F c an b e read b y any R ADIAN type radio equipment : portable d rive-by o r f ixed network d ata
+entry t erminal.
+Technical f ile for AO - C ONFIDENTIAL A CTARIS © 09/2004 - LM/MKT page: 1 /8
+
+Machine Translated by Google
+RELIABILITY
+The C yble R F r emotely transmits t he c urrent volume i ndex in full accordance with t he m echanical i ndex o f t he water m eter. T he
+Cyble t echnology, o n which the C yble R F is b ased, e liminates any p arasitic p ulse, c ounts w ater r egardless of t he f low d irection a nd
+takes i nto account a ny w ater returns. T he Cyble t echnology, patented b y A ctaris, has p roven its r eliability s ince 1 996, o n several
+million meters
+The t arget, m ade o f a non-magnetic material a nd p resent as s tandard o n the t otalizer o f t he e ntire range o f Actaris w ater m eters,
+as w ell as t he C yble R F detection s ystem are insensitive to attempts at fraud by m agnet.
+Encapsulating t he e lectronics i n a w aterproof r esin p rotects t he C yble RF f rom the p rolonged e ffects of w ater immersion (IP68).
+The C yble R F's housing is designed t o b e s hock and U V resistant.
+The C yble R F h as a typical l ifespan of 1 5 y ears u nder s tandard u se.
+The C yble R F h as b een designed to w ithstand r esidential, commercial and i ndustrial environments . I t can b e i nstalled both in a
+face and i n a technical d uct.
+MULTIFUNCTIONS
+The t arget t echnology h as m ade i t possible t o i ntegrate numerous i ntelligent functions w hich constitute as m uch a dded value c ompared
+to a summary i ndex reading: - monthly r eadings of t he w ater m eter i ndex
+over 13 m onths, - detection and h istory of l eaks o ver 1 3 m onths, - detection,
+history o ver 1 3 months and q uantification of r everse f lows i n
+the pipeline, - i ndication o f end o f b attery l ife, - detection o f t emporary or permanent f raud a ttempts, - alarms, etc.
+These functions a llow the C yble R F to m eet t he n eeds o f: - billing or distribution, -
+control a nd m aintenance o f t he meter
+fleet and t he i nstallation.
+Technical f ile for AO - C ONFIDENTIAL A CTARIS © 06/2007 - LM/MKT page: 2 /8
+
+Machine Translated by Google
+2. TECHNICAL CHARACTERISTICS
+2.1INTRODUCTION
+ÿ
+The Cyble R F is a radio i nterface for Actaris water m eters pre-equipped w ith a target.
+It is a n i ntelligent i nterface t hat counts t he target r evolutions ( one r evolution corresponds t o
+an i ncrement o n t he l ast roller of the totalizer a nd therefore to the pulse w eight o f t he counter)
+and p rovides i ndexes, flags ( event indicators), a larms and information p rocessed by radio
+link via a ny RADIAN c ompatible equipment.
+ÿ
+Radio t ransmission b etween the Cyble RF a nd radio e quipment above h as the
+features t he following:
+- Frequency m odulation ( FSK)
+- 433.82 MHz -
+2 channels
+Block d iagram of the overall s ystem
+TSP
+C Serial n umber Cyble ÿ RÿF (Walk By)
+E
+Counter + Target
+Cyble s chematic diagram ÿ RF
+Antenna
+Battery
+Micro
+Detection Electronic
+electronics controller RF
+IP68 housing
+Anti-fraud p ush b utton
+Anti-fraud mechanical i nterface
+Technical file for AO - C ONFIDENTIAL ACTARIS © 0 6/2007 - L M/MKT page: 3/8
+
+Machine Translated by Google
+2.2 F EATURES
+Until n ow, a meter w as only able to p rovide an index, l imiting i ts i nformation role to the strict m inimum
+necessary.
+ÿ
+A m eter e quipped with t he Cyble RF a llows y ou to achieve m uch more than just a
+index r eading:
+- Current v olume register
+- Fixed-date index r eadings w ith 1 3-month storage
+- Fraud d etection by t earing/lifting
+- Battery e nd of life i ndication
+- Leak detection
+- Return count d etection
+- Water r eturn r egister
+- Alarms ( battery/lifting/detection error)
+- Date a nd time
+- …
+Detailed d escription of f eatures
+FEATURES DESCRIPTION
+Encryption Data e ncapsulation i n a frame according t o the R ADIAN p rotocol In order to
+reduce
+Radio s tandby m ode battery consumption, t he p roduct is woken up every 2 sec.
+Wake-up i s only p ossible f rom M onday to S aturday.
+The daily listening window i s programmable:
+- m odule delivered alone: default value from 0:00 t o 24:00.
+To b e reprogrammed. Recommended r ange: 12:00
+per day. - module d elivered on meter: d efault v alue from 6 :00 t o
+6:00 p.m.
+Radio C all
+Transmission
+Awakening Awakening Awakening
+Sleep Sleep Sleep
+10ms 2s 2s 10ms 2s 10ms
+msec dry dry dry msec
+Technical f ile for AO - C ONFIDENTIAL A CTARIS © 0 9/2004 - LM/MKT page: 4 /8
+
+Machine Translated by Google
+ÿ
+Filtering o f s purious i mpulses Cyble t echnology does not, b y d esign, a llow p arasitic pulses b y bouncing
+or v ibration, u nlike REED t echnology.
+End o f l ife i ndication An a larm i ndicates t he battery l ife status.
+This alarm i s triggered 1 y ear b efore the m inimum theoretical e nd o f life (12
+years) of t he battery.
+A counter a lso i ndicates t he remaining b attery l ife, e xpressed i n m onths.
+Current index The i nitialization or r esetting of the i ndex is possible on site. The index p rovided by the
+ÿ
+Cyble R F takes i nto a ccount a ny w ater r eturns, and i s therefore in l ine with t he mechanical
+index o f the totalizer.
+The i ndex is p rovided on 8 d igits (99999999).
+The index changes from 00000000 to 99999999 when decremented.
+Date a nd time Date a nd time a re a vailable and t ake i nto a ccount l eap y ears u ntil 2 100.
+Date and t ime can b e set o n site.
+Monthly a rchiving o f i ndexes The current index is automatically a rchived on t he l ast day o f the month - e very m onth
+- and kept i n m emory for 13 c onsecutive rolling months.
+Leak d etection A l eak detection t hreshold i s a vailable a nd can b e c onfigured o n s ite o r in the f actory.
+It generates a d aily flag ( =event i ndicator) (at midnight) w hen Q moy > threshold d uring
+the entire past d ay.
+In addition, the n umber of days per m onth during which a l eak above t he threshold w as
+detected is stored. A h istory o ver 1 3 c onsecutive rolling months is kept i n memory.
+Reverse f low The cumulative volume index i n case of r everse f low i s available, f rom the first target
+needle turn (=pulse w eight).
+This index can b e r eset during an o n-site i ntervention.
+In addition, if a r everse f low g reater than 10 target n eedle turns is detected a t least once
+in t he month, a m onthly a larm is t riggered. T his i nformation i s archived over 1 3 consecutive
+rolling months.
+Fraud d etection Any attempt at uprising o r w ithdrawal, t emporary o r p ermanent,
+ÿ
+of the Cyble RF m odule is d etected (fraud check every 1 s ec) a nd t riggers a n a larm
+(temporary fraud/permanent f raud).
+This alarm c an b e reset during an o n-site i ntervention.
+ÿ
+The g eometry o f the m echanical interface between the C yble R F and the
+totalizer p rohibits a ny a ttempt to i nsert a foreign b ody.
+Alarms Available alarms: - b attery
+life less t han 1 y ear - a ttempted fraud (temporary o r
+permanent) - t ransmission problem between the meter and t he
+RF module - r everse f low - l eaks
+Note: T he functions r elating to under-volume counts ( = consumption too l ow), e xcessive
+volumes (= c onsumption too h igh) and counting interruptions ( = zero c onsumption)
+are integrated into t he A ctaris e mbedded r eading software s upplied with the A ctaris
+portable data e ntry terminals. These functions a re part o f the “ Consumption control”
+automatically implemented during r eading.
+Technical f ile for AO - C ONFIDENTIAL A CTARIS © 0 6/2007 - LM/MKT page: 5 /8
+
+Machine Translated by Google
+2.3 A PPEARANCE
+- Max. h eight on t he meter: 50 m m (antenna included)
+- Serial number o f the m eter readable w ithout d ismantling the C yble m odule - T otalizer ÿ RF
+index r eadable without dismantling t he C yble m odule - A ntenna i ntegrated into ÿ RF
+the h ousing - C olor: black
+- Marking: - R F
+ÿ
+cyble, year a nd month o f m anufacture, s erial number. T his l ast information i s a lso r ecorded in t he
+form o f a bar c ode.
+- Radio certification: n umber of the approved laboratory w hich carried o ut t he tests: 0536.
+ÿ
+- ACTARIS, A ccess C yble , CE and RF logos
+120 m m
+62 m m
+50 m m
+Label
+Antenna
+Map
+Batteries
+Anti-fraud b utton
+Technical f ile for AO - C ONFIDENTIAL A CTARIS © 0 6/2007 - LM/MKT page: 6 /8
+
+Machine Translated by Google
+2.4 R ADIO F REQUENCY I NTERFACE
+RADIAN c ommunication p rotocol Communication
+frequency: 4 33.82 MHz (offset f rom the 4 33.92 MHz frequency, the m ost u sed in t he t erritory i n t he 4 33 b and)
+Modulation type: FSK ( frequency modulation digital)
+Transmission t ype: 2 channels
+Transmitted power: Erp ÿ 10 m W
+Optimal performance: -
+Maximum theoretical r ange: 6 00m i n o pen field - M inimum
+theoretical c ollection time: < 3 sec/interrogation Operation i n any
+position.
+2.5 P ROGRAMMING
+The Cybleÿ RF is field configurable.
+The following parameters a re p rogrammable, e ither a t installation s tart-up ( commissioning) or
+during on-site i ntervention:
+- Initial index o f the a ssociated water meter
+- Date and Time
+- Pulse w eight o f the a ssociated w ater meter
+- Serial number o f t he a ssociated w ater m eter
+- Resetting histories
+- Reset alarms
+- L eakage threshold if desired
+The parameters i ndicated i n b old must b e configured f or radio f requency reading.
+2.6 M ECHANICAL INTERFACE
+The Cybleÿ RF is c ompatible w ith A CTARIS t otalizers o f the T VM, TSN and T S type. The
+corresponding counters are: NARVAL, A QUADIS, A QUADIS+, T D8, F LODIS, FLOSTAR M ,
+IRRIMAG, WOLTEX M, WOLTMAG M, I SOFLO.
+The C ybleÿ RF is fixed to t he m eter using a screw. Max t ightening torque: 1 .2 N m
+Flat-type s crewdriver.
+Technical f ile for AO - C ONFIDENTIAL A CTARIS © 0 9/2004 - LM/MKT page: 7 /8
+
+Machine Translated by Google
+2.7 ENVIRONMENTAL C ONSTRAINTS
+Temperature
+Accidental a nd transport: - 20°C
+in peaks ( < 24 h ours / year) + 7 0°C i n
+peaks ( < 24 h ours / year)
+Continuous operation (including s torage): -10°C t o +55°C
+Temperature % o f time 5 20
+-10°C
+0°C 45
+20°C 25
+40°C 5
+55°C
+IP protection r ating IP68:
+non-interchangeable b attery.
+ÿ
+The Cyble RF i s f unctional e ven when submerged i n a manhole.
+Shock p rotection
+Falls o nto c oncrete from a h eight of 1 m , on each of the 3 axes, 2 faces/axes, with no impact on the
+ÿ
+functionality a nd integrity o f t he Cyble RF.
+Vibes
+3 g i n the main resonance f requencies/directions ( up t o 5), f or 1 minute, f requency range 0 to 300 H z, without i mpact
+on t he functionality and integrity o f t he Cyble
+ÿ
+RF.
+2.8 LIFESPAN
+15 y ears typical ( including storage).
+Minimum lifetime: 1 2 y ears minimum. ( lifetime
+calculated o n the b asis of o ne interrogation p er d ay max, w ith temperature profile d escribed i n p oint
+1.2.7. a nd radio a larm range o f 1 2 h ours per d ay f rom M onday to Saturday).
+2.9 CONFORMITIES
+Authorization for u se in France i ssued by t he n otified b ody E MITECH a nd i dentified under no. 0 536.
+Standards specified b y R&TTE D irective 1999/5/EC:
+EN 300-220-3 (Radio)
+EN 301-489-3 (EMC)
+EN 60950-1:2001 (protection of t he health and s afety of persons)
+Compliance t esting t o t he above standards available upon r equest.
+Technical f ile for AO - C ONFIDENTIAL A CTARIS © 0 6/2007 - LM/MKT page: 8 /8
+

@@ -1,0 +1,1448 @@
+Cyble RF 433Mhz installed by my community
+The Actaris radio frequency module for water meters: a reliable, compact and intelligent tool for remote reading, from the distribution network to collective housing. Completely waterproof RADIAN™ compatible compact radio communication module, Cyble RF can be installed very easily, on site or in the factory, on both a cold and hot water meter. Its installation on site requires no wiring or wall fixing, nor removal or unplugging of the meter. Specially designed to withstand harsh environments, Cyble RF is suitable for all conditions encountered, from flooded manholes to technical ducts. Its numerous intelligent functions allow, in addition to the index reading, to obtain:
+
+the monthly history of the index over 13 months,
+water return detection, reverse cumulative volume and 13-month monthly history
+leak detection and 13-month monthly history
+detection of fraud attempts
+the end of battery life indication
+various alarms
+RADIAN protocol
+impossible to find on the internet, the address http://www.radianprotocol.com/ is no longer active
+from web.archive.org
+The Radian Protocol
+
+A two-way 433 MHz Radio Protocol
+
+Radian Protocol is designed for all applications in water, electricity, gas and heat meter reading and data transmitting. Its two way characteristics allows developed service solutions, including information exchange with final user.
+
+reliability 	
+  physical layer: FSK modulation, narrow band
+  Logical Link Layer: packet numbering
+two ways, half duplex, data transmission 	
+relaying capability 	
+  receive an repeat datagrams
+  up to 7 nodes forward
+sophisticated wake up mechanism 	
+  standby mode
+  wake-up signal => awaken mode
+my address?
+
+yes => let's communicate!
+  no => back to standby
+time to get data from a node: 2-3 s
+
+both master - slave control and CSMA asynchronous communications
+from a documentation of a survey tool
+FSK process, bidirectional
+Frequency 433.82 MHz
+Asynchronous FSK, NRZ modulation
+Radian Protocol
+5 KHz modulation shift
+Channel bandwidth 25 KHz
+Transmission speed 2,400 baud
+Central radio transmit power + 10 dBm (10 mW)
+Reception sensitivity - 105 dBm
+Range approx. 50 m
+f5943_cyblerfvacatris.pdf does not provide anything more
+
+other tracks
+standard 13757-4 (DATA\DOCUMENTATIONS_div) → meh ultimately the protocol is not really compatible
+open-meter_wp2_d2.1_part3_v1.0.pdf –> EverBlu (5.4.11) 10Kbps → false trail
+cyble RF technical file
+the carrier is 433.82Mhz
+they talk about cryptography (apart from the CRC, there’s nothing…)
+the counter can only be woken up during its “working hours” (effectively but the hours and days are configurable at the factory)
+hacking
+In 2011 I released this web page to the winds of the web.
+
+In 2014, Julien got hooked and we grouped together some docs that we had on the subject.
+
+He decided to listen to the meters in his residence 24/7 with an SDR and a large hard drive.
+
+In February 2016 he managed to capture several meter readings, we started scraping.
+
+But we were missing how to calculate the CRC and how to make the link between what is marked on our meter and the reading frame.
+
+SigmaPic joined the project and fixed a lot of things (well, especially the bits :-P).
+
+There was still this problem of etiquette.
+
+In December 2016 we were all sniffing our meters and Julien managed to capture the reading of his own meter.
+
+1 month later signacPic managed to read its own meter 88-8.
+
+Protocol
+Physical Layer
+RF Transmission
+FSK process, bidirectional
+Frequency 433.82 MHz
+Asynchronous FSK, NRZ modulation
+Radian Protocol
+5 KHz modulation shift
+Channel bandwidth 25 KHz
+Transmission speed 2,400 baud
+Communication Frame
+Any communication frame consists of:
+
+A preamble used to notify the receiver that data will be sent
+A sync word used to notify the receiver that data transmission is starting
+Some data
+Preamble
+Preamble is a series of 0101….0101 at 2400 bits/sec. There are two preamble durations:
+
+Long preamble for meter wake-up: 4928 bits (2464 x 01)
+Short preamble for other frames: 80 bit (40 x01)
+In order to save energy, meter wakes-up every 2 seconds and check if someone is speaking. If nobody is speaking, meter goes back to sleep. This is the reason why long preamble is used when the master sends a request.
+
+ a preamble with a master request
+
+ zoom on end of preamble
+
+Syncpattern
+Sync pattern starts with low level during 14.3ms followed by a high level during 14.3ms.
+
+ preamble and synch pattern of meter response
+
+Data
+Data are sent by UART:
+
+Baudrate: 2400 bits/sec
+lsb first
+1 start bit / No parity / 2 or 2.5 stop bits
+
+
+Frame Structure
+L(1)	C(1)	S(1)	Receiver Address(5)	S(1)	Sender Address(5)	S(1)	Data + Checksum (4-240)
+L (Length Byte) Total number of bytes including length byte and checksum
+C (Control Byte)
+0x10: Request
+0x06: Acknowledge
+0x11:Response
+S (Spacer) 0x00
+Receiver Address (5bytes): Meter address when master is speaking and master address when meter is speaking
+S (Spacer) 0x00
+Sender Address (5bytes): Master address when master is speaking and meter address when meter is speaking
+Data Payload (Up to 238 bytes)
+Checksum (2bytes) CRC-CCITT ( Kermit )
+Polynomial: 0x8408
+Initial Value: 0
+Bytes are reversed (MSB first)
+Result is inverted
+Final XOR: 0
+Stored in little endian.
+Meter Data mapping
+ 
+
+Meter Address Encoding
+Address is encoded over 5 bytes.
+First byte is 0x45 (TBC).
+Four other bytes are deduced from numbers below the bar-code
+format is YY-AAAAAAA-CCC.
+2nd byte YY: Years encoded on 8bits
+3rd-to 5th Byte AAAAAAA to be converted in from decimal to hex MSB first
+CCC: Check digits (Not used in address encoding but used to verify YY-AAAAAAA consistency)
+
+
+example
+Serial number 16 - 0123456 -CCC
+YY = 16d → 10h
+AAAAAAA = 0123456d →01E240h
+Master request to be predeced by 2s of 2464*01 then follow by Sync pattern and encapsulated in 1 start bit / No parity / 2.5 stop bits (works also with 2bit and 3bit)
+13 10 00 45 10 01 E2 40 00 45 67 89 AB CD 00 0A 40 DA DC (cks) for the calculation of the CKS take the Kermit line and swap the nibbles ⇒ http://crccalc.com/?crc=131000451001E24000456789ABCD000A40&method=c rc16&datatype =hex
+Length	Control	Spacer	Receiver Address	Spacer	Sender Address	Spacer	Data + Checksum
+Master request	13	10	00	45 10 01 E2 40	00	45 67 89 AB CD	00	0A 40 DA DC
+Meter Acq	12	06	00	45 67 89 AB CD	00	45 10 01 E2 40	00	0A 90 9E
+Meter response	7C	11	00	45 67 89 AB CD	00	45 10 01 E2 40	00	01 08 00 D2 73 07 00 40 ….. cks (488402 liters)
+Master Acq	12	06	00	45 10 01 E2 40	00	45 67 89 AB CD	00	0A 23 93
+backup solutions
+CC1101
+the CC1101 is an RF transceiver you can adjust a bunch of parameters, but the actual frequency is not exactly the one you adjust.
+
+//for example I have 2 CC101 cards for the same frequency setting one assembly obtains a response the other does not 
+halRfWriteReg ( FREQ0 , 0xC1 ) ;  //Frequency Control Word, Low Byte CC1101_N1 814 824 (KB); CC1101_N2 810 820 (OK) 
+halRfWriteReg ( FREQ0 , 0xB7 ) ;    //CC1101_N1 810 819.5 OK 
+my counter also does F1 :  433808500   F2 :  433819500   
+hence the need to calibrate the FREQ0 register using a TNT key which does SDR 
+
+rpi + CC1101
+cable schematics
+5V , GND ---> RPi HE26 --- . ----- 2 * GND ;  2 * 3.3V , SCLK , MISO , MOSI , CSn , GDO2 , GDO0 -------->   CC1101 HE10
+                         | 
+                      debug_connector ( HE14 )
+RPi PIN allocation
+WiringPi Pin = WPP
+
+Function	WPP	Name	Header	Name	WPP	Function
+3.3v	1	2	5v		
+8	SDA	3	4	5v		
+9	SCL	5	6	0v		
+7	GPIO7	7	8	TxD	15	
+0v	9	10	RxD	16	
+GDO0	0	GPIO0	11	12	GPIO1	1	
+GDO2	2	GPIO2	13	14	0v		
+LED	3	GPIO3	15	16	GPIO4	4	
+3.3v	17	18	GPIO5	5	
+MOSI	12	MOSI	19	20	0v		
+MISO	13	MISO	21	22	GPIO6	6	
+SCLK	14	SCLK	23	24	CE0	10	Csn
+GND		0v	25	26	CE1	11	
+#define GDO2 2 //header 13 
+#define GDO1_MISO 13 
+#define GDO0 0 //header 11 
+#define MOSI 12 
+#define cc1101_CSn 10 ////header 24 
+#define LED 3 //header 15
+HE10 CC101
+Top view
+
+Function	Header	Function
+3.3v	1	2	3.3V
+MOSI	3	4	SCLK
+MISO	5	6	GDO2
+CSn	7	8	GDO0
+GND	9	10	GND
+Flipped view from bottom
+
+Function	Header	Function
+3.3v	2	1	3.3V
+MOSI	4	3	SCLK
+MISO	6	5	GDO2
+CSn	8	7	GDO0
+GND	10	9	GND
+debug_connector(HE14)
+SALEAE led(1)
+
+Function	Header	Function
+D1	1	2	D2
+D3	3	4	D4
+D5	5	6	D6
+D7	7	8	D8
+GND	9	10	GND
+           DB9 TDA (front
+(GND) 5 4 3 2 1 (data)
+         9 8 7 6(5v)    
+HE14
+
+Function	Header	Function
+(D1 saleae)DATA TDA	1	2	(D2 saleae)LED
+(D3 saleae)SCLK	3	4	(D4 saleae)SI
+(D5 saleae)GDO2	5	6	(D6 saleae)SO
+(D7 saleae)GDO0	7	8	(D8 saleae)CSn
+GND	9	10	GND
+3.3	11	12	GND
+DATA TDA	13	14	5V
+coded
+the zip has a word d3 pa5se this is the name of the zip file radian_trx.zip
+
+config
+the delivered code will not compile (gcc radian_trx.c -o radian_trx -lwiringPi -lpthread -Wall) because there are 2 parameters to adjust + 2 tipo
+
+frequency to adjust according to your CC1101 CC1101.c: line 229: halRfWriteReg(FREQ0, ….)
+I advise starting with the base frequency then measuring with the TNT dongle to center it on the 433.820 or the response of the meter
+if there was no response from the counter then you will have to try to shift in steps of 2kHz on each side of 433.820
+you must modify FREQ0 by adding/subtracting a few units to shift the main frequency by 2kHz, you should know that an “SDR TNT key for 20€” does not give the real frequency in absolute terms, in relative terms it is already better
+the serial number of the meter. here is the line of code that goes with the example paragraph
+CC1101.c: line 664: TS_len_u8=Make_Radian_Master_req(txbuffer, 16 , 123456 );
+in CC1101.c add at the top #define TX_LOOP_OUT 300
+a “c” character to delete in line 5 of radian_trc.c
+script
+sudo crontab -e
+55 9 * * * sudo /home/pi/radian_trx/web_tx_releve >/dev/null 2>&1
+55 9 * * * sudo /home/pi/radian_trx/web_tx_releve >> /var/log/crontab.log
+performance
+minepi + CC1101(2) + lambda/4 behind partition	shutter open	rssi=185 lqi=128 F_est=255
+minepi + CC1101(2) + lambda/4 in partition	shutter open	rssi=185 lqi=128 F_est=255
+minepi + CC1101(2) + ant spiral behind partition	shutter open	rssi=183-4 lqi=128 F_est=255
+Mbed+ CC1101
+RTL SDR
+https://www.youtube.com/watch?v=c3C7GBuxpNo
+http://www.nooelec.com/store/qs/
+Plug your NESDR into an available USB port
+Open the 'NESDR Driver Installer', Zadig
+Select 'List All Devices' from the 'Options' menu in Zadig
+From the main dropdown, select the NESDR
+Confirm the selected device has a USB ID of '0BDA 2838'
+Press the big button to install drivers–button
+http://m3ghe.blogspot.fr/p/adding-support-for-rtl-sdr-usb-dongles.html
+=⇒SDR console OK
+
+http://www.rtl-sdr.com/rtl-sdr-quick-start-guide/
+http://rtl-sdr.sceners.org/?p=193 kalibrate
+With a sampling frequency of 31.25 ksps that's 2.5GB of data over 12 hours. It seems heavy but on a 1TB HDD it still allows you to record 1024/2.5=410 working days.
+
+gear
+http://fr.farnell.com/mipot/32000508e/emitter-fsk-50-pll-5-12v-433-92mhz/dp/1702924 , Frequency range: 433.42MHz to 434.42MHz
+http://www.roue-libre.be/article.php3?id_article=180
+http://iw3hzx.altervista.org/Antenna/HENTENNA/Hentenna.htm
+SDR
+SX1212
+http://f5ad.free.fr/ANT-QSP_Descriptions_430.htm
+http://users.belgacom.net/hamradio/schemas/jpole.gif
+http://www.roue-libre.be/article.php3?id_article=258
+http://radio.pagesperso-orange.fr/Ant.htm#GP ; https://www.adri38.fr/antenne-ground-plane-446-mhz/
+https://www.elektor.nl/Uploads/Forum/Posts/How-to-make-a-Air-Cooled-433MHz-antenna.pdf
+http://www.qsl.net/ve2ztt/IndexD/moxon_fichiers/moxon.htm ; http://f1rzv.free.fr/moxon/index.php
+antennas
+http://www.ta-formation.com/cours/e-antennes.pdf
+
+classification according to http://www.modelisme.com/forum/aero-vol-en-immersion/195087-amplifier-un-signal-uhf-433mhz-optimize-la-reception.html
+from least good gain to best
+
+Monopoly 1/2 Wave
+1/4 wave monopoly
+1/2 wave dipole
+1/4 wave dipole (approx 70ohm)
+1/2 wave inverted V antenna
+1/4 wave inverted V antenna
+Moxon antenna (approx 50ohm)
+Yagi antenna, patch or quad (directional antenna)
+Discussion
+yesouinouinouin , 11/2014
+Hello,
+I am looking for a solution to query Cyble RF modules.
+I am ready to put my hand in my pocket to get some equipment (equipment to interrogate the RF cyble counters). in the meantime, my research on the internet shows me that the everblu protocol is compatible with the radian protocol.
+If I had enough time to experiment, I would put an SDR receiver close to my module tuned to the frequency and I would wait (one week/one month/three months). while logging reception. once a very high level emission is detected, it will be enough to look at the frames upstream.
+however I assume that there is data encryption...
+meterfairymeterfairy , 02/2015
+Good to see that your interested in these EverBlu meters. From what I can tell the Everblu Cyble Enhanced meters have no encryption or authentication whatsoever for the RF transmissions. I think the meters communicate using protocol which is very similar if not identical to the Wireless M-Bus standard. It may be the RADIAN protocol was renamed once the wireless M-Bus standard was adopted.
+
+I have access to an SDR and understand how the communication frames (size, content, checksums etc.) for these meters work, however I don't own a physical meter to test. If anyone knows where I can buy or obtain an Everblu Cyble Enhanced meter I would really appreciate it!
+yesouinouinouin , 04/2015
+Hi meterfairy
+we can find some meters in ebay from times to times (i found a new one in italy), i bought one, but the most difficult material is the programming console to initialize it.
+the difficult point is the meter itself doesn't send any frames, it just looks up for a snc pattern every 2 secs (you can "listen it" by butting the sdr centered on 433.82mhz very near the meter.)
+if you think you can find how to trigger a sleeping meter by trying to send "wake up" patterns, id be ready to offer you a unit if you find one on the ebay.
+take care, units already initialized are usually listening for wake up frames from 6am to 6pm from monday to friday (its not a joke, and its the most efficient and clever power saving idea i never heard of).
+looks
+StephaneStéphane , 01/2016
+Hi,
+Did anyone find how to wake up the Everblu Cyble RF?
+What's new since one year?
+Best regards
+yesouinouinouin , 02/2016
+Hi,
+I managed today to sniff Radian Frames with my sdr during teletransmission to hand held in my building, I captured many frames from different Water meters with the help of my sdr (30€ TNT usb stick), I ll soon upload the raw and demodulated data for getting help to decode.
+
+
+be ready to download audacity, gnuradio an the latest version of gqrx :)
+yesouinouinouin , 02/2016
+hi,
+
+have a look at
+http://ouinouin.net/owncloud/index.php/s/Nt8lnC6PPkO8AeL
+i m sharing a demodulated file to open with audacity, this is a fm demodulation of a 7minutes capture of radian polling and responses by some water meters.
+i just finished the capture + cut, i ll quickly look at the file, calculate the symbol rate and try to find the encoding.
+
+I ll nearly post on the snootlab forum more complete informations + link to the raw file captured with my sdr.
+fred_fred_ , 02/2016
+YESSS great job!!!
+FredFred , 02/2016
+Hello
+http://hackaday.com/2014/02/25/using-sdr-to-read-your-smart-meter/
+https://github.com/bemasher/rtlamr
+
+Fred
+SigmaPicSigmaPic , 03/2016
+Hello,
+
+I am also interested!
+Have you made any progress on the subject?
+How can we contribute?
+
+@+
+Fredfred , 03/2016 , 03/2016
+yes we have made progress you can look at julien's tests.
+at the end we decoded the messages (at the bit and byte level), now we need to:
+- understand how the message from the reading tool is constructed (we are interested in other recordings if we also have the number of the meter marked on the label that could help)
+- try to replay a pre-recorded message to see if we get a response
+
+from my side I am waiting for a tranceiver based on CC1101 which comes from China to be able to play with it.
+
+Fred (the site admin)
+frederic34frederic34 , 03/2016
+Hello
+My meter is 868MHz, there is a Homerider label on it with the address of the meter like 5322/11.81.xx.xx.xx
+I have an SDR key (rtl2832 with rt820t) bought for around ten euros
+I am near Montpellier and it was Veol!a who put the meter
+
+frederic34
+Sigma PicSigma Pic , 04/2016
+Hi,
+
+I have just attempted an acquisition with the SDRSharp software and a TNT RTL2832U + RT820 dongle (Saturday 12:00 p.m.).
+The antenna is 20cm from the meter.
+
+At 433.92MHz, I have no signal. Nothing at all...
+
+Is it normal at this time of the week that there is nothing?
+Sigma PicSigma Pic , 04/2016
+Quick question about the data in Julien's Excel file.
+
+Is the data transmitted with start + stop + parity bits?
+Fredfred , 04/2016
+hi
+the working hours of the meter are from Monday to Saturday 6:00 a.m. to 6:00 p.m., so Saturday around 12:00 p.m. is not bad, but to "wake up" the meter you have to send it a wake-up frame.
+2.5s of 0/1 @1.2khz followed by a frame like that of maison2:compteur_d_eau:14270.png.
+the problem is that this frame is specific to each counter.
+
+to get this frame you have to listen when the guy passes in the street to read your meter (once a year...) or if you are lucky every week when the remote reading is installed on the telephone poles or street lamps.
+
+we did not identify start + stop + parity bits, but we noticed that each byte was separated by 3 bits when it is the reading tool which speaks and 4 bits when it is the counter which speaks. in the out_raw.zip file these separation bits are present. in the out.zip and out.xls files they have been deleted.
+Sigma PicSigma Pic , 04/2016
+Ok, it works.
+
+I quickly looked at the Excel file and this is what I understood.
+
+Hand recorder frame:
+Byte 0 to 1: ????
+Byte 2 to 7: Some sort of sender address (which may include an id linked to the manufacturer)
+Byte 8 to 13: Recipient address
+Byte 14 and 15: (0x00 0x28)????
+Byte 16: ?
+Byte 17 and 18: Maybe a CRC but with what polynomial???
+
+First response from the counter with an empty frame perhaps to say "I'm here, I'm going to send you the data":
+Byte 0 to 1: ????
+Byte 2 to 7: Address of the counter
+Byte 8 to 13: Address of the hand recorder which issued the request
+Byte 14 and 15: (0x00 0x28)????
+Byte 16 and 17: Maybe a CRC but with what polynomial???
+
+Second response from the counter with an empty frame perhaps to say "I'm here, I'm going to send you the data":
+Byte 0 to 1: ????
+Byte 2 to 7: Address of the counter
+Byte 8 to 13: Address of the hand recorder which issued the request
+Byte 14 to 121: Data with perhaps indexes on the last months???
+Byte 122 and 123: CRC ??
+
+
+Has anyone managed to find the CRC algorithm that is used?
+
+@+
+Sigma PicSigma Pic , 04/2016
+In fact it is rather:
+
+
+
+Byte 2 to 7: Address of the recipient
+
+Byte 8 to 13: Address of the sender
+YoannYoann , 04/2016
+Since then, has anyone made any new discoveries?
+Since, has somebody made some new discoveries?
+4u9ur4u9ur , 05/2016
+See on the Hackaday website, dated February 24, 2016
+-> http://hackaday.com/2014/02/25/using-sdr-to-read-your-smart-meter/
+PatrickPatrick , 09/2016
+Hello,
+
+I also have a Veolia water meter in HRF at 868Mhz and an RTL-SDR nearby. Can I help make captures? analysis ? tests ?
+RF operates at 433.82 MHz. Do we know the frequency of 868Mhz?
+Thanks,
+
+---Patrick
+yesouinouinouin , 11/2016
+Hello,
+on the 868 MHz part, the physical layer will be rather everblue, which is encrypted, but always make recordings if the meter transmits continuously, with gqrx or rtl_fm, or even try to see if rtl_433 or rtl_amr decodes your frames (to compile yourself).
+Sigma PicSigma Pic , 11/2016
+Encrypted or signed ????
+
+Could someone post a frame with the numbers that are on the corresponding counter and why not the index.
+SigmaPicSigmaPic , 11/2016
+Can someone re-uplode the zip archives from julien's capture?
+Fredfred , 11/2016
+hi patrick I am not an expert in RTL-SDR, julien is much more so, I will try to write some advice
+Sigma PicSigma Pic , 02/2017
+Hi Patrick,
+
+Experience has shown us that the Cyble RF and the EverBlu Cyble Enhanced use the same protocol at 433MHz.
+Have you been able to check if your meter is transmitting constantly.
+If you have a TNT dongle like "RTL2832 + R820T", it's almost a win.
+There are many software programs that allow you to record the baseband at the frequency you choose (SDR# for example).
+If your meter is not transmitting constantly, you will even need a "wolf trap" in place to capture frames during remote reading.
+
+@+
+TeleboyTelectroboy , 04/2017
+Hi,
+
+Has anyone tested this?
+https://github.com/merbanan/rtl_433
+
+We can easily change the frequency to 433.82, I think it's worth a try.
+JayceJayce , 04/2017
+Hello,
+
+
+
+How do you actually recover the data?
+
+Software ....
+
+I have a TNT key of the type RTL2832 + R820T
+
+
+
+Thank you in advance
+Fredfred , 04/2017
+I developed a solution based on rpi + CC1101, for the moment the software is not publishable, and sigma pic made a solution based on an Mbed + C1101 card, I don't know where it came from. is his code
+MiriamMiriam , 05/2017
+Hi Fred,
+
+
+
+I have some Everblue Cyble Sensor with RADIAN protocol,
+
+
+
+I have both C1101+Mbed and RPI + CC1101.
+
+
+
+Could you help me with protocol?
+
+
+
+Thanks
+
+
+
+MM
+JayceJayce , 07/2017
+Hello
+
+What is the gear you ultimately need?
+
+thanks in advance
+Fredfred , 07/2017
+you need an RF transceiver, we chose the CC1101.
+and you need a micro controller to control it I chose a RaspberryPI and sigma an Mbed card
+
+for debugging the use of a dongle RTL-SDR USB key (with R820T2) is strongly recommended to check that you emit something and also check the emission spectrum.
+
+the first step consists of sending a query frame to your meter (see Master request in the "example" paragraph) (do not forget the 2 seconds of WUP), during the working hours of your meter => to be sure to be inside 9am-5pm weekdays
+JayceJayce , 07/2017
+You need this CC1101 module: https://www.amazon.fr/Neuftech-Wireless-Module-%C3%A9métrie-r%C3%A9cepteur-Transceiver/dp/B01CI01F94/ref=sr_1_1?ie=UTF8&qid=1500308377&sr=8 -1&keywords=CC1101 or https://www.amazon.fr/dp/B01LLQ3B98/ref=sr_1_2?ie=UTF8&qid=1500308377&sr=8-2&keywords=CC1101?
+
+Thanks in advance for the information
+Fredfred , 07/2017
+the 2 are equivalent, you must indeed choose the version with SPI protocol, even if it is not marked in the description, I recognize the image :-)
+JayceJayce , 07/2017
+THANKS
+JayceJayce , 07/2017
+I have all the equipment, now I'm missing the sources for your programs, can you provide them?
+I thank you in advance.
+Krotof1aKrotof1a , 07/2017
++1
+
+
+
+I just discovered this page while looking for information on the RADIAN protocol since I have a meter with an Everblu module. I have an RPi, different Arduinos and my CC1101 module is on its way. If there's code to build on, I'm interested. Bravo for all the work already done and thank you in advance for your support.
+JeansJohn , 09/2017
+Hello,
+
+Congratulations on this great retro work!
+I so want to do the same thing, but my meter seems to have a new type of address which is like in the following photo:
+http://www.endetec.com/endetec/ressources/files/1/31837, homeriderdplaquettecompteurs.pdf
+
+Do you have any idea how to decode it and do you think the frames are identical?
+
+Also strangely, my counter is in 868Mhz even though I thought it was the US frequency.
+Thanks for your help.
+Fredfred , 09/2017 , 09/2017
+I would say that you can try the same protocol as in 433Mhz.
+actually the label does not have the same format
+5322/10.81.09.05.09.89 (01/2009)
+against
+YY-AAAAAAA-CCC
+
+I would go for this mapping
+TYPE/AA.AA.AA.AA.YY.CC
+
+if you don't has no response try to double the data rate.
+and otherwise you will have to make a recording when the guy passes...
+ClementClement , 11/2017
+Hello,
+Great job! Do you think this kind of solution could be integrated into the Gateway RFLink? http://www.rflink.nl
+QQ , 12/2017
+I have applications on the android to read these modules, you would need to make a bluetooth device rf433 if you can do something like this I can share the apk
+maxmax , 01/2018
+have a look here - this is the official reading & programming interface for Radian 433 in walk by reading applications
+https://www.itron.com/eu/technology/product-services-catalog/products/c/8/1/bluetooth -rf-master-433-radian
+The WildebeestThe Gnoutu , 04/2018
+Hello everyone,
+
+I'm digging a little but I'm interested in electromagnetic pollution of all kinds and I was surprised not to see anything when I brought my spectrum analyzer (between 430 and 440mhz) closer to my EverBlu Cyble in 433mhz, from So I looked for the technical data and what I understood was this:
+1) the meter's RF module only transmits if it receives the "request"
+2) this RF module checks every 2 seconds that it is not receiving this request
+3) the only way to read the meter (and it transmits) is to use a mobile reading terminal (I'm talking about "normal" use here eh; )
+
+Is it right?
+
+I also read in the comments that there are also reading systems integrated into the direct environment of the meter, avoiding the need for a technician to travel. Is this actually the case?
+
+Thank you in advance for your response!
+JohnDoeJohnDoe , 04/2018
+Hello everyone,
+
+This page is a real gold mine, it is full of valuable information when you are looking to query your meter. Unfortunately, it is difficult to access and it would benefit from having an "Implementation" section which, in a few steps, explains how, starting from nothing, we can recover the desired data in very detail. I could help you write it, but for that I would have to get to the end myself! :)
+
+Today the points which are blocking on my side:
+1) [CC1101 - RPi connection] Confirm the correctness of the following connections:
+[CC1101] <=> [RPi]
+VCC PIN1
+VCC -
+MOSI PIN19
+SCK PIN23
+MISO PIN21
+GDO2 PIN13
+CSn PIN24
+GDO0 PIN11
+GND PIN25
+GND -
+
+
+2) [Determination of FREQ0] Specify the basic values ​​for High Byte, Middle Byte and Low Byte as well as the associated search method for these values. Could you detail this?
+
+3) [Compilation] Resolve the numerous errors that appear during compilation (missing #include <> in cc1101.c apparently). Do you have the list so that it compiles on the first try?
+
+Thank you in advance for your wonderful work and hoping that the resolution of my difficulties can help the next ones who embark on the adventure! :)
+
+Good Sunday.
+Alex
+Fredfred , 05/2018 , 05/2018
+thank you for your feedback
+
+1) yes it looks like it look at http://www.lamaisonsimon.fr/wiki/doku.php?id=maison2:compteur_d_eau:compteur_d_eau#schema_de_cablage
+2) determining FREQ0 is not easy, I was lucky because the meter responded and therefore I was able to see the frequency of the response on my SDR and therefore adjust the transmission frequency to be closest.
+I recommended scanning the 433.82Mhz in steps of 2-3khz starting from the center
+3) you should not compile CC1101.c alone, but radian_trc.c with the following command line: gcc radian_trx.c -o radian_trx -lwiringPi -lpthread -Wall.
+there is indeed a "c" character to delete in line 5 of radian_trc.c
+Fredfred , 05/2018
+I updated the § on compilation there are 2 tips to correct in the code ;-)
+JohnDoeJohnDoe , 05/2018
+Hello Fred,
+
+Thank you for these first elements. In order:
+
+1) The link you point to does not provide the information directly. Unfortunately I'm still not sure.
+2) Ok, I'm going to try to get it to compile now, hoping that the wiring is good to avoid burning everything up! :)
+3) Ah yes with this command line + the correction of typos it works! Please note, it is not a 'c' that should be deleted at the end of line 5, but an 's'.
+
+Thanks, Have a nice week end.
+JohnDoeJohnDoe , 05/2018
+Hello,
+
+Apparently, the counter reacts on my side, since I see a "bump" appear on SDR# when I launch the tool from the compilation.
+However, I don't get any values... Here is what I get:
+
+./radian_trx
+raspian radian trx built:Apr 29 2018 14:18:51
+
+command list:
+exit:x ;cc1101 version:v; read config: c
+m:MARCSTATE a:MCSM1_val s:full_status
+H:relevance tool scenario!
+R:Reset CC1101
+
+What should I do next?
+
+Thanks in advance. Good week.
+JohnDoeJohnDoe , 06/2018
+Hello,
+
+After trying to enter all possible letters, no data. I'm losing hope a little... Could you give me some ideas?
+
+Thank you so much.
+Good week
+Fredfred , 06/2018
+Hello,
+
+press H (capital h) between 9 a.m. and 5 p.m. on weekdays, you should see a signal on your SDR which will last 2 seconds followed if you are lucky by the response from the meter
+JohnDoeJohnDoe , 07/2018
+Hello,
+
+I get this, after doing it just now:
+
+HMARCSTATE: raw:0x13 0x13 free_byte:0x0F sts:0x02 sending 2s WUP...
+0free_byte:0x0F sts:0x02
+MARCSTATE: raw:0x0D 0x0D(RX RX )
+TMO on REC
+MARCSTATE: raw:0x0D 0x0D(RX RX)
+TMO on REC
+
+How to interpret it? What is the value of my meter?
+
+Thank you again for your help. Good week.
+Spout91Spout91 , 08/2018
+Hello,
+
+
+
+remarkable work. I really want to test it on my meter. This is a HomeRider system G2 HRF-c at 868 Mz. For your information, before I had an ITRON (but replaced because no more battery and therefore no more readings) so I imagine that the new one must be compatible.
+
+
+
+the label indicates:
+
+53.22 /
+
+50.81.17.37.0D.0D
+
+
+
+it was installed 3 weeks ago and it is operational because I see my daily readings on the Véolia website.
+
+
+
+Do you have any idea of ​​the address of this meter?
+
+
+
+thank you for your help, see you soon,
+Spout91Spout91 , 08/2018
+Hello,
+
+After analysis: the 17 in my meter number is indeed the year. While researching on the internet, I saw that Cyble HRF meters always have this format
+
+53.22 / XX.81.AA.YY.YY.YY. With AA the year of the counter. So I suspect the serial number must be YY.YY.YY because in the RADIAN protocol it only takes 3 bytes for the address.
+
+Has anyone made this observation?
+Ilya ErteIlya Erte , 11/2018
+Hello And what is the password for the radian_trx.zip file?
+bublboblzbublboblz , 04/2019
+| Hello And what is the password for the radian_trx.zip file?
+the file name without the extension
+MichaelMichael , 04/2019
+Hello,
+thank you for this article and all the hard work that enabled this reverse engineering!
+My home having been equipped with this meter since 2007 and having an RPI, CC1101 and SDR, I tried to get them to communicate.
+Using the radian_trx script and pressing H I was able to observe with SDR# that the RPI and the meter seemed to communicate well with each other. In this screenshot: https://ibb.co/hFq2rDY we see 3 frames. The first comes from the RPI, the next 2 from the water meter. Unfortunately the script does not seem to be able to decode the frames sent back.
+
+Do you have an idea or advice?
+
+THANKS
+MichaelMichael , 04/2019
+Finally IT WORKS! :) I made a mistake in connecting the CC1101...
+Has anyone written a script with a more usable output?
+I see in the article a reference to a script called via cron: web_tx_releve but it is not in the zip.
+paulpaul , 07/2019
+Hello, thank you for this information. I was trying to find out if the Cyble RF was toxic in terms of electromagnetic waves and if it emitted often and for a long time. I understood from reading this blog that it never transmits except when it is interrogated once a year or once a week if the lifting module is on a nearby pole. Okay and how much does he emit, how long does he cause when he's awake? Thank you for your response and congratulations for your work.
+Fredfred , 07/2019 , 07/2019
+hi
+
+here is the content of web_tx_releve
+cpt_response=`sudo /home/pi/cpt_eau/radian_trx r`
+echo $cpt_response
+wget -4 -O/home/pi/cpt_eau/phpout -o/home/pi/cpt_eau/out http:// www.tonserveur.com/traitement.php?data=$cpt_response
+
+it only sends the data to a server, if you want more data you can try the output.\radian_trx, without parameters it causes more
+
+
+in terms of RF pollution is the same as a car key, ie nothing or almost nothing
+philippephilippe , 10/2019
+hi, I would like to know if it would be possible to adapt the code to a simple solution like this https://fr.aliexpress.com/item/32877048266.html
+
+It's a CC1101 USB, that would make it much easier simple, and accessible to all!
+FlopFlop , 10/2019
+Hello,
+
+Thank you for publishing all this information, thanks to you I managed to read my recently installed water meter.
+Not having a TNT key, I added a function that scans the frequencies and attempts recovery. I may have been lucky, but it worked to find the Freq0 setting
+
+uint8_t cc1101_scan(void)
+{
+uint8_t ret=0;
+
+for (uint8_t freq=0;freq<255;freq++){
+halRfWriteReg(FREQ0,freq);
+printf("\n\nTry with Freq0=%d\n",freq);
+ret=scenario_releve();
+if (ret!=0) {
+printf("\nResponse!!!!");
+show_cc1101_registers_settings();
+//break;
+}
+}
+return 1;
+}
+cedCed , 11/2019
+Hello and above all congratulations!
+
+Thank you, thanks to your great work, I was able to recover the data from my AnyQuest Cybel meter, all that remains is to integrate it into Domoticz :)
+
+The SDR key helped me a lot, and especially to see that my CC1101 does not was not transmitting: in the wiring diagram, remember to connect the 3.3V (VCC) of the CC1101 to the Raspberry (PIN 1 or 17).
+
+I didn't need to change the frequency, the online value 233 (0xB7) worked straight for me.
+
+My meter actually only communicates during working hours (9 a.m. to 5 p.m.? - I haven't checked the range)
+
+For all those who are embarking on the adventure, it can be scary but the most complicated thing is doing the wiring between the raspberry and the CC1101 (do not make a mistake in the connections!)
+
+A+!
+cedCed , 11/2019
+PS: the meter does not emit waves regularly: it must be "wake up" with the 2-second signal (which contains the serial number of the meter) for it to transmit its data
+MarkMark , 12/2019
+Hello,
+Thank you very much for the work accomplished. I am in the process of getting into electronic editing but do any of you have details on the integration into Domoticz?
+Thanks in advance.
+MarkMark , 12/2019
+FYI, everything works as expected. I still had to use Flop's scan function (THANK YOU!!!!) to find the right frequency.
+
+
+
+Next step: integration into Domoticz to log my daily consumption and set up an alarm on a high threshold to detect possible leaks (this happened to me so I know what I'm talking about :-( )
+
+
+
+Thanks again for the great job.
+cedCed , 01/2020
+Hi,
+
+for integration into Domoticz:
+
+1. modify the cc1101.c file: add the functions
+
+void writeres(char *tow)
+{
+FILE *fptr;
+char file_name[] = { "./litres.txt" };
+fptr = fopen(file_name, "w");
+
+if(fptr == NULL)
+{
+printf("Error!");
+exit(1);
+}
+fprintf(fptr,"%s", tow);
+fclose(fptr);
+}
+
+void display_meter_cron (uint8_t *decoded_buffer , uint8_t size)
+{
+char output[1000];
+if (size >= 30)
+{
+printf("%u\n",decoded_buffer[18]+decoded_buffer[19]*256 + decoded_buffer[20]*65536 + decoded_buffer[21]*16777216);
+sprintf(output,"%u",decoded_buffer[18]+decoded_buffer[19]*256 + decoded_buffer[20]*65536 + decoded_buffer[21]*16777216);
+writers(output);
+}
+}
+
+and replace in the scenario_releve function: the line:
+else show_in_hex_one_line_GET(meter_data, meter_data_size);
+by the line:
+else display_meter_cron(meter_data, meter_data_size);
+
+2. recompile, put the program in the /home/pi/radian/ folder
+
+3. in Domoticz, create a new hardware of type "Dummy"
+then create a new virtual sensor of type "Counter"
+Retrieve its index number in the devices (Idx column)
+Your meter appears in the Measurements menu: modify it to set a “Water” type and a divisor at 1000
+
+4. create a /home/pi/radian/script.sh file on the PI, replace the value 167 in the script with that of your previously found index number:
+#!/bin/sh
+cd /home/pi/radian
+FILE="/home/pi/radian/litres.txt"
+HISTORY="/home/pi/ radian/litres_history.txt"
+dt=$(date '+%d/%m/%Y %H:%M:%S');
+rm -f $FILE
+/home/pi/radian/radian_trx r
+if test -f "$FILE"; then
+value=`cat $FILE`
+echo "$value"
+curl "http://localhost:8080/json.htm?type=command¶m=udevice&idx=167&svalue=$value"
+echo "$dt;$value" >> $HISTORY
+rm -f $FILE
+fi
+
+5. for info, the script logs the values ​​in the file /home/pi/radian/litres_history.txt with the date and time
+
+6. Edit your crontab (crontab -e) and add:
+0 9.17 * * 1-5 /home/pi/radian/script.sh
+this runs the script at 9am and 5pm every working day of the week.
+
+7.
+
+There remains to be done: I don't yet know why but Domoticz does not count liters correctly when there has not been a value for a certain time...
+A solution would perhaps be to create a script which is launched outside of the collection hours (9 a.m. and 5 p.m.) and which would systematically push the last value, to be tested!
+
+PS: I'm not sure it's a good idea to read the meter too regularly for leak detection: the battery might not last that long, any opinions?
+
+++!
+cedCed , 01/2020
+not yet tested over time with Domoticz, but for the script which retrieves the last value from the history file and sends it back to Domoticz:
+
+1. create the file /home/pi/radian/dummy.sh, replace the value 167 in the script with that of your previously found index number:
+#!/bin/sh
+cd /home/pi/radian
+HISTORY="/home/pi/radian/litres_history.txt"
+if test -f "$HISTORY"; then
+value=`tail -1 $HISTORY | cut -d\; -f2`
+echo "$value"
+curl "http://localhost:8080/json.htm?type=command¶m=udevice&idx=167&svalue=$value"
+fi
+
+2. Edit your crontab (crontab -e) and add:
+30 * * * * /home/pi/radian/dummy.sh
+this launches the script every hour at 30 minutes (to avoid the conflict at the fixed time of 9 a.m. and 5 p.m.!)
+Fredfred , 02/2020
+thank you to flop and ced for your contributions
+garycoopergarycooper , 02/2020
+Hello, I have two water meters equipped with a Cyble RF and I would also like to create this "sniffer" based on a 0W raspberry pi and a CC1101 module. Would there be a complete tutorial to facilitate implementation?
+
+In addition to the Pi0W, I was thinking of purchasing this CC1101 module:
+
+https://fr.aliexpress.com/item/4000310314726.html?spm=a2g0s.9042311.0.0.38fd6c37s7T6jA
+
+and this PCB:
+
+https://netxing.files.wordpress. com/2017/09/photo_2017-09-20_22-11-18.jpg
+vaguidavaguida , 04/2020
+Hello hello,
+
+
+
+Has anyone managed to recover the data from the Homeridersystems HRF-C-G2 ​​water meter in the end?
+vaguidavaguida , 04/2020
+This really makes me want to try! Do you think it would work with RFLink? I'm just wondering, if it works, how can I then send the information to Home Assistant that I use on my Raspberry Pi 4... In reality, I would have liked not to have an Arduino or ESP card in addition, and not have to only use my Pi 4 but that seems compromised to me. I am wrong ?
+I'm really hesitant to get started because it's not very clear for my environment and my need for 868MHz...
+Many thanks to anyone who can give me some insight!
+Guillaumeguillaume , 05/2020
+Thanks for the crazy work.
+I took advantage of confinement to test and sniff my meter. This is done using Ced's function to cycle through frequencies.
+I added a curl just to send the reading via the Domticz API
+Everything works on Raspberry, but impossible to get the CC1101 to work on orange Pi zero.. to be continued
+garycoopergarycooper , 05/2020
+Hello, I ended up receiving the hardware (CC01 + RPi0W) but I can't find what to do to be able to capture the signals from my 2 meters. I installed raspbian lite on the micro SD but what next? Are there files to copy to the root of the memory card? A git to clone? I'm a bit lost... Could anyone advise how to proceed? Subsequently, I want to send this data to my hometicz installed on RPi4.
+garycoopergarycooper , 05/2020
+I'm making a little progress (at least, it seems to me), but now I'm stumbling over the coding of the meter number and where it should be entered. My number is 06-0306576-243
+garycoopergarycooper , 06/2020
+Weird, when I run the compilation, I get this:
+
+In file included from radian_trx.h:96,
+from radian_trx.c:5:
+cc1101.c: In function 'scenario_releve':
+cc1101.c:685:13: warning: variable 'TS_len_u8' set but not used [-Wunused-but-set-variable]
+uint8_t TS_len_u8;
+^~~~~~~~~
+NikolaNikola , 07/2020
+can you help me with advice on how to lower the frequency by 20khz because it now broadcasts to 433.846MHz
+nikolanikola , 07/2020
+i have a different serial number 23820591 only that number is written on the heatmeter sontex ... which also uses 433.820 radian 0
+
+is there a possibility to send the command I sniffed with this protocol when communicating gateway and heatmeter?
+FrancoisFrancois , 08/2020
+Hello everyone,
+First of all a big thank you to all those who helped find the solutions to take the readings of our water meters: Fred, Julien, SigmaPic and then more recently the other contributors for Domoticz, etc.. I
+
+managed to read my water meter (EverBlu Cyble Enhanced V2.1) using a Raspberry Pi 4 and a small CC1101 module (https://www.amazon.fr/dp/B07YX92NMP?ref_=pe_3044141_248816771_302_E_DDE_dt_1) .
+The main difficulty encountered was with the serial number of my meter: "0123456". I entered "0123456" in the "Make_Radian_Master_req" function and it didn't work. After removing the "0" at the beginning, i.e. entering "123456" in the "Make_Radian_Master_req" function, it started working perfectly (without changing the frequencies, which suited me well...) . For the explanation of the "0" at the start of a value in C/C++, it's here: https://stackoverflow.com/questions/29325822/c-int-with-preceding-0-changes-entire-value
+
+I have started to make some changes to the code (more information in particular) and I would perhaps like to switch it to C++ rather than C. What is the license associated with the source code?
+@Fred: Does the code use licensed pieces of code?
+
+Last question: given that the meter returns an indicator on the number of readings, there is no risk (not physical, but rather on the "legal" side) in reading your meter often...? For those who have integrated their meter with a home automation system, how many readings do you take per day/hour?
+Fredfred , 08/2020
+Nikola, the tuning of frequency is done by configuring halRfWriteReg(FREQ0,??) you can try to shift from some digit and check the result using an SDR
+
+Francois
+indeed the example given for the serial number is not ideal.
+I didn't put a license on this code, maybe I should, I didn't know much about it in terms of licensing.
+this code was made by "looking at" the radian protocol which is said to be open source higher up on the page, I don't know if that helps?
+
+the reading meter can be monitored by your water manager, especially in the event of self-reading.
+personally I only do one reading per day I have not seen any impact on the lifespan of the integrated battery
+AlexAlex , 08/2020
+Firstly thank you for the research and development.
+
+
+
+I managed to put them all together; on the other hand I have a question about the automation of the launch of the exe created on the pi.
+
+
+
+What is given above launches the executable because an execution in relief must be indicated to it the path H:scenario of the relief tool! and the crontab simply asks to launch the exe:
+
+
+
+"sudo crontab -e
+
+
+
+55 9 * * * sudo /home/pi/radian_trx/web_tx_releve >/dev/null 2>&1
+
+
+
+55 9 * * * sudo /home/pi/ radian_trx/web_tx_releve >> /var/log/crontab.log"
+DidierDidier , 09/2020
+Hello
+I don't have a raspberry Pi but an arduino + CC1101.
+Maybe someone would have developed a code on arduino to read the RF cyble meters
+You never know
+CharlesCharles , 09/2020
+Hello and congratulations for this superb work.
+Before getting started I have a question which I believe has not yet been raised:
+How far from your meter is your reading system and have you carried out maximum distance tests?
+frangarrobfrangarrob , 10/2020
+Hi François. I also have an EverBlu Cyble Enhanced V2.1. I don't know how to register on the forum. Can you pass me the source code you used to do the readings?
+frangarrobfrangarrob , 10/2020
+I leave you my email frangarrob@yahoo.es
+avsantosavsantos , 10/2020
+Hello everyone,
+
+
+
+First of all thank you for the fantastic work you have done.
+
+
+
+I share with you the problems I had:
+
+1) The CC1101 card I bought did not work properly, I suggest you buy this:
+
+https://www.amazon.es/gp/product /B07YX92NMP/ref=ppx_yo_dt_b_asin_title_o00_s00?ie=UTF8&psc=1
+
+2) The connection to the RaspberryPi 3 is not 26 pin, but 40, please note the connections. I was wrong to connect the Csn(CC1101) - CE0(pi) and the CC1101 did not work.
+
+3) Verify that the CC1101 is working by running radian_trx and choosing the option: v. If the response is no different than 00 or FF, it is because they are not communicating with cc1101.
+
+3) The chosen frequency FREQ0 was the faulty frequency and worked correctly (halRfWriteReg(FREQ0,0x75);).
+
+4) The serial number of my Cyble everblue started at 0. Do not place 0 in the cc1101.c file
+
+5) The cyble pairs with the physical counter, that is to say it has an association. This association is done by counting and serial number, which is read in the communication.
+
+
+
+Corrections required: The serial number of the physical meter is upside down. In other words, the last digit is the first and so on.
+
+
+
+Suggested Implementations:
+
+1) Get information about water leaks - This device allows the water leak to be in place and should be read.
+
+2) Check the possibility of changing the Cyble+ physical counter pair. For example, I purchased the Cyble+ physical meter. So they make a pair. However, I removed the cyble from the physical meter and now wanted to put in the water company's physical meter, which has another account and serial number. The account and serial number must be possible to change.
+
+
+
+Thank you all
+PacificPacific , 01/2021
+Hello,
+Found this blog by chance and very happy because I was wondering how to read my ITRON Everblue Cyble V2.1 meter in order to include the information in my Jeedom home automation.
+I'm not a programming specialist but tinker a bit. I'm going to bring in a TI interface and a PiZero. I think this should be suitable and then I will tackle the script for the connection with Jeedom (this is where it will get complicated ;-))
+Has there been any progress on the software? I'm tearing my hair out trying to figure out how to calculate the frequency. I'm playing with TI's SmartRF Studio and it seems that the algorithm is not that simple, several elements come into play. We come back to your FREQ0 suggestions by taking the various parameters already recorded in the init. As soon as I have the equipment I will compare with an SDR, after having calibrated its offset (on aero weather frequency..) I will keep you informed of my progress It's a great job that has been done, thank you again
+DidierDidier , 01/2021
+Hello
+
+I would be interested in the software that "sigma PIC" would have developed on Mbed + CC1101.
+BuleBule , 02/2021
+Hello, thank you very much for your work, the truth is that it has helped me a lot.
+
+I just said that.
+PacificPacific , 02/2021
+Hello,
+
+Too bad this blog seems to have fallen asleep but for the curious still listening, I confirm that it works very well. I kept the default settings and the first time, I obtained the results. This also allowed me to notice that the electronic part of my meter, even if it works and sees the information again, is blocked. As it was a new meter, set to zero, this made it possible to note the town hall's reading error and to determine a blockage of more than 6 months. I hope they will replace it for me because now that I can read it and include it in my home automation.... It's annoying ;-)
+
+Well, as far as the frequency is concerned, well it's relatively simple and above all more precise than the empirical method of testing of various values.
+
+I took inspiration from different libraries (Github) for using CC1101 with Arduino and found the calculation method.
+
+There are mainly 2, one relatively cumbersome to implement because it is based on binary information with rotations to the left and right, all with a re-calculation in decimal/hex each time. We work on 32 bits so you see the work but it works. I used Excel and its various options to create a table.
+
+On the other hand, the second is much simpler but also requires Excel to facilitate calculations.
+
+The principle uses 7 main cells and three more to convert the decimal results into Hexa to enter them in the program.
+
+Cell 1: 433.920 - chosen median frequency
+
+cell 2: 26 - circuit quartz frequency (fixed)
+
+cell 3: =ENT(Cel1/cel2) - FREQ2 in decimal (integer value)
+
+cell 4: =MOD(Cel1;cel2) - Modulo of FREQ2
+
+cell 5: =ENT(cel4/0.1015625) - FREQ1 in decimal the value of the divisor is fixed and don't ask me how we find it......don't know
+
+cell 6: =MOD(cel4; 0.1015625) - Modulo of FREQ1
+
+cell 7: =ENT(cel6/0.00039675) - FREQ0 in decimal the value of the divisor is fixed and don't ask me how we find it
+
+the last 3 cells use =DECHEX(celx) for convert the FREQx values ​​to Hex in order to correctly complete the program.
+
+
+
+Have fun, just change the frequency and everything increments automatically. Results have been verified with TI's Smart RF Studion. It's OK
+
+, compare with the empirical values ​​and you'll see.
+
+@+
+dckillerdckiller , 03/2021
+Hello,
+I have carried out the tests. I successfully received the data. On the other hand, I have a discrepancy.
+Counter = 1555 received 1595
+Counter = 1613 received 1656
+Is this a freq setting problem?
+PacificPacific , 03/2021
+Hello,
+I don't think this is a frequency problem because, after frequency control tests, it either works or it doesn't. If on reception the frame is complete and therefore the display of the result is clear in the last line, the difference can, in my opinion, only come from a slight shift in the mechanical transmission (visual sensor) I think have this problem on my meter since everything works except the volume increment. If your results are in liters the difference is not convincing between a mechanical meter reading and the electronic one.
+Vincentvincent , 04/2021
+hello,
+
+Very interesting forum and I would like to make my assembly for the same water sensor towards Domoticz.
+I don't see how to register on this forum and retrieve the sources :(
+could anyone have those mentioned by François?
+
+If there is anyone who reads this bottle in the sea, don't hesitate do not contact me/give me useful links please:
+harko_tank at yahoo.fr
+
+thank you in any case!
+vincent
+PacificPacific , 04/2021
+Hi,
+No need to register for sources. Simply download the radian_trx.zip file in the code section (the password is the name of the file, very simple) With the default frequency setting it works the first time (for me..) you simply have to enter the counter number without the 0 at the beginning and make the 2 corrections in the files as indicated.
+For Domotiz, the explanations are given, for my part I simply made some modifications so that it works in a virtual Jeedom.
+Good hack
+NonoNono , 06/2021
+Hello,
+
+
+
+Could there have been any improvements to make the assembly more accessible and use it with home assistant and why not with an ESP32?
+
+
+
+Because after careful reading, I didn't really understand what exactly to do.
+
+
+
+THANKS.
+JonathanJonathan , 06/2021
+Hello everyone and thank you for all this work!
+
+For my part, it doesn't work at the moment. No response from the meter (tested in the middle of the day, on a weekday) despite the scan function and testing different possibilities (year in decimal and hexadecimal, serial number with/without inverted numbers). A priori, the CC1101 works since I see the two seconds of "wake-up of the meter" on SDR# via my SDR key.
+
+Thanks again anyway.
+LaurentLaurent , 07/2021
+Hello - After a lot of errors, I received a frame but nothing else: MARCSTATE: raw:0x0D 0x0D(RX RX)
+GDO0! 00 1st synch received rssi=177 lqi=128 F_est=255
+MARCSTATE: raw:0x0D 0x0D(RX RX)
+GDO0! frame received
+RAW buffer
+received radian frame size=0
+TMO on REC
+
+Has anyone ever had this type of situation?
+I think it's either a phantom response (but it only appears around 433.82) or it's another counter that reacts but not mine.
+It's not easy to find out more. .
+THANKS !
+Titi007Titi007 , 08/2021
+Well, come on, I'm going to try to do it too...
+I'm ordering the CC1101 on Amazon, for the rpi, can we take a pi zero?
+
+@Pacific, what kind of modification did you make because the same is to integrate it into jeedom?
+
+A big thank you to those who worked to find this solution!
+AnasAnas , 11/2021
+Hello,
+
+I have an itron cyble HRFv5.2 868MHz meter. Do you know what is the right frequency to listen to? Because with the command rtl_433 -f 868MHz it doesn't work even after several hours of listening! I have a nooelec rtl-sdr key. Thank you for your help
+pg88650pg88650 , 11/2021
+Hello,
+
+I am interested in being able to read my water meter remotely, your discussion is very interesting but it is easy to get lost, especially for uninitiated people like me.
+
+Could someone make a detailed tutorial to explain everything, I know I'm asking a lot but this subject interests a lot of people?
+
+I should point out that I also have a water meter with an Everblue mounted on it.
+
+Thank you for your help, best regards.
+
+Phil
+tuxtoftuxtof , 02/2022
+Hello @Anas, I have the same water meter as you, have you come up with anything???
+BertrandBertrand , 02/2022
+Hello,
+
+I have some problems:
+
+- Does anyone have a solution for the error below:
+
+In file included from radian_trx.h:96,
+from radian_trx.c:5:
+cc1101.c: In function 'scenario_releve':
+cc1101.c:685:13: warning: variable 'TS_len_u8' set but not used [-Wunused-but-set-variable]
+uint8_t TS_len_u8;
+^~~~~~~~~
+
+Furthermore, can you explain what should be done with the different FREQ lines?
+
+Thanks in advance,
+ChristianCristian , 03/2022
+Hi,
+
+I am trying for a week now to read my "AnyQuest Cyble Enchanced" -433Mhz watermeter. I have some experience with RF but this watermeter seems to be my kryptonite :).
+I have the code right, I tried different frequencies, I have the correct year and serial "15" - "1052512", I tried different times of day, there is no response from it. I am watching in parallel the communication with a RTLSDR to see if message is sent correctly, and it seems it is sent ok. I just can't make it work. There is no response from the meter.
+
+I am using Raspberry Pi zero + CC1101 module.
+Wiring is done correctly (triple checked it). The message sniffing with RTL-SDR looks correct.
+
+Any other suggestions that might help me?
+BertrandBertrand , 03/2022
+Hello Christian,
+
+Unfortunately I can't help you. It looks like you are further than me: could you help on my previous mail?
+I tried with a rtlsdr but not sure I see messages from the watermeter.
+
+My issues are still:
+
+1-Did you jump into this error? and how did you solve it? maybe could you share your CC1101.c file around row 660 ? when compiling:
+
+In file included from radian_trx.h:96,
+from radian_trx.c:5:
+cc1101.c: In function 'scenario_releve':
+cc1101.c:685:13: warning: variable 'TS_len_u8' set but not used [- Wunused-but-set-variable]
+uint8_t TS_len_u8;
+^~~~~~~~~
+
+2 - In your mail, it looks like you correctly deal with the frequency in file CC1101.c: could you also share it?
+
+3 - watermeter number: in some posts above, I understood we have to post the number from right to left. For instance if watermeter id is 123456 you have to put in CC1101.C 654321. Is it what you did?
+
+Also, I share with you an other tool that looks interesting, but I don't read anything from the everblu cyble watermeter at that stage (youtube: https://www.youtube.com/watch?v=m5R6sfsGmvE&list=UURJE6Yb_R3Xei-QGcy_Qwhw&index =14)
+
+
+Many thanks for your help,
+
+Regards,
+Al RamirAl Ramir , 03/2022
+How can I get in touch with lamaisonsimon.fr to discuss a project to read data from an Itron's water meter using EverBlu Cyble
+ChristianCristian , 03/2022
+Hi Bertrand,
+https://github.com/tpacri/cyble_reader
+here is my code. I added 3 more key shortcuts: 2 for increasing/decreasing the frequency by 0.2Khz as instructed to make it easier to test with different freq.
+And another shortcut that starts a continuous reading every 10 seconds or so. I am using this in order to start the continuous reading (outputting the result to a file) and moving my raspberry pi closer to the watermeter just in case the transmit power was not enough).
+
+
+In my code in cc1101.c line 825 replace the YY, SSSS with your own values ​​from the watermeter reader
+int msgSize = Make_Radian_Master_req(txbuffer, YY, SSSSSS);
+
+To be noted tha as so far i was NOT able to read anything from my watermeter. Watermeter doesn't seem to react to my messages
+
+To build it, copy my code to your raspberry pi zero, change the YY, SSSSS to your values ​​and then ran "bash build.sh" to build your code. If no error, you can run it and test
+ChristianCristian , 03/2022
+I think I have a response. Hopefully I don't rush into conclusions but I'm kind of happy and need to share :). I will update you with details in the next days. What I tried today was to use arduino instead of Raspberry pi (with same CC1101 module). From Arduino I set a bigger deviation (the code provided on this site had a very small deviation and my UniversalRadioHacker could not decrypt it well. So, I increased deviation and I changed the encode2serial_1_3 code to encode bytes by adding 2 "1"s in the end instead of 3 as in the original code. So now my bytes are encoded like: "0"byte"11" instead of "0"byte"111".
+After doing these changes I saw with my RTLSDR a very weak response. It was a response for sure but the deviation was so small that my UniversalRadioHacker could not decode it yet. I will try in the next days to dig in more and maybe change the raspberry pi code to make it work also. Will update here.
+BertrandBertrand , 03/2022
+Hi Christian,
+
+I ran into some compilation issues using your files. I had some errors that I was unable to understand.
+
+But I found this, which is working based on the work done above and similar to your work: https://github.com/neutrinus/everblu-meters. Only issue was related to the wiring indications, that were wrong (do not use the numbers on the CC1101 but the names of the pin)
+
+I have an accurate measurement, and as the mqtt part is embedded, I can have the information uploaded into HA as well.
+
+Regards,
+BertrandBertrand , 03/2022
+Christian,
+
+Currently, the CC1101 is linked to a Pi4. Not the best hitch, I will maybe buy a smaller raspberry. But the watermeter is on the ground level, while the CC1101 is on the 2 level, so at least 6 meters away and the signal is correct and accurate. Maybe it depends on the CC1101 model?
+
+For the HA part, I am using utilities meter, but I also started to adapt this to the Itron watermeter measurements. https://forum.hacf.fr/t/monitoring-electricite-avec-la-teleinfo-node-red-influxdb/4546
+
+Regards,
+pmachatpmpurchase , 05/2022
+Hello
+After some difficulties a priori I retrieve data "GDO0! frame received" with lots of code in Hexa when I do the command "H"
+How to obtain the liters / m3 from the meter?
+My meter is ITRON EverBlu CyBle 22-xxxxxxx-177
+Thank you
+SiriusSirius , 05/2022
+Hello everyone,
+
+after a few weeks of studying this page and doing tests I was finally able to successfully recover the value of my meter!
+This is great, thank you for your work! Especially all the comments above.
+
+Well now I have to see if it is possible to recover the value of the counter for the last x days. In particular so as not to have zero consumption on Saturday and Sunday and too high on Monday (in my case I take one measurement per day.
+I know that Suez or Veolia had similar meters with index feedback on their site. No consumption information on Saturday or Sunday but the following Monday we retrieved the consumption of the weekend day by day. So I tell myself that it is recorded in the meter and surely transmitted in one way or another other... (for those who are interested: https://domotique.web2diz.net/recuperer-les-information-de-consommation-du-site-de-la-lyonnaise-des-eaux-sdei/)
+
+
+I will try to dig a little deeper but it will certainly go beyond my limits... If I find something I will keep you informed!
+
+
+Thanks again and see you soon
+PmachatPmachat , 05/2022
+Hello Sirius,
+I'm still in trouble.
+Can you tell me if you entered the year and meter number in the code as displayed on the meter?
+Personally, I have a number starting with zero, I tried with and without it didn't work
+Otherwise how far should you be from the meter because mine is in the street?
+Thanks in advance
+SiriusSirius , 05/2022
+Hello,
+
+I entered the code without the zeros at the beginning:
+
+eg if your code is 21-02365800-123 you enter 2365800
+
+Sorry for the delay ;)
+pmachatpmpurchase , 05/2022
+Hello,
+Thank you Sirus for the info at least now I no longer have any doubts about the number.
+
+1/When I launch "H" (remote reading scenario), I only obtain the message (in debug mode)
+MARCSTATE: raw:0x13 0x13 free_byte:0x0F sts:0x02 sending 2s WUP...
+50 00 00 00 03 FF FF FF FF 64 70 47 00 75 17 34
+76 07 03 73 77 00 75 17 02 72 87 05 71 47 00 72
+87 01 76 47 1E FF FF
+189free_byte:0x0F sts:0x07
+MARCSTATE: raw:0x0D 0x 0D(RX RX)
+TMO on REC
+MARCSTATE: raw:0x0D 0x0D(RX RX)
+TMO on REC
+I conclude that I receive nothing.....
+
+2/ I "verified" the CC1101 with "v": I obtain
+vCC1101 Partnumber: 0x00
+CC1101 Version != 00 or 0xFF: 0x04
+I guess this is correct.
+
+3/ FOR the register config, command "c" I obtain
+Config Register in hex:
+0 1 2 3 4 5 6 7 8 9 ABCDEF
+0D 2E 06 47 55 00 FF 00 00 00 00 08 00 10 AF B7 F6
+83 02 00 00 15 07 00 18 1D 1C C7 00 B2 87 6B
+FB B6 10 E9 2A 00 1F 41 00 59 7F 3F 81 35 09
+PaTable:
+60 00 00 00 00 00 00 00
+
+
+Can you tell me what you get for these orders to be able to compare?
+If you have an idea....
+
+Thanks in advance
+psyduckpsyduck , 05/2022
+For your information, I ported the code to run it on an ESP8266 or ESP32: https://github.com/psykokwak-com/everblu-meters-esp8266
+
+Thanks to the authors for their reverse engineering work.
+ChristianCristian , 06/2022
+psykokwak - Thank you. I was struggling for a couple of months now with my Anyquest - Cyble watermketer and I could not have a stable read so far. I tried with Arduino and then with Raspberry Pi zero without any luck (there was one time when I saw a response, but that's it. Just once).
+I tried yesterday your code with a Wemos and I finally I have a stable reading integrated in HomeAssistant.
+
+Thank you!
+
+PS: I can confirm that my Anyquest-Cyble does NOT respond in weekends nor in weekends after 17:00 local time
+Fredfred , 07/2022 , 07/2022
+hi psykokwakpsykokwak
+
+thank you for your port to esp8266, it's nice to see the project live.
+
+thank you also to the other comments
+
+It's been a long time since I came back to see the comments, I'm amazed by all this activity :-)
+MarcoMarco , 08/2022
+Hello everyone, I am a little (much) ignorant on the subject but the subject interests me because I would like to develop, among other things, using a PI4 and home automation, a system for reading my water meter . Reading you, all this seems difficult to me and I don't know where to start. Could someone help me by starting with the necessary hardware and then configuring it in a language that would be accessible to me. I would also like to connect to the site, but I have not yet found the door for someone who is not yet registered. Thanks in advance
+SiriusSirius , 09/2022
+@pmachat
+
+Sorry I only see your message now.
+
+The installation has been in place for a few weeks and I have no problems for your information.
+I had a few times it didn't work, it was because the sensor wasn't close enough. (you can test at 1m to check...).
+Today he is 10 years away and crosses a car and a brick wall and it works...
+
+When I put the H option I get:
+
+command list:
+exit:x ;cc1101 version:v; read config: c
+m:MARCSTATE a:MCSM1_val s:full_status
+H:scenario of the survey tool!
+S: Scan
+R: Reset CC1101
+
+HMARCSTATE: RAW: 0x13 0x13 free_byte: 0x0f STS: 0x02 Sending 2S WUP ...
+
+50 00 00 03 FF FF FF FF 64 70 47 00 75 17 44
+76 07 71 71 77 00 75 17 02 72 87 05 71 47 00 72
+87 01 72 77 3E FF FF
+186free_byte:0x0D sts:0x07
+MARCSTATE: raw:0x0D 0x0D(RX RX)
+GDO0! 00 1st synch received rssi=171 lqi=128 F_est=255
+MARCSTATE: raw:0x0D 0x0D(RX RX)
+GDO0! frame received
+MARCSTATE: raw:0x0D 0x0D(RX RX)
+GDO0! 00 1st synch received rssi=171 lqi=128 F_est=255
+MARCSTATE: raw:0x0D 0x0D(RX RX)
+GDO0! frame received
+
+0x00,0xFF [then a long message in hex]
+
+To finish with the line which displays the information:
+2/9/2022 15:6:25 264903litres Num189 113Month 6h-18h serial:<serial of my meter>
+
+
+I have adapted the .h script and made a .sh to add the information in domoticz automatically, I will detail that very soon here https://github.com/Sirus10/consoEAU ...
+
+Thank you all for your contributions and your help!
+MarcoMarco , 12/2022
+Does anyone know how to configure Cyble RF remotely?
+
+I know it is possible, but I cant find the data format or payload to set the configurations.
+
+Best regards,
+
+-- Marco
+AndyAndy , 01/2023
+I would also be interested to learn about configuring the meter...
+I would like it to respond outside of business hours.
+Charley86Charley86 , 07/2023
+Hello and thank you for this great work,
+
+For those who are interested, my little contribution, I made CC1101 cards that can be directly plugged into a PI (it's simpler and prettier)
+https://github.com/hallard/cc1101 -e07-pi
+
+Received yesterday, tested working impek, I also updated the code for this card
+https://github.com/hallard/everblu-meters-pi
+
+Others to come including an ESP32 with the CC1101 module directly on it and another PI board with AliExpress modules (not the EBytes E07) so you can solder easily.
+DiscipleDisciple , 08/2023
+Many thanks to everyone for this tutorial and your comments/experiences.
+
+With all the help found here (Thanks @Fred),
+and the complements found https://haade.fr/fr/blog/domotiser-compteur-eau-itron-everblu-cyble (Thanks @Nico @Haade)
+I will Lauch myself.
+
+Waiting for AliExpress delivery!
+
+Thanks again to all forum participants.
+rigsrigues , 10/2023
+Hello everyone, great contributions here, I would like to buy one of this set that can reads Cyble too, I would like to see if someone is interested on sell me a complete setup of an Cyble reader that sends information thought MQTT or HTTPD to a server in a JSON. I have a building here that has 60 of these cybles and need to be read by a very old walkby device.
+
+Thanks
+
+rigues
+staroxstarox , 02/2024
+Hi everyone,
+
+I have an actaris cyble rf 433Mhz from 2002. I won't do anything with it.
+If anyone is interested, I can send it to France. Give what you can.
+
+Hello everyone,
+
+I have an Actaris cyble rf 433Mhz from 2002. I'm not going to do anything with it.
+If anyone is interested, I can send them to France.
+Give what you want in exchange.
+WilliamWilliam , 03/2024
+Hello,
+
+
+I have an Itron EverBlu Cyble water meter installed by SICOVAL.
+
+Can you help me retrieve the information from this meter, is there a tutorial?
+
+Thanks in advance,
+
+William

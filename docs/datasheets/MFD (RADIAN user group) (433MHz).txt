@@ -1,0 +1,106 @@
+AnyQuest / EverBlu
+Option Board
+Radio Module for Remote Heat, Cooling & Water Meter Reading
+The AnyQuest / EverBlu option board has been designed to fulfi l the requirement of
+utilities and service companies willing to remote read their heat, cooling and water
+meters by radio in Mobile or Fixed Network in order to improve their productivity and sell
+extra services to their customers.
+As heat, cooling and water meters are Compatibility Powerful and Advanced Features
+an important investment for utilities, the The AnyQuest / EverBlu option board is » AnyQuest
+complete Itron CF-family of ultrasonic heat compatible to all Itron heat, cooling and Managed by the RF reading software,
+and cooling meter as well as calculators water meters of the latest CF-family range multiple data frames could be selected:
+for split meters and the Echodis of products:
+water meters could be pre-equipped Heat & Cooling Echodis
+» CF Echo II (standard frame)*
+considering actual or future evolutions
+» CF 51 calculator - Energy Index
+towards remote reading technologies.
+- Volume - Flow
+» CF 55 calculator - Power - Operating
+FEATURES AND BENEFITS - Instant Flow Time
+» CF 800 calculator - Return & Flow temperature - Alarms
+» Ease of Installation - Alarms
+» Echodis
+» Consistent Reliability » EverBlu
+For retrofi t of meters already installed in
+» Advanced functions the fi eld the board can easily be mounted Heat & Cooling Echodis
+» Compatible with EverBlu Fixed Network in the meters option board slot. (standard frame)*
+- Energy - 24 hourly
+» Compatible with AnyQuest Mobile - Volume index
+Consistent reliability
+solution - Power - Alarms
+The AnyQuest / EverBlu option board is - Instant Flow
+- Return & Flow temperature
+Benefi ts of Wireless Solution directly interfaced with the calculators - Cooling Energy
+micro processor. This guarantees the - Alarms
+» Automatic radio meter reading
+perfect correlation between the heat,
+increases the reading reliability and
+cooling and water meter values and the External water meter inputs
+signifi cantly enhances the data
+remote reading index. For combined heat, cooling and water-billing
+acquisition speed.
+The integrity and reliability of this data is applications, the option board also provides
+» The radio reading opens accessibility
+key for use in billing applications. two additional input registers for external
+to all meters even in the customer is
+The functionality of the AnyQuest / water meters with low frequency pulse
+absent or in hard to read locations.
+EverBlu option board is optimized for emitters. Each input can be programmed
+billing purposes. By standard reading independently with a pulse value and meter
+mode, an end of day value of the heat offset. The indexes of these two registers
+meters registers is transmitted to the are automatically included in the standard
+reading system. reading mode as well as in all fi xed date
+reading frames.
+SYSTEM knowledge to shape your future
+
+Technical Specifi cations COMPATIBLE WITH ANYQUEST
+Radio Frequency Features Itron offers a complete Mobile
+Protocol RADIAN / EverBlu AMR solution including handheld
+Modulation Frequency Shift Keying terminals, RF interfaces, reading- and
+Frequency carrier 433,82 MHz routemanagement software as well as RF
+Radiated power < 10 mW software drivers*.
+Transmission Symmetrical 2-way communication
+* see specifi c leafl ets.
+Conformity Compliant with the European R&TTE directive 1999/5/EC
+Using the integrated Itron route software
+Functional Specifi cations in combination with the corresponding
+Power supply 2 AA lithium battery pack or mains power supply handheld terminal, the reader can
+Battery lifetime 10 years ergonomically collect meter data
+Operating temperature 5°C - 55°C either from heat-, water-, gas- and
+Storage temperature 0°C - 55°C electricitymeters by radio transmission or
+Under normal applications with monthly reading cycle and within the specifi ed operating environment. by manual keying method.
+Optional pulse input features
+Available pulse values 1, 2.5, 10, 25, 100 and 250 litre
+Characteristics Solid state switch, dry contact, reed switch
+Contact voltage Typ. 3 V =
+Maximum frequency 2 Hz
+Minimum low state time 100 ms
+Maximum on resistance 10kΩ
+Maximum cable length 10 m
+APPLICATION
+Due to the wide range of meter types covering sizes from Qp 0,6 to Qp 250 the
+AnyQuest / EverBlu option board is suited to various applications for residential,
+commercial and industrial uses.
+EverBlu Software FTP Server
+Billing system / Data Center
+Mobile reading Software
+AnyQuest Mobile
+AnyQuest handheld
+PC software Utility mainframe
+AnyQuest Host (billing system/customer
+information system)
+Our company is the world’s leading provider of smart metering, data collection and utility software systems, with over
+8,000 utilities worldwide relying on our technology to optimize the delivery and use of energy and water.
+To realize your smarter energy and water future, start here: www.itron.com
+For more information, contact your local sales representative or agency: ITRON WATER METERING
+9, rue Ampère
+71031 Mâcon cedex
+France
+Phone: +33 3 85 29 39 00
+Fax: +33 3 85 29 38 58
+While Itron strives to make the content of its marketing materials as timely and accurate as possible, Itron makes no claims, promises, or guarantees about the accuracy, completeness,
+or adequacy of, and expressly disclaims liability for errors and omissions in, such materials. No warranty of any kind, implied, expressed, or statutory, including but not limited to
+the warranties of non-infringement of third party rights, title, merchantability, and fitness for a particular purpose, is given with respect to the content of these marketing materials.
+© Copyright 2011, Itron. All rights reserved. SYS-0025.3-EN-09.11
+

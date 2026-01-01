@@ -1,0 +1,110 @@
+EU DECLARATION OF DECLARATION UE DE DECLARACIÓN CE DE DICHIARAZIONE CE DI DECLARAÇÃO CE DE
+EG KONFORMITÄTSERKLÄRUNG
+CONFORMITY CONFORMITE CONFORMIDAD CONFORMITÀ CONFORMIDADE
+Number Numéro Nummer Número Numero Numero
+Name and address of the Name und Anschrift des Nombre y dirección del Nome ed indirizzo del
+Nom et adresse du fabricant Nome e endereço do fabricante
+manufacturer Herstellers fabricante fabbricante
+ITRON FRANCE, 9 Rue Ampère 71000 MACON (France)
+This declaration of conformity is Die alleinige Verantwortung für La presente declaración de La presente dichiarazione di A presente declaração de
+La présente déclaration de
+issued under the sole die Ausstellung dieser conformidad se expide bajo la conformità è rilasciata sotto la conformidade é emitida sob a
+conformité est établie sous la
+responsibility of the Konformitätserklärung trägt der exclusiva responsabilidad del responsabilità esclusiva del exclusiva responsabilidade do
+seule responsabilité du fabricant.
+manufacturer. Hersteller. fabricante. fabbricante. fabricante.
+Object of the declaration Objet de la déclaration Gegenstand der Erklärung Objeto de la declaración Oggetto della dichiarazione Objecto da declaração
+Electronical modules RF: Cyble NRF / Cyble NRF HT / Cyble OMS wM-Bus 434 Electronical modules RF: Cyble LPWAN / Cyble 5 / Cyble OMS wM-Bus 868
+Frequency ISM Band: 434 MHz Frequency ISM Band: 868 MHz
+Radiated Power: ≤ 10 mW Radiated Power: ≤ 25 mW
+Der oben beschriebene O objecto da declaração acima
+The object of the declaration L'objet de la déclaration décrit ci- El objeto de la declaración L’oggetto della dichiarazione di
+Gegenstand der Erklärung erfüllt mencionada está em
+described above is in conformity dessus est conforme à la descrita anteriormente es cui sopra è conforme alla
+die einschlägigen conformidade com a legislação
+with the relevant Union législation communautaire conforme a la legislación pertinente normativa comunitaria
+Harmonisierungsrechtsvorschrift comunitária aplicável em matéria
+harmonization legislation and the d'harmonisation applicable ainsi comunitaria de armonización di armonizzazione e alle
+en der Gemeinschaft und den de harmonização e as
+corresponding harmonized qu'aux normes harmonisées pertinente y las normas corrispondenti norme
+entsprechenden harmonisierten correspondentes normas
+standards associées armonizadas correspondientes armonizzate
+Normen harmonizadas
+● 2014/53/EU (RED) Safety/Health - EN 62368-1:2014
+● 2012/19/EU (WEEE) WEEE
+● 2014/30/EU (EMC) EMC - EN 62311:2008
+- EN 301489-1 v2.1.1:2012
+- EN 301489-3 v2.1.1:2013
+● 2014/35/EU (Low Voltage) Radio - EN 300220-1 v3.1.1:2017
+- EN 300220-2 v3.1.1:2017
+● 2011/65/EU (RoHS) - EN IEC63000:2018
+Annex II 2015/863 2015.03.31 (Cyble 5)
+Gegebenenfalls von der Si procede, los certificados Se for esse o caso, certificados
+Where applicable, certificates Le cas échéant, certificats Se del caso, certificati rilasciati
+benannten Stelle ausgestellte emitidos por el organismo emitidos pelo organismo
+issued by the notified body délivrés par l’organisme notifié dall'organismo notificato
+Bescheinigungen notificado notificado
+● 2014/53/EU (RED) LCIE – 170 Rue de Chatagnon – 38430 Moirans (FR) - LCIE - N°1-1633
+Place and date of issue Date et lieu d'établissement Ort und datum der Ausstellung Lugar y fecha de expedición Luogo e data del rilascio Local e data da emissão
+02/11/2021 - ITRON Mâcon France
+Nome e cognome, Funzione,
+Name, Function, Signature Nom, Fonction, Signature Name, Funktion, Unterschrift Nombre, Cargo, Firma Nome, Cargo, Assinatura
+Firma
+JEAN EMMANUEL NOREUX JEAN-PHILIPPE FIELDES
+(Quality System Manager) (Plant Manager)
+© Copyright 2021 Itron. All rights reserved. Document reference : 801-1026-00-(AB)
+
+EU-MEGFELELŐSÉGI DECLARAȚIA CE DE EG VERKLARING VAN
+DEKLARACJA ZGODNOŚCI UE AB UYGUNLUK BEYANI EU 적합성 선언
+NYILATKOZAT CONFORMITATE OVEREENSTEMMING
+Szám Număr Aantal Numer Numara 번호
+Numele și adresa
+A gyártó neve és címe Naam en adres van de fabrikant Nazwa i adres producenta Üretici firmanın adı ve adresi 제조업체의 이름과 주소
+producătorului
+ITRON FRANCE, 9 Rue Ampère 71000 MACON (France)
+Această declarație de Deze conformiteitsverklaring wordt
+Ezt a megfelelőségi nyilatkozatot Niniejsza deklaracja zgodności Bu uygunluk beyanı, tamamen 이 적합성 선언은 전적으로
+conformitate este emisă sub verstrekt onder de
+a gyártó kizárólagos felelőssége wydana zostaje na wyłączną üreticinin sorumluluğu altında 제조업체의 책임하에
+responsabilitatea exclusivă a verantwoordelijkheid van de
+mellett adják ki. odpowiedzialność producenta. düzenlenmiştir. 발행됩니다.
+producătorului. fabrikant.
+A nyilatkozat tárgya Obiectul declarației Onderwerp van de verklaring Przedmiot deklaracji Beyannamenin amacı 선언의 대상
+Electronical modules RF: Cyble NRF / Cyble NRF HT / Cyble OMS wM-Bus 434 Electronical modules RF: Cyble LPWAN / Cyble 5 / Cyble OMS wM-Bus 868
+Frequency ISM Band: 434 MHz Frequency ISM Band: 868 MHz
+Radiated Power: ≤ 10 mW Radiated Power: ≤ 25 mW
+Opisany powyżej przedmiot
+Obiectul declarației descrise mai Het onderwerp van de hierboven deklaracji jest zgodny z
+A fent leírt nyilatkozat tárgya Yukarıda açıklanan
+sus este în conformitate cu beschreven verklaring is in odpowiednim prawodawstwem
+összhangban van a vonatkozó beyannamenin amacı, ilgili Birlik 위에 설명 된 선언의 목적은 관련
+legislația relevantă de overeenstemming met de relevante harmonizacyjnym Unii,
+uniós harmonizációs uyumlaştırma mevzuatına ve 연합의 일치된 법규 및 일치된
+armonizare a Uniunii și cu harmonisatiewetgeving van de Unie podstawowymi normami
+jogszabályokkal és a megfelelő ilgili uyumlaştırılmış standartlara 해당 표준을 준수하는 것입니다.
+standardele armonizate en de overeenkomstige zharmonizowanymi i innymi
+harmonizált szabványokkal uygundur.
+corespunzătoare geharmoniseerde normen specyfikacjami technicznymi lub
+dokumentami normatywnymi
+● 2014/53/EU (RED) Safety/Health - EN 62368-1:2014
+● 2012/19/EU (WEEE) WEEE
+● 2014/30/EU (EMC) EMC - EN 62311:2008
+- EN 301489-1 v2.1.1:2012
+● 2012/19/EU (WEEE) WEEE - EN 301489-3 v2.1.1:2013
+● 2014/35/EU (Low Voltage) Radio - EN 300220-1 v3.1.1:2017
+- EN 300220-2 v3.1.1:2017
+● 2011/65/EU (RoHS) - EN IEC63000:2018
+Annex II 2015/863 2015.03.31 (Cyble 5)
+Adott esetben a bejelentett Indien van toepassing, certificaten Geçerli olduğu durumlarda,
+După caz, certificate emise de Certyfikaty wydane przez jednostkę 해당되는 경우, 인증 기관에서
+szervezet által kiállított afgegeven door de aangemelde onaylanmış kuruluş tarafından
+organismul acreditat notyfikowaną, jeśli dotyczy 발급 한 인증서
+igazolások instantie verilen sertifikalar
+● 2014/53/EU (RED) LCIE – 170 Rue de Chatagnon – 38430 Moirans (FR) - LCIE - N°1-1633
+Kiállítás helye és dátuma Locul și data emiterii Plaats en datum van uitgifte Miejsce i data wydania Yayın Yeri ve tarihi 발행 장소 및 날짜
+01/10/2021 - ITRON Mâcon France
+Név, beosztás, aláírás Nume, funcție, semnătură Naam, functie, handtekening Imię i nazwisko, stanowisko, podpis İsim, Fonksiyon, İmza 이름, 기능, 서명
+JEAN EMMANUEL NOREUX JEAN-PHILIPPE FIELDES
+(Quality System Manager) (Plant Manager)
+© Copyright 2021 Itron. All rights reserved. Document reference : 801-1026-00-(AB)
+
