@@ -83,6 +83,11 @@
 #define METER_YEAR xx
 #define METER_SERIAL xxxxxxx
 
+// Meter type configuration
+// "water" = water meter (default) - readings in liters (L), device class water
+// "gas"   = gas meter - readings in cubic meters (m³), device class gas
+#define METER_TYPE "water"
+
 // ============================================================================
 // RADIO / CC1101 CONFIGURATION
 // ============================================================================

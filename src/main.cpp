@@ -1,7 +1,8 @@
 /*
  * Project: EverBlu Meters ESP8266/ESP32
- * Description: Fetch water/gas usage data from Itron EverBlu Cyble Enhanced RF water meters using the RADIAN protocol on 433 MHz.
+ * Description: Fetch water/gas usage data from Itron EverBlu Cyble Enhanced RF water and gas meters using the RADIAN protocol on 433 MHz.
  *              Integrated with Home Assistant via MQTT AutoDiscovery.
+ *              Supports both water meters (readings in L) and gas meters (readings in m³).
  * Author: Forked and improved by Genestealer, based on work by Psykokwak and Neutrinus.
  * License: Unknown (refer to the README for details).
  *
@@ -289,6 +290,41 @@ char mqttLwtTopic[80] = "everblu/cyble/" TOSTRING(METER_SERIAL) "/status"; // LW
 #define MQTT_TOPIC_BUFFER_SIZE 80
 
 // ============================================================================
+// Meter Type Configuration
+// ============================================================================
+
+// Define meter type if not defined in private.h (default to water)
+#ifndef METER_TYPE
+#define METER_TYPE "water"
+#endif
+
+// Meter-specific configuration based on METER_TYPE
+// These variables control the Home Assistant device class, icon, and unit of measurement
+const char *meterDeviceClass;
+const char *meterIcon;
+const char *meterUnit;
+const bool meterIsGas = (strcmp(METER_TYPE, "gas") == 0);
+
+// Initialize meter configuration
+static void initMeterTypeConfig()
+{
+  if (meterIsGas)
+  {
+    meterDeviceClass = "gas";
+    meterIcon = "mdi:meter-gas";
+    meterUnit = "m³";
+    Serial.println("> Meter type: GAS (readings in m³)");
+  }
+  else
+  {
+    meterDeviceClass = "water";
+    meterIcon = "mdi:water";
+    meterUnit = "L";
+    Serial.println("> Meter type: WATER (readings in L)");
+  }
+}
+
+// ============================================================================
 // Schedule Validation API
 // ============================================================================
 
@@ -479,7 +515,7 @@ static const char *wifiStatusToString(wl_status_t st)
 }
 
 // Function: onUpdateData
-// Description: Fetches data from the water meter and publishes it to MQTT topics.
+// Description: Fetches data from the water and gas meter and publishes it to MQTT topics.
 //              Retries up to 10 times if data retrieval fails.
 void onUpdateData()
 {
@@ -509,7 +545,7 @@ void onUpdateData()
 
   // Handle data retrieval failure (including first-layer protection rejecting
   // corrupted frames and returning zeros).
-  if (meter_data.reads_counter == 0 || meter_data.liters == 0)
+  if (meter_data.reads_counter == 0 || meter_data.volume == 0)
   {
     Serial.printf("Unable to retrieve data from meter (attempt %d/%d)\n", _retry + 1, MAX_RETRIES);
 
@@ -561,16 +597,36 @@ void onUpdateData()
   snprintf(timeEndFormatted, sizeof(timeEndFormatted), "%02d:00", timeEnd);
 
   Serial.printf("Data from meter:\n");
-  Serial.printf("Liters : %d\nBattery (in months) : %d\nCounter : %d\nRSSI : %d\nTime start : %s\nTime end : %s\n\n", meter_data.liters, meter_data.battery_left, meter_data.reads_counter, meter_data.rssi, timeStartFormatted, timeEndFormatted);
+  if (meterIsGas)
+  {
+    Serial.printf("%s : %.3f\nBattery (in months) : %d\nCounter : %d\nRSSI : %d\nTime start : %s\nTime end : %s\n\n",
+                  meterUnit, meter_data.volume / 1000.0, meter_data.battery_left, meter_data.reads_counter, meter_data.rssi, timeStartFormatted, timeEndFormatted);
+  }
+  else
+  {
+    Serial.printf("%s : %d\nBattery (in months) : %d\nCounter : %d\nRSSI : %d\nTime start : %s\nTime end : %s\n\n",
+                  meterUnit, meter_data.volume, meter_data.battery_left, meter_data.reads_counter, meter_data.rssi, timeStartFormatted, timeEndFormatted);
+  }
   Serial.printf("RSSI (dBm) : %d\n", meter_data.rssi_dbm);
   Serial.printf("RSSI (percentage) : %d\n", calculateMeterdBmToPercentage(meter_data.rssi_dbm));
   Serial.printf("Signal quality (LQI) : %d\n", meter_data.lqi);
   Serial.printf("Signal quality (LQI percentage) : %d\n", calculateLQIToPercentage(meter_data.lqi));
 
   // Publish meter data to MQTT (using char buffers instead of String)
+  // For gas meters, convert from liters to cubic meters (m³)
   char valueBuffer[32];
 
-  snprintf(valueBuffer, sizeof(valueBuffer), "%d", meter_data.liters);
+  if (meterIsGas)
+  {
+    // Gas meters: publish value in m³ (volume / 1000)
+    float cubicMeters = meter_data.volume / 1000.0;
+    snprintf(valueBuffer, sizeof(valueBuffer), "%.3f", cubicMeters);
+  }
+  else
+  {
+    // Water meters: publish value in liters
+    snprintf(valueBuffer, sizeof(valueBuffer), "%d", meter_data.volume);
+  }
   mqtt.publish(String(mqttBaseTopic) + "/liters", valueBuffer, true);
   delay(5);
 
@@ -650,12 +706,12 @@ void onUpdateData()
     // Declare these outside of any goto targets to avoid crossing initialisation
     // when jumping to finalize_history_json.
     uint32_t currentMonthUsage = 0;
-    uint32_t currentLiters = static_cast<uint32_t>(meter_data.liters);
-    if (num_history > 0 && currentLiters > meter_data.history[num_history - 1])
+    uint32_t currentVolume = static_cast<uint32_t>(meter_data.volume);
+    if (num_history > 0 && currentVolume > meter_data.history[num_history - 1])
     {
-      currentMonthUsage = currentLiters - meter_data.history[num_history - 1];
+      currentMonthUsage = currentVolume - meter_data.history[num_history - 1];
     }
-    Serial.printf("  Now  %10d  %9u (current month usage: %u L)\n", meter_data.liters, currentMonthUsage);
+    Serial.printf("  Now  %10d  %9u (current month usage: %u L)\n", meter_data.volume, currentVolume, currentMonthUsage);
     Serial.println("===================================\n");
 
     // Add monthly usage calculations to JSON
@@ -761,7 +817,7 @@ skip_history_publish:;
 
   // Publish all data as a JSON message as well this is redundant but may be useful for some
   char json[512];
-  sprintf(json, jsonTemplate, meter_data.liters, meter_data.reads_counter, meter_data.battery_left, meter_data.rssi, iso8601);
+  sprintf(json, jsonTemplate, meter_data.volume, meter_data.reads_counter, meter_data.battery_left, meter_data.rssi, iso8601);
   mqtt.publish(String(mqttBaseTopic) + "/json", json, true);
   delay(5);
 
@@ -886,8 +942,8 @@ String buildDeviceJson()
   json.reserve(300);
 
   json = "\"ids\": [\"" + String(METER_SERIAL) + "\"],\n";
-  json += "    \"name\": \"Water Meter " + String(METER_SERIAL) + "\",\n";
-  json += "    \"mdl\": \"Itron EverBlu Cyble Enhanced Water Meter ESP8266/ESP32\",\n";
+  json += "    \"name\": \"EverBlu Meter " + String(METER_SERIAL) + "\",\n";
+  json += "    \"mdl\": \"Itron EverBlu Cyble Enhanced Water and Gas Meter ESP8266/ESP32\",\n";
   json += "    \"mf\": \"Genestealer\",\n";
   json += "    \"sw\": \"" EVERBLU_FW_VERSION "\",\n";
   json += "    \"cu\": \"https://github.com/genestealer/everblu-meters-esp8266-improved\"";
@@ -1010,12 +1066,12 @@ void publishMeterSettings()
   char topicBuffer[MQTT_TOPIC_BUFFER_SIZE];
 
   snprintf(valueBuffer, sizeof(valueBuffer), "%d", METER_YEAR);
-  snprintf(topicBuffer, sizeof(topicBuffer), "%s/water_meter_year", mqttBaseTopic);
+  snprintf(topicBuffer, sizeof(topicBuffer), "%s/everblu_meter_year", mqttBaseTopic);
   mqtt.publish(topicBuffer, valueBuffer, true);
   delay(5);
 
   snprintf(valueBuffer, sizeof(valueBuffer), "%u", METER_SERIAL);
-  snprintf(topicBuffer, sizeof(topicBuffer), "%s/water_meter_serial", mqttBaseTopic);
+  snprintf(topicBuffer, sizeof(topicBuffer), "%s/everblu_meter_serial", mqttBaseTopic);
   mqtt.publish(topicBuffer, valueBuffer, true);
   delay(5);
 
@@ -1037,7 +1093,7 @@ void publishMeterSettings()
 // Function: publishDiscoveryMessage
 // Description: Helper function to publish a single MQTT discovery message for Home Assistant
 // @param domain The Home Assistant domain (sensor, button, binary_sensor, etc.)
-// @param entity The entity name suffix (e.g., "water_meter_value")
+// @param entity The entity name suffix (e.g., "everblu_meter_value")
 // @param jsonPayload The complete JSON discovery payload
 static void publishDiscoveryMessage(const char *domain, const char *entity, const String &jsonPayload)
 {
@@ -1060,15 +1116,15 @@ void publishHADiscovery()
 
   String json;
 
-  // Reading (Total) - Main water sensor
-  Serial.println("> Publishing Water Usage sensor discovery...");
+  // Reading (Total) - Main water/gas sensor
+  Serial.println("> Publishing Reading (Total) sensor discovery...");
   json = "{\n";
   json += "  \"name\": \"Reading (Total)\",\n";
-  json += "  \"uniq_id\": \"" + String(METER_SERIAL) + "_water_meter_value\",\n";
-  json += "  \"obj_id\": \"" + String(METER_SERIAL) + "_water_meter_value\",\n";
-  json += "  \"ic\": \"mdi:water\",\n";
-  json += "  \"unit_of_meas\": \"L\",\n";
-  json += "  \"dev_cla\": \"water\",\n";
+  json += "  \"uniq_id\": \"" + String(METER_SERIAL) + "_everblu_meter_value\",\n";
+  json += "  \"obj_id\": \"" + String(METER_SERIAL) + "_everblu_meter_value\",\n";
+  json += "  \"ic\": \"" + String(meterIcon) + "\",\n";
+  json += "  \"unit_of_meas\": \"" + String(meterUnit) + "\",\n";
+  json += "  \"dev_cla\": \"" + String(meterDeviceClass) + "\",\n";
   json += "  \"stat_cla\": \"total_increasing\",\n";
   json += "  \"qos\": 0,\n";
   json += "  \"avty_t\": \"" + String(mqttBaseTopic) + "/status\",\n";
@@ -1079,13 +1135,13 @@ void publishHADiscovery()
   json += "  \"frc_upd\": true,\n";
   json += "  \"dev\": {\n    " + buildDeviceJson() + "\n  }\n";
   json += "}";
-  publishDiscoveryMessage("sensor", "water_meter_value", json);
+  publishDiscoveryMessage("sensor", "everblu_meter_value", json);
 
   // Read Counter
   json = "{\n";
   json += "  \"name\": \"Read Counter\",\n";
-  json += "  \"uniq_id\": \"" + String(METER_SERIAL) + "_water_meter_counter\",\n";
-  json += "  \"obj_id\": \"" + String(METER_SERIAL) + "_water_meter_counter\",\n";
+  json += "  \"uniq_id\": \"" + String(METER_SERIAL) + "_everblu_meter_counter\",\n";
+  json += "  \"obj_id\": \"" + String(METER_SERIAL) + "_everblu_meter_counter\",\n";
   json += "  \"ic\": \"mdi:counter\",\n";
   json += "  \"qos\": 0,\n";
   json += "  \"avty_t\": \"" + String(mqttBaseTopic) + "/status\",\n";
@@ -1093,13 +1149,13 @@ void publishHADiscovery()
   json += "  \"frc_upd\": true,\n";
   json += "  \"dev\": {\n    " + buildDeviceJson() + "\n  }\n";
   json += "}";
-  publishDiscoveryMessage("sensor", "water_meter_counter", json);
+  publishDiscoveryMessage("sensor", "everblu_meter_counter", json);
 
   // Last Read (timestamp)
   json = "{\n";
   json += "  \"name\": \"Last Read\",\n";
-  json += "  \"uniq_id\": \"" + String(METER_SERIAL) + "_water_meter_timestamp\",\n";
-  json += "  \"obj_id\": \"" + String(METER_SERIAL) + "_water_meter_timestamp\",\n";
+  json += "  \"uniq_id\": \"" + String(METER_SERIAL) + "_everblu_meter_timestamp\",\n";
+  json += "  \"obj_id\": \"" + String(METER_SERIAL) + "_everblu_meter_timestamp\",\n";
   json += "  \"ic\": \"mdi:clock\",\n";
   json += "  \"dev_cla\": \"timestamp\",\n";
   json += "  \"qos\": 0,\n";
@@ -1108,13 +1164,13 @@ void publishHADiscovery()
   json += "  \"frc_upd\": true,\n";
   json += "  \"dev\": {\n    " + buildDeviceJson() + "\n  }\n";
   json += "}";
-  publishDiscoveryMessage("sensor", "water_meter_timestamp", json);
+  publishDiscoveryMessage("sensor", "everblu_meter_timestamp", json);
 
   // Request Reading Button
   json = "{\n";
   json += "  \"name\": \"Request Reading Now\",\n";
-  json += "  \"uniq_id\": \"" + String(METER_SERIAL) + "_water_meter_request\",\n";
-  json += "  \"obj_id\": \"" + String(METER_SERIAL) + "_water_meter_request\",\n";
+  json += "  \"uniq_id\": \"" + String(METER_SERIAL) + "_everblu_meter_request\",\n";
+  json += "  \"obj_id\": \"" + String(METER_SERIAL) + "_everblu_meter_request\",\n";
   json += "  \"qos\": 0,\n";
   json += "  \"avty_t\": \"" + String(mqttBaseTopic) + "/status\",\n";
   json += "  \"cmd_t\": \"" + String(mqttBaseTopic) + "/trigger_force\",\n";
@@ -1124,38 +1180,38 @@ void publishHADiscovery()
   json += "  \"frc_upd\": true,\n";
   json += "  \"dev\": {\n    " + buildDeviceJson() + "\n  }\n";
   json += "}";
-  publishDiscoveryMessage("button", "water_meter_request", json);
+  publishDiscoveryMessage("button", "everblu_meter_request", json);
 
   // Diagnostic sensors
-  publishDiscoveryMessage("sensor", "water_meter_wifi_ip", buildDiscoveryJson("IP Address", "wifi_ip", "mdi:ip-network-outline", nullptr, nullptr, nullptr, "diagnostic"));
-  publishDiscoveryMessage("sensor", "water_meter_wifi_rssi", buildDiscoveryJson("WiFi RSSI", "wifi_rssi", "mdi:signal-variant", "dBm", "signal_strength", "measurement", "diagnostic"));
-  publishDiscoveryMessage("sensor", "water_meter_mac_address", buildDiscoveryJson("MAC Address", "mac_address", "mdi:network", nullptr, nullptr, nullptr, "diagnostic"));
-  publishDiscoveryMessage("sensor", "water_meter_wifi_ssid", buildDiscoveryJson("WiFi SSID", "wifi_ssid", "mdi:help-network-outline", nullptr, nullptr, nullptr, "diagnostic"));
-  publishDiscoveryMessage("sensor", "water_meter_wifi_bssid", buildDiscoveryJson("WiFi BSSID", "wifi_bssid", "mdi:access-point-network", nullptr, nullptr, nullptr, "diagnostic"));
-  publishDiscoveryMessage("sensor", "water_meter_uptime", buildDiscoveryJson("Device Uptime", "uptime", nullptr, nullptr, "timestamp", nullptr, "diagnostic"));
-  publishDiscoveryMessage("sensor", "water_meter_wifi_signal_percentage", buildDiscoveryJson("WiFi Signal", "wifi_signal_percentage", "mdi:wifi", "%", nullptr, "measurement", "diagnostic"));
-  publishDiscoveryMessage("sensor", "water_meter_reading_time", buildDiscoveryJson("Reading Time (UTC)", "reading_time", "mdi:clock-outline", nullptr, nullptr, nullptr, "diagnostic"));
-  publishDiscoveryMessage("sensor", "water_meter_reading_schedule", buildDiscoveryJson("Reading Schedule", "reading_schedule", "mdi:calendar-clock", nullptr, nullptr, nullptr, "diagnostic"));
-  publishDiscoveryMessage("sensor", "water_meter_year", buildDiscoveryJson("Meter Year", "water_meter_year", "mdi:calendar", nullptr, nullptr, nullptr, "diagnostic"));
-  publishDiscoveryMessage("sensor", "water_meter_serial", buildDiscoveryJson("Meter Serial", "water_meter_serial", "mdi:barcode", nullptr, nullptr, nullptr, "diagnostic"));
-  publishDiscoveryMessage("sensor", "water_meter_battery_months", buildDiscoveryJson("Months Remaining", "battery", "mdi:battery-clock", "months", nullptr, "measurement", nullptr));
-  publishDiscoveryMessage("sensor", "water_meter_rssi_dbm", buildDiscoveryJson("RSSI", "rssi_dbm", "mdi:signal", "dBm", "signal_strength", "measurement", nullptr));
-  publishDiscoveryMessage("sensor", "water_meter_rssi_percentage", buildDiscoveryJson("Signal", "rssi_percentage", "mdi:signal-cellular-3", "%", nullptr, "measurement", nullptr));
-  publishDiscoveryMessage("sensor", "water_meter_lqi_percentage", buildDiscoveryJson("Signal Quality (LQI)", "lqi_percentage", "mdi:signal-cellular-outline", "%", nullptr, "measurement", nullptr));
-  publishDiscoveryMessage("sensor", "water_meter_time_start", buildDiscoveryJson("Wake Time", "time_start", "mdi:clock-start", nullptr, nullptr, nullptr, nullptr));
-  publishDiscoveryMessage("sensor", "water_meter_time_end", buildDiscoveryJson("Sleep Time", "time_end", "mdi:clock-end", nullptr, nullptr, nullptr, nullptr));
-  publishDiscoveryMessage("sensor", "water_meter_total_attempts", buildDiscoveryJson("Total Read Attempts", "total_attempts", "mdi:counter", nullptr, nullptr, "total_increasing", "diagnostic"));
-  publishDiscoveryMessage("sensor", "water_meter_successful_reads", buildDiscoveryJson("Successful Reads", "successful_reads", "mdi:check-circle", nullptr, nullptr, "total_increasing", "diagnostic"));
-  publishDiscoveryMessage("sensor", "water_meter_failed_reads", buildDiscoveryJson("Failed Reads", "failed_reads", "mdi:alert-circle", nullptr, nullptr, "total_increasing", "diagnostic"));
-  publishDiscoveryMessage("sensor", "water_meter_last_error", buildDiscoveryJson("Last Error", "last_error", "mdi:alert", nullptr, nullptr, nullptr, "diagnostic"));
-  publishDiscoveryMessage("sensor", "water_meter_cc1101_state", buildDiscoveryJson("CC1101 State", "cc1101_state", "mdi:radio-tower", nullptr, nullptr, nullptr, "diagnostic"));
-  publishDiscoveryMessage("sensor", "water_meter_freq_offset", buildDiscoveryJson("Frequency Offset", "frequency_offset", "mdi:sine-wave", "kHz", nullptr, nullptr, "diagnostic"));
+  publishDiscoveryMessage("sensor", "everblu_meter_wifi_ip", buildDiscoveryJson("IP Address", "wifi_ip", "mdi:ip-network-outline", nullptr, nullptr, nullptr, "diagnostic"));
+  publishDiscoveryMessage("sensor", "everblu_meter_wifi_rssi", buildDiscoveryJson("WiFi RSSI", "wifi_rssi", "mdi:signal-variant", "dBm", "signal_strength", "measurement", "diagnostic"));
+  publishDiscoveryMessage("sensor", "everblu_meter_mac_address", buildDiscoveryJson("MAC Address", "mac_address", "mdi:network", nullptr, nullptr, nullptr, "diagnostic"));
+  publishDiscoveryMessage("sensor", "everblu_meter_wifi_ssid", buildDiscoveryJson("WiFi SSID", "wifi_ssid", "mdi:help-network-outline", nullptr, nullptr, nullptr, "diagnostic"));
+  publishDiscoveryMessage("sensor", "everblu_meter_wifi_bssid", buildDiscoveryJson("WiFi BSSID", "wifi_bssid", "mdi:access-point-network", nullptr, nullptr, nullptr, "diagnostic"));
+  publishDiscoveryMessage("sensor", "everblu_meter_uptime", buildDiscoveryJson("Device Uptime", "uptime", nullptr, nullptr, "timestamp", nullptr, "diagnostic"));
+  publishDiscoveryMessage("sensor", "everblu_meter_wifi_signal_percentage", buildDiscoveryJson("WiFi Signal", "wifi_signal_percentage", "mdi:wifi", "%", nullptr, "measurement", "diagnostic"));
+  publishDiscoveryMessage("sensor", "everblu_meter_reading_time", buildDiscoveryJson("Reading Time (UTC)", "reading_time", "mdi:clock-outline", nullptr, nullptr, nullptr, "diagnostic"));
+  publishDiscoveryMessage("sensor", "everblu_meter_reading_schedule", buildDiscoveryJson("Reading Schedule", "reading_schedule", "mdi:calendar-clock", nullptr, nullptr, nullptr, "diagnostic"));
+  publishDiscoveryMessage("sensor", "everblu_meter_year", buildDiscoveryJson("Meter Year", "everblu_meter_year", "mdi:calendar", nullptr, nullptr, nullptr, "diagnostic"));
+  publishDiscoveryMessage("sensor", "everblu_meter_serial", buildDiscoveryJson("Meter Serial", "everblu_meter_serial", "mdi:barcode", nullptr, nullptr, nullptr, "diagnostic"));
+  publishDiscoveryMessage("sensor", "everblu_meter_battery_months", buildDiscoveryJson("Months Remaining", "battery", "mdi:battery-clock", "months", nullptr, "measurement", nullptr));
+  publishDiscoveryMessage("sensor", "everblu_meter_rssi_dbm", buildDiscoveryJson("RSSI", "rssi_dbm", "mdi:signal", "dBm", "signal_strength", "measurement", nullptr));
+  publishDiscoveryMessage("sensor", "everblu_meter_rssi_percentage", buildDiscoveryJson("Signal", "rssi_percentage", "mdi:signal-cellular-3", "%", nullptr, "measurement", nullptr));
+  publishDiscoveryMessage("sensor", "everblu_meter_lqi_percentage", buildDiscoveryJson("Signal Quality (LQI)", "lqi_percentage", "mdi:signal-cellular-outline", "%", nullptr, "measurement", nullptr));
+  publishDiscoveryMessage("sensor", "everblu_meter_time_start", buildDiscoveryJson("Wake Time", "time_start", "mdi:clock-start", nullptr, nullptr, nullptr, nullptr));
+  publishDiscoveryMessage("sensor", "everblu_meter_time_end", buildDiscoveryJson("Sleep Time", "time_end", "mdi:clock-end", nullptr, nullptr, nullptr, nullptr));
+  publishDiscoveryMessage("sensor", "everblu_meter_total_attempts", buildDiscoveryJson("Total Read Attempts", "total_attempts", "mdi:counter", nullptr, nullptr, "total_increasing", "diagnostic"));
+  publishDiscoveryMessage("sensor", "everblu_meter_successful_reads", buildDiscoveryJson("Successful Reads", "successful_reads", "mdi:check-circle", nullptr, nullptr, "total_increasing", "diagnostic"));
+  publishDiscoveryMessage("sensor", "everblu_meter_failed_reads", buildDiscoveryJson("Failed Reads", "failed_reads", "mdi:alert-circle", nullptr, nullptr, "total_increasing", "diagnostic"));
+  publishDiscoveryMessage("sensor", "everblu_meter_last_error", buildDiscoveryJson("Last Error", "last_error", "mdi:alert", nullptr, nullptr, nullptr, "diagnostic"));
+  publishDiscoveryMessage("sensor", "everblu_meter_cc1101_state", buildDiscoveryJson("CC1101 State", "cc1101_state", "mdi:radio-tower", nullptr, nullptr, nullptr, "diagnostic"));
+  publishDiscoveryMessage("sensor", "everblu_meter_freq_offset", buildDiscoveryJson("Frequency Offset", "frequency_offset", "mdi:sine-wave", "kHz", nullptr, nullptr, "diagnostic"));
 
   // Buttons
   json = "{\n";
   json += "  \"name\": \"Restart Device\",\n";
-  json += "  \"uniq_id\": \"" + String(METER_SERIAL) + "_water_meter_restart\",\n";
-  json += "  \"obj_id\": \"" + String(METER_SERIAL) + "_water_meter_restart\",\n";
+  json += "  \"uniq_id\": \"" + String(METER_SERIAL) + "_everblu_meter_restart\",\n";
+  json += "  \"obj_id\": \"" + String(METER_SERIAL) + "_everblu_meter_restart\",\n";
   json += "  \"qos\": 0,\n";
   json += "  \"avty_t\": \"" + String(mqttBaseTopic) + "/status\",\n";
   json += "  \"cmd_t\": \"" + String(mqttBaseTopic) + "/restart\",\n";
@@ -1163,12 +1219,12 @@ void publishHADiscovery()
   json += "  \"ent_cat\": \"config\",\n";
   json += "  \"dev\": {\n    " + buildDeviceJson() + "\n  }\n";
   json += "}";
-  publishDiscoveryMessage("button", "water_meter_restart", json);
+  publishDiscoveryMessage("button", "everblu_meter_restart", json);
 
   json = "{\n";
   json += "  \"name\": \"Scan Frequency\",\n";
-  json += "  \"uniq_id\": \"" + String(METER_SERIAL) + "_water_meter_freq_scan\",\n";
-  json += "  \"obj_id\": \"" + String(METER_SERIAL) + "_water_meter_freq_scan\",\n";
+  json += "  \"uniq_id\": \"" + String(METER_SERIAL) + "_everblu_meter_freq_scan\",\n";
+  json += "  \"obj_id\": \"" + String(METER_SERIAL) + "_everblu_meter_freq_scan\",\n";
   json += "  \"ic\": \"mdi:magnify-scan\",\n";
   json += "  \"qos\": 0,\n";
   json += "  \"avty_t\": \"" + String(mqttBaseTopic) + "/status\",\n";
@@ -1177,13 +1233,13 @@ void publishHADiscovery()
   json += "  \"ent_cat\": \"config\",\n";
   json += "  \"dev\": {\n    " + buildDeviceJson() + "\n  }\n";
   json += "}";
-  publishDiscoveryMessage("button", "water_meter_freq_scan", json);
+  publishDiscoveryMessage("button", "everblu_meter_freq_scan", json);
 
   // Binary sensor for active reading
   json = "{\n";
   json += "  \"name\": \"Active Reading\",\n";
-  json += "  \"uniq_id\": \"" + String(METER_SERIAL) + "_water_meter_active_reading\",\n";
-  json += "  \"obj_id\": \"" + String(METER_SERIAL) + "_water_meter_active_reading\",\n";
+  json += "  \"uniq_id\": \"" + String(METER_SERIAL) + "_everblu_meter_active_reading\",\n";
+  json += "  \"obj_id\": \"" + String(METER_SERIAL) + "_everblu_meter_active_reading\",\n";
   json += "  \"dev_cla\": \"running\",\n";
   json += "  \"qos\": 0,\n";
   json += "  \"avty_t\": \"" + String(mqttBaseTopic) + "/status\",\n";
@@ -1192,7 +1248,7 @@ void publishHADiscovery()
   json += "  \"pl_off\": \"false\",\n";
   json += "  \"dev\": {\n    " + buildDeviceJson() + "\n  }\n";
   json += "}";
-  publishDiscoveryMessage("binary_sensor", "water_meter_active_reading", json);
+  publishDiscoveryMessage("binary_sensor", "everblu_meter_active_reading", json);
 
   Serial.println("> Home Assistant discovery messages published");
 }
@@ -1877,9 +1933,12 @@ void setup()
   }
 #endif
   Serial.println("Everblu Meters ESP8266/ESP32 Starting...");
-  Serial.println("Water usage data for Home Assistant");
+  Serial.println("Water/Gas usage data for Home Assistant");
   Serial.println("https://github.com/genestealer/everblu-meters-esp8266-improved");
   Serial.printf("Target meter: 20%02d-%07lu\n\n", METER_YEAR, (unsigned long)METER_SERIAL);
+
+  // Initialize meter type configuration
+  initMeterTypeConfig();
 
   // Validate configuration before proceeding
   if (!validateConfiguration())
@@ -2014,7 +2073,7 @@ void setup()
   // Use this piece of code to test
   struct tmeter_data meter_data;
   meter_data = get_meter_data();
-  Serial.printf("\nLiters : %d\nBattery (in months) : %d\nCounter : %d\nTime start : %d\nTime end : %d\n\n", meter_data.liters, meter_data.battery_left, meter_data.reads_counter, meter_data.time_start, meter_data.time_end);
+  Serial.printf("\nVolume : %d\nBattery (in months) : %d\nCounter : %d\nTime start : %d\nTime end : %d\n\n", meter_data.volume, meter_data.battery_left, meter_data.reads_counter, meter_data.time_start, meter_data.time_end);
   while (42);
   */
 

@@ -1,7 +1,9 @@
-# everblu-meters-esp8266/esp32 - Itron EverBlu Cyble Enhanced RF RADIAN Water Usage Data for Home Assistant
+# everblu-meters-esp8266/esp32 - Itron EverBlu Cyble Enhanced RF RADIAN Water/Gas Usage Data for Home Assistant
 
-Fetch water or gas usage data from Itron EverBlu Cyble Enhanced RF water meters using the RADIAN protocol (Sontex, Itron) on 433 MHz with an ESP32/ESP8266 and CC1101 transceiver.
+Fetch water or gas usage data from Itron EverBlu Cyble Enhanced RF meters using the RADIAN protocol (Sontex, Itron) on 433 MHz with an ESP32/ESP8266 and CC1101 transceiver.
 Integrated with Home Assistant via MQTT AutoDiscovery.
+
+**Supports both water meters (readings in liters) and gas meters (readings in cubic meters)**.
 
 [![ESP8266 Build](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/build-esp8266.yml/badge.svg?branch=main)](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/build-esp8266.yml)
 [![ESP32 Build](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/build-esp32.yml/badge.svg?branch=main)](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/build-esp32.yml)
@@ -40,7 +42,9 @@ Supported meters:
 <details>
 <summary>Full feature list</summary>
 
-- Fetch water or gas usage data from Itron EverBlu Cyble Enhanced RF water meters.
+- Fetch water or gas usage data from Itron EverBlu Cyble Enhanced RF meters.
+- **Water meter mode**: Readings in liters (L) with water device class
+- **Gas meter mode**: Readings in cubic meters (m³) with gas device class
 - Includes RSSI (Radio Signal Strength Indicator), LQI (Link Quality) and Signal Strength for the meter for diagnostics.
 - Time Start and Time End sensors to indicate when the meter wakes and sleeps.
 - MQTT integration for Home Assistant with AutoDiscovery.
@@ -68,7 +72,26 @@ See the Hardware section below for full wiring tables and pictures.
   - Wi‑Fi SSID/password
   - MQTT broker/port (+ credentials, if used)
   - `METER_YEAR` and `METER_SERIAL` (from the meter label)
+  - `METER_TYPE` - set to `"water"` (default) or `"gas"` depending on your meter type
 - `platformio.ini`: select `env:huzzah` (ESP8266 HUZZAH) or `env:esp32dev` (ESP32 DevKit).
+
+### Meter Type Configuration
+
+This project supports both **water meters** and **gas meters**. The main differences are:
+
+| Meter Type | Unit of Measurement | Device Class | Icon |
+|------------|---------------------|--------------|------|
+| **Water** (default) | Liters (L) | `water` | `mdi:water` |
+| **Gas** | Cubic meters (m³) | `gas` | `mdi:meter-gas` |
+
+To configure your meter type, set `METER_TYPE` in `include/private.h`:
+```cpp
+#define METER_TYPE "water"  // For water meters
+// OR
+#define METER_TYPE "gas"    // For gas meters
+```
+
+For gas meters, readings are automatically converted from the internal liter count to cubic meters (m³) before publishing to Home Assistant.
 
 ### 3. Get your first reading
 

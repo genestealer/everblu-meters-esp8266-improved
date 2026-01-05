@@ -1,9 +1,9 @@
 /**
  * @file cc1101.h
- * @brief CC1101 radio driver for Everblu Cyble water meter communication
+ * @brief CC1101 radio driver for Everblu Cyble water/gas meter communication
  *
  * This header defines the interface for communicating with Everblu Cyble
- * water meters using the CC1101 sub-GHz radio transceiver and the RADIAN protocol.
+ * water and gas meters using the CC1101 sub-GHz radio transceiver and the RADIAN protocol.
  * Supports adaptive frequency tracking and historical data extraction.
  */
 
@@ -12,15 +12,15 @@
 
 /**
  * @struct tmeter_data
- * @brief Water meter data structure containing current readings and metadata
+ * @brief Meter data structure containing current readings and metadata
  *
- * Contains all data extracted from an Everblu Cyble water meter reading,
+ * Contains all data extracted from an Everblu Cyble water/gas meter reading,
  * including current consumption, historical data, signal quality metrics,
  * and battery information.
  */
 struct tmeter_data
 {
-  int liters;             // Current water consumption reading in liters
+  int volume;             // Current consumption reading in liters (water) or cubic meters (gas)
   int reads_counter;      // Number of times meter has been read (wraps around 255→1)
   int battery_left;       // Estimated battery life remaining in months
   int time_start;         // Reading window start time (24-hour format, e.g., 8 = 8am)
@@ -59,7 +59,7 @@ void setMHZ(float mhz);
 bool cc1101_init(float freq);
 
 /**
- * @brief Read data from Everblu Cyble water meter
+ * @brief Read data from Everblu Cyble water/gas meter
  *
  * Performs a complete read cycle:
  * 1. Transmits RADIAN protocol request frame to meter

@@ -794,9 +794,9 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
     return data;
   }
 
-  // Extract liters using proper uint32_t handling to prevent overflow
+  // Extract volume using proper uint32_t handling to prevent overflow
   // Byte order is LSB first: [18]=LSB, [19], [20], [21]=MSB
-  data.liters = ((uint32_t)decoded_buffer[18]) |
+  data.volume = ((uint32_t)decoded_buffer[18]) |
                 ((uint32_t)decoded_buffer[19] << 8) |
                 ((uint32_t)decoded_buffer[20] << 16) |
                 ((uint32_t)decoded_buffer[21] << 24);
@@ -804,10 +804,10 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
   // Basic plausibility checks for primary fields. These are deliberately
   // conservative so we only reject clearly bogus frames while keeping the
   // behaviour compatible with good data.
-  if (data.liters == 0 || data.liters == 0xFFFFFFFFUL)
+  if (data.volume == 0 || data.volume == 0xFFFFFFFFUL)
   {
-    echo_debug(1, "ERROR: Parsed liters value is invalid (0x%08lX) - discarding frame\n",
-               (unsigned long)data.liters);
+    echo_debug(1, "ERROR: Parsed volume value is invalid (0x%08lX) - discarding frame\n",
+               (unsigned long)data.volume);
     memset(&data, 0, sizeof(data));
     return data;
   }
@@ -943,19 +943,19 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
       // 3) Cross-check newest historical value against current meter reading
       //    (if available). History should never greatly exceed the current
       //    reading because each entry is a past snapshot of the same counter.
-      if (history_ok && data.liters > 0 && num_values > 0)
+      if (history_ok && data.volume > 0 && num_values > 0)
       {
         uint32_t newest = data.history[num_values - 1];
-        if (newest > data.liters)
+        if (newest > data.volume)
         {
-          uint32_t diff = newest - data.liters;
+          uint32_t diff = newest - data.volume;
           // Allow a small tolerance for off-by-one / rounding, but reject
           // obviously impossible values.
           const uint32_t MAX_FORWARD_TOLERANCE = 1000000UL; // 1M L tolerance
           if (diff > MAX_FORWARD_TOLERANCE)
           {
-            echo_debug(1, "ERROR: Newest history value (%u) exceeds current liters (%u) by %u L - marking history invalid\n",
-                       newest, data.liters, diff);
+            echo_debug(1, "ERROR: Newest history value (%u) exceeds current volume (%u) by %u L - marking history invalid\n",
+                       newest, data.volume, diff);
             history_ok = false;
           }
         }

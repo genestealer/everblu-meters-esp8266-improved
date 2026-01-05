@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The release process is automated via GitHub Actions and is triggered by tags matching `v*.*.*`. See `.github/workflows/release.yml`.
 
+## [Unreleased]
+
+What's new:
+
+- Add support for gas meters in addition to water meters (Issue #32)
+- Add `METER_TYPE` configuration option in `private.h` to select between "water" (default) or "gas"
+- Gas meters: readings are automatically converted to cubic meters (m³) and use gas device class
+- Water meters: readings remain in liters (L) with water device class
+- Update MQTT discovery messages to use appropriate device class, icon, and unit based on meter type
+- Update README with gas meter configuration instructions
+
 ## [v1.1.5] - 2025-11-18
 
 What's changed since v1.1.4:
