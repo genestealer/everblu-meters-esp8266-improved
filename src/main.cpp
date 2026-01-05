@@ -22,6 +22,7 @@
 #include "private.h"        // Include private configuration (Wi-Fi, MQTT, etc.)
 #include "everblu_meters.h" // Include EverBlu meter communication library
 #include "version.h"        // Firmware version definition
+#include "wifi_serial.h"    // WiFi serial monitor
 #if defined(ESP8266)
 #include <ESP8266WiFi.h> // Wi-Fi library for ESP8266
 #include <ESP8266mDNS.h> // mDNS library for ESP8266
@@ -249,8 +250,13 @@ const char jsonTemplate[] = "{ "
                             "\"rssi\" : %d, "
                             "\"timestamp\" : \"%s\" }";
 
+// Define the default maximum retries if missing from the private.h file
+#ifndef MAX_RETRIES
+#define MAX_RETRIES 10 // Default: 10 retry attempts before cooldown
+#endif
+
 int _retry = 0;
-const int MAX_RETRIES = 5;                    // Maximum number of retry attempts
+const int max_retries = MAX_RETRIES;          // Maximum number of retry attempts (configurable in private.h)
 unsigned long lastFailedAttempt = 0;          // Timestamp of last failed attempt
 const unsigned long RETRY_COOLDOWN = 3600000; // 1 hour cooldown in milliseconds
 
@@ -547,16 +553,16 @@ void onUpdateData()
   // corrupted frames and returning zeros).
   if (meter_data.reads_counter == 0 || meter_data.volume == 0)
   {
-    Serial.printf("Unable to retrieve data from meter (attempt %d/%d)\n", _retry + 1, MAX_RETRIES);
+    Serial.printf("Unable to retrieve data from meter (attempt %d/%d)\n", _retry + 1, max_retries);
 
-    if (_retry < MAX_RETRIES - 1)
+    if (_retry < max_retries - 1)
     {
       // Schedule retry using callback instead of recursion to prevent stack overflow
       _retry++;
       static char errorMsg[64];
-      snprintf(errorMsg, sizeof(errorMsg), "Retry %d/%d - No data received", _retry, MAX_RETRIES);
+      snprintf(errorMsg, sizeof(errorMsg), "Retry %d/%d - No data received", _retry, max_retries);
       lastErrorMessage = errorMsg;
-      Serial.printf("Scheduling retry in 10 seconds... (next attempt %d/%d)\n", _retry + 1, MAX_RETRIES);
+      Serial.printf("Scheduling retry in 10 seconds... (next attempt %d/%d)\n", _retry + 1, max_retries);
       mqtt.publish(String(mqttBaseTopic) + "/active_reading", "false", true);
       mqtt.publish(String(mqttBaseTopic) + "/cc1101_state", "Idle", true);
       mqtt.publish(String(mqttBaseTopic) + "/last_error", lastErrorMessage, true);
@@ -570,7 +576,7 @@ void onUpdateData()
       lastFailedAttempt = millis();
       failedReads++;
       lastErrorMessage = "Max retries reached - cooling down";
-      Serial.printf("Max retries (%d) reached. Entering 1-hour cooldown period.\n", MAX_RETRIES);
+      Serial.printf("Max retries (%d) reached. Entering 1-hour cooldown period.\n", max_retries);
       mqtt.publish(String(mqttBaseTopic) + "/active_reading", "false", true);
       mqtt.publish(String(mqttBaseTopic) + "/cc1101_state", "Idle", true);
       mqtt.publish(String(mqttBaseTopic) + "/status_message", "Failed after max retries, cooling down for 1 hour", true);
@@ -1318,6 +1324,9 @@ void onConnectionEstablished()
   Serial.println("> Ready");
   Serial.print("> IP address: ");
   Serial.println(WiFi.localIP());
+
+  // Start WiFi serial monitor
+  wifiSerialBegin();
 
   char triggerTopic[80];
   snprintf(triggerTopic, sizeof(triggerTopic), "%s/trigger", mqttBaseTopic);
@@ -2103,6 +2112,7 @@ void loop()
 {
   mqtt.loop();
   ArduinoOTA.handle();
+  wifiSerialLoop();
 
   // Update diagnostics and Wi-Fi details every 5 minutes
   if (millis() - lastWifiUpdate > 300000)
@@ -2116,6 +2126,12 @@ void loop()
   // ------------------------------
   const bool wifiUp = mqtt.isWifiConnected();
   const bool mqttUp = mqtt.isMqttConnected();
+
+  // Start WiFi serial server as soon as Wi-Fi is up (no wait for MQTT)
+  if (wifiUp)
+  {
+    wifiSerialBegin();
+  }
 
   // Log transitions to connected state (one-time per connect)
   if (wifiUp && !g_prevWifiUp)

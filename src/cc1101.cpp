@@ -6,6 +6,7 @@
 #include "utils.h"          // Include the local utils library for utility functions
 #include "cc1101.h"         // Include the local cc1101 library for CC1101 functions
 #include <Arduino.h>        // Include the Arduino library for basic functions
+#include "wifi_serial.h"    // Mirror Serial to WiFi
 #include <SPI.h>            // Include the SPI library for SPI communication
 #if defined(ESP32)
 #include <esp_task_wdt.h>

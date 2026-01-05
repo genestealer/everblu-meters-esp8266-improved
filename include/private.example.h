@@ -71,9 +71,9 @@
 //   - Ignore the suffix (-ZZZ)
 //
 // Example:
-//   Serial: 23-1875247-234
-//     METER_YEAR   = 23
-//     METER_SERIAL = 1875247
+//   Serial: 20-02777550-234
+//     METER_YEAR   = 20
+//     METER_SERIAL = 2777550
 //
 // Common mistakes:
 //   - Using a 4-digit year
@@ -123,3 +123,12 @@
 // 1 = enable verbose CC1101 / RADIAN logging
 // 0 = disable (default)
 #define DEBUG_CC1101 0
+
+// ============================================================================
+// READING RETRY CONFIGURATION
+// ============================================================================
+
+// Maximum number of retry attempts when reading fails
+// After this many failed attempts, the system enters a 1-hour cooldown period
+// Default: 10 retries
+#define MAX_RETRIES 10

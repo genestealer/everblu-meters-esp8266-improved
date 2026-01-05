@@ -73,6 +73,7 @@ See the Hardware section below for full wiring tables and pictures.
   - MQTT broker/port (+ credentials, if used)
   - `METER_YEAR` and `METER_SERIAL` (from the meter label)
   - `METER_TYPE` - set to `"water"` (default) or `"gas"` depending on your meter type
+  - `MAX_RETRIES` - maximum reading retry attempts before cooldown (optional, default is 10)
 - `platformio.ini`: select `env:huzzah` (ESP8266 HUZZAH) or `env:esp32dev` (ESP32 DevKit).
 
 ### Meter Type Configuration
@@ -93,14 +94,47 @@ To configure your meter type, set `METER_TYPE` in `include/private.h`:
 
 For gas meters, readings are automatically converted from the internal liter count to cubic meters (m³) before publishing to Home Assistant.
 
-### 3. Get your first reading
+### 3. Build and upload the firmware
+
+#### First-time USB Upload
 
 1. Wire the CC1101 to your board as shown in the Hardware section.
-2. Connect the board over USB and open VS Code with PlatformIO installed.
-3. In PlatformIO, select the matching environment (huzzah or esp32dev) and run “Upload and Monitor”.
-4. On first boot, wait up to ~2 minutes while the automatic wide frequency scan runs (serial monitor will show progress).
-5. Once the scan finishes, you should see meter data in the serial monitor and MQTT topics everblu/cyble/...
-on your broker/Home Assistant.
+2. Connect the board to your computer via USB.
+3. Open the project folder in VS Code with PlatformIO installed.
+4. **Select your board environment** using the PlatformIO status bar at the bottom:
+   - For **Adafruit HUZZAH ESP8266**: select `env:huzzah`
+   - For **WeMos D1 Mini**: select `env:d1_mini`
+   - For **WeMos D1 Mini Pro**: select `env:d1_mini_pro`
+   - For **NodeMCU v2**: select `env:nodemcuv2`
+   - For **ESP32 DevKit**: select `env:esp32dev`
+5. Click the **PlatformIO: Upload and Monitor** button (→ with line) in the status bar, or use the PlatformIO sidebar:
+   - Click the PlatformIO icon on the left sidebar
+   - Expand your environment (e.g., "huzzah")
+   - Click "Upload and Monitor"
+6. Wait for the build and upload to complete.
+7. On first boot, wait up to ~2 minutes while the automatic wide frequency scan runs (serial monitor will show progress).
+8. Once the scan finishes, you should see meter data in the serial monitor and MQTT topics `everblu/cyble/{METER_SERIAL}/...` on your broker/Home Assistant.
+
+#### Over-The-Air (OTA) Updates
+
+Once your device is running and connected to Wi-Fi, you can update it wirelessly:
+
+1. In `platformio.ini`, find your board's `-ota` environment (e.g., `[env:huzzah-ota]`).
+2. **Update the IP address** to match your device's IP:
+   ```ini
+   upload_port = 192.168.2.21  ; Change to your device's IP
+   monitor_port = socket://192.168.2.21:23  ; Change to match upload_port
+   ```
+3. **Select the OTA environment** in PlatformIO:
+   - For **HUZZAH**: select `env:huzzah-ota`
+   - For **D1 Mini**: select `env:d1_mini-ota`
+   - For **D1 Mini Pro**: select `env:d1_mini_pro-ota`
+   - For **NodeMCU v2**: select `env:nodemcuv2-ota`
+   - For **ESP32 DevKit**: select `env:esp32dev-ota`
+4. Click **PlatformIO: Upload and Monitor** as before.
+5. The firmware will be uploaded over your Wi-Fi network.
+
+> **Note**: You can find your device's IP address in the serial monitor output at startup, or check your router's DHCP client list, or look at the `everblu/cyble/{METER_SERIAL}/wifi_ip` MQTT topic in Home Assistant.
 
 ---
 
@@ -335,16 +369,21 @@ By default, it is set to `0` (disabled).
       - `#define DEBUG_CC1101 1` enables verbose radio debugging (default in the example file).
       - `#define DEBUG_CC1101 0` disables verbose radio debugging.
 
-3. **Update Platform Configuration**
-  - Select an environment in `platformio.ini`:
-    - `env:huzzah` (ESP8266 Adafruit HUZZAH)
-    - `env:esp32dev` (ESP32 DevKit)
-  - Example: build ESP8266 HUZZAH
-    - In VS Code, choose the `huzzah` environment and run “Build” or “Upload and Monitor”.
-  - Example: build ESP32 DevKit
-    - In VS Code, choose the `esp32dev` environment and run “Build” or “Upload and Monitor”.
-- OTA upload is configured only under `env:huzzah` by default.
-For ESP32, use serial upload unless you add OTA settings for your device’s IP.
+3. **Select Your Board Environment**
+  - Use the PlatformIO status bar at the bottom of VS Code to select your board:
+    - `env:huzzah` - Adafruit HUZZAH ESP8266 (USB upload)
+    - `env:huzzah-ota` - Adafruit HUZZAH ESP8266 (OTA upload)
+    - `env:d1_mini` - WeMos D1 Mini (USB upload)
+    - `env:d1_mini-ota` - WeMos D1 Mini (OTA upload)
+    - `env:d1_mini_pro` - WeMos D1 Mini Pro (USB upload)
+    - `env:d1_mini_pro-ota` - WeMos D1 Mini Pro (OTA upload)
+    - `env:nodemcuv2` - NodeMCU v2 (USB upload)
+    - `env:nodemcuv2-ota` - NodeMCU v2 (OTA upload)
+    - `env:esp32dev` - ESP32 DevKit (USB upload)
+    - `env:esp32dev-ota` - ESP32 DevKit (OTA upload)
+  - **For first-time setup**: Use the standard environment (without `-ota`)
+  - **For OTA updates**: After your device is running on Wi-Fi, use the `-ota` environment and update the IP address in `platformio.ini`
+  - See the "Quick Start" section above for detailed build and upload instructions
 
 4. **Perform Frequency Discovery (First-Time Setup)**
 - On the very first boot (or anytime there is no stored frequency offset), the firmware automatically launches a wide scan while `AUTO_SCAN_ENABLED` is set to `1` (default).
@@ -360,9 +399,10 @@ Once the scan completes and the optimal frequency is found, the device will conn
 - For best results, perform this step during local business hours when the meter is most likely to transmit.
 Refer to the "Frequency Adjustment" section below for additional guidance.
 
-5. **Compile and Flash the Code**
-  - Compile and upload the code to your ESP device using **PlatformIO > Upload and Monitor**.
-  - Keep the device connected to your computer during this process.
+5. **Build and Upload**
+  - Follow the build and upload instructions in the "Quick Start" section above.
+  - For first-time setup, use USB upload with the standard environment (e.g., `env:huzzah`).
+  - Keep the device connected to your computer during USB upload.
 
 6. **Verify Meter Data**
 - After WiFi and MQTT connection is established (or after the initial frequency scan completes), the meter data should appear in the terminal (bottom panel) and be pushed to MQTT.
