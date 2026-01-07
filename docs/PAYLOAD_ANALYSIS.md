@@ -193,7 +193,7 @@ The unknown bytes could be analyzed by:
 
 - **Payload Size**: 122 bytes (decoded), 124 bytes (frame length indicator)
 - **Protocol**: RADIAN (Itron proprietary, basis for Wireless M-Bus Mode F)
-- **Meter Model**: Itron EverBlu Cyble Enhanced (e.g., 2020-0257750)
+- **Meter Model**: Itron EverBlu Cyble Enhanced (e.g., 2020-0123456)
 - **Reference Implementation**: hallard/everblu-meters-pi (Raspberry Pi, C language)
 - **This Implementation**: genestealer/everblu-meters-esp8266-improved (ESP8266, Arduino C++)
 

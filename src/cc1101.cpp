@@ -1195,7 +1195,7 @@ uint8_t decode_4bitpbit_serial(uint8_t *rxBuffer, int l_total_byte, uint8_t *dec
 
    Meter Hardware Details:
    - Device: Itron EverBlu Cyble Enhanced
-   - Serial: 2020-0257750
+   - Serial: 2020-0123456
    - Frequency: 433.82 MHz ±0.05 ppm
    - Modulation: 2-FSK with 5 kHz shift
    - Preamble: 0x55 repeated (01010101...)
