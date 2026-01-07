@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The release process is automated via GitHub Actions and is triggered by tags matching `v*.*.*`. See `.github/workflows/release.yml`.
 
+## [v1.1.7] - 2025-01-07
+
+What's changed since v1.1.6:
+
+### Fixed
+- Automatically append METER_SERIAL to MQTT client ID to prevent conflicts when running multiple devices on the same broker (#35)
+- Restored Home Assistant button discovery by removing unsupported per-button availability payloads
+- Device now gracefully handles missing CC1101 radio without continuous reboots
+- CC1101 State sensor now shows "unavailable" instead of "Idle" when radio is not connected
+- WiFi and MQTT functionality maintained even when CC1101 radio is disconnected
+
 ## [v1.1.6] - 2026-01-07
 
 What's changed since v1.1.5:
