@@ -150,4 +150,4 @@ This should not happen - USB Serial output is always preserved. If you experienc
 - **TCP No-Delay**: Nagle algorithm is disabled for lower latency
 - **Buffer Management**: Uses WiFiClient internal buffering (no additional buffers)
 - **Memory Impact**: Minimal - only one WiFiServer and one WiFiClient object
-- **Performance**: Non-blocking calls ensure no impact on main application timing
+- **Performance**: Connection handling is non-blocking and designed to minimize impact on the main application loop; however, individual write operations may block when TCP buffers are full or the connection is slow (see note above)

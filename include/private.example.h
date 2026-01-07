@@ -119,7 +119,7 @@
 //   - Move to a different meter
 //
 // After one successful boot, set back to 0 to retain the stored frequency.
-#define CLEAR_EEPROM_ON_BOOT 1
+#define CLEAR_EEPROM_ON_BOOT 0
 
 // Enable wide frequency scan when no stored offset exists
 //
@@ -162,3 +162,6 @@
 // To use when enabled:
 //   telnet <device-ip> 23
 #define WIFI_SERIAL_MONITOR_ENABLED 0
+#if WIFI_SERIAL_MONITOR_ENABLED
+#warning "WiFi serial monitor is ENABLED: this may expose credentials and internal state over the network"
+#endif

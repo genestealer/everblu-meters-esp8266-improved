@@ -61,6 +61,9 @@ void wifiSerialPrintf(const char *format, ...);
 // - WifiSerialStream only implements a subset of the HardwareSerial API. Third-party libraries
 //   that rely on advanced Serial methods (e.g. availableForWrite(), readBytes(), etc.) may
 //   not compile or may behave unexpectedly when this remap is active.
+// - Known compatibility risk: any library expecting the full HardwareSerial surface (or relying
+//   on Serial being a hardware UART) can fail to compile or behave differently. Prefer defining
+//   WIFI_SERIAL_NO_REMAP and using WiFiSerial explicitly where needed.
 // - To avoid remapping in code that expects the original HardwareSerial `Serial` object,
 //   define WIFI_SERIAL_NO_REMAP before including this header, for example:
 //   #define WIFI_SERIAL_NO_REMAP

@@ -67,7 +67,7 @@ volume_m³ = raw_counter_liters / GAS_VOLUME_DIVISOR
 |---|---|---|---|
 | 0.01 m³ | per unit | 100 | counter=81415 → 814.15 m³ |
 | 0.001 m³ | per unit | 1000 | counter=81415 → 81.415 m³ |
-| 0.1 L | per unit | 1000 | counter=81415 → 81.415 m³ |
+| 1 L (0.001 m³) | per unit | 1000 | counter=81415 → 81.415 m³ |
 
 ### Where to Find Your Meter's Pulse Weight
 

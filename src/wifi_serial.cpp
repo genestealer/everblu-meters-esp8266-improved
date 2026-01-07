@@ -5,6 +5,7 @@
 
 #define WIFI_SERIAL_NO_REMAP
 #include "wifi_serial.h"
+#include "version.h"
 
 #if defined(ESP8266)
 #include <ESP8266WiFi.h>
@@ -13,7 +14,7 @@
 #endif
 
 // TCP server on configured port
-static WiFiServer *wifiSerialServer = nullptr;
+static WiFiServer wifiSerialServer(WIFI_SERIAL_PORT);
 static WiFiClient wifiSerialClient;
 static bool serverStarted = false;
 
@@ -31,12 +32,9 @@ void WifiSerialStream::beginServer()
         return;
     }
 
-    // NOTE: WiFiServer is allocated once with 'new' and kept for the lifetime of the application.
-    // The serverStarted flag ensures it's only created once, preventing memory leaks from
-    // multiple calls. If WiFi drops and reconnects, the same server instance continues to be used.
-    wifiSerialServer = new WiFiServer(WIFI_SERIAL_PORT);
-    wifiSerialServer->begin();
-    wifiSerialServer->setNoDelay(true); // Lower latency for logs
+    // Start the server on the statically allocated WiFiServer instance.
+    wifiSerialServer.begin();
+    wifiSerialServer.setNoDelay(true); // Lower latency for logs
     serverStarted = true;
 
     _usb.printf("[WiFi Serial] Server started on port %d\n", WIFI_SERIAL_PORT);
@@ -53,7 +51,7 @@ void WifiSerialStream::loop()
         return;
     }
 
-    if (wifiSerialServer->hasClient())
+    if (wifiSerialServer.hasClient())
     {
         if (wifiSerialClient && wifiSerialClient.connected())
         {
@@ -61,7 +59,7 @@ void WifiSerialStream::loop()
             wifiSerialClient.stop();
         }
 
-        wifiSerialClient = wifiSerialServer->accept();
+        wifiSerialClient = wifiSerialServer.accept();
         if (wifiSerialClient)
         {
             _usb.printf("[WiFi Serial] Client connected from %s\n",
@@ -73,6 +71,7 @@ void WifiSerialStream::loop()
             wifiSerialClient.println("WiFi Serial Monitor Connected");
             wifiSerialClient.println("=====================================");
             wifiSerialClient.println("Everblu Meters ESP8266/ESP32");
+            wifiSerialClient.printf("Firmware Version: %s\n", EVERBLU_FW_VERSION);
             wifiSerialClient.println("Water/Gas usage data for Home Assistant");
             wifiSerialClient.println("https://github.com/genestealer/everblu-meters-esp8266-improved");
             wifiSerialClient.println();
@@ -121,13 +120,18 @@ size_t WifiSerialStream::write(const uint8_t *buffer, size_t size)
 
 size_t WifiSerialStream::printf(const char *format, ...)
 {
-    // NOTE: Formatted strings longer than WIFI_SERIAL_PRINTF_BUFFER_SIZE-1 characters
-    // will be silently truncated. This is a limitation of the fixed buffer approach.
     char buffer[WIFI_SERIAL_PRINTF_BUFFER_SIZE];
     va_list args;
     va_start(args, format);
-    vsnprintf(buffer, sizeof(buffer), format, args);
+    int len = vsnprintf(buffer, sizeof(buffer), format, args);
     va_end(args);
+
+    bool truncated = (len < 0) || (len >= static_cast<int>(sizeof(buffer)));
+    if (truncated)
+    {
+        _usb.println("[WiFi Serial] Warning: printf output truncated (buffer 256 bytes)");
+    }
+
     return write(reinterpret_cast<uint8_t *>(buffer), strlen(buffer));
 }
 
@@ -181,12 +185,17 @@ void wifiSerialPrintln(const char *str)
 
 void wifiSerialPrintf(const char *format, ...)
 {
-    // NOTE: Formatted strings longer than WIFI_SERIAL_PRINTF_BUFFER_SIZE-1 characters
-    // will be silently truncated. This is a limitation of the fixed buffer approach.
     char buffer[WIFI_SERIAL_PRINTF_BUFFER_SIZE];
     va_list args;
     va_start(args, format);
-    vsnprintf(buffer, sizeof(buffer), format, args);
+    int len = vsnprintf(buffer, sizeof(buffer), format, args);
     va_end(args);
+
+    bool truncated = (len < 0) || (len >= static_cast<int>(sizeof(buffer)));
+    if (truncated)
+    {
+        WiFiSerial.println("[WiFi Serial] Warning: printf output truncated (buffer 256 bytes)");
+    }
+
     WiFiSerial.print(buffer);
 }

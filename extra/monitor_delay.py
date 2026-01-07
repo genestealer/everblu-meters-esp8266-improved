@@ -2,10 +2,15 @@ Import("env")  # type: ignore
 import time
 import socket
 
-# Optional: retry logic for WiFi serial monitor connection
-# Set with `custom_monitor_connect_delay` in platformio.ini (float or int).
-# If > 0, will attempt to connect to monitor port with retries instead of fixed delay.
-_RETRY_TIMEOUT = float(env.GetProjectOption("custom_monitor_connect_delay", 0) or 0)  # type: ignore
+_RETRY_TIMEOUT = 0.0
+try:
+    _custom_monitor_connect_delay = env.GetProjectOption("custom_monitor_connect_delay", 0)  # type: ignore
+    _RETRY_TIMEOUT = float(_custom_monitor_connect_delay or 0)
+except Exception as exc:  # noqa: BLE001 - broad for robustness in PlatformIO env
+    print(
+        "[monitor-delay] Invalid or unavailable 'custom_monitor_connect_delay' value (%r); using default 0.0. Error: %s"
+        % (locals().get("_custom_monitor_connect_delay", None), exc)
+    )
 _RETRY_INTERVAL = 1.0  # seconds between connection attempts
 _INITIAL_DELAY = 3.0   # seconds to wait for ESP to reboot before first connection attempt
 
@@ -52,6 +57,7 @@ def _wait_for_monitor_ready(*args, **kwargs):
                 print("[monitor-delay] Monitor port ready after %.1fs (attempt %d)" % (elapsed, attempt))
                 return
         except (socket.timeout, OSError):
+            # Ignore transient connection errors; retry until overall timeout
             pass
         
         # Wait before next attempt

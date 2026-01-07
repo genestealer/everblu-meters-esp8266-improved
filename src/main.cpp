@@ -320,10 +320,12 @@ char mqttLwtTopic[80] = "everblu/cyble/" TOSTRING(METER_SERIAL) "/status"; // LW
 const char *meterDeviceClass;
 const char *meterIcon;
 const char *meterUnit;
-// NOTE: meterIsGas uses strcmp() at runtime during initialization.
-// This is intentional for simplicity; consider using preprocessor conditions (#if/#else)
-// if compile-time evaluation becomes critical for performance.
-const bool meterIsGas = (strcmp(METER_TYPE, "gas") == 0);
+// Compile-time string equality helper to avoid runtime strcmp for meter type
+constexpr bool strEq(const char *a, const char *b)
+{
+  return (*a == *b) && (*a == '\0' || strEq(a + 1, b + 1));
+}
+constexpr bool meterIsGas = strEq(METER_TYPE, "gas");
 
 // Initialize meter configuration
 static void initMeterTypeConfig()
@@ -639,8 +641,8 @@ void onUpdateData()
   Serial.println("==================\n");
 
   // Publish meter data to MQTT (using char buffers instead of String)
-  // NOTE: meter_data.volume is assumed to be in liters for both water and gas meters.
-  // For gas meters, this value is converted to cubic meters (m³) before publishing.
+  // NOTE: meter_data.volume is the raw counter value from the meter (liters for water;
+  // for gas, this raw counter is converted to cubic meters using GAS_VOLUME_DIVISOR).
   char valueBuffer[32];
 
   if (meterIsGas)
@@ -739,7 +741,7 @@ void onUpdateData()
     {
       currentMonthUsage = currentVolume - meter_data.history[num_history - 1];
     }
-    Serial.printf("[HISTORY]   Now  %10d  %9u (current month usage: %u L)\n", meter_data.volume, currentVolume, currentMonthUsage);
+    Serial.printf("[HISTORY]   Now  %10u  %9u (current month usage: %u L)\n", currentVolume, currentMonthUsage, currentMonthUsage);
     Serial.println("===================================\n");
 
     // Add monthly usage calculations to JSON
@@ -2163,13 +2165,7 @@ void loop()
   const bool wifiUp = mqtt.isWifiConnected();
   const bool mqttUp = mqtt.isMqttConnected();
 
-  // Start WiFi serial server as soon as Wi-Fi is up (no wait for MQTT) if enabled
-#if WIFI_SERIAL_MONITOR_ENABLED
-  if (wifiUp)
-  {
-    wifiSerialBegin();
-  }
-#endif
+  // WiFi serial server is started in onConnectionEstablished() when enabled
 
   // Log transitions to connected state (one-time per connect)
   if (wifiUp && !g_prevWifiUp)
