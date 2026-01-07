@@ -1299,8 +1299,33 @@ void onConnectionEstablished()
   // Note, my VLAN has no WAN/internet, so I am useing Home Assistant Community Add-on: chrony to proxy the time
   configTzTime("UTC0", SECRET_NTP_SERVER);
 
-  delay(5000); // Give it a moment for the time to sync the print out the time
+  // Wait briefly for NTP to set the clock and report status
+  const time_t MIN_VALID_EPOCH = 1609459200; // 2021-01-01
+  const unsigned long NTP_SYNC_TIMEOUT_MS = 10000;
+  bool timeSynced = false;
+  unsigned long waitStart = millis();
+  while (millis() - waitStart < NTP_SYNC_TIMEOUT_MS)
+  {
+    time_t probe = time(nullptr);
+    if (probe >= MIN_VALID_EPOCH)
+    {
+      timeSynced = true;
+      break;
+    }
+    delay(200);
+  }
+
   time_t tnow = time(nullptr);
+  if (timeSynced)
+  {
+    Serial.printf("✓ NTP sync successful after %lu ms\n", (unsigned long)(millis() - waitStart));
+  }
+  else
+  {
+    Serial.printf("WARNING: NTP sync failed within %lu ms. Clock may be unset (epoch=%ld).\n",
+                  (unsigned long)(millis() - waitStart), (long)tnow);
+  }
+
   struct tm *ptm = gmtime(&tnow);
   Serial.printf("Current date (UTC) : %04d/%02d/%02d %02d:%02d/%02d - %ld\n", ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, (long)tnow);
   // Print simple offset and derived local time for debugging
@@ -2083,7 +2108,7 @@ void setup()
   // Log effective frequency and warn if default is used
   Serial.printf("> Frequency (effective): %.6f MHz\n", (double)FREQUENCY);
 #if FREQUENCY_DEFINED_DEFAULT
-  Serial.println("WARNING: FREQUENCY not set in private.h; using default 433.820000 MHz (RADIAN).");
+  Serial.println("NOTE: FREQUENCY not set in private.h; using default 433.820000 MHz (RADIAN).");
 #endif
 
   // Optional functionalities of EspMQTTClient

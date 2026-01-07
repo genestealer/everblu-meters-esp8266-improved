@@ -133,7 +133,7 @@ halRfWriteReg(FOCCFG, 0x16);  // Default FOC configuration with tracking enabled
 Serial.printf("> Frequency (effective): %.6f MHz\n", (double)FREQUENCY);
 
 #if FREQUENCY_DEFINED_DEFAULT
-  Serial.println("WARNING: FREQUENCY not set in private.h; using default 433.820000 MHz (RADIAN).");
+  Serial.println("NOTE: FREQUENCY not set in private.h; using default 433.820000 MHz (RADIAN).");
 #endif
 ```
 
