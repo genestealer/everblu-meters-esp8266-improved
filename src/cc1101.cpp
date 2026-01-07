@@ -952,10 +952,10 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
           uint32_t diff = newest - data.volume;
           // Allow a small tolerance for off-by-one / rounding, but reject
           // obviously impossible values.
-          const uint32_t MAX_FORWARD_TOLERANCE = 1000000UL; // 1M L tolerance
+          const uint32_t MAX_FORWARD_TOLERANCE = 1000000UL; // 1M unit tolerance (liters for water, or internal units for gas)
           if (diff > MAX_FORWARD_TOLERANCE)
           {
-            echo_debug(1, "ERROR: Newest history value (%u) exceeds current volume (%u) by %u L - marking history invalid\n",
+            echo_debug(1, "ERROR: Newest history value (%u) exceeds current volume (%u) by %u units - marking history invalid\n",
                        newest, data.volume, diff);
             history_ok = false;
           }

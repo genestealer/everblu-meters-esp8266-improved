@@ -54,7 +54,17 @@ void wifiSerialPrint(const char *str);
 void wifiSerialPrintln(const char *str);
 void wifiSerialPrintf(const char *format, ...);
 
-// Remap Serial to the combined stream for all translation units that include this header
+// Remap Serial to the combined stream for all translation units that include this header.
+// NOTE:
+// - This macro changes all uses of `Serial` to `WiFiSerial` in any file that includes this
+//   header (unless WIFI_SERIAL_NO_REMAP is defined before including it).
+// - WifiSerialStream only implements a subset of the HardwareSerial API. Third-party libraries
+//   that rely on advanced Serial methods (e.g. availableForWrite(), readBytes(), etc.) may
+//   not compile or may behave unexpectedly when this remap is active.
+// - To avoid remapping in code that expects the original HardwareSerial `Serial` object,
+//   define WIFI_SERIAL_NO_REMAP before including this header, for example:
+//   #define WIFI_SERIAL_NO_REMAP
+//   #include "wifi_serial.h"
 #ifndef WIFI_SERIAL_NO_REMAP
 #define Serial WiFiSerial
 #endif

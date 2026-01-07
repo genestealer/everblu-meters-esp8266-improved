@@ -78,6 +78,13 @@ static const unsigned long OFFLINE_LED_BLINK_MS = 500UL;
 #define ENABLE_MQTT_DEBUGGING 0 // Set to 1 to enable MQTT debugging messages
 #endif
 
+// Define gas volume divisor if missing from the private.h file
+// Converts internal liter count to cubic meters for gas meters
+// Default: 100 (equivalent to 0.01 m³ per unit)
+#ifndef GAS_VOLUME_DIVISOR
+#define GAS_VOLUME_DIVISOR 100
+#endif
+
 // Define the default reading schedule if missing from the private.h file.
 // Options: "Monday-Friday", "Monday-Saturday", or "Monday-Sunday"
 #ifndef DEFAULT_READING_SCHEDULE
@@ -124,6 +131,10 @@ static int g_readHourUtc = DEFAULT_READING_HOUR_UTC;
 static int g_readMinuteUtc = DEFAULT_READING_MINUTE_UTC;
 static int g_readHourLocal = DEFAULT_READING_HOUR_UTC;
 static int g_readMinuteLocal = DEFAULT_READING_MINUTE_UTC;
+
+// Flag to indicate if current data read is from scheduled trigger (vs manual MQTT command)
+// Used to control whether auto-alignment should be applied to future scheduled reads
+static bool g_isScheduledRead = false;
 
 // Define a default meter frequency if missing from private.h.
 // RADIAN protocol nominal center frequency for EverBlu is 433.82 MHz.
@@ -291,9 +302,9 @@ char mqttBaseTopic[64] = "everblu/cyble/" TOSTRING(METER_SERIAL);          // Ba
 char mqttLwtTopic[80] = "everblu/cyble/" TOSTRING(METER_SERIAL) "/status"; // LWT status topic with serial number
 
 // Standard buffer size for constructing MQTT topic strings
-// Calculation: mqttBaseTopic (max 25) + longest suffix "/wifi_signal_percentage" (24) + null (1) = 50 bytes
-// Buffer size: 80 bytes provides 1.6x safety margin for topic construction
-#define MQTT_TOPIC_BUFFER_SIZE 80
+// Calculation: mqttBaseTopic (max 63) + longest suffix "/wifi_signal_percentage" (24) + null (1) = 88 bytes
+// Buffer size: 128 bytes provides 1.45x safety margin for topic construction
+#define MQTT_TOPIC_BUFFER_SIZE 128
 
 // ============================================================================
 // Meter Type Configuration
@@ -309,6 +320,9 @@ char mqttLwtTopic[80] = "everblu/cyble/" TOSTRING(METER_SERIAL) "/status"; // LW
 const char *meterDeviceClass;
 const char *meterIcon;
 const char *meterUnit;
+// NOTE: meterIsGas uses strcmp() at runtime during initialization.
+// This is intentional for simplicity; consider using preprocessor conditions (#if/#else)
+// if compile-time evaluation becomes critical for performance.
 const bool meterIsGas = (strcmp(METER_TYPE, "gas") == 0);
 
 // Initialize meter configuration
@@ -525,9 +539,11 @@ static const char *wifiStatusToString(wl_status_t st)
 //              Retries up to 10 times if data retrieval fails.
 void onUpdateData()
 {
-  Serial.printf("Updating data from meter...\n");
-  Serial.printf("Retry count : %d\n", _retry);
-  Serial.printf("Reading schedule : %s\n", readingSchedule);
+  Serial.printf("[STATUS] Firmware version: %s\n", EVERBLU_FW_VERSION);
+  Serial.printf("[STATUS] Updating data from meter...\n");
+  Serial.printf("[STATUS] Retry count: %d\n", _retry);
+  Serial.printf("[STATUS] Reading schedule: %s\n", readingSchedule);
+  Serial.printf("[STATUS] Scheduled read time: %02d:%02d UTC (%02d:%02d local-offset)\n", g_readHourUtc, g_readMinuteUtc, g_readHourLocal, g_readMinuteLocal);
 
   // Increment total attempts counter
   totalReadAttempts++;
@@ -544,7 +560,7 @@ void onUpdateData()
   // Get current UTC time
   time_t tnow = time(nullptr);
   struct tm *ptm = gmtime(&tnow);
-  Serial.printf("Current date (UTC) : %04d/%02d/%02d %02d:%02d/%02d - %ld\n", ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, (long)tnow);
+  Serial.printf("[TIME] Current date (UTC): %04d/%02d/%02d %02d:%02d/%02d - %ld\n", ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, (long)tnow);
 
   char iso8601[128];
   strftime(iso8601, sizeof iso8601, "%FT%TZ", gmtime(&tnow));
@@ -553,7 +569,7 @@ void onUpdateData()
   // corrupted frames and returning zeros).
   if (meter_data.reads_counter == 0 || meter_data.volume == 0)
   {
-    Serial.printf("Unable to retrieve data from meter (attempt %d/%d)\n", _retry + 1, max_retries);
+    Serial.printf("[ERROR] Unable to retrieve data from meter (attempt %d/%d)\n", _retry + 1, max_retries);
 
     if (_retry < max_retries - 1)
     {
@@ -562,7 +578,7 @@ void onUpdateData()
       static char errorMsg[64];
       snprintf(errorMsg, sizeof(errorMsg), "Retry %d/%d - No data received", _retry, max_retries);
       lastErrorMessage = errorMsg;
-      Serial.printf("Scheduling retry in 10 seconds... (next attempt %d/%d)\n", _retry + 1, max_retries);
+      Serial.printf("[STATUS] Scheduling retry in 10 seconds... (next attempt %d/%d)\n", _retry + 1, max_retries);
       mqtt.publish(String(mqttBaseTopic) + "/active_reading", "false", true);
       mqtt.publish(String(mqttBaseTopic) + "/cc1101_state", "Idle", true);
       mqtt.publish(String(mqttBaseTopic) + "/last_error", lastErrorMessage, true);
@@ -576,7 +592,7 @@ void onUpdateData()
       lastFailedAttempt = millis();
       failedReads++;
       lastErrorMessage = "Max retries reached - cooling down";
-      Serial.printf("Max retries (%d) reached. Entering 1-hour cooldown period.\n", max_retries);
+      Serial.printf("[ERROR] Max retries (%d) reached. Entering 1-hour cooldown period.\n", max_retries);
       mqtt.publish(String(mqttBaseTopic) + "/active_reading", "false", true);
       mqtt.publish(String(mqttBaseTopic) + "/cc1101_state", "Idle", true);
       mqtt.publish(String(mqttBaseTopic) + "/status_message", "Failed after max retries, cooling down for 1 hour", true);
@@ -602,30 +618,36 @@ void onUpdateData()
   snprintf(timeStartFormatted, sizeof(timeStartFormatted), "%02d:00", timeStart);
   snprintf(timeEndFormatted, sizeof(timeEndFormatted), "%02d:00", timeEnd);
 
-  Serial.printf("Data from meter:\n");
+  Serial.println("\n=== METER DATA ===");
   if (meterIsGas)
   {
-    Serial.printf("%s : %.3f\nBattery (in months) : %d\nCounter : %d\nRSSI : %d\nTime start : %s\nTime end : %s\n\n",
-                  meterUnit, meter_data.volume / 1000.0, meter_data.battery_left, meter_data.reads_counter, meter_data.rssi, timeStartFormatted, timeEndFormatted);
+    Serial.printf("[METER DATA] %-25s: %.3f\n", meterUnit, meter_data.volume / (float)GAS_VOLUME_DIVISOR);
   }
   else
   {
-    Serial.printf("%s : %d\nBattery (in months) : %d\nCounter : %d\nRSSI : %d\nTime start : %s\nTime end : %s\n\n",
-                  meterUnit, meter_data.volume, meter_data.battery_left, meter_data.reads_counter, meter_data.rssi, timeStartFormatted, timeEndFormatted);
+    Serial.printf("[METER DATA] %-25s: %d\n", meterUnit, meter_data.volume);
   }
-  Serial.printf("RSSI (dBm) : %d\n", meter_data.rssi_dbm);
-  Serial.printf("RSSI (percentage) : %d\n", calculateMeterdBmToPercentage(meter_data.rssi_dbm));
-  Serial.printf("Signal quality (LQI) : %d\n", meter_data.lqi);
-  Serial.printf("Signal quality (LQI percentage) : %d\n", calculateLQIToPercentage(meter_data.lqi));
+  Serial.printf("[METER DATA] %-25s: %d\n", "Battery (months)", meter_data.battery_left);
+  Serial.printf("[METER DATA] %-25s: %d\n", "Counter", meter_data.reads_counter);
+  Serial.printf("[METER DATA] %-25s: %d\n", "RSSI (raw)", meter_data.rssi);
+  Serial.printf("[METER DATA] %-25s: %d dBm\n", "RSSI", meter_data.rssi_dbm);
+  Serial.printf("[METER DATA] %-25s: %d%%\n", "RSSI (percentage)", calculateMeterdBmToPercentage(meter_data.rssi_dbm));
+  Serial.printf("[METER DATA] %-25s: %d\n", "Signal quality (LQI)", meter_data.lqi);
+  Serial.printf("[METER DATA] %-25s: %d%%\n", "LQI (percentage)", calculateLQIToPercentage(meter_data.lqi));
+  Serial.printf("[METER DATA] %-25s: %s\n", "Time window start", timeStartFormatted);
+  Serial.printf("[METER DATA] %-25s: %s\n", "Time window end", timeEndFormatted);
+  Serial.println("==================\n");
 
   // Publish meter data to MQTT (using char buffers instead of String)
-  // For gas meters, convert from liters to cubic meters (m³)
+  // NOTE: meter_data.volume is assumed to be in liters for both water and gas meters.
+  // For gas meters, this value is converted to cubic meters (m³) before publishing.
   char valueBuffer[32];
 
   if (meterIsGas)
   {
-    // Gas meters: publish value in m³ (volume / 1000)
-    float cubicMeters = meter_data.volume / 1000.0;
+    // Gas meters: publish value in m³ (volume / GAS_VOLUME_DIVISOR)
+    // Default divisor 100 = 0.01 m³ per unit (typical EverBlu Cyble gas module)
+    float cubicMeters = meter_data.volume / (float)GAS_VOLUME_DIVISOR;
     snprintf(valueBuffer, sizeof(valueBuffer), "%.3f", cubicMeters);
   }
   else
@@ -656,7 +678,7 @@ void onUpdateData()
     // non‑zero entries, treat it as unavailable for this frame.
     if (num_history == 0)
     {
-      Serial.println("WARN: history_available=true but no non-zero history entries found - skipping history publish for this frame");
+      Serial.println("[WARN] history_available=true but no non-zero history entries found - skipping history publish for this frame");
       meter_data.history_available = false;
     }
   }
@@ -664,9 +686,9 @@ void onUpdateData()
   if (meter_data.history_available)
   {
 
-    Serial.printf("\n=== Historical Data (%d months) ===\n", num_history);
-    Serial.println("Month  Volume (L)  Usage (L)");
-    Serial.println("-----  ----------  ---------");
+    Serial.printf("\n=== HISTORICAL DATA (%d months) ===\n", num_history);
+    Serial.println("[HISTORY] Month  Volume (L)  Usage (L)");
+    Serial.println("[HISTORY] -----  ----------  ---------");
 
     // Calculate monthly consumption from the historical data
     // Format: {"history": [oldest_volume, ..., newest_volume], "monthly_usage": [month1_usage, ..., month13_usage]}
@@ -705,7 +727,7 @@ void onUpdateData()
       {
         usage = meter_data.history[i] - meter_data.history[i - 1];
       }
-      Serial.printf(" -%02d   %10u  %9u\n", num_history - i, meter_data.history[i], usage);
+      Serial.printf("[HISTORY]  -%02d   %10u  %9u\n", num_history - i, meter_data.history[i], usage);
     }
 
     // Calculate current month usage (difference from most recent historical reading).
@@ -717,7 +739,7 @@ void onUpdateData()
     {
       currentMonthUsage = currentVolume - meter_data.history[num_history - 1];
     }
-    Serial.printf("  Now  %10d  %9u (current month usage: %u L)\n", meter_data.volume, currentVolume, currentMonthUsage);
+    Serial.printf("[HISTORY]   Now  %10d  %9u (current month usage: %u L)\n", meter_data.volume, currentVolume, currentMonthUsage);
     Serial.println("===================================\n");
 
     // Add monthly usage calculations to JSON
@@ -829,6 +851,8 @@ skip_history_publish:;
 
 #if AUTO_ALIGN_READING_TIME
   // Optionally auto-align the daily scheduled reading time to the meter's wake window
+  // Only apply when this read was triggered by the scheduler, not by manual MQTT command
+  if (g_isScheduledRead)
   {
     int timeStart = constrain(meter_data.time_start, 0, 23);
     int timeEnd = constrain(meter_data.time_end, 0, 23);
@@ -881,7 +905,10 @@ skip_history_publish:;
   // Perform adaptive frequency tracking based on FREQEST register
   adaptiveFrequencyTracking(meter_data.freqest);
 
-  Serial.printf("Data update complete.\n\n");
+  // Reset scheduled read flag for next invocation
+  g_isScheduledRead = false;
+
+  Serial.println("[STATUS] Data update complete.\n");
 }
 
 // Function: onScheduled
@@ -924,6 +951,7 @@ void onScheduled()
 
     // Update data
     _retry = 0;
+    g_isScheduledRead = true; // Mark this read as triggered by scheduler
     onUpdateData();
     return;
   }
@@ -996,7 +1024,7 @@ String buildDiscoveryJson(const char *name, const char *entity_id, const char *i
 // Description: Publishes Wi-Fi diagnostics (IP, RSSI, signal strength, etc.) to MQTT.
 void publishWifiDetails()
 {
-  Serial.println("> Publish Wi-Fi details");
+  Serial.println("> Publish Wi-Fi details...");
 
   // Get WiFi details (use String for network functions that return String)
   char wifiIP[16];
@@ -1065,7 +1093,7 @@ void publishWifiDetails()
 // Description: Publishes meter configuration (year, serial, frequency) to MQTT.
 void publishMeterSettings()
 {
-  Serial.println("> Publish meter settings");
+  Serial.println("> Publish meter settings...");
 
   // Publish Meter Year, Serial (using char buffers instead of String)
   char valueBuffer[16];
@@ -1325,8 +1353,13 @@ void onConnectionEstablished()
   Serial.print("> IP address: ");
   Serial.println(WiFi.localIP());
 
-  // Start WiFi serial monitor
+  // Start WiFi serial monitor if enabled in configuration
+#if WIFI_SERIAL_MONITOR_ENABLED
   wifiSerialBegin();
+  Serial.println("> WiFi Serial Monitor: ENABLED");
+#else
+  Serial.println("> WiFi Serial Monitor: DISABLED");
+#endif
 
   char triggerTopic[80];
   snprintf(triggerTopic, sizeof(triggerTopic), "%s/trigger", mqttBaseTopic);
@@ -1367,14 +1400,14 @@ void onConnectionEstablished()
                  {
     // Input validation: accept same commands as the normal trigger
     if (message != "update" && message != "read") {
-      Serial.printf("WARN: Invalid force-trigger command '%s' (expected 'update' or 'read')\n", message.c_str());
+      Serial.printf("[WARN] Invalid force-trigger command '%s' (expected 'update' or 'read')\n", message.c_str());
       char topicBuffer[MQTT_TOPIC_BUFFER_SIZE];
       snprintf(topicBuffer, sizeof(topicBuffer), "%s/status_message", mqttBaseTopic);
       mqtt.publish(topicBuffer, "Invalid trigger command", true);
       return;
     }
 
-    Serial.printf("Force update requested via MQTT (command: %s) - overriding cooldown\n", message.c_str());
+    Serial.printf("[STATUS] Force update requested via MQTT (command: %s) - overriding cooldown\n", message.c_str());
 
     // Immediately attempt to update, ignoring any cooldown state
     _retry = 0;
@@ -1944,6 +1977,7 @@ void setup()
   Serial.println("Everblu Meters ESP8266/ESP32 Starting...");
   Serial.println("Water/Gas usage data for Home Assistant");
   Serial.println("https://github.com/genestealer/everblu-meters-esp8266-improved");
+  Serial.printf("Firmware version: %s\n", EVERBLU_FW_VERSION);
   Serial.printf("Target meter: 20%02d-%07lu\n\n", METER_YEAR, (unsigned long)METER_SERIAL);
 
   // Initialize meter type configuration
@@ -2112,7 +2146,9 @@ void loop()
 {
   mqtt.loop();
   ArduinoOTA.handle();
+#if WIFI_SERIAL_MONITOR_ENABLED
   wifiSerialLoop();
+#endif
 
   // Update diagnostics and Wi-Fi details every 5 minutes
   if (millis() - lastWifiUpdate > 300000)
@@ -2127,11 +2163,13 @@ void loop()
   const bool wifiUp = mqtt.isWifiConnected();
   const bool mqttUp = mqtt.isMqttConnected();
 
-  // Start WiFi serial server as soon as Wi-Fi is up (no wait for MQTT)
+  // Start WiFi serial server as soon as Wi-Fi is up (no wait for MQTT) if enabled
+#if WIFI_SERIAL_MONITOR_ENABLED
   if (wifiUp)
   {
     wifiSerialBegin();
   }
+#endif
 
   // Log transitions to connected state (one-time per connect)
   if (wifiUp && !g_prevWifiUp)

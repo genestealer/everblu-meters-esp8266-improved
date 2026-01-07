@@ -51,7 +51,7 @@ def _wait_for_monitor_ready(*args, **kwargs):
                 elapsed = time.time() - start_time
                 print("[monitor-delay] Monitor port ready after %.1fs (attempt %d)" % (elapsed, attempt))
                 return
-        except Exception as e:
+        except (socket.timeout, OSError):
             pass
         
         # Wait before next attempt

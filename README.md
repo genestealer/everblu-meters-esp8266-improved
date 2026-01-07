@@ -74,6 +74,7 @@ See the Hardware section below for full wiring tables and pictures.
   - `METER_YEAR` and `METER_SERIAL` (from the meter label)
   - `METER_TYPE` - set to `"water"` (default) or `"gas"` depending on your meter type
   - `MAX_RETRIES` - maximum reading retry attempts before cooldown (optional, default is 10)
+  - `WIFI_SERIAL_MONITOR_ENABLED` - set to `1` to enable WiFi serial monitor for remote debugging (default is `0` for security)
 - `platformio.ini`: select `env:huzzah` (ESP8266 HUZZAH) or `env:esp32dev` (ESP32 DevKit).
 
 ### Meter Type Configuration
@@ -92,7 +93,33 @@ To configure your meter type, set `METER_TYPE` in `include/private.h`:
 #define METER_TYPE "gas"    // For gas meters
 ```
 
-For gas meters, readings are automatically converted from the internal liter count to cubic meters (m³) before publishing to Home Assistant.
+#### Gas Meter Volume Divisor
+
+For gas meters, this firmware assumes an internal count in liter-equivalents and converts those values to cubic meters (m³) before publishing to Home Assistant. If your gas meter uses a different base unit or scaling, you may need to adjust the meter configuration or conversion logic accordingly.
+
+The conversion uses a configurable **gas volume divisor** that can be set in `include/private.h`:
+```cpp
+// Default: 100 (equivalent to 0.01 m³ per unit)
+#define GAS_VOLUME_DIVISOR 100
+```
+
+**Important:** The correct divisor depends on your meter's pulse weight configuration:
+- `100`: 0.01 m³ per unit (typical for modern EverBlu Cyble gas modules)
+- `1000`: 0.001 m³ per unit (0.1 L per unit, less common)
+
+##### How We Determined the Correct Divisor
+
+Through empirical testing with an actual EverBlu Cyble gas meter, we discovered that many gas modules are configured with a pulse weight of **0.01 m³ per unit**, not the 0.001 m³ that might be expected from a naive "liters to cubic meters" conversion.
+
+**Real-world example:**
+- Physical meter register: 825,292 m³
+- RADIAN protocol data (raw value): 0x00013E07 = 81,415 units
+- Using divisor 1000: 81.415 m³ (incorrect, off by ~744 m³)
+- Using divisor 100: 814.15 m³ (correct, ~11 m³ gap from register)
+
+The gap of ~11 m³ is consistent with the assumption that the EverBlu module was installed after the meter had already recorded some consumption. Without access to the meter's installation records or multiple data points, we cannot definitively confirm the exact pulse weight; however, **0.01 m³/unit proved more plausible through trial and error comparison with the actual mechanical meter register**.
+
+**If your readings seem incorrect:** Verify your specific meter's pulse weight (often printed on the device label) and adjust `GAS_VOLUME_DIVISOR` accordingly.
 
 ### 3. Build and upload the firmware
 

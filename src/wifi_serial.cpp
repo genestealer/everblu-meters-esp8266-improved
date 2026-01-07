@@ -31,6 +31,9 @@ void WifiSerialStream::beginServer()
         return;
     }
 
+    // NOTE: WiFiServer is allocated once with 'new' and kept for the lifetime of the application.
+    // The serverStarted flag ensures it's only created once, preventing memory leaks from
+    // multiple calls. If WiFi drops and reconnects, the same server instance continues to be used.
     wifiSerialServer = new WiFiServer(WIFI_SERIAL_PORT);
     wifiSerialServer->begin();
     wifiSerialServer->setNoDelay(true); // Lower latency for logs
@@ -39,6 +42,8 @@ void WifiSerialStream::beginServer()
     _usb.printf("[WiFi Serial] Server started on port %d\n", WIFI_SERIAL_PORT);
     _usb.printf("[WiFi Serial] Connect using: telnet %s %d\n",
                 WiFi.localIP().toString().c_str(), WIFI_SERIAL_PORT);
+    // NOTE: This server is unauthenticated and unencrypted. Any device on your local network
+    // can connect and view serial output, which may include WiFi/MQTT credentials and internal state.
 }
 
 void WifiSerialStream::loop()
@@ -90,6 +95,8 @@ void WifiSerialStream::loop()
 size_t WifiSerialStream::write(uint8_t c)
 {
     _usb.write(c);
+    // NOTE: WiFi client write calls may block if the TCP buffer is full or connection is slow.
+    // This could briefly block the main application loop.
     if (wifiSerialClient && wifiSerialClient.connected())
     {
         wifiSerialClient.write(c);
@@ -100,6 +107,8 @@ size_t WifiSerialStream::write(uint8_t c)
 size_t WifiSerialStream::write(const uint8_t *buffer, size_t size)
 {
     _usb.write(buffer, size);
+    // NOTE: WiFi client write calls may block if the TCP buffer is full or connection is slow.
+    // This could briefly block the main application loop.
     if (wifiSerialClient && wifiSerialClient.connected())
     {
         wifiSerialClient.write(buffer, size);
@@ -107,9 +116,14 @@ size_t WifiSerialStream::write(const uint8_t *buffer, size_t size)
     return size;
 }
 
+// Buffer size for printf formatting (including room for null terminator)
+#define WIFI_SERIAL_PRINTF_BUFFER_SIZE 256
+
 size_t WifiSerialStream::printf(const char *format, ...)
 {
-    char buffer[256];
+    // NOTE: Formatted strings longer than WIFI_SERIAL_PRINTF_BUFFER_SIZE-1 characters
+    // will be silently truncated. This is a limitation of the fixed buffer approach.
+    char buffer[WIFI_SERIAL_PRINTF_BUFFER_SIZE];
     va_list args;
     va_start(args, format);
     vsnprintf(buffer, sizeof(buffer), format, args);
@@ -167,7 +181,9 @@ void wifiSerialPrintln(const char *str)
 
 void wifiSerialPrintf(const char *format, ...)
 {
-    char buffer[256];
+    // NOTE: Formatted strings longer than WIFI_SERIAL_PRINTF_BUFFER_SIZE-1 characters
+    // will be silently truncated. This is a limitation of the fixed buffer approach.
+    char buffer[WIFI_SERIAL_PRINTF_BUFFER_SIZE];
     va_list args;
     va_start(args, format);
     vsnprintf(buffer, sizeof(buffer), format, args);

@@ -6,20 +6,61 @@ This project includes a WiFi-based serial monitor that mirrors all `Serial.print
 
 ## Features
 
-- **Non-blocking operation**: Does not interfere with the main loop or introduce delays
+- **Non-blocking connection handling**: The server loop does not interfere with the main application loop
+  - **Note**: Write operations to the WiFi client may block if the TCP buffer is full or connection is slow
 - **Automatic fallback**: Works seamlessly whether WiFi is connected or not
 - **USB Serial preserved**: All USB Serial output continues to work normally
 - **Single client support**: One WiFi client at a time (new clients replace existing ones)
 - **Standard Telnet port**: Uses port 23 by default (configurable)
+- **Security note**: The TCP server is unauthenticated and unencrypted. Any device on your local network can connect and view serial output, which may include WiFi/MQTT credentials and internal system states
 
 ## Configuration
+
+The WiFi serial monitor must be explicitly enabled for security reasons (disabled by default).
+
+### Enabling the Feature
+
+To enable the WiFi serial monitor, set `WIFI_SERIAL_MONITOR_ENABLED` in `include/private.h`:
+
+```cpp
+#define WIFI_SERIAL_MONITOR_ENABLED 1  // Enable WiFi serial monitor
+```
 
 The TCP port can be customized by defining `WIFI_SERIAL_PORT` before including `wifi_serial.h`:
 
 ```cpp
-#define WIFI_SERIAL_PORT 23  // Default: 23
+#define WIFI_SERIAL_PORT 23  // Default: 23 (Telnet)
 #include "wifi_serial.h"
 ```
+
+### Security Considerations
+
+**IMPORTANT**: The WiFi serial monitor is **disabled by default** for security reasons:
+
+- **Unauthenticated Access**: Any device on your local network can connect without a password
+- **Unencrypted**: All serial output is sent in plain text over the network
+- **Sensitive Data Exposure**: Serial output may contain WiFi credentials, MQTT credentials, or internal system states
+- **Network Overhead**: Streaming serial output over WiFi adds overhead to the device
+
+Only enable this feature:
+- For initial debugging and setup
+- On trusted local networks
+- When actively monitoring/troubleshooting
+- Disable it again once setup is complete
+
+### Performance Impact
+
+With `WIFI_SERIAL_MONITOR_ENABLED 0` (default):
+- No WiFi serial server created
+- No network overhead
+- Minimal memory impact
+- Slightly improved device responsiveness
+
+With `WIFI_SERIAL_MONITOR_ENABLED 1`:
+- WiFi serial server running at all times
+- Continuous network output streaming
+- Memory overhead from WiFiServer and WiFiClient objects
+- Slight impact on main application loop (non-blocking, but write operations may block)
 
 ## Usage
 
