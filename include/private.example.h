@@ -71,9 +71,9 @@
 //   - Ignore the suffix (-ZZZ)
 //
 // Example:
-//   Serial: 23-1875247-234
-//     METER_YEAR   = 23
-//     METER_SERIAL = 1875247
+//   Serial: 20-02777550-234
+//     METER_YEAR   = 20
+//     METER_SERIAL = 2777550
 //
 // Common mistakes:
 //   - Using a 4-digit year
@@ -82,6 +82,26 @@
 //
 #define METER_YEAR xx
 #define METER_SERIAL xxxxxxx
+
+// Meter type configuration
+// "water" = water meter (default) - readings in liters (L), device class water
+// "gas"   = gas meter - internally stored in the meter's native format (like water)
+//           and converted to cubic meters (m³) for display and MQTT, device class gas
+#define METER_TYPE "water"
+
+// Gas meter volume divisor (only used when METER_TYPE is "gas")
+//
+// The RADIAN protocol transmits meter readings in liters (L). For gas meters,
+// this divisor converts liters to cubic meters (m³).
+//
+// Default: 100 (equivalent to 0.01 m³ per unit)
+//
+// If your readings seem incorrect, verify your meter's pulse weight and adjust
+// this divisor accordingly:
+//   - 100: 0.01 m³ per unit (typical for modern gas meters)
+//   - 1000: 0.001 m³ per unit (0.1 L per unit)
+//
+#define GAS_VOLUME_DIVISOR 100
 
 // ============================================================================
 // RADIO / CC1101 CONFIGURATION
@@ -118,3 +138,30 @@
 // 1 = enable verbose CC1101 / RADIAN logging
 // 0 = disable (default)
 #define DEBUG_CC1101 0
+
+// ============================================================================
+// READING RETRY CONFIGURATION
+// ============================================================================
+
+// Maximum number of retry attempts when reading fails
+// After this many failed attempts, the system enters a 1-hour cooldown period
+// Default: 10 retries
+#define MAX_RETRIES 10
+
+// ============================================================================
+// WIFI SERIAL MONITOR CONFIGURATION
+// ============================================================================
+
+// Enable WiFi-based serial monitor for remote debugging via Telnet
+// WARNING: This exposes all serial output (including credentials and internal state)
+// to any device on your local network. Only enable if needed for debugging.
+//
+// 0 (default): Disabled - improves security and reduces overhead
+// 1:           Enabled - allows remote monitoring via telnet on port 23
+//
+// To use when enabled:
+//   telnet <device-ip> 23
+#define WIFI_SERIAL_MONITOR_ENABLED 0
+#if WIFI_SERIAL_MONITOR_ENABLED
+#warning "WiFi serial monitor is ENABLED: this may expose credentials and internal state over the network"
+#endif

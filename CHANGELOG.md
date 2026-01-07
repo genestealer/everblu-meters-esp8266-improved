@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 The release process is automated via GitHub Actions and is triggered by tags matching `v*.*.*`. See `.github/workflows/release.yml`.
 
+## [v1.1.6] - 2026-01-07
+
+What's changed since v1.1.5:
+
+- Add support for gas meters in addition to water meters (Issue #32)
+- Add `METER_TYPE` configuration option to select between water (default) or gas meters
+- Gas meter readings automatically convert to cubic meters (m³) with configurable divisor
+- Add WiFi-based TCP serial monitor for remote debugging via Telnet (disabled by default)
+- Add support for multiple board environments in OTA configuration
+- Add OTA update support for all boards with intelligent device boot detection
+- Add `MAX_RETRIES` configuration option for customizable retry behavior
+- Fix auto-alignment to only apply to scheduled reads, not manual MQTT reads (Issue #34)
+- Update MQTT discovery and Home Assistant integration for both meter types
+- Improve logging with consistent context prefixes for easier debugging
+- Rename MQTT entities from `water_meter_*` to `everblu_meter_*` for clarity
+- Update documentation with comprehensive setup and configuration guides
+
 ## [v1.1.5] - 2025-11-18
 
 What's changed since v1.1.4:

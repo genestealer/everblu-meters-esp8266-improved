@@ -1,6 +1,6 @@
 # API Documentation
 
-This document provides comprehensive API documentation for the Everblu Cyble water meter reader project.
+This document provides comprehensive API documentation for the Everblu Cyble water/gas meter reader project.
 
 ## Table of Contents
 
@@ -20,13 +20,13 @@ This document provides comprehensive API documentation for the Everblu Cyble wat
 
 #### `struct tmeter_data`
 
-Water meter data structure containing current readings and metadata.
+Water/gas meter data structure containing current readings and metadata.
 
 **Fields:**
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `liters` | `int` | Current water consumption reading in liters |
+| `volume` | `int` | Current consumption reading in liters (water) or liters (gas, pre-conversion) |
 | `reads_counter` | `int` | Number of times meter has been read (wraps 255→1) |
 | `battery_left` | `int` | Estimated battery life remaining in months |
 | `time_start` | `int` | Reading window start time (24-hour format, e.g., 8 = 8am) |
@@ -37,6 +37,8 @@ Water meter data structure containing current readings and metadata.
 | `freqest` | `int8_t` | Frequency offset estimate from CC1101 for adaptive tracking |
 | `history[13]` | `uint32_t[]` | Monthly historical readings (13 months), index 0 = oldest, 12 = most recent |
 | `history_available` | `bool` | True if historical data was successfully extracted |
+
+**Note on Gas Meters:** For gas meters, the `volume` field contains the raw reading in liters. The firmware automatically converts this to cubic meters (m³) using the `GAS_VOLUME_DIVISOR` configuration value (default: 100, equivalent to 0.01 m³ per unit).
 
 ### Functions
 
@@ -74,7 +76,7 @@ Performs complete initialization of the CC1101 radio including:
 
 #### `struct tmeter_data get_meter_data(void)`
 
-Read data from Everblu Cyble water meter.
+Read data from Everblu Cyble water/gas meter.
 
 **Returns:**
 - `tmeter_data` structure containing all extracted meter data

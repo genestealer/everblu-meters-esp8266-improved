@@ -9,6 +9,7 @@
  */
 
 #include <Arduino.h>
+#include "wifi_serial.h" // Mirror Serial to WiFi
 
 #include "everblu_meters.h"
 #include <private.h> // Configuration file (Wi-Fi, MQTT, meter settings)
@@ -338,4 +339,3 @@ bool isValidReadingSchedule(const char *schedule)
 	// Everything else is considered invalid for now
 	return false;
 }
-
