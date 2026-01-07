@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 The release process is automated via GitHub Actions and is triggered by tags matching `v*.*.*`. See `.github/workflows/release.yml`.
 
+## [v1.2.0] - 2026-01-07
+
+- Major release version bump.
+
 ## [v1.1.7] - 2025-01-07
 
 What's changed since v1.1.6:
