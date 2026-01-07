@@ -242,14 +242,20 @@ void performWideInitialScan();
 void adaptiveFrequencyTracking(int8_t freqest);
 
 // Secrets pulled from private.h file
+// Note: MQTT Client ID is made unique per device by appending the meter serial number
+// This prevents multiple devices from having the same client ID and causing MQTT connection conflicts
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+#define MQTT_CLIENT_ID_WITH_SERIAL SECRET_MQTT_CLIENT_ID "-" TOSTRING(METER_SERIAL)
+
 EspMQTTClient mqtt(
-    SECRET_WIFI_SSID,      // Your Wifi SSID
-    SECRET_WIFI_PASSWORD,  // Your WiFi key
-    SECRET_MQTT_SERVER,    // MQTT Broker server ip
-    SECRET_MQTT_USERNAME,  // MQTT Username Can be omitted if not needed
-    SECRET_MQTT_PASSWORD,  // MQTT Password Can be omitted if not needed
-    SECRET_MQTT_CLIENT_ID, // MQTT Client name that uniquely identify your device
-    1883                   // MQTT Broker server port
+    SECRET_WIFI_SSID,           // Your Wifi SSID
+    SECRET_WIFI_PASSWORD,       // Your WiFi key
+    SECRET_MQTT_SERVER,         // MQTT Broker server ip
+    SECRET_MQTT_USERNAME,       // MQTT Username Can be omitted if not needed
+    SECRET_MQTT_PASSWORD,       // MQTT Password Can be omitted if not needed
+    MQTT_CLIENT_ID_WITH_SERIAL, // MQTT Client name: uniquely identifies device by appending meter serial
+    1883                        // MQTT Broker server port
 );
 
 // Base MQTT topic prefix for all EverBlu Cyble entities
@@ -1217,7 +1223,6 @@ void publishHADiscovery()
   json += "  \"pl_not_avail\": \"offline\",\n";
   json += "  \"pl_prs\": \"update\",\n";
   json += "  \"frc_upd\": true,\n";
-  json += "  \"avty\": {\"topic\": \"" + String(mqttBaseTopic) + "/cc1101_availability\"},\n";
   json += "  \"dev\": {\n    " + buildDeviceJson() + "\n  }\n";
   json += "}";
   publishDiscoveryMessage("button", "everblu_meter_request", json);
@@ -1271,7 +1276,6 @@ void publishHADiscovery()
   json += "  \"cmd_t\": \"" + String(mqttBaseTopic) + "/frequency_scan\",\n";
   json += "  \"pl_prs\": \"scan\",\n";
   json += "  \"ent_cat\": \"config\",\n";
-  json += "  \"avty\": {\"topic\": \"" + String(mqttBaseTopic) + "/cc1101_availability\"},\n";
   json += "  \"dev\": {\n    " + buildDeviceJson() + "\n  }\n";
   json += "}";
   publishDiscoveryMessage("button", "everblu_meter_freq_scan", json);

@@ -17,7 +17,14 @@
 
 // Broker connection
 #define SECRET_MQTT_SERVER "192.168.xxx.xxx"  // Broker IP or hostname
-#define SECRET_MQTT_CLIENT_ID "everbluMeters" // Client identifier
+#define SECRET_MQTT_CLIENT_ID "everbluMeters" // Client identifier (meter serial is appended automatically)
+
+// IMPORTANT: Multiple devices running this firmware will append their meter serial number
+// to the client ID to ensure uniqueness. For example, if METER_SERIAL is 123456:
+//   Final MQTT Client ID: "everbluMeters-123456"
+// This prevents MQTT connection conflicts and ensures proper Home Assistant availability tracking
+// when multiple meters are connected to the same broker.
+// Do NOT manually add the serial to this value - it's done automatically at compile time.
 
 // Authentication
 #define SECRET_MQTT_USERNAME "xxxxxxxxx"
