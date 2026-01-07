@@ -153,6 +153,9 @@ unsigned long successfulReads = 0;
 unsigned long failedReads = 0;
 const char *lastErrorMessage = "None";
 
+// CC1101 radio connection state
+bool cc1101RadioConnected = false; // Tracks whether the radio is detected and initialized
+
 // Frequency offset storage
 #define EEPROM_SIZE 64
 #define FREQ_OFFSET_ADDR 0
@@ -582,7 +585,7 @@ void onUpdateData()
       lastErrorMessage = errorMsg;
       Serial.printf("[STATUS] Scheduling retry in 10 seconds... (next attempt %d/%d)\n", _retry + 1, max_retries);
       mqtt.publish(String(mqttBaseTopic) + "/active_reading", "false", true);
-      mqtt.publish(String(mqttBaseTopic) + "/cc1101_state", "Idle", true);
+      mqtt.publish(String(mqttBaseTopic) + "/cc1101_state", cc1101RadioConnected ? "Idle" : "unavailable", true);
       mqtt.publish(String(mqttBaseTopic) + "/last_error", lastErrorMessage, true);
       digitalWrite(LED_BUILTIN, HIGH); // Turn off LED
       // Use non-blocking callback instead of recursive call
@@ -596,7 +599,7 @@ void onUpdateData()
       lastErrorMessage = "Max retries reached - cooling down";
       Serial.printf("[ERROR] Max retries (%d) reached. Entering 1-hour cooldown period.\n", max_retries);
       mqtt.publish(String(mqttBaseTopic) + "/active_reading", "false", true);
-      mqtt.publish(String(mqttBaseTopic) + "/cc1101_state", "Idle", true);
+      mqtt.publish(String(mqttBaseTopic) + "/cc1101_state", cc1101RadioConnected ? "Idle" : "unavailable", true);
       mqtt.publish(String(mqttBaseTopic) + "/status_message", "Failed after max retries, cooling down for 1 hour", true);
       mqtt.publish(String(mqttBaseTopic) + "/last_error", lastErrorMessage, true);
 
@@ -884,7 +887,7 @@ skip_history_publish:;
 
   // Notify MQTT that active reading has ended
   mqtt.publish(String(mqttBaseTopic) + "/active_reading", "false", true);
-  mqtt.publish(String(mqttBaseTopic) + "/cc1101_state", "Idle", true);
+  mqtt.publish(String(mqttBaseTopic) + "/cc1101_state", cc1101RadioConnected ? "Idle" : "unavailable", true);
   digitalWrite(LED_BUILTIN, HIGH); // Turn off LED to indicate completion
 
   // Reset retry counter and cooldown on successful read
@@ -1214,6 +1217,7 @@ void publishHADiscovery()
   json += "  \"pl_not_avail\": \"offline\",\n";
   json += "  \"pl_prs\": \"update\",\n";
   json += "  \"frc_upd\": true,\n";
+  json += "  \"avty\": {\"topic\": \"" + String(mqttBaseTopic) + "/cc1101_availability\"},\n";
   json += "  \"dev\": {\n    " + buildDeviceJson() + "\n  }\n";
   json += "}";
   publishDiscoveryMessage("button", "everblu_meter_request", json);
@@ -1267,6 +1271,7 @@ void publishHADiscovery()
   json += "  \"cmd_t\": \"" + String(mqttBaseTopic) + "/frequency_scan\",\n";
   json += "  \"pl_prs\": \"scan\",\n";
   json += "  \"ent_cat\": \"config\",\n";
+  json += "  \"avty\": {\"topic\": \"" + String(mqttBaseTopic) + "/cc1101_availability\"},\n";
   json += "  \"dev\": {\n    " + buildDeviceJson() + "\n  }\n";
   json += "}";
   publishDiscoveryMessage("button", "everblu_meter_freq_scan", json);
@@ -1489,11 +1494,16 @@ void onConnectionEstablished()
   mqtt.publish(topicBuffer, "false", true);
   delay(5);
 
+  // Publish CC1101 radio availability status for button enable/disable
+  snprintf(topicBuffer, sizeof(topicBuffer), "%s/cc1101_availability", mqttBaseTopic);
+  mqtt.publish(topicBuffer, cc1101RadioConnected ? "online" : "offline", true);
+  delay(5);
+
   // Publish initial diagnostic metrics (using char buffers instead of String)
   char metricBuffer[16];
 
   snprintf(topicBuffer, sizeof(topicBuffer), "%s/cc1101_state", mqttBaseTopic);
-  mqtt.publish(topicBuffer, "Idle", true);
+  mqtt.publish(topicBuffer, cc1101RadioConnected ? "Idle" : "unavailable", true);
   delay(5);
 
   snprintf(metricBuffer, sizeof(metricBuffer), "%lu", totalReadAttempts);
@@ -1685,7 +1695,7 @@ void performFrequencyScan()
   }
 
   snprintf(topicBuffer, sizeof(topicBuffer), "%s/cc1101_state", mqttBaseTopic);
-  mqtt.publish(topicBuffer, "Idle", true);
+  mqtt.publish(topicBuffer, cc1101RadioConnected ? "Idle" : "Not Connected", true);
 }
 
 // Function: performWideInitialScan
@@ -1715,7 +1725,19 @@ void performWideInitialScan()
   for (float freq = scanStart; freq <= scanEnd; freq += scanStep)
   {
     FEED_WDT(); // Feed watchdog for each frequency step
-    cc1101_init(freq);
+
+    // Check if CC1101 radio initialization succeeds before attempting communication
+    if (!cc1101_init(freq))
+    {
+      Serial.println("> CC1101 radio not responding - skipping wide initial scan");
+      Serial.println("> Check: 1) Wiring connections 2) 3.3V power supply 3) SPI pins");
+      snprintf(topicBuffer, sizeof(topicBuffer), "%s/status_message", mqttBaseTopic);
+      mqtt.publish(topicBuffer, "ERROR: CC1101 radio not responding - cannot scan", true);
+      snprintf(topicBuffer, sizeof(topicBuffer), "%s/cc1101_state", mqttBaseTopic);
+      mqtt.publish(topicBuffer, "Error", true);
+      return; // Exit the scan immediately instead of continuing indefinitely
+    }
+
     delay(100); // Longer delay for frequency to settle during wide scan
 
     struct tmeter_data test_data = get_meter_data();
@@ -1741,7 +1763,14 @@ void performWideInitialScan()
     for (float freq = fineStart; freq <= fineEnd; freq += fineStep)
     {
       FEED_WDT(); // Feed watchdog for each frequency step
-      cc1101_init(freq);
+
+      // Check if CC1101 radio initialization succeeds before attempting communication
+      if (!cc1101_init(freq))
+      {
+        Serial.println("> CC1101 radio not responding during fine scan - aborting");
+        break; // Exit fine scan if radio fails
+      }
+
       delay(50);
 
       struct tmeter_data test_data = get_meter_data();
@@ -1789,7 +1818,7 @@ void performWideInitialScan()
   }
 
   snprintf(topicBuffer, sizeof(topicBuffer), "%s/cc1101_state", mqttBaseTopic);
-  mqtt.publish(topicBuffer, "Idle", true);
+  mqtt.publish(topicBuffer, cc1101RadioConnected ? "Idle" : "Not Connected", true);
 }
 
 // Function: adaptiveFrequencyTracking
@@ -2127,17 +2156,17 @@ void setup()
   }
   if (!cc1101_init(effectiveFrequency))
   {
-    Serial.println("FATAL ERROR: CC1101 radio initialization failed!");
-    Serial.println("Please check your wiring and connections.");
-    while (true)
-    {
-      digitalWrite(LED_BUILTIN, LOW); // Blink LED to indicate error
-      delay(200);
-      digitalWrite(LED_BUILTIN, HIGH);
-      delay(200);
-    }
+    Serial.println("WARNING: CC1101 radio initialization failed!");
+    Serial.println("Please check: 1) Wiring connections 2) 3.3V power supply 3) SPI pins");
+    Serial.println("Continuing with WiFi/MQTT only - radio functionality will not be available");
+    Serial.println("Device will remain accessible via WiFi/MQTT for diagnostics and configuration");
+    cc1101RadioConnected = false;
   }
-  Serial.println("> CC1101 radio initialized successfully");
+  else
+  {
+    Serial.println("> CC1101 radio initialized successfully");
+    cc1101RadioConnected = true;
+  }
 
   /*
   // Use this piece of code to test
