@@ -2,7 +2,7 @@
 
 ## Overview
 
-In January 2026, four code improvement suggestions from user dredzik (from GitHub discussion) were evaluated against the working Itron EverBlu Cyble Enhanced meter (serial 2020-0257750). All improvements were theoretically sound but ultimately failed when tested with actual hardware.
+In January 2026, four code improvement suggestions from user dredzik (from GitHub discussion) were evaluated against the working Itron EverBlu Cyble Enhanced meter (serial 2020-0123456). All improvements were theoretically sound but ultimately failed when tested with actual hardware.
 
 **Key Finding:** Dredzik's MicroPython implementation was never validated with compatible hardware - his own meter was not compatible with the RADIAN protocol.
 

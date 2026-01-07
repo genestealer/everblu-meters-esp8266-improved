@@ -289,6 +289,6 @@ Potential improvements for future versions:
 ## References
 
 - **RADIAN Protocol**: Itron proprietary, basis for Wireless M-Bus EN 13757-4 Mode F
-- **Meter Model**: Itron EverBlu Cyble Enhanced (e.g., 2020-0257750)
+- **Meter Model**: Itron EverBlu Cyble Enhanced (e.g., 2020-0123456)
 - **Payload Bytes**: [66-117] contain 13 × uint32_t historical volumes (LSB first)
 - **Home Assistant MQTT Discovery**: [MQTT Sensor Documentation](https://www.home-assistant.io/integrations/sensor.mqtt/)

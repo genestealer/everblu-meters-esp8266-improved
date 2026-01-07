@@ -358,6 +358,14 @@ The following MQTT topics are used to integrate the device with Home Assistant v
 
 ---
 
+## Multiple Devices
+
+When running multiple ESP devices on the same MQTT broker, the firmware automatically appends the meter serial number to the MQTT Client ID to ensure uniqueness. This prevents connection conflicts and proper Home Assistant availability tracking.
+
+**Example:** With `SECRET_MQTT_CLIENT_ID = "EverblueCyble"` and `METER_SERIAL = 123456`, the final Client ID becomes `"EverblueCyble-123456"`.
+
+---
+
 ## Configuration
 
 ### Local Development Setup
