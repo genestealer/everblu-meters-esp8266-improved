@@ -19,14 +19,21 @@
  * For more details, refer to the README file.
  */
 
-#include "private.h"             // Include private configuration (Wi-Fi, MQTT, etc.)
-#include "cc1101.h"              // CC1101 radio driver and meter data functions
-#include "version.h"             // Firmware version definition
-#include "wifi_serial.h"         // WiFi serial monitor
-#include "frequency_manager.h"   // Frequency management module
-#include "storage_abstraction.h" // Platform-independent storage
-#include "schedule_manager.h"    // Daily reading schedule management
-#include "meter_history.h"       // Historical meter data processing
+#include "private.h"                                         // Include private configuration (Wi-Fi, MQTT, etc.)
+#include "core/cc1101.h"                                     // CC1101 radio driver and meter data functions
+#include "core/version.h"                                    // Firmware version definition
+#include "core/wifi_serial.h"                                // WiFi serial monitor
+#include "services/frequency_manager.h"                      // Frequency management module
+#include "services/storage_abstraction.h"                    // Platform-independent storage
+#include "services/schedule_manager.h"                       // Daily reading schedule management
+#include "services/meter_history.h"                          // Historical meter data processing
+#include "services/meter_reader.h"                           // Meter reading orchestrator
+#include "adapters/config_provider.h"                        // Configuration interface
+#include "adapters/time_provider.h"                          // Time provider interface
+#include "adapters/data_publisher.h"                         // Data publisher interface
+#include "adapters/implementations/define_config_provider.h" // Configuration from #defines
+#include "adapters/implementations/ntp_time_provider.h"      // NTP time synchronization
+#include "adapters/implementations/mqtt_data_publisher.h"    // MQTT data publishing
 #if defined(ESP8266)
 #include <ESP8266WiFi.h> // Wi-Fi library for ESP8266
 #include <ESP8266mDNS.h> // mDNS library for ESP8266
@@ -181,6 +188,27 @@ EspMQTTClient mqtt(
     MQTT_CLIENT_ID_WITH_SERIAL, // MQTT Client name: uniquely identifies device by appending meter serial
     1883                        // MQTT Broker server port
 );
+
+// ============================================================================
+// NEW ARCHITECTURE: Adapter Pattern for Reusability
+// ============================================================================
+// These adapters enable the core meter reading logic to work with different
+// platforms (standalone MQTT, ESPHome, etc.) without modification
+
+// Configuration provider (reads from #defines in private.h)
+DefineConfigProvider configProvider;
+
+// Time provider (NTP-based for standalone mode)
+NTPTimeProvider timeProvider;
+
+// Data publisher (MQTT-based for standalone mode)
+// Note: Will be initialized after mqttBaseTopic is set up in setup()
+MQTTDataPublisher *dataPublisher = nullptr;
+
+// Meter reader orchestrator (coordinates all operations)
+MeterReader *meterReader = nullptr;
+
+// ============================================================================
 
 // Base MQTT topic prefix for all EverBlu Cyble entities
 // Centralising this avoids repeating "everblu/cyble/" all over the code.
@@ -1132,6 +1160,32 @@ void onConnectionEstablished()
   // Initialize schedule caches using validated UTC defaults
   updateResolvedScheduleFromUtc(DEFAULT_READING_HOUR_UTC, DEFAULT_READING_MINUTE_UTC);
 
+  // ============================================================================
+  // NEW ARCHITECTURE: Initialize adapters and meter reader
+  // ============================================================================
+  Serial.println("> Initializing new adapter architecture...");
+
+  // Initialize time provider with NTP
+  timeProvider.begin(SECRET_NTP_SERVER);
+
+  // Initialize data publisher with MQTT
+  bool meterIsGas = false;
+#ifdef METER_IS_GAS
+  meterIsGas = (METER_IS_GAS != 0);
+#endif
+  int gasVolumeDivisor = 100;
+#ifdef GAS_VOLUME_DIVISOR
+  gasVolumeDivisor = GAS_VOLUME_DIVISOR;
+#endif
+  dataPublisher = new MQTTDataPublisher(mqtt, mqttBaseTopic, meterIsGas, gasVolumeDivisor);
+
+  // Initialize meter reader orchestrator
+  meterReader = new MeterReader(&configProvider, &timeProvider, dataPublisher);
+  meterReader->begin();
+
+  Serial.println("> Adapter architecture initialized successfully");
+  // ============================================================================
+
   Serial.println("> Configure Arduino OTA flash.");
   ArduinoOTA.onStart([]()
                      {
@@ -1192,24 +1246,15 @@ void onConnectionEstablished()
       mqtt.publish(topicBuffer, "Invalid trigger command", true);
       return;
     }
+
+    Serial.printf("Manual meter read triggered via MQTT (command: %s)\n", message.c_str());
     
-    // Check if we're in cooldown period
-    if (lastFailedAttempt > 0 && (millis() - lastFailedAttempt) < RETRY_COOLDOWN) {
-      unsigned long remainingCooldown = (RETRY_COOLDOWN - (millis() - lastFailedAttempt)) / 1000;
-      Serial.printf("Cannot trigger update: Still in cooldown period. %lu seconds remaining.\n", remainingCooldown);
-      
-      char cooldownMsg[64];
-      snprintf(cooldownMsg, sizeof(cooldownMsg), "Cooldown active, %lus remaining", remainingCooldown);
-      char topicBuffer[MQTT_TOPIC_BUFFER_SIZE];
-      snprintf(topicBuffer, sizeof(topicBuffer), "%s/status_message", mqttBaseTopic);
-      mqtt.publish(topicBuffer, cooldownMsg, true);
-      return;
-    }
-
-    Serial.printf("Update data from meter from MQTT trigger (command: %s)\n", message.c_str());
-
-    _retry = 0;
-    onUpdateData(); });
+    // Use new MeterReader architecture
+    if (meterReader) {
+      meterReader->triggerReading(false); // false = manual trigger, not scheduled
+    } else {
+      Serial.println("ERROR: MeterReader not initialized");
+    } });
 
   // Force trigger: an alternate topic that bypasses the cooldown period.
   // This is intended for Home Assistant buttons that should override cooldown.
@@ -1226,11 +1271,14 @@ void onConnectionEstablished()
       return;
     }
 
-    Serial.printf("[STATUS] Force update requested via MQTT (command: %s) - overriding cooldown\n", message.c_str());
+    Serial.printf("[STATUS] Force update requested via MQTT (command: %s)\n", message.c_str());
 
-    // Immediately attempt to update, ignoring any cooldown state
-    _retry = 0;
-    onUpdateData(); });
+    // Use new MeterReader architecture
+    if (meterReader) {
+      meterReader->triggerReading(false); // false = manual trigger
+    } else {
+      Serial.println("ERROR: MeterReader not initialized");
+    } });
 
   char restartTopic[80];
   snprintf(restartTopic, sizeof(restartTopic), "%s/restart", mqttBaseTopic);
@@ -1269,16 +1317,12 @@ void onConnectionEstablished()
     
     Serial.println("Frequency scan command received via MQTT");
     
-    // Define callback for status updates
-    auto statusCallback = [](const char *state, const char *message) {
-      char topicBuffer[MQTT_TOPIC_BUFFER_SIZE];
-      snprintf(topicBuffer, sizeof(topicBuffer), "%s/cc1101_state", mqttBaseTopic);
-      mqtt.publish(topicBuffer, state, true);
-      snprintf(topicBuffer, sizeof(topicBuffer), "%s/status_message", mqttBaseTopic);
-      mqtt.publish(topicBuffer, message, true);
-    };
-    
-    FrequencyManager::performFrequencyScan(statusCallback); });
+    // Use new MeterReader architecture
+    if (meterReader) {
+      meterReader->performFrequencyScan(true); // true = wide scan
+    } else {
+      Serial.println("ERROR: MeterReader not initialized");
+    } });
 
   Serial.println("> Send MQTT config for HA.");
 
@@ -1341,7 +1385,7 @@ void onConnectionEstablished()
   Serial.println("> Setup done");
   Serial.println("Ready to go...");
 
-  onScheduled();
+  // Note: Old onScheduled() call removed - scheduling is now handled by meterReader->loop()
 }
 
 /**
@@ -1686,6 +1730,15 @@ void loop()
 #if WIFI_SERIAL_MONITOR_ENABLED
   wifiSerialLoop();
 #endif
+
+  // ============================================================================
+  // NEW ARCHITECTURE: Call meter reader loop for scheduling
+  // ============================================================================
+  if (meterReader != nullptr)
+  {
+    meterReader->loop();
+  }
+  // ============================================================================
 
   // Update diagnostics and Wi-Fi details every 5 minutes
   if (millis() - lastWifiUpdate > 300000)
