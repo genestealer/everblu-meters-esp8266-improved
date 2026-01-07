@@ -1,13 +1,12 @@
 /*  CC1101 radio interface for Itron EverBlu Cyble Enhanced water meters */
 /*  Implements RADIAN protocol communication over 433 MHz RF */
 
-#include "private.h"        // Include the local config file for passwords etc. not for GitHub. Generate your own private.h file with the same content as private.example.h
-#include "everblu_meters.h" // Include the local everblu_meters library
-#include "utils.h"          // Include the local utils library for utility functions
-#include "cc1101.h"         // Include the local cc1101 library for CC1101 functions
-#include <Arduino.h>        // Include the Arduino library for basic functions
-#include "wifi_serial.h"    // Mirror Serial to WiFi
-#include <SPI.h>            // Include the SPI library for SPI communication
+#include "private.h"     // Include the local config file for passwords etc. not for GitHub. Generate your own private.h file with the same content as private.example.h
+#include "utils.h"       // Include the local utils library for utility functions
+#include "cc1101.h"      // Include the local cc1101 library for CC1101 functions
+#include <Arduino.h>     // Include the Arduino library for basic functions
+#include "wifi_serial.h" // Mirror Serial to WiFi
+#include <SPI.h>         // Include the SPI library for SPI communication
 #if defined(ESP32)
 #include <esp_task_wdt.h>
 #endif
