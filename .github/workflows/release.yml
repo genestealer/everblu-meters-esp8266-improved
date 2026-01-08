@@ -3,11 +3,11 @@ name: Release
 on:
   push:
     tags:
-      - 'v*.*.*'  # Triggers on version tags like v1.0.0, v2.1.3, etc.
+      - "v*.*.*" # Triggers on version tags like v1.0.0, v2.1.3, etc.
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to release (e.g., v1.0.0)'
+        description: "Tag to release (e.g., v1.0.0)"
         required: true
         type: string
 
@@ -30,175 +30,180 @@ jobs:
             board: NodeMCU v2
           - name: esp32dev
             board: ESP32 Dev Module
-    
+
     name: Build Release for ${{ matrix.environment.board }}
-    
+
     steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0  # Fetch all history for version info
-    
-    - name: Get version from tag
-      id: version
-      run: |
-        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-          TAG="${{ github.event.inputs.tag }}"
-        else
-          TAG=${GITHUB_REF#refs/tags/}
-        fi
-        echo "tag=${TAG}" >> $GITHUB_OUTPUT
-        echo "version=${TAG#v}" >> $GITHUB_OUTPUT
-        echo "Building version: ${TAG}"
-    
-    - name: Cache PlatformIO
-      uses: actions/cache@v4
-      with:
-        path: ~/.platformio
-        key: ${{ runner.os }}-pio-release-${{ hashFiles('**/platformio.ini') }}
-        restore-keys: |
-          ${{ runner.os }}-pio-release-
-    
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-    
-    - name: Install PlatformIO
-      run: |
-        python -m pip install --upgrade pip
-        pip install --upgrade platformio
-    
-    - name: Create private.h from example if missing
-      run: |
-        if [ ! -f include/private.h ]; then
-          cp include/private.example.h include/private.h
-          echo "Created private.h from private.example.h"
-        fi
-    
-    - name: Build PlatformIO Project
-      run: pio run -e ${{ matrix.environment.name }}
-    
-    - name: Rename firmware with version
-      run: |
-        VERSION="${{ steps.version.outputs.version }}"
-        ENV="${{ matrix.environment.name }}"
-        cd .pio/build/$ENV
-        
-        # Rename binary firmware
-        if [ -f firmware.bin ]; then
-          mv firmware.bin everblu-meters-${ENV}-${VERSION}.bin
-        fi
-        
-        # Rename ELF file
-        if [ -f firmware.elf ]; then
-          mv firmware.elf everblu-meters-${ENV}-${VERSION}.elf
-        fi
-        
-        ls -lh
-    
-    - name: Upload firmware artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: firmware-${{ matrix.environment.name }}-${{ steps.version.outputs.version }}
-        path: |
-          .pio/build/${{ matrix.environment.name }}/everblu-meters-*.bin
-          .pio/build/${{ matrix.environment.name }}/everblu-meters-*.elf
-        retention-days: 90
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch all history for version info
+
+      - name: Get version from tag
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            TAG=${GITHUB_REF#refs/tags/}
+          fi
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+          echo "Building version: ${TAG}"
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: ${{ runner.os }}-pio-release-${{ hashFiles('**/platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-release-
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install PlatformIO
+        run: |
+          python -m pip install --upgrade pip
+          pip install --upgrade platformio
+
+      - name: Create private.h from example if missing
+        run: |
+          if [ ! -f include/private.h ]; then
+            cp include/private.example.h include/private.h
+            echo "Created private.h from private.example.h"
+          fi
+
+      - name: Inject dummy values for CI build
+        run: |
+          sed -i 's/#define METER_YEAR xx/#define METER_YEAR 99/g' include/private.h
+          sed -i 's/#define METER_SERIAL xxxxxxx/#define METER_SERIAL 9999999/g' include/private.h
+          echo "Injected dummy METER_YEAR=99 and METER_SERIAL=9999999 for release build"
+
+      - name: Build PlatformIO Project
+        run: pio run -e ${{ matrix.environment.name }}
+
+      - name: Rename firmware with version
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          ENV="${{ matrix.environment.name }}"
+          cd .pio/build/$ENV
+
+          # Rename binary firmware
+          if [ -f firmware.bin ]; then
+            mv firmware.bin everblu-meters-${ENV}-${VERSION}.bin
+          fi
+
+          # Rename ELF file
+          if [ -f firmware.elf ]; then
+            mv firmware.elf everblu-meters-${ENV}-${VERSION}.elf
+          fi
+
+          ls -lh
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ matrix.environment.name }}-${{ steps.version.outputs.version }}
+          path: |
+            .pio/build/${{ matrix.environment.name }}/everblu-meters-*.bin
+            .pio/build/${{ matrix.environment.name }}/everblu-meters-*.elf
+          retention-days: 90
 
   create-release:
     needs: build-release
     runs-on: ubuntu-latest
     name: Create GitHub Release
-    
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-    
-    - name: Get version from tag
-      id: version
-      run: |
-        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-          TAG="${{ github.event.inputs.tag }}"
-        else
-          TAG=${GITHUB_REF#refs/tags/}
-        fi
-        echo "tag=${TAG}" >> $GITHUB_OUTPUT
-        echo "version=${TAG#v}" >> $GITHUB_OUTPUT
-    
-    - name: Download all firmware artifacts
-      uses: actions/download-artifact@v4
-      with:
-        path: firmware-artifacts
-    
-    - name: Organize release files
-      run: |
-        mkdir -p release-files
-        find firmware-artifacts -name "*.bin" -exec cp {} release-files/ \;
-        find firmware-artifacts -name "*.elf" -exec cp {} release-files/ \;
-        ls -lh release-files/
-    
-    - name: Generate release notes
-      id: release_notes
-      run: |
-        VERSION="${{ steps.version.outputs.version }}"
-        
-        # Get previous tag
-        PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-        
-        echo "# EverBlu Meters ESP8266/ESP32 - Version ${VERSION}" > release-notes.md
-        echo "" >> release-notes.md
-        echo "## What's Changed" >> release-notes.md
-        echo "" >> release-notes.md
-        
-        if [ -n "$PREV_TAG" ]; then
-          echo "Changes since ${PREV_TAG}:" >> release-notes.md
-          echo "" >> release-notes.md
-          git log ${PREV_TAG}..HEAD --pretty=format:"- %s" --no-merges >> release-notes.md
-        else
-          echo "Initial release" >> release-notes.md
-        fi
-        
-        echo "" >> release-notes.md
-        echo "" >> release-notes.md
-        echo "## Supported Boards" >> release-notes.md
-        echo "" >> release-notes.md
-        echo "- **ESP8266**: Adafruit HUZZAH, WeMos D1 Mini Pro, NodeMCU v2" >> release-notes.md
-        echo "- **ESP32**: ESP32 Dev Module" >> release-notes.md
-        echo "" >> release-notes.md
-        echo "## Installation" >> release-notes.md
-        echo "" >> release-notes.md
-        echo "1. Download the appropriate \`.bin\` file for your board" >> release-notes.md
-        echo "2. Flash using esptool.py or PlatformIO" >> release-notes.md
-        echo "3. Configure your meter settings in \`private.h\`" >> release-notes.md
-        echo "4. Upload and enjoy!" >> release-notes.md
-        echo "" >> release-notes.md
-        echo "## Documentation" >> release-notes.md
-        echo "" >> release-notes.md
-        echo "See [README.md](https://github.com/${{ github.repository }}/blob/main/README.md) for full documentation." >> release-notes.md
-        
-        cat release-notes.md
-    
-    - name: Create Release
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: ${{ steps.version.outputs.tag }}
-        name: Release ${{ steps.version.outputs.tag }}
-        body_path: release-notes.md
-        draft: false
-        prerelease: false
-        files: |
-          release-files/*.bin
-          release-files/*.elf
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    
-    - name: Release Summary
-      run: |
-        echo "### Release ${{ steps.version.outputs.tag }} Created! 🎉" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "View the release at: https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "#### Firmware Files" >> $GITHUB_STEP_SUMMARY
-        ls -lh release-files/ >> $GITHUB_STEP_SUMMARY
 
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version from tag
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            TAG=${GITHUB_REF#refs/tags/}
+          fi
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+
+      - name: Download all firmware artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: firmware-artifacts
+
+      - name: Organize release files
+        run: |
+          mkdir -p release-files
+          find firmware-artifacts -name "*.bin" -exec cp {} release-files/ \;
+          find firmware-artifacts -name "*.elf" -exec cp {} release-files/ \;
+          ls -lh release-files/
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          # Get previous tag
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+
+          echo "# EverBlu Meters ESP8266/ESP32 - Version ${VERSION}" > release-notes.md
+          echo "" >> release-notes.md
+          echo "## What's Changed" >> release-notes.md
+          echo "" >> release-notes.md
+
+          if [ -n "$PREV_TAG" ]; then
+            echo "Changes since ${PREV_TAG}:" >> release-notes.md
+            echo "" >> release-notes.md
+            git log ${PREV_TAG}..HEAD --pretty=format:"- %s" --no-merges >> release-notes.md
+          else
+            echo "Initial release" >> release-notes.md
+          fi
+
+          echo "" >> release-notes.md
+          echo "" >> release-notes.md
+          echo "## Supported Boards" >> release-notes.md
+          echo "" >> release-notes.md
+          echo "- **ESP8266**: Adafruit HUZZAH, WeMos D1 Mini Pro, NodeMCU v2" >> release-notes.md
+          echo "- **ESP32**: ESP32 Dev Module" >> release-notes.md
+          echo "" >> release-notes.md
+          echo "## Installation" >> release-notes.md
+          echo "" >> release-notes.md
+          echo "1. Download the appropriate \`.bin\` file for your board" >> release-notes.md
+          echo "2. Flash using esptool.py or PlatformIO" >> release-notes.md
+          echo "3. Configure your meter settings in \`private.h\`" >> release-notes.md
+          echo "4. Upload and enjoy!" >> release-notes.md
+          echo "" >> release-notes.md
+          echo "## Documentation" >> release-notes.md
+          echo "" >> release-notes.md
+          echo "See [README.md](https://github.com/${{ github.repository }}/blob/main/README.md) for full documentation." >> release-notes.md
+
+          cat release-notes.md
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Release ${{ steps.version.outputs.tag }}
+          body_path: release-notes.md
+          draft: false
+          prerelease: false
+          files: |
+            release-files/*.bin
+            release-files/*.elf
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release Summary
+        run: |
+          echo "### Release ${{ steps.version.outputs.tag }} Created! 🎉" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "View the release at: https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### Firmware Files" >> $GITHUB_STEP_SUMMARY
+          ls -lh release-files/ >> $GITHUB_STEP_SUMMARY
