@@ -112,6 +112,7 @@ The conversion uses a configurable **gas volume divisor** that can be set in `in
 Through empirical testing with an actual EverBlu Cyble gas meter, we discovered that many gas modules are configured with a pulse weight of **0.01 m³ per unit**, not the 0.001 m³ that might be expected from a naive "liters to cubic meters" conversion.
 
 **Real-world example:**
+
 - Physical meter register: 825,292 m³
 - RADIAN protocol data (raw value): 0x00013E07 = 81,415 units
 - Using divisor 1000: 81.415 m³ (incorrect, off by ~744 m³)
