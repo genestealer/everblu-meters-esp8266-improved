@@ -325,38 +325,22 @@ The following MQTT topics are used to integrate the device with Home Assistant v
 
 | **Sensor**          | **MQTT Topic**                  | **Description**                                                                |
 |---------------------|---------------------------------|--------------------------------------------------------------------------------|
-| `Liters`            | `everblu/cyble/liters`          | Total water usage in liters.
-|
-| `Battery`           | `everblu/cyble/battery`         | Remaining battery life in months.
-|
-| `Counter`           | `everblu/cyble/counter`         | Number of times the meter has been read (wraps around 255→1).
-|
-| `RSSI`              | `everblu/cyble/rssi`            | Raw RSSI value of the meter's signal.
-|
-| `RSSI (dBm)`        | `everblu/cyble/rssi_dbm`        | RSSI value converted to dBm.
-|
-| `RSSI (%)`          | `everblu/cyble/rssi_percentage` | RSSI value converted to a percentage.
-|
-| `Time Start`        | `everblu/cyble/time_start`      | Time when the meter wakes up, formatted as `HH:MM`.
-|
-| `Time End`          | `everblu/cyble/time_end`        | Time when the meter goes to sleep, formatted as `HH:MM`.
-|
-| `Timestamp`         | `everblu/cyble/timestamp`       | ISO 8601 timestamp of the last reading.
-|
-| `Wi-Fi IP`          | `everblu/cyble/wifi_ip`         | IP address of the device.
-|
-| `Wi-Fi RSSI`        | `everblu/cyble/wifi_rssi`       | Wi-Fi signal strength in dBm.
-|
-| `Wi-Fi Signal (%)`  | `everblu/cyble/wifi_signal_percentage` | Wi-Fi signal strength as a percentage.
-|
-| `MAC Address`       | `everblu/cyble/mac_address`     | MAC address of the device.
-|
-| `SSID`              | `everblu/cyble/ssid`            | Wi-Fi SSID the device is connected to.
-|
-| `BSSID`             | `everblu/cyble/bssid`           | Wi-Fi BSSID the device is connected to.
-|
-| `Uptime`            | `everblu/cyble/uptime`          | Device uptime in ISO 8601 format.
-|
+| `Liters`            | `everblu/cyble/liters`          | Total water usage in liters. |
+| `Battery`           | `everblu/cyble/battery`         | Remaining battery life in months. |
+| `Counter`           | `everblu/cyble/counter`         | Number of times the meter has been read (wraps around 255→1). |
+| `RSSI`              | `everblu/cyble/rssi`            | Raw RSSI value of the meter's signal. |
+| `RSSI (dBm)`        | `everblu/cyble/rssi_dbm`        | RSSI value converted to dBm. |
+| `RSSI (%)`          | `everblu/cyble/rssi_percentage` | RSSI value converted to a percentage. |
+| `Time Start`        | `everblu/cyble/time_start`      | Time when the meter wakes up, formatted as `HH:MM`. |
+| `Time End`          | `everblu/cyble/time_end`        | Time when the meter goes to sleep, formatted as `HH:MM`. |
+| `Timestamp`         | `everblu/cyble/timestamp`       | ISO 8601 timestamp of the last reading. |
+| `Wi-Fi IP`          | `everblu/cyble/wifi_ip`         | IP address of the device. |
+| `Wi-Fi RSSI`        | `everblu/cyble/wifi_rssi`       | Wi-Fi signal strength in dBm. |
+| `Wi-Fi Signal (%)`  | `everblu/cyble/wifi_signal_percentage` | Wi-Fi signal strength as a percentage. |
+| `MAC Address`       | `everblu/cyble/mac_address`     | MAC address of the device. |
+| `SSID`              | `everblu/cyble/ssid`            | Wi-Fi SSID the device is connected to. |
+| `BSSID`             | `everblu/cyble/bssid`           | Wi-Fi BSSID the device is connected to. |
+| `Uptime`            | `everblu/cyble/uptime`          | Device uptime in ISO 8601 format. |
 
 </details>
 
@@ -400,7 +384,7 @@ If your MQTT setup does not require a username and password, comment out those l
       // Serial with leading zeros: 23-0123456-234
       #define METER_YEAR 23       // First part
       #define METER_SERIAL 123456  // Omit leading zeros
-```text
+      ```
      ![Cyble Meter Label](docs/images/meter_label.jpg)
 - **Wi-Fi PHY Mode**: To enable 802.11g Wi-Fi PHY mode, set `ENABLE_WIFI_PHY_MODE_11G` to `1` in the `private.h` file.
 By default, it is set to `0` (disabled).
