@@ -97,12 +97,11 @@ jobs:
 
           # Validate required defines exist in example
           REQUIRED_DEFINES=(
-            "WIFI_SSID"
-            "WIFI_PASSWORD"
-            "MQTT_SERVER_IP"
-            "MQTT_USERNAME"
-            "MQTT_PASSWORD"
-            "MQTT_SERVER_PORT"
+            "SECRET_WIFI_SSID"
+            "SECRET_WIFI_PASSWORD"
+            "SECRET_MQTT_SERVER"
+            "SECRET_MQTT_USERNAME"
+            "SECRET_MQTT_PASSWORD"
             "METER_YEAR"
             "METER_SERIAL"
             "METER_TYPE"
@@ -128,11 +127,11 @@ jobs:
           echo "🔍 Checking for placeholder values..."
 
           PLACEHOLDERS=(
-            "your_wifi_ssid:WIFI_SSID"
-            "your_wifi_password:WIFI_PASSWORD"
-            "192.168.x.x:MQTT_SERVER_IP"
-            "your_mqtt_username:MQTT_USERNAME"
-            "your_mqtt_password:MQTT_PASSWORD"
+            "xxxx:SECRET_WIFI_SSID"
+            "xxxxxxx:SECRET_WIFI_PASSWORD"
+            "192.168.xxx.xxx:SECRET_MQTT_SERVER"
+            "xxxxxxxxx:SECRET_MQTT_USERNAME"
+            "xxxxxxxxxxxxxxx:SECRET_MQTT_PASSWORD"
             "xxxxxxx:METER_SERIAL"
             "xx:METER_YEAR"
           )
