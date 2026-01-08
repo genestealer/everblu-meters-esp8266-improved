@@ -230,7 +230,7 @@ MISO   → D6 (GPIO 12)
 MOSI   → D7 (GPIO 13)
 CSN    → D8 (GPIO 15)
 GDO0   → D1 (GPIO 5)
-```text
+```
 
 #### Quick Reference: Adafruit Feather HUZZAH ESP8266
 
@@ -243,7 +243,7 @@ MISO   → #12 (GPIO 12)
 MOSI   → #13 (GPIO 13)
 CSN    → #15 (GPIO 15)
 GDO0   → #5  (GPIO 5)
-```text
+```
 
 #### Quick Reference: ESP32 DevKit (esp32dev)
 
@@ -256,7 +256,7 @@ MISO   → MISO (GPIO 19)
 MOSI   → MOSI (GPIO 23)
 CSN    → SS (GPIO 5 by default on many boards)
 GDO0   → GPIO 4 (or GPIO 27)  ← set this in include/private.h as GDO0
-```text
+```
 
 Notes for ESP32
 - Use the board’s hardware SPI pins (SCK/MISO/MOSI/SS).
