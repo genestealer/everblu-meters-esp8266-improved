@@ -7,6 +7,7 @@
 #include "schedule_manager.h"
 #include "meter_history.h"
 #include "../core/utils.h"
+#include "../core/wifi_serial.h"
 #include <Arduino.h>
 
 // Schedule check interval (milliseconds)
