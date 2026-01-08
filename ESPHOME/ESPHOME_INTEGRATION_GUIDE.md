@@ -61,19 +61,48 @@ git clone https://github.com/yourusername/everblu-meters-esp8266-improved.git
 cd everblu-meters-esp8266-improved
 ```
 
-### Step 2: Copy Component to ESPHome
+### Step 2: Use External Components (Recommended)
 
-Copy the component directory to your ESPHome configuration:
+The easiest method is to use ESPHome's `external_components` feature directly in your YAML configuration. This automatically pulls all required files:
 
-```bash
-# If using ESPHome dashboard
-cp -r ESPHOME/components/everblu_meter /config/esphome/components/
-
-# Or for local ESPHome installation
-cp -r ESPHOME/components/everblu_meter ~/.esphome/components/
+```yaml
+external_components:
+  - source:
+      type: git
+      url: https://github.com/yourusername/everblu-meters-esp8266-improved
+      ref: main
+    components: [ everblu_meter ]
+    refresh: 1d
 ```
 
-Alternatively, use the `external_components` feature (see Configuration section).
+Alternatively, for local development:
+
+```yaml
+external_components:
+  - source:
+      type: local
+      path: /path/to/everblu-meters-esp8266-improved/ESPHOME
+    components: [ everblu_meter ]
+```
+
+### Step 2 Alternative: Manual Installation
+
+If you prefer to copy files locally, you need the complete component package:
+
+```bash
+# Create component directory structure
+mkdir -p /config/esphome/custom_components/everblu_meter
+
+# Copy component files
+cp -r ESPHOME/components/everblu_meter/* /config/esphome/custom_components/everblu_meter/
+
+# Copy required source dependencies
+cp -r src/core /config/esphome/custom_components/everblu_meter/
+cp -r src/services /config/esphome/custom_components/everblu_meter/
+cp -r src/adapters /config/esphome/custom_components/everblu_meter/
+```
+
+**Note**: The component depends on source files from `src/core/`, `src/services/`, and `src/adapters/`. The `external_components` method (recommended above) handles this automatically.
 
 ### Step 3: Create Your Configuration
 
@@ -450,6 +479,120 @@ everblu_meter:
 ```
 
 **Note**: Reading multiple meters requires careful scheduling to avoid conflicts.
+
+## Developer Notes
+
+### Architecture Overview
+
+The ESPHome component uses **dependency injection** to achieve maximum code reusability. The core meter reading logic is platform-agnostic and shared between standalone MQTT and ESPHome modes (~95% code sharing).
+
+#### Modular Components
+
+The codebase is organized into three layers:
+
+1. **Core Services** (`src/services/`)
+   - `MeterReader`: Platform-agnostic meter reading orchestrator
+   - `FrequencyManager`: Frequency calibration and optimization
+   - `ScheduleManager`: Daily reading schedule logic
+   - `StorageAbstraction`: Platform-independent persistent storage
+
+2. **Adapter Interfaces** (`src/adapters/`)
+   - `IConfigProvider`: Abstract configuration interface
+   - `ITimeProvider`: Abstract time synchronization interface
+   - `IDataPublisher`: Abstract data publishing interface
+
+3. **ESPHome Adapters** (`src/adapters/implementations/`)
+   - `ESPHomeConfigProvider`: Reads configuration from YAML
+   - `ESPHomeTimeProvider`: Uses ESPHome's RealTimeClock
+   - `ESPHomeDataPublisher`: Publishes directly to ESPHome sensors
+
+#### Dependency Injection Pattern
+
+The component wires up adapters in the `setup()` method:
+
+```cpp
+void EverbluMeterComponent::setup() {
+    // Create adapters specific to ESPHome
+    auto config = new ESPHomeConfigProvider();
+    auto time = new ESPHomeTimeProvider(this->time_);
+    auto publisher = new ESPHomeDataPublisher();
+    
+    // Configure adapters from YAML settings
+    config->setMeterYear(this->meter_year_);
+    config->setMeterSerial(this->meter_serial_);
+    // ... more configuration ...
+    
+    // Link sensors to publisher
+    publisher->set_volume_sensor(this->volume_sensor_);
+    publisher->set_battery_sensor(this->battery_sensor_);
+    // ... more sensors ...
+    
+    // Create meter reader with injected dependencies
+    this->meter_reader_ = new MeterReader(config, time, publisher);
+    this->meter_reader_->begin();
+}
+```
+
+This pattern allows the same `MeterReader` code to work in both standalone MQTT and ESPHome environments without modification.
+
+#### Component File Structure
+
+```
+ESPHOME/components/everblu_meter/
+├── __init__.py              # Python config schema
+├── everblu_meter.h          # Component header
+├── everblu_meter.cpp        # Component implementation
+├── core/                    # Core functionality (from src/)
+│   ├── cc1101.h/.cpp       # CC1101 radio driver
+│   ├── utils.h/.cpp        # Utility functions
+│   └── wifi_serial.h/.cpp  # WiFi serial (unused in ESPHome)
+├── services/                # Business logic (from src/)
+│   ├── meter_reader.h/.cpp
+│   ├── frequency_manager.h/.cpp
+│   ├── schedule_manager.h/.cpp
+│   ├── meter_history.h/.cpp
+│   └── storage_abstraction.h/.cpp
+└── adapters/                # Adapter pattern (from src/)
+    ├── config_provider.h
+    ├── time_provider.h
+    ├── data_publisher.h
+    └── implementations/
+        ├── esphome_config_provider.h
+        ├── esphome_time_provider.h/.cpp
+        └── esphome_data_publisher.h/.cpp
+```
+
+### Extending the Component
+
+To add new features:
+
+1. **Add Configuration**: Update `CONFIG_SCHEMA` in `__init__.py`
+2. **Add Setter**: Add corresponding setter in `everblu_meter.h`
+3. **Pass to Adapter**: Call setter in `to_code()` function
+4. **Use in Core**: Access via adapter interface in `MeterReader`
+
+Example - adding a new parameter:
+
+```python
+# In __init__.py
+CONFIG_SCHEMA = cv.Schema({
+    # ... existing config ...
+    cv.Optional("my_new_setting", default=42): cv.int_range(min=0, max=100),
+})
+
+# In to_code()
+async def to_code(config):
+    # ... existing code ...
+    cg.add(var.setMyNewSetting(config["my_new_setting"]))
+```
+
+```cpp
+// In everblu_meter.h
+void setMyNewSetting(int value) { my_new_setting_ = value; }
+
+// In everblu_meter.cpp setup()
+config_provider->setMyNewSetting(this->my_new_setting_);
+```
 
 ## Support
 

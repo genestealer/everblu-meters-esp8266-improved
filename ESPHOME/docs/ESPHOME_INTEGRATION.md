@@ -1,8 +1,12 @@
-# ESPHome Integration Guide
+# ESPHome Integration - Developer Notes
 
-## Overview
+> **📚 For end-users**: See the complete [ESPHome Integration Guide](../ESPHOME/ESPHOME_INTEGRATION_GUIDE.md) for installation instructions, configuration, and troubleshooting.
 
-The refactored codebase is designed for **maximum reusability** across different projects, especially ESPHome custom components. The key design principle is **dependency injection** - radio operations are not hard-coded but injected through callbacks.
+This document contains technical architecture details for developers who want to understand or extend the ESPHome integration.
+
+## Architecture Overview
+
+The refactored codebase is designed for **maximum reusability** across different projects, especially ESPHome custom components. The key design principle is **dependency injection** - platform-specific implementations are injected rather than hard-coded.
 
 ## Why This Matters
 
