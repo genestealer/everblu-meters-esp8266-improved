@@ -4,6 +4,36 @@ All notable changes to this project will be documented in this file.
 
 The release process is automated via GitHub Actions and is triggered by tags matching `v*.*.*`. See `.github/workflows/release.yml`.
 
+## [v2.0.0] - 2026-01-08
+
+Major architectural refactor with ESPHome integration support.
+
+### Added
+- **ESPHome Integration** (⚠️ UNTESTED): Custom component with 15+ sensors, example YAMLs, and documentation
+- **Dependency Injection Pattern**: Abstract interfaces (IConfigProvider, ITimeProvider, IDataPublisher) for platform-agnostic operation
+- **Dual-Mode Support**: Choose between standalone MQTT or ESPHome with ~95% code sharing
+- WiFi Serial Monitor support for remote debugging
+
+### Changed
+- Reorganized code structure: `adapters/`, `core/`, `services/` directories
+- MeterReader now platform-agnostic using dependency injection
+- Improved separation of concerns and maintainability
+
+### Fixed
+- Missing includes causing compilation failures
+- WiFi Serial Monitor now captures all MeterReader logs
+- ESP32 build error with watchdog timer include
+
+### Testing
+- ✅ Standalone MQTT mode tested on ESP8266
+- ⚠️ ESPHome integration UNTESTED - use with caution
+
+### Breaking Changes
+- Source code structure reorganized
+- Internal APIs changed due to adapter pattern
+
+⚠️ **Note**: ESPHome component is untested. Standalone MQTT mode validated on hardware.
+
 ## [v1.2.0] - 2026-01-07
 
 - Major release version bump.
