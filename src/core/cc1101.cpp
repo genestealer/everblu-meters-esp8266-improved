@@ -1,13 +1,12 @@
 /*  CC1101 radio interface for Itron EverBlu Cyble Enhanced water meters */
 /*  Implements RADIAN protocol communication over 433 MHz RF */
 
-#include "private.h"        // Include the local config file for passwords etc. not for GitHub. Generate your own private.h file with the same content as private.example.h
-#include "everblu_meters.h" // Include the local everblu_meters library
-#include "utils.h"          // Include the local utils library for utility functions
-#include "cc1101.h"         // Include the local cc1101 library for CC1101 functions
-#include <Arduino.h>        // Include the Arduino library for basic functions
-#include "wifi_serial.h"    // Mirror Serial to WiFi
-#include <SPI.h>            // Include the SPI library for SPI communication
+#include "private.h"     // Include the local config file for passwords etc. not for GitHub. Generate your own private.h file with the same content as private.example.h
+#include "utils.h"       // Include the local utils library for utility functions
+#include "cc1101.h"      // Include the local cc1101 library for CC1101 functions
+#include <Arduino.h>     // Include the Arduino library for basic functions
+#include "wifi_serial.h" // Mirror Serial to WiFi
+#include <SPI.h>         // Include the SPI library for SPI communication
 #if defined(ESP32)
 #include <esp_task_wdt.h>
 #endif
@@ -318,7 +317,7 @@ void SPIReadBurstReg(uint8_t spi_instr, uint8_t *pArr, uint8_t len)
   // Bounds check to prevent buffer overflow
   if (len > MAX_SPI_BURST_SIZE)
   {
-    echo_debug(1, "ERROR: SPI burst read too large (%u > %u)\n", (unsigned)len, (unsigned)MAX_SPI_BURST_SIZE);
+    echo_debug(1, "[ERROR] SPI burst read too large (%u > %u)\n", (unsigned)len, (unsigned)MAX_SPI_BURST_SIZE);
     return;
   }
 
@@ -353,7 +352,7 @@ void SPIWriteBurstReg(uint8_t spi_instr, uint8_t *pArr, uint8_t len)
   // Bounds check to prevent buffer overflow
   if (len > MAX_SPI_BURST_SIZE)
   {
-    echo_debug(1, "ERROR: SPI burst write too large (%u > %u)\n", (unsigned)len, (unsigned)MAX_SPI_BURST_SIZE);
+    echo_debug(1, "[ERROR] SPI burst write too large (%u > %u)\n", (unsigned)len, (unsigned)MAX_SPI_BURST_SIZE);
     return;
   }
 
@@ -508,7 +507,7 @@ bool cc1101_init(float freq)
   // Initialize SPI bus for CC1101 communication (500 kHz)
   if ((wiringPiSPISetup(0, 500000)) < 0)
   {
-    printf("ERROR: Failed to initialize SPI bus - check CC1101 wiring and connections\n");
+    printf("[ERROR] Failed to initialize SPI bus - check CC1101 wiring and connections\n");
     return false;
   }
 
@@ -523,7 +522,7 @@ bool cc1101_init(float freq)
   // PARTNUM may be 0x00 on some variants, so we rely mainly on VERSION
   if (version == 0x00 || version == 0xFF)
   {
-    printf("ERROR: CC1101 radio not responding (PARTNUM: 0x%02X, VERSION: 0x%02X)\n", partnum, version);
+    printf("[ERROR] CC1101 radio not responding (PARTNUM: 0x%02X, VERSION: 0x%02X)\n", partnum, version);
     printf("       Check: 1) Wiring connections 2) 3.3V power supply 3) SPI pins\n");
     return false;
   }
@@ -532,7 +531,7 @@ bool cc1101_init(float freq)
   static bool s_reported_ok = false;
   if (!s_reported_ok)
   {
-    printf("> CC1101 radio found OK (PARTNUM: 0x%02X, VERSION: 0x%02X)\n", partnum, version);
+    printf("[CC1101] Radio found OK (PARTNUM: 0x%02X, VERSION: 0x%02X)\n", partnum, version);
     s_reported_ok = true;
   }
 
@@ -544,7 +543,7 @@ bool cc1101_init(float freq)
   CC1101_CMD(SCAL);  // Calibrate frequency synthesizer and turn it off
   delay(5);          // Wait for calibration to complete (typically <1ms, but we add margin)
 
-  echo_debug(debug_out, "> Frequency synthesizer calibrated for %.6f MHz\n", freq);
+  echo_debug(debug_out, "[CC1101] Frequency synthesizer calibrated for %.6f MHz\n", freq);
 
   return true;
 }
@@ -649,7 +648,7 @@ uint8_t cc1101_check_packet_received(void)
       uint8_t rxbytes_reg = halRfReadReg(RXBYTES_ADDR);
       if (rxbytes_reg & 0x80)
       {
-        echo_debug(1, "ERROR: RX FIFO overflow detected - data corrupted\n");
+        echo_debug(1, "[ERROR] RX FIFO overflow detected - data corrupted\n");
         CC1101_CMD(SFRX); // Flush RX FIFO to recover
         return FALSE;
       }
@@ -664,7 +663,7 @@ uint8_t cc1101_check_packet_received(void)
       }
       else if (l_nb_byte && ((pktLen + l_nb_byte) > 100))
       {
-        echo_debug(1, "ERROR: Would overflow rxBuffer (pktLen=%u + l_nb_byte=%u > 100)\n", pktLen, l_nb_byte);
+        echo_debug(1, "[ERROR] Would overflow rxBuffer (pktLen=%u + l_nb_byte=%u > 100)\n", pktLen, l_nb_byte);
         break;
       }
     }
@@ -712,7 +711,7 @@ static bool validate_radian_crc(const uint8_t *decoded_buffer, size_t size)
 {
   if (size < 4)
   {
-    echo_debug(1, "ERROR: Decoded frame too small for CRC validation (size=%u)\n", size);
+    echo_debug(1, "[ERROR] Decoded frame too small for CRC validation (size=%u)\n", size);
     return false;
   }
 
@@ -726,15 +725,15 @@ static bool validate_radian_crc(const uint8_t *decoded_buffer, size_t size)
     // meaning the CRC bytes are not present in the decoded payload. Log the situation
     // but keep the frame so we don't regress existing setups.
     echo_debug(debug_out,
-               "WARN: RADIAN frame missing %u byte(s) from advertised length (expected=%u got=%u)\n",
+               "[WARN] RADIAN frame missing %u byte(s) from advertised length (expected=%u got=%u)\n",
                (unsigned)missing, (unsigned)expected_len, (unsigned)size);
     if (missing == 2)
     {
-      echo_debug(debug_out, "WARN: CRC bytes absent in payload - skipping CRC validation\n");
+      echo_debug(debug_out, "[WARN] CRC bytes absent in payload - skipping CRC validation\n");
       return true;
     }
     // For any other mismatch we can't meaningfully validate, so accept the frame but warn.
-    echo_debug(debug_out, "WARN: Length mismatch prevents CRC validation - accepting frame\n");
+    echo_debug(debug_out, "[WARN] Length mismatch prevents CRC validation - accepting frame\n");
     return true;
   }
 
@@ -866,8 +865,8 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
     if (num_values > 0)
     {
       data.history_available = true;
-      echo_debug(debug_out, "\n> Extracting historical data from buffer (size=%d):\n", size);
-      echo_debug(debug_out, "> Starting at byte 70: %d bytes available, %d complete values\n",
+      echo_debug(debug_out, "\n[CC1101] Extracting historical data from buffer (size=%d):\n", size);
+      echo_debug(debug_out, "[CC1101] Starting at byte 70: %d bytes available, %d complete values\n",
                  available_bytes, num_values);
 
       for (int i = 0; i < num_values; i++)
@@ -898,7 +897,7 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
         data.history[i] = 0;
       }
 
-      echo_debug(debug_out, "> Extracted %d historical values: %u L (oldest) → %u L (newest)\n",
+      echo_debug(debug_out, "[CC1101] Extracted %d historical values: %u L (oldest) → %u L (newest)\n",
                  num_values, data.history[0], data.history[num_values - 1]);
 
       // --- Sanity checks on historical data ---------------------------------
@@ -978,7 +977,7 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
   else
   {
     data.history_available = false;
-    echo_debug(debug_out, "> Buffer size %d < 118, historical data unavailable\n", size);
+    echo_debug(debug_out, "[CC1101] Buffer size %d < 118, historical data unavailable\n", size);
   }
 
   return data;
@@ -1253,7 +1252,7 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
   }
   if (l_tmo < rx_tmo_ms)
   {
-    echo_debug(debug_out, "> GDO0 triggered at %dms\n", l_tmo);
+    echo_debug(debug_out, "[CC1101] GDO0 triggered at %dms\n", l_tmo);
   }
   else
   {
@@ -1276,7 +1275,7 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
 
   if (l_tmo < rx_tmo_ms && l_byte_in_rx > 0)
   {
-    echo_debug(debug_out, "> First sync pattern received (%d bytes)\n", l_byte_in_rx);
+    echo_debug(debug_out, "[CC1101] First sync pattern received (%d bytes)\n", l_byte_in_rx);
   }
   else
   {
@@ -1340,7 +1339,7 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
   }
   if (l_tmo < rx_tmo_ms)
   {
-    echo_debug(debug_out, "> GDO0 triggered for frame start at %dms\n", l_tmo);
+    echo_debug(debug_out, "[CC1101] GDO0 triggered for frame start at %dms\n", l_tmo);
   }
   else
   {
@@ -1366,7 +1365,7 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
 
   if (l_tmo < rx_tmo_ms && l_total_byte > 0)
   {
-    echo_debug(debug_out, "> Frame received successfully (%d bytes)\n", l_total_byte);
+    echo_debug(debug_out, "[CC1101] Frame received successfully (%d bytes)\n", l_total_byte);
   }
   else
   {
@@ -1558,7 +1557,7 @@ struct tmeter_data get_meter_data(void)
     // If debug enabled, print the decoded (post-serial-decoding) meter data so we can inspect fields (timestamp etc.)
     if (debug_out)
     {
-      echo_debug(debug_out, "> Decoded meter data size = %d\n", meter_data_size);
+      echo_debug(debug_out, "[CC1101] Decoded meter data size = %d\n", meter_data_size);
       show_in_hex_one_line(meter_data, meter_data_size);
     }
 

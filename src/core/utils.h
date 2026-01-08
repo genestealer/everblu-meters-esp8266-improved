@@ -51,7 +51,7 @@ void show_in_bin(const uint8_t *buffer, size_t len);
  * @param fmt Format string (printf-style)
  * @param ... Variable arguments for format string
  */
-void echo_debug(T_BOOL l_flag, const char *fmt, ...);
+void echo_debug(bool l_flag, const char *fmt, ...);
 
 /**
  * @brief Print current timestamp for debugging

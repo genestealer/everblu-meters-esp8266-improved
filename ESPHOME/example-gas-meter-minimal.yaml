@@ -1,0 +1,57 @@
+# EverBlu Gas Meter - Minimal Configuration Example
+# This example shows the minimum required configuration
+
+esphome:
+  name: everblu-gas-meter
+  platform: ESP8266
+  board: d1_mini
+
+# WiFi configuration
+wifi:
+  ssid: "YourWiFiSSID"
+  password: "YourWiFiPassword"
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+
+# Enable OTA updates
+ota:
+
+# Time component (required)
+time:
+  - platform: homeassistant
+    id: ha_time
+
+# EverBlu Meter Component
+external_components:
+  - source:
+      type: local
+      path: components
+    components: [ everblu_meter ]
+
+everblu_meter:
+  id: my_gas_meter
+  
+  # REQUIRED: Meter identification
+  meter_year: 22
+  meter_serial: 87654321
+  
+  # REQUIRED: Meter type
+  meter_type: gas
+  gas_volume_divisor: 100  # Gas meters use divisor (100 or 1000)
+  
+  # Optional: Link to time component
+  time_id: ha_time
+  
+  # Minimal sensors - just the essentials
+  volume:
+    name: "Gas Volume"
+    unit_of_measurement: "m³"
+    device_class: gas
+    state_class: total_increasing
+  
+  status:
+    name: "Meter Status"

@@ -10,9 +10,7 @@
 
 #include <Arduino.h>
 #include "wifi_serial.h" // Mirror Serial to WiFi
-
-#include "everblu_meters.h"
-#include <private.h> // Configuration file (Wi-Fi, MQTT, meter settings)
+#include <private.h>	 // Configuration file (Wi-Fi, MQTT, meter settings)
 
 #include <string.h>
 
@@ -90,7 +88,7 @@ void show_in_bin(const uint8_t *buffer, size_t len)
 	printf("\n");
 }
 
-void echo_debug(T_BOOL l_flag, const char *fmt, ...)
+void echo_debug(bool l_flag, const char *fmt, ...)
 {
 	if (l_flag)
 	{

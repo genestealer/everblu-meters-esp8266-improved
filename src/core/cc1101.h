@@ -10,6 +10,9 @@
 #ifndef __CC1101_H__
 #define __CC1101_H__
 
+#include <stdint.h>
+#include <stdbool.h>
+
 /**
  * @struct tmeter_data
  * @brief Meter data structure containing current readings and metadata

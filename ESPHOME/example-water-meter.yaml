@@ -1,0 +1,179 @@
+# EverBlu Water Meter - Complete Example Configuration
+# This example shows all available sensors and configuration options
+
+esphome:
+  name: everblu-water-meter
+  platform: ESP8266
+  board: d1_mini
+
+# WiFi configuration
+wifi:
+  ssid: "YourWiFiSSID"
+  password: "YourWiFiPassword"
+  
+  # Enable fallback hotspot
+  ap:
+    ssid: "EverBlu Fallback"
+    password: "ConfigMe123"
+
+# Enable logging
+logger:
+  level: DEBUG
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "your-32-byte-base64-encoded-key-here"
+
+# Enable OTA updates
+ota:
+  password: "YourOTAPassword"
+
+# Time component (required for scheduled readings)
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+    timezone: America/New_York
+
+# EverBlu Meter Component
+external_components:
+  - source:
+      type: local
+      path: components
+    components: [ everblu_meter ]
+
+everblu_meter:
+  id: my_water_meter
+  
+  # Meter identification (REQUIRED)
+  meter_year: 21          # Last 2 digits of year (e.g., 21 for 2021)
+  meter_serial: 12345678  # Your meter's serial number
+  
+  # Meter type
+  meter_type: water       # 'water' or 'gas'
+  
+  # Radio configuration
+  frequency: 433.82       # MHz - adjust if needed for your region
+  auto_scan: true         # Automatically scan for optimal frequency
+  
+  # Reading schedule
+  schedule: Monday-Friday # Options: Monday-Friday, Saturday, Sunday, Everyday
+  read_hour: 10          # Hour to perform reading (0-23)
+  read_minute: 0         # Minute to perform reading (0-59)
+  timezone_offset: -5    # Hours from UTC (optional if using time component)
+  
+  # Time alignment features
+  auto_align_time: true      # Align readings to configured time
+  auto_align_midpoint: true  # Use midpoint of reading window
+  
+  # Retry configuration
+  max_retries: 10                    # Maximum read attempts
+  retry_cooldown: 1h                 # Cooldown between retry sessions
+  
+  # Link to time component
+  time_id: homeassistant_time
+  
+  # Update interval for sensor updates
+  update_interval: 60s
+  
+  # Volume sensors
+  volume:
+    name: "Water Volume"
+    unit_of_measurement: "L"
+    accuracy_decimals: 0
+    device_class: water
+    state_class: total_increasing
+    icon: "mdi:water"
+  
+  counter:
+    name: "Water Counter"
+    unit_of_measurement: "L"
+    accuracy_decimals: 0
+    state_class: total_increasing
+    icon: "mdi:counter"
+  
+  # Battery sensor
+  battery:
+    name: "Meter Battery"
+    unit_of_measurement: "years"
+    accuracy_decimals: 1
+    icon: "mdi:battery"
+  
+  # Radio quality sensors
+  rssi:
+    name: "RSSI"
+    unit_of_measurement: "dBm"
+    accuracy_decimals: 0
+    device_class: signal_strength
+    icon: "mdi:signal"
+  
+  rssi_percentage:
+    name: "RSSI Percentage"
+    unit_of_measurement: "%"
+    accuracy_decimals: 0
+    icon: "mdi:signal"
+  
+  lqi:
+    name: "LQI"
+    accuracy_decimals: 0
+    icon: "mdi:wifi-strength-4"
+  
+  lqi_percentage:
+    name: "LQI Percentage"
+    unit_of_measurement: "%"
+    accuracy_decimals: 0
+    icon: "mdi:wifi-strength-4"
+  
+  # Timing sensors
+  time_start:
+    name: "Reading Start Time"
+    unit_of_measurement: "ms"
+    accuracy_decimals: 0
+    icon: "mdi:clock-start"
+  
+  time_end:
+    name: "Reading End Time"
+    unit_of_measurement: "ms"
+    accuracy_decimals: 0
+    icon: "mdi:clock-end"
+  
+  # Statistics sensors
+  total_attempts:
+    name: "Total Read Attempts"
+    accuracy_decimals: 0
+    state_class: total_increasing
+    icon: "mdi:counter"
+  
+  successful_reads:
+    name: "Successful Reads"
+    accuracy_decimals: 0
+    state_class: total_increasing
+    icon: "mdi:check-circle"
+  
+  failed_reads:
+    name: "Failed Reads"
+    accuracy_decimals: 0
+    state_class: total_increasing
+    icon: "mdi:alert-circle"
+  
+  # Status text sensors
+  status:
+    name: "Meter Status"
+    icon: "mdi:information"
+  
+  error:
+    name: "Last Error"
+    icon: "mdi:alert"
+  
+  radio_state:
+    name: "Radio State"
+    icon: "mdi:radio-tower"
+  
+  timestamp:
+    name: "Last Reading Time"
+    icon: "mdi:clock-outline"
+  
+  # Binary sensors
+  active_reading:
+    name: "Reading Active"
+    device_class: running

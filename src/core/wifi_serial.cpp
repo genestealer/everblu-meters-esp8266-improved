@@ -116,7 +116,8 @@ size_t WifiSerialStream::write(const uint8_t *buffer, size_t size)
 }
 
 // Buffer size for printf formatting (including room for null terminator)
-#define WIFI_SERIAL_PRINTF_BUFFER_SIZE 256
+// Increased to 1024 bytes to accommodate large JSON history data and other verbose output
+#define WIFI_SERIAL_PRINTF_BUFFER_SIZE 1024
 
 size_t WifiSerialStream::printf(const char *format, ...)
 {
@@ -129,7 +130,7 @@ size_t WifiSerialStream::printf(const char *format, ...)
     bool truncated = (len < 0) || (len >= static_cast<int>(sizeof(buffer)));
     if (truncated)
     {
-        _usb.println("[WiFi Serial] Warning: printf output truncated (buffer 256 bytes)");
+        _usb.printf("[WiFi Serial] Warning: printf output truncated (buffer %d bytes)\n", WIFI_SERIAL_PRINTF_BUFFER_SIZE);
     }
 
     return write(reinterpret_cast<uint8_t *>(buffer), strlen(buffer));
@@ -194,7 +195,7 @@ void wifiSerialPrintf(const char *format, ...)
     bool truncated = (len < 0) || (len >= static_cast<int>(sizeof(buffer)));
     if (truncated)
     {
-        WiFiSerial.println("[WiFi Serial] Warning: printf output truncated (buffer 256 bytes)");
+        WiFiSerial.printf("[WiFi Serial] Warning: printf output truncated (buffer %d bytes)\n", WIFI_SERIAL_PRINTF_BUFFER_SIZE);
     }
 
     WiFiSerial.print(buffer);

@@ -1,0 +1,171 @@
+# EverBlu Meter - Advanced Configuration with Custom Schedule
+# This example shows advanced scheduling and monitoring features
+
+esphome:
+  name: everblu-meter-advanced
+  platform: ESP32
+  board: esp32dev
+
+# WiFi configuration
+wifi:
+  ssid: "YourWiFiSSID"
+  password: "YourWiFiPassword"
+  
+  # Static IP (optional)
+  manual_ip:
+    static_ip: 192.168.1.100
+    gateway: 192.168.1.1
+    subnet: 255.255.255.0
+
+# Enable logging with custom levels
+logger:
+  level: INFO
+  logs:
+    everblu_meter: DEBUG
+    sensor: WARN
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "your-32-byte-base64-encoded-key-here"
+
+# Enable OTA updates
+ota:
+  password: "YourOTAPassword"
+
+# Web server for diagnostics
+web_server:
+  port: 80
+
+# Time component with SNTP fallback
+time:
+  - platform: homeassistant
+    id: ha_time
+    timezone: Europe/Paris
+    on_time_sync:
+      then:
+        - logger.log: "Time synchronized with Home Assistant"
+
+# EverBlu Meter Component
+external_components:
+  - source:
+      type: local
+      path: components
+    components: [ everblu_meter ]
+
+everblu_meter:
+  id: my_meter
+  
+  # Meter configuration
+  meter_year: 23
+  meter_serial: 12345678
+  meter_type: water
+  
+  # Radio configuration - custom frequency
+  frequency: 433.85       # Fine-tuned frequency
+  auto_scan: false        # Disable auto-scan for faster readings
+  
+  # Advanced scheduling - weekend only
+  schedule: Saturday      # Read only on Saturdays
+  read_hour: 6           # Early morning reading
+  read_minute: 30
+  timezone_offset: 1     # CET/CEST
+  
+  # Timing features
+  auto_align_time: true
+  auto_align_midpoint: false  # Use exact configured time
+  
+  # Aggressive retry strategy
+  max_retries: 15                    # More attempts
+  retry_cooldown: 30min              # Shorter cooldown
+  
+  # Time component
+  time_id: ha_time
+  
+  # Fast updates for monitoring
+  update_interval: 30s
+  
+  # Core sensors
+  volume:
+    id: water_volume
+    name: "Water Volume"
+    unit_of_measurement: "L"
+    device_class: water
+    state_class: total_increasing
+    filters:
+      - or:
+        - throttle: 10s          # Limit updates
+        - delta: 0.1             # Only on change
+  
+  battery:
+    name: "Meter Battery"
+    unit_of_measurement: "years"
+    filters:
+      - throttle: 1h             # Battery doesn't change often
+  
+  # Monitoring sensors
+  rssi_percentage:
+    name: "Signal Quality"
+    unit_of_measurement: "%"
+    filters:
+      - sliding_window_moving_average:
+          window_size: 5         # Smooth signal readings
+          send_every: 1
+  
+  lqi_percentage:
+    name: "Link Quality"
+    unit_of_measurement: "%"
+  
+  # Performance metrics
+  successful_reads:
+    name: "Successful Reads"
+    state_class: total_increasing
+  
+  failed_reads:
+    name: "Failed Reads"
+    state_class: total_increasing
+  
+  # Status monitoring
+  status:
+    name: "Meter Status"
+    on_value:
+      then:
+        - if:
+            condition:
+              text_sensor.state:
+                id: status
+                state: "Error"
+            then:
+              - logger.log:
+                  level: ERROR
+                  format: "Meter reading error detected"
+  
+  error:
+    name: "Last Error"
+  
+  timestamp:
+    name: "Last Reading"
+  
+  active_reading:
+    name: "Reading In Progress"
+    on_press:
+      then:
+        - logger.log: "Meter reading started"
+    on_release:
+      then:
+        - logger.log: "Meter reading completed"
+
+# Template sensor for consumption calculation
+sensor:
+  - platform: template
+    name: "Daily Water Consumption"
+    unit_of_measurement: "L"
+    device_class: water
+    state_class: measurement
+    update_interval: 1h
+    lambda: |-
+      static float last_reading = 0;
+      const float current = id(water_volume).state;
+      const float consumption = current - last_reading;
+      last_reading = current;
+      return consumption;
