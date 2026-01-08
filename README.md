@@ -221,7 +221,7 @@ The CC1101 settings used in this project stay within that envelope, but ensure y
 
 #### Quick Reference: Wemos D1 Mini
 
-```text
+```
 CC1101 → Wemos D1 Mini
 VCC    → 3V3
 GND    → G
@@ -234,7 +234,7 @@ GDO0   → D1 (GPIO 5)
 
 #### Quick Reference: Adafruit Feather HUZZAH ESP8266
 
-```text
+```
 CC1101 → HUZZAH ESP8266
 VCC    → 3V
 GND    → GND
@@ -247,7 +247,7 @@ GDO0   → #5  (GPIO 5)
 
 #### Quick Reference: ESP32 DevKit (esp32dev)
 
-```text
+```
 CC1101 → ESP32 DevKit
 VCC    → 3V3
 GND    → GND
@@ -470,7 +470,7 @@ Example configuration in `private.h`:
 ```cpp
 #define DEFAULT_READING_SCHEDULE "Monday-Saturday"
 
-```text
+```
 
 ### Time zone offset and wake-up window (simple)
 
@@ -482,7 +482,7 @@ Configuration (in `include/private.h`):
 // Minutes from UTC. Examples: 0 (UTC), 60 (UTC+1), -300 (UTC-5)
 #define TIMEZONE_OFFSET_MINUTES 0
 
-```text
+```
 
 Behavior:
 
@@ -530,7 +530,7 @@ A warning is logged.
 // If not defined, defaults to 433.82 MHz
 #define FREQUENCY 433.82
 
-```text
+```
 
 Ways to find the best frequency:
 
@@ -540,9 +540,9 @@ Ways to find the best frequency:
 
 The effective frequency is printed at startup:
 
-```text
+```
 > Frequency (effective): 433.820000 MHz
-```text
+```
 
 ---
 
@@ -568,14 +568,14 @@ In `include/private.h`, set:
 ```cpp
 #define CLEAR_EEPROM_ON_BOOT 1
 
-```text
+```
 
 Upload, let it boot once (wide scan runs), then set it back to:
 
 ```cpp
 #define CLEAR_EEPROM_ON_BOOT 0
 
-```text
+```
 
 See `ADAPTIVE_FREQUENCY_FEATURES.md` for deeper technical notes.
 
@@ -598,13 +598,13 @@ Try the following in order:
   ```powershell
   & "$env:USERPROFILE\.platformio\penv\Scripts\platformio.exe" upgrade
   & "$env:USERPROFILE\.platformio\penv\Scripts\platformio.exe" platform update espressif32
-```text
+```
 
 - If it still fails, install the package into PlatformIO’s embedded Python (use the PlatformIO terminal to ensure the right interpreter is used):
 
   ```powershell
 & "$env:USERPROFILE\.platformio\penv\Scripts\python.exe" -m pip install --disable-pip-version-check --no-warn-script-location intelhex
-```text
+```
 
 Notes
 
