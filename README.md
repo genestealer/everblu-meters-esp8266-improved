@@ -34,7 +34,7 @@ Supported meters:
 
 ## Features
 
-- Home Assistant integration via MQTT AutoDiscovery.
+- Home Assistant integration via MQTT AutoDiscovery **or** native ESPHome component.
 - Daily scheduled readings (with configurable reading days).
 - Built-in frame validation (CRC-16/KERMIT) plus signal diagnostics (RSSI/LQI).
 - Automatic CC1101 frequency calibration plus first-boot wide scan.
@@ -48,6 +48,7 @@ Supported meters:
 - Includes RSSI (Radio Signal Strength Indicator), LQI (Link Quality) and Signal Strength for the meter for diagnostics.
 - Time Start and Time End sensors to indicate when the meter wakes and sleeps.
 - MQTT integration for Home Assistant with AutoDiscovery.
+- **Native ESPHome component** for seamless integration.
 - Automatic CC1101 frequency calibration with manual fallback.
 - Wi-Fi diagnostics and OTA updates.
 - Built-in CRC-16/KERMIT verification to discard corrupted RADIAN frames before publishing data.
@@ -55,6 +56,49 @@ Supported meters:
 - Daily scheduled meter readings.
 
 </details>
+
+## Integration Options
+
+This project supports two integration methods:
+
+### Option 1: ESPHome Component (Recommended)
+
+**Best for**: Users who prefer ESPHome's YAML configuration and native Home Assistant integration.
+
+- ✅ Simple YAML configuration
+- ✅ Native Home Assistant integration
+- ✅ Automatic sensor discovery
+- ✅ All ESPHome features (OTA, logging, etc.)
+- ✅ No MQTT broker required
+
+**Quick start**:
+```yaml
+external_components:
+  - source:
+      type: local
+      path: components
+    components: [ everblu_meter ]
+
+everblu_meter:
+  meter_year: 21
+  meter_serial: 12345678
+  meter_type: water
+  volume:
+    name: "Water Volume"
+```
+
+📖 **Full documentation**: [ESPHOME/ESPHOME_INTEGRATION_GUIDE.md](ESPHOME/ESPHOME_INTEGRATION_GUIDE.md)
+
+### Option 2: Standalone with MQTT
+
+**Best for**: Users who want direct control, custom builds, or already use MQTT extensively.
+
+- ✅ Full control over firmware
+- ✅ PlatformIO-based development
+- ✅ MQTT AutoDiscovery for Home Assistant
+- ✅ Extensive customization options
+
+**Quick start**: Edit `include/private.h` and build with PlatformIO (see below).
 
 ## Quick Start: First Successful Reading
 
