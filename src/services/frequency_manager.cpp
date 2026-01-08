@@ -4,6 +4,9 @@
  */
 
 #include "frequency_manager.h"
+#if defined(ESP32)
+#include <esp_task_wdt.h>
+#endif
 
 // Static member initialization
 float FrequencyManager::s_baseFrequency = 0.0;
@@ -23,7 +26,6 @@ void FrequencyManager::feedWatchdog()
 #if defined(ESP8266)
     ESP.wdtFeed();
 #elif defined(ESP32)
-#include <esp_task_wdt.h>
     esp_task_wdt_reset();
     yield();
 #endif
