@@ -382,7 +382,7 @@ static void validateReadingSchedule()
 {
   if (!isValidReadingSchedule(readingSchedule))
   {
-    Serial.printf("WARNING: Invalid reading schedule '%s'. Falling back to 'Monday-Friday'.\n", readingSchedule);
+    Serial.printf("[WARNING] Invalid reading schedule '%s'. Falling back to 'Monday-Friday'.\n", readingSchedule);
     readingSchedule = "Monday-Friday";
   }
 }
@@ -714,7 +714,7 @@ void onUpdateData()
     int remaining = sizeof(historyJson) - pos;
     if (remaining <= 1)
     {
-      Serial.println("ERROR: historyJson buffer too small before writing header - skipping history publish");
+      Serial.println("[ERROR] historyJson buffer too small before writing header - skipping history publish");
       // Nothing written, just bail out of history publishing for this frame.
       return;
     }
@@ -726,7 +726,7 @@ void onUpdateData()
       remaining = sizeof(historyJson) - pos;
       if (remaining <= 1)
       {
-        Serial.println("ERROR: historyJson buffer full while writing history array - truncating");
+        Serial.println("[ERROR] historyJson buffer full while writing history array - truncating");
         break;
       }
       pos += snprintf(historyJson + pos, remaining, "%s%u",
@@ -757,7 +757,7 @@ void onUpdateData()
     remaining = sizeof(historyJson) - pos;
     if (remaining <= 1)
     {
-      Serial.println("ERROR: historyJson buffer full before monthly_usage - truncating");
+      Serial.println("[ERROR] historyJson buffer full before monthly_usage - truncating");
       // Close what we have so far and publish best-effort JSON.
       historyJson[sizeof(historyJson) - 1] = '\0';
       Serial.printf("Publishing JSON attributes (%d bytes): %s\n\n", strlen(historyJson), historyJson);
@@ -788,7 +788,7 @@ void onUpdateData()
       remaining = sizeof(historyJson) - pos;
       if (remaining <= 1)
       {
-        Serial.println("ERROR: historyJson buffer full while writing monthly_usage - truncating");
+        Serial.println("[ERROR] historyJson buffer full while writing monthly_usage - truncating");
         break;
       }
       pos += snprintf(historyJson + pos, remaining, "%s%u",
@@ -798,7 +798,7 @@ void onUpdateData()
     remaining = sizeof(historyJson) - pos;
     if (remaining <= 1)
     {
-      Serial.println("ERROR: historyJson buffer full before tail - truncating");
+      Serial.println("[ERROR] historyJson buffer full before tail - truncating");
       historyJson[sizeof(historyJson) - 1] = '\0';
       Serial.printf("Publishing JSON attributes (%d bytes): %s\n\n", strlen(historyJson), historyJson);
       mqtt.publish(String(mqttBaseTopic) + "/liters_attributes", historyJson, true);
@@ -1331,7 +1331,7 @@ void onConnectionEstablished()
   }
   else
   {
-    Serial.printf("WARNING: NTP sync failed within %lu ms. Clock may be unset (epoch=%ld).\n",
+    Serial.printf("[WARNING] NTP sync failed within %lu ms. Clock may be unset (epoch=%ld).\n",
                   (unsigned long)(millis() - waitStart), (long)tnow);
   }
 
@@ -1403,7 +1403,7 @@ void onConnectionEstablished()
                  {
     // Input validation: only accept whitelisted commands
     if (message != "update" && message != "read") {
-      Serial.printf("WARN: Invalid trigger command '%s' (expected 'update' or 'read')\n", message.c_str());
+      Serial.printf("[WARN] Invalid trigger command '%s' (expected 'update' or 'read')\n", message.c_str());
       char topicBuffer[MQTT_TOPIC_BUFFER_SIZE];
       snprintf(topicBuffer, sizeof(topicBuffer), "%s/status_message", mqttBaseTopic);
       mqtt.publish(topicBuffer, "Invalid trigger command", true);
@@ -1456,7 +1456,7 @@ void onConnectionEstablished()
                    // Input validation: only accept exact "restart" command
                    if (message != "restart")
                    {
-                     Serial.printf("WARN: Invalid restart command '%s' (expected 'restart')\n", message.c_str());
+                     Serial.printf("[WARN] Invalid restart command '%s' (expected 'restart')\n", message.c_str());
                      char topicBuffer[MQTT_TOPIC_BUFFER_SIZE];
                      snprintf(topicBuffer, sizeof(topicBuffer), "%s/status_message", mqttBaseTopic);
                      mqtt.publish(topicBuffer, "Invalid restart command", true);
@@ -1477,7 +1477,7 @@ void onConnectionEstablished()
                  {
     // Input validation: only accept "scan" command
     if (message != "scan") {
-      Serial.printf("WARN: Invalid frequency scan command '%s' (expected 'scan')\n", message.c_str());
+      Serial.printf("[WARN] Invalid frequency scan command '%s' (expected 'scan')\n", message.c_str());
       char topicBuffer[MQTT_TOPIC_BUFFER_SIZE];
       snprintf(topicBuffer, sizeof(topicBuffer), "%s/status_message", mqttBaseTopic);
       mqtt.publish(topicBuffer, "Invalid scan command", true);
@@ -1631,7 +1631,7 @@ float loadFrequencyOffset()
 void performFrequencyScan()
 {
   Serial.println("> Starting frequency scan...");
-  Serial.println("> NOTE: Wi-Fi/MQTT connections may temporarily drop and reconnect while the scan is running. This is expected.");
+  Serial.println("> [NOTE] Wi-Fi/MQTT connections may temporarily drop and reconnect while the scan is running. This is expected.");
   char topicBuffer[MQTT_TOPIC_BUFFER_SIZE];
   snprintf(topicBuffer, sizeof(topicBuffer), "%s/cc1101_state", mqttBaseTopic);
   mqtt.publish(topicBuffer, "Frequency Scanning", true);
@@ -1909,13 +1909,13 @@ bool validateConfiguration()
   {
     if (METER_YEAR >= 2000 && METER_YEAR <= 2099)
     {
-      Serial.printf("ERROR: METER_YEAR=%d appears to be a 4-digit year\n", METER_YEAR);
+      Serial.printf("[ERROR] METER_YEAR=%d appears to be a 4-digit year\n", METER_YEAR);
       Serial.printf("       Use 2-digit year format: %d (not %d)\n", METER_YEAR - 2000, METER_YEAR);
       Serial.println("       Example: Serial '23-1875247-234' → use 23");
     }
     else
     {
-      Serial.printf("ERROR: Invalid METER_YEAR=%d (expected 0-99)\n", METER_YEAR);
+      Serial.printf("[ERROR] Invalid METER_YEAR=%d (expected 0-99)\n", METER_YEAR);
     }
     valid = false;
   }
@@ -1935,21 +1935,21 @@ bool validateConfiguration()
   // Note: If middle part starts with 0, omit leading zeros (e.g., 0123456 → 123456)
   if (METER_SERIAL == 0)
   {
-    Serial.println("ERROR: METER_SERIAL not configured (value is 0)");
+    Serial.println("[ERROR] METER_SERIAL not configured (value is 0)");
     Serial.println("       Use the middle part of your meter's serial number");
     Serial.println("       Example: Serial '23-1875247-234' → use 1875247");
     valid = false;
   }
   else if (METER_SERIAL > 99999999UL) // 8 digits max (most serials are 6-7 digits)
   {
-    Serial.printf("ERROR: METER_SERIAL=%lu seems too long (>8 digits)\n", (unsigned long)METER_SERIAL);
+    Serial.printf("[ERROR] METER_SERIAL=%lu seems too long (>8 digits)\n", (unsigned long)METER_SERIAL);
     Serial.println("       Use only the middle part of the serial (ignore last part)");
     Serial.println("       Example: Serial '23-1875247-234' → use 1875247 (not 1875247234)");
     valid = false;
   }
   else if (METER_SERIAL < 10UL) // Very suspiciously short (< 2 digits)
   {
-    Serial.printf("WARNING: METER_SERIAL=%lu is very short (<2 digits)\n", (unsigned long)METER_SERIAL);
+    Serial.printf("[WARNING] METER_SERIAL=%lu is very short (<2 digits)\n", (unsigned long)METER_SERIAL);
     Serial.println("         Double-check you entered the complete middle part");
     Serial.printf("⚠ METER_SERIAL: %lu\n", (unsigned long)METER_SERIAL);
   }
@@ -1966,7 +1966,7 @@ bool validateConfiguration()
 #ifdef FREQUENCY
   if (FREQUENCY < 300.0 || FREQUENCY > 500.0)
   {
-    Serial.printf("ERROR: Invalid FREQUENCY=%.2f MHz (expected 300-500 MHz)\n", FREQUENCY);
+    Serial.printf("[ERROR] Invalid FREQUENCY=%.2f MHz (expected 300-500 MHz)\n", FREQUENCY);
     valid = false;
   }
   else
@@ -1980,12 +1980,12 @@ bool validateConfiguration()
   // Validate reading time defaults (UTC)
   if (DEFAULT_READING_HOUR_UTC < 0 || DEFAULT_READING_HOUR_UTC > 23)
   {
-    Serial.printf("ERROR: Invalid DEFAULT_READING_HOUR_UTC=%d (expected 0-23)\n", DEFAULT_READING_HOUR_UTC);
+    Serial.printf("[ERROR] Invalid DEFAULT_READING_HOUR_UTC=%d (expected 0-23)\n", DEFAULT_READING_HOUR_UTC);
     valid = false;
   }
   else if (DEFAULT_READING_MINUTE_UTC < 0 || DEFAULT_READING_MINUTE_UTC > 59)
   {
-    Serial.printf("ERROR: Invalid DEFAULT_READING_MINUTE_UTC=%d (expected 0-59)\n", DEFAULT_READING_MINUTE_UTC);
+    Serial.printf("[ERROR] Invalid DEFAULT_READING_MINUTE_UTC=%d (expected 0-59)\n", DEFAULT_READING_MINUTE_UTC);
     valid = false;
   }
   else
@@ -1997,14 +1997,14 @@ bool validateConfiguration()
 #ifdef GDO0
   Serial.printf("✓ GDO0 Pin: GPIO %d\n", GDO0);
 #else
-  Serial.println("ERROR: GDO0 pin not defined in private.h");
+  Serial.println("[ERROR] GDO0 pin not defined in private.h");
   valid = false;
 #endif
 
   // Validate reading schedule
   if (!isValidReadingSchedule(readingSchedule))
   {
-    Serial.printf("WARNING: Invalid reading schedule '%s'. Will fall back to 'Monday-Friday'.\n", readingSchedule);
+    Serial.printf("[WARNING] Invalid reading schedule '%s'. Will fall back to 'Monday-Friday'.\n", readingSchedule);
     Serial.println("         Expected: 'Monday-Friday', 'Monday-Saturday', or 'Monday-Sunday'");
   }
   else
@@ -2141,7 +2141,7 @@ void setup()
   // Log effective frequency and warn if default is used
   Serial.printf("> Frequency (effective): %.6f MHz\n", (double)FREQUENCY);
 #if FREQUENCY_DEFINED_DEFAULT
-  Serial.println("NOTE: FREQUENCY not set in private.h; using default 433.820000 MHz (RADIAN).");
+  Serial.println("[NOTE] FREQUENCY not set in private.h; using default 433.820000 MHz (RADIAN).");
 #endif
 
   // Optional functionalities of EspMQTTClient
@@ -2160,7 +2160,7 @@ void setup()
   }
   if (!cc1101_init(effectiveFrequency))
   {
-    Serial.println("WARNING: CC1101 radio initialization failed!");
+    Serial.println("[WARNING] CC1101 radio initialization failed!");
     Serial.println("Please check: 1) Wiring connections 2) 3.3V power supply 3) SPI pins");
     Serial.println("Continuing with WiFi/MQTT only - radio functionality will not be available");
     Serial.println("Device will remain accessible via WiFi/MQTT for diagnostics and configuration");

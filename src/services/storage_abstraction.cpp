@@ -41,7 +41,7 @@ bool StorageAbstraction::saveFloat(const char *key, float value, uint16_t magic)
     }
     else
     {
-        Serial.printf("> ERROR: Failed to save %s to EEPROM\n", key);
+        Serial.printf("> [ERROR] Failed to save %s to EEPROM\n", key);
     }
 
     return success;
@@ -66,13 +66,13 @@ bool StorageAbstraction::saveFloat(const char *key, float value, uint16_t magic)
     }
     else
     {
-        Serial.printf("> ERROR: Failed to save %s to Preferences\n", key);
+        Serial.printf("> [ERROR] Failed to save %s to Preferences\n", key);
     }
 
     return success;
 
 #else
-    Serial.printf("> ERROR: Storage not supported on this platform\n");
+    Serial.printf("> [ERROR] Storage not supported on this platform\n");
     return false;
 #endif
 }
@@ -144,7 +144,7 @@ float StorageAbstraction::loadFloat(const char *key, float defaultValue, uint16_
     return value;
 
 #else
-    Serial.printf("> ERROR: Storage not supported on this platform\n");
+    Serial.printf("> [ERROR] Storage not supported on this platform\n");
     return defaultValue;
 #endif
 }

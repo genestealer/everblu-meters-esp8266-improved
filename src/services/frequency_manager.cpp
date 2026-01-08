@@ -34,12 +34,12 @@ bool FrequencyManager::validateCallbacks()
 {
     if (!s_radioInitCallback)
     {
-        Serial.println("ERROR: Radio init callback not set. Call setRadioInitCallback() first!");
+        Serial.println("[ERROR] Radio init callback not set. Call setRadioInitCallback() first!");
         return false;
     }
     if (!s_meterReadCallback)
     {
-        Serial.println("ERROR: Meter read callback not set. Call setMeterReadCallback() first!");
+        Serial.println("[ERROR] Meter read callback not set. Call setMeterReadCallback() first!");
         return false;
     }
     return true;
@@ -65,7 +65,7 @@ float FrequencyManager::begin(float baseFrequency)
     // Validate callbacks are set
     if (!validateCallbacks())
     {
-        Serial.println("ERROR: FrequencyManager::begin() failed - callbacks not configured!");
+        Serial.println("[ERROR] FrequencyManager::begin() failed - callbacks not configured!");
         return 0.0;
     }
 
@@ -124,7 +124,7 @@ float FrequencyManager::loadFrequencyOffset()
 void FrequencyManager::performFrequencyScan(void (*statusCallback)(const char *, const char *))
 {
     Serial.println("> Starting frequency scan...");
-    Serial.println("> NOTE: Wi-Fi/MQTT connections may temporarily drop and reconnect. This is expected.");
+    Serial.println("> [NOTE] Wi-Fi/MQTT connections may temporarily drop and reconnect. This is expected.");
 
     if (statusCallback)
     {
