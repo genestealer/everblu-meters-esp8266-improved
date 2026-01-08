@@ -1,0 +1,274 @@
+name: Memory and Size Tracking
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  analyze-memory:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment:
+          - name: huzzah
+            board: ESP8266 HUZZAH
+            platform: espressif8266
+            ram_limit: 80000 # 80KB - ESP8266 has ~81KB total
+            ram_warn: 68000 # Warn at 85%
+            flash_limit: 1044464 # ~1MB - depends on partition scheme
+            flash_warn: 900000 # Warn at ~85%
+          - name: d1_mini
+            board: D1 Mini
+            platform: espressif8266
+            ram_limit: 80000
+            ram_warn: 68000
+            flash_limit: 1044464
+            flash_warn: 900000
+          - name: esp32dev
+            board: ESP32 Dev
+            platform: espressif32
+            ram_limit: 327680 # 320KB - ESP32 has more
+            ram_warn: 280000 # Warn at 85%
+            flash_limit: 1310720 # Depends on partition
+            flash_warn: 1150000
+
+    name: Memory Analysis - ${{ matrix.environment.board }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: ${{ runner.os }}-pio-${{ matrix.environment.platform }}-${{ hashFiles('**/platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-${{ matrix.environment.platform }}-
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install PlatformIO
+        run: |
+          python -m pip install --upgrade pip
+          pip install --upgrade platformio
+
+      - name: Create private.h from example
+        run: |
+          if [ ! -f include/private.h ]; then
+            cp include/private.example.h include/private.h
+          fi
+          sed -i 's/#define METER_YEAR xx/#define METER_YEAR 99/g' include/private.h
+          sed -i 's/#define METER_SERIAL xxxxxxx/#define METER_SERIAL 9999999/g' include/private.h
+
+      - name: Build and capture memory usage
+        id: build
+        run: |
+          # Build with verbose output
+          pio run -e ${{ matrix.environment.name }} -v 2>&1 | tee build-output.log
+
+          # Extract memory usage from PlatformIO output
+          # ESP8266/ESP32 reports: RAM:   [====      ]  45.2% (used 37084 bytes from 81920 bytes)
+          #                        Flash: [=====     ]  52.1% (used 543621 bytes from 1044464 bytes)
+
+          RAM_LINE=$(grep -E "RAM:|SRAM:" build-output.log | tail -1 || echo "")
+          FLASH_LINE=$(grep -E "Flash:|ROM:" build-output.log | tail -1 || echo "")
+
+          # Parse RAM usage
+          if [[ $RAM_LINE =~ used[[:space:]]+([0-9]+)[[:space:]]+bytes[[:space:]]+from[[:space:]]+([0-9]+) ]]; then
+            RAM_USED="${BASH_REMATCH[1]}"
+            RAM_TOTAL="${BASH_REMATCH[2]}"
+            RAM_PERCENT=$(awk "BEGIN {printf \"%.1f\", ($RAM_USED/$RAM_TOTAL)*100}")
+          else
+            RAM_USED="unknown"
+            RAM_TOTAL="unknown"
+            RAM_PERCENT="0"
+          fi
+
+          # Parse Flash usage
+          if [[ $FLASH_LINE =~ used[[:space:]]+([0-9]+)[[:space:]]+bytes[[:space:]]+from[[:space:]]+([0-9]+) ]]; then
+            FLASH_USED="${BASH_REMATCH[1]}"
+            FLASH_TOTAL="${BASH_REMATCH[2]}"
+            FLASH_PERCENT=$(awk "BEGIN {printf \"%.1f\", ($FLASH_USED/$FLASH_TOTAL)*100}")
+          else
+            FLASH_USED="unknown"
+            FLASH_TOTAL="unknown"
+            FLASH_PERCENT="0"
+          fi
+
+          # Save to outputs
+          echo "ram_used=$RAM_USED" >> $GITHUB_OUTPUT
+          echo "ram_total=$RAM_TOTAL" >> $GITHUB_OUTPUT
+          echo "ram_percent=$RAM_PERCENT" >> $GITHUB_OUTPUT
+          echo "flash_used=$FLASH_USED" >> $GITHUB_OUTPUT
+          echo "flash_total=$FLASH_TOTAL" >> $GITHUB_OUTPUT
+          echo "flash_percent=$FLASH_PERCENT" >> $GITHUB_OUTPUT
+
+          # Get binary size
+          BIN_SIZE=$(stat -f%z ".pio/build/${{ matrix.environment.name }}/firmware.bin" 2>/dev/null || stat -c%s ".pio/build/${{ matrix.environment.name }}/firmware.bin" 2>/dev/null || echo "0")
+          echo "bin_size=$BIN_SIZE" >> $GITHUB_OUTPUT
+
+          echo "### Build completed successfully" | tee -a memory-report.md
+          echo "" | tee -a memory-report.md
+          echo "**RAM Usage**: $RAM_USED / $RAM_TOTAL bytes ($RAM_PERCENT%)" | tee -a memory-report.md
+          echo "**Flash Usage**: $FLASH_USED / $FLASH_TOTAL bytes ($FLASH_PERCENT%)" | tee -a memory-report.md
+          echo "**Binary Size**: $BIN_SIZE bytes" | tee -a memory-report.md
+
+      - name: Check memory thresholds
+        id: threshold_check
+        run: |
+          RAM_USED=${{ steps.build.outputs.ram_used }}
+          RAM_WARN=${{ matrix.environment.ram_warn }}
+          RAM_LIMIT=${{ matrix.environment.ram_limit }}
+          FLASH_USED=${{ steps.build.outputs.flash_used }}
+          FLASH_WARN=${{ matrix.environment.flash_warn }}
+          FLASH_LIMIT=${{ matrix.environment.flash_limit }}
+
+          STATUS="✅ OK"
+          WARNINGS=""
+          ERRORS=""
+
+          # Check RAM
+          if [ "$RAM_USED" != "unknown" ]; then
+            if [ $RAM_USED -gt $RAM_LIMIT ]; then
+              STATUS="❌ FAILED"
+              ERRORS="${ERRORS}🔴 RAM usage ($RAM_USED bytes) exceeds hard limit ($RAM_LIMIT bytes)\n"
+            elif [ $RAM_USED -gt $RAM_WARN ]; then
+              if [ "$STATUS" = "✅ OK" ]; then
+                STATUS="⚠️ WARNING"
+              fi
+              WARNINGS="${WARNINGS}⚠️ RAM usage ($RAM_USED bytes) exceeds warning threshold ($RAM_WARN bytes)\n"
+            fi
+          fi
+
+          # Check Flash
+          if [ "$FLASH_USED" != "unknown" ]; then
+            if [ $FLASH_USED -gt $FLASH_LIMIT ]; then
+              STATUS="❌ FAILED"
+              ERRORS="${ERRORS}🔴 Flash usage ($FLASH_USED bytes) exceeds hard limit ($FLASH_LIMIT bytes)\n"
+            elif [ $FLASH_USED -gt $FLASH_WARN ]; then
+              if [ "$STATUS" = "✅ OK" ]; then
+                STATUS="⚠️ WARNING"
+              fi
+              WARNINGS="${WARNINGS}⚠️ Flash usage ($FLASH_USED bytes) exceeds warning threshold ($FLASH_WARN bytes)\n"
+            fi
+          fi
+
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+          echo "warnings<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$WARNINGS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "errors<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$ERRORS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          # Output to summary
+          echo "## Memory Check Result: $STATUS" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -n "$ERRORS" ]; then
+            echo "### Errors" >> $GITHUB_STEP_SUMMARY
+            echo -e "$ERRORS" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ -n "$WARNINGS" ]; then
+            echo "### Warnings" >> $GITHUB_STEP_SUMMARY
+            echo -e "$WARNINGS" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Fail if hard limits exceeded
+          if [ "$STATUS" = "❌ FAILED" ]; then
+            echo "❌ Memory limits exceeded!"
+            exit 1
+          fi
+
+      - name: Generate memory report
+        run: |
+          cat > memory-full-report.md << 'EOF'
+          # Memory Analysis Report - ${{ matrix.environment.board }}
+
+          ## Summary
+          - **Status**: ${{ steps.threshold_check.outputs.status }}
+          - **RAM**: ${{ steps.build.outputs.ram_used }} / ${{ steps.build.outputs.ram_total }} bytes (${{ steps.build.outputs.ram_percent }}%)
+          - **Flash**: ${{ steps.build.outputs.flash_used }} / ${{ steps.build.outputs.flash_total }} bytes (${{ steps.build.outputs.flash_percent }}%)
+          - **Binary Size**: ${{ steps.build.outputs.bin_size }} bytes
+
+          ## Thresholds
+          - **RAM Warning**: ${{ matrix.environment.ram_warn }} bytes (85%)
+          - **RAM Limit**: ${{ matrix.environment.ram_limit }} bytes (98%)
+          - **Flash Warning**: ${{ matrix.environment.flash_warn }} bytes (85%)
+          - **Flash Limit**: ${{ matrix.environment.flash_limit }} bytes (98%)
+
+          ## Memory Distribution
+          ```
+          RAM:   [${{ steps.build.outputs.ram_percent }}%] (${{ steps.build.outputs.ram_used }} bytes used)
+          Flash: [${{ steps.build.outputs.flash_percent }}%] (${{ steps.build.outputs.flash_used }} bytes used)
+          ```
+
+          ## Notes
+          - ESP8266 has limited RAM (~80KB). High usage can cause runtime crashes.
+          - For OTA updates, flash must accommodate two copies of firmware.
+          - Consider optimizing if usage exceeds 85% warning threshold.
+
+          EOF
+
+          cat memory-full-report.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload memory report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: memory-report-${{ matrix.environment.name }}
+          path: |
+            memory-report.md
+            memory-full-report.md
+            build-output.log
+          retention-days: 30
+
+  compare-sizes:
+    runs-on: ubuntu-latest
+    needs: analyze-memory
+    name: Size Comparison Summary
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Download all memory reports
+        uses: actions/download-artifact@v4
+        with:
+          path: memory-reports
+
+      - name: Create comparison summary
+        run: |
+          echo "# 📊 Firmware Size Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Board | RAM Usage | Flash Usage | Binary Size |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-----------|-------------|-------------|" >> $GITHUB_STEP_SUMMARY
+
+          for dir in memory-reports/memory-report-*/; do
+            if [ -f "$dir/memory-full-report.md" ]; then
+              BOARD=$(basename "$dir" | sed 's/memory-report-//')
+              RAM=$(grep "RAM:" "$dir/memory-full-report.md" | grep -oP '\d+%' | head -1 || echo "N/A")
+              FLASH=$(grep "Flash:" "$dir/memory-full-report.md" | grep -oP '\d+%' | head -1 || echo "N/A")
+              SIZE=$(grep "Binary Size:" "$dir/memory-full-report.md" | grep -oP '\d+' || echo "N/A")
+              
+              # Format size in KB
+              if [ "$SIZE" != "N/A" ]; then
+                SIZE_KB=$(echo "scale=2; $SIZE / 1024" | bc)
+                SIZE="${SIZE_KB}KB"
+              fi
+              
+              echo "| $BOARD | $RAM | $FLASH | $SIZE |" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> 💡 **Tip**: Keep RAM usage below 85% to prevent runtime crashes on ESP8266" >> $GITHUB_STEP_SUMMARY

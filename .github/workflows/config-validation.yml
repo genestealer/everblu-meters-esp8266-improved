@@ -1,0 +1,270 @@
+name: Configuration Validation
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-config:
+    runs-on: ubuntu-latest
+    name: Validate Configuration Files
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install configparser toml
+
+      - name: Validate platformio.ini syntax
+        run: |
+          python << 'PYEOF'
+          import configparser
+          import sys
+
+          print("🔍 Validating platformio.ini syntax...")
+
+          try:
+              config = configparser.ConfigParser()
+              config.read('platformio.ini')
+              
+              # Check required sections exist
+              required_sections = ['platformio']
+              for section in required_sections:
+                  if not config.has_section(section):
+                      print(f"❌ Missing required section: [{section}]")
+                      sys.exit(1)
+              
+              # Check for at least one environment
+              env_sections = [s for s in config.sections() if s.startswith('env:')]
+              if not env_sections:
+                  print("❌ No environment sections found (e.g., [env:huzzah])")
+                  sys.exit(1)
+              
+              print(f"✅ Found {len(env_sections)} environment(s): {', '.join([s.replace('env:', '') for s in env_sections])}")
+              
+              # Validate each environment has required keys
+              for env in env_sections:
+                  env_name = env.replace('env:', '')
+                  
+                  # Check for extends or platform
+                  if not config.has_option(env, 'extends') and not config.has_option(env, 'platform'):
+                      print(f"⚠️  Environment '{env_name}' should have 'platform' or 'extends'")
+                  
+                  # Check for framework if platform is specified
+                  if config.has_option(env, 'platform'):
+                      if not config.has_option(env, 'framework') and not config.has_option('env:base', 'framework'):
+                          print(f"⚠️  Environment '{env_name}' should specify 'framework' (typically 'arduino')")
+              
+              print("\n✅ platformio.ini syntax is valid")
+              
+          except configparser.Error as e:
+              print(f"❌ platformio.ini syntax error: {e}")
+              sys.exit(1)
+          except Exception as e:
+              print(f"❌ Unexpected error: {e}")
+              sys.exit(1)
+          PYEOF
+
+      - name: Check private.h configuration
+        run: |
+          echo "🔍 Checking private.h configuration..."
+
+          # Check if example exists
+          if [ ! -f include/private.example.h ]; then
+            echo "❌ include/private.example.h not found"
+            exit 1
+          fi
+
+          echo "✅ private.example.h exists"
+
+          # Create private.h if it doesn't exist (for CI)
+          if [ ! -f include/private.h ]; then
+            cp include/private.example.h include/private.h
+            echo "📝 Created include/private.h from example"
+          fi
+
+          # Validate required defines exist in example
+          REQUIRED_DEFINES=(
+            "WIFI_SSID"
+            "WIFI_PASSWORD"
+            "MQTT_SERVER_IP"
+            "MQTT_USERNAME"
+            "MQTT_PASSWORD"
+            "MQTT_SERVER_PORT"
+            "METER_YEAR"
+            "METER_SERIAL"
+            "METER_TYPE"
+          )
+
+          MISSING_DEFINES=()
+          for define in "${REQUIRED_DEFINES[@]}"; do
+            if ! grep -q "#define $define" include/private.example.h; then
+              MISSING_DEFINES+=("$define")
+            fi
+          done
+
+          if [ ${#MISSING_DEFINES[@]} -gt 0 ]; then
+            echo "❌ Missing required defines in private.example.h:"
+            printf '   - %s\n' "${MISSING_DEFINES[@]}"
+            exit 1
+          fi
+
+          echo "✅ All required defines present in private.example.h"
+
+          # Check for placeholder values
+          echo ""
+          echo "🔍 Checking for placeholder values..."
+
+          PLACEHOLDERS=(
+            "your_wifi_ssid:WIFI_SSID"
+            "your_wifi_password:WIFI_PASSWORD"
+            "192.168.x.x:MQTT_SERVER_IP"
+            "your_mqtt_username:MQTT_USERNAME"
+            "your_mqtt_password:MQTT_PASSWORD"
+            "xxxxxxx:METER_SERIAL"
+            "xx:METER_YEAR"
+          )
+
+          for placeholder in "${PLACEHOLDERS[@]}"; do
+            VALUE="${placeholder%%:*}"
+            DEFINE="${placeholder##*:}"
+            if grep -q "define $DEFINE.*$VALUE" include/private.example.h; then
+              echo "✅ Placeholder '$VALUE' found for $DEFINE"
+            else
+              echo "⚠️  Placeholder for $DEFINE might not be clear"
+            fi
+          done
+
+      - name: Validate METER_TYPE values
+        run: |
+          echo "🔍 Validating METER_TYPE configuration..."
+
+          # Check that code handles both water and gas types
+          if ! grep -rq '"water"' src/ && ! grep -rq '"gas"' src/; then
+            echo "❌ Source code should reference METER_TYPE values (\"water\" or \"gas\")"
+            exit 1
+          fi
+
+          echo "✅ METER_TYPE handling present in source code"
+
+      - name: Check library dependencies
+        run: |
+          echo "🔍 Checking library dependencies in platformio.ini..."
+
+          # Extract lib_deps from platformio.ini
+          python << 'PYEOF'
+          import configparser
+
+          config = configparser.ConfigParser()
+          config.read('platformio.ini')
+
+          # Check base environment for lib_deps
+          if config.has_option('env:base', 'lib_deps'):
+              libs = config.get('env:base', 'lib_deps').strip().split('\n')
+              libs = [lib.strip() for lib in libs if lib.strip()]
+              
+              print(f"📚 Found {len(libs)} library dependencies:")
+              for lib in libs:
+                  print(f"   - {lib}")
+              
+              # Check for critical libraries
+              critical_libs = ['EspMQTTClient', 'ArduinoOTA']
+              missing_critical = []
+              
+              for critical in critical_libs:
+                  found = any(critical.lower() in lib.lower() for lib in libs)
+                  if not found:
+                      missing_critical.append(critical)
+              
+              if missing_critical:
+                  print(f"\n⚠️  Potentially missing critical libraries: {', '.join(missing_critical)}")
+              else:
+                  print("\n✅ All critical libraries present")
+          else:
+              print("⚠️  No lib_deps found in [env:base]")
+          PYEOF
+
+      - name: Validate build flags
+        run: |
+          echo "🔍 Checking build flags..."
+
+          # Check for common issues in build flags
+          if grep -q "build_flags.*-D.*=.*\s" platformio.ini; then
+            echo "⚠️  Build flags with spaces after '=' might cause issues"
+          fi
+
+          echo "✅ Build flags check complete"
+
+      - name: Check for common configuration mistakes
+        run: |
+          echo "🔍 Checking for common configuration mistakes..."
+
+          ISSUES_FOUND=0
+
+          # Check 1: Ensure upload_speed is reasonable
+          if grep -q "upload_speed.*=.*[0-9]\{8,\}" platformio.ini; then
+            echo "⚠️  Upload speed seems unusually high (>10MB/s)"
+            ISSUES_FOUND=$((ISSUES_FOUND + 1))
+          fi
+
+          # Check 2: Monitor speed should be common baud rate
+          MONITOR_SPEED=$(grep "monitor_speed" platformio.ini | grep -o "[0-9]\+" | head -1 || echo "0")
+          COMMON_BAUDS=(9600 19200 38400 57600 115200 230400)
+          if [ "$MONITOR_SPEED" != "0" ]; then
+            if [[ ! " ${COMMON_BAUDS[@]} " =~ " ${MONITOR_SPEED} " ]]; then
+              echo "⚠️  Unusual monitor_speed: $MONITOR_SPEED (common: 115200)"
+              ISSUES_FOUND=$((ISSUES_FOUND + 1))
+            fi
+          fi
+
+          # Check 3: Ensure framework is specified somewhere
+          if ! grep -q "framework.*=.*arduino" platformio.ini; then
+            echo "⚠️  Arduino framework not explicitly specified"
+            ISSUES_FOUND=$((ISSUES_FOUND + 1))
+          fi
+
+          if [ $ISSUES_FOUND -eq 0 ]; then
+            echo "✅ No common configuration issues found"
+          else
+            echo ""
+            echo "⚠️  Found $ISSUES_FOUND potential configuration issue(s)"
+            echo "    (These are warnings, not errors)"
+          fi
+
+      - name: Generate validation summary
+        if: always()
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << 'EOF'
+          ## Configuration Validation Results
+
+          ### Checks Performed
+          - ✅ `platformio.ini` syntax validation
+          - ✅ Required defines in `private.example.h`
+          - ✅ METER_TYPE value handling
+          - ✅ Library dependencies check
+          - ✅ Build flags validation
+          - ✅ Common configuration mistakes
+
+          ### Summary
+          All configuration files have been validated. Any warnings above should be reviewed but won't block the build.
+
+          ### For Contributors
+          When adding new configuration:
+          1. Update `include/private.example.h` with clear placeholders
+          2. Document new settings in README.md
+          3. Ensure backward compatibility where possible
+          EOF
+
+          echo "✅ Configuration validation complete!"

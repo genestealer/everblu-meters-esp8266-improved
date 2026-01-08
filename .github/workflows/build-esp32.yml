@@ -68,11 +68,82 @@ jobs:
           echo "Injected dummy METER_YEAR=99 and METER_SERIAL=9999999 for CI build"
 
       - name: Build PlatformIO Project (${{ matrix.environment.board }})
-        run: pio run -e ${{ matrix.environment.name }}
+        run: |
+          echo "Building with warning analysis..."
+          pio run -e ${{ matrix.environment.name }} -v 2>&1 | tee build-output.log
+
+          # Check build status
+          if [ ${PIPESTATUS[0]} -ne 0 ]; then
+            echo "❌ Build failed"
+            exit 1
+          fi
+
+          echo "✅ Build successful"
+
+      - name: Analyze compiler warnings
+        if: always()
+        run: |
+          echo "🔍 Analyzing compiler warnings..."
+
+          # Extract warnings from build output
+          grep -i "warning:" build-output.log > warnings.txt || true
+
+          WARNING_COUNT=$(wc -l < warnings.txt || echo 0)
+
+          echo "Found $WARNING_COUNT compiler warning(s)"
+
+          if [ $WARNING_COUNT -gt 0 ]; then
+            echo "" >> warnings-summary.md
+            echo "## ⚠️ Compiler Warnings Found: $WARNING_COUNT" >> warnings-summary.md
+            echo "" >> warnings-summary.md
+            
+            # Categorize warnings
+            UNUSED_VAR=$(grep -c "unused variable" warnings.txt || echo 0)
+            DEPRECATED=$(grep -c "deprecated" warnings.txt || echo 0)
+            COMPARISON=$(grep -c "comparison" warnings.txt || echo 0)
+            SIGN_COMPARE=$(grep -c "sign-compare" warnings.txt || echo 0)
+            TYPE_LIMITS=$(grep -c "type-limits" warnings.txt || echo 0)
+            
+            echo "### Warning Categories" >> warnings-summary.md
+            echo "- Unused variables: $UNUSED_VAR" >> warnings-summary.md
+            echo "- Deprecated: $DEPRECATED" >> warnings-summary.md
+            echo "- Comparisons: $COMPARISON" >> warnings-summary.md
+            echo "- Sign comparison: $SIGN_COMPARE" >> warnings-summary.md
+            echo "- Type limits: $TYPE_LIMITS" >> warnings-summary.md
+            echo "" >> warnings-summary.md
+            
+            # Show first 20 warnings
+            echo "### First 20 Warnings" >> warnings-summary.md
+            echo '```' >> warnings-summary.md
+            head -20 warnings.txt >> warnings-summary.md
+            echo '```' >> warnings-summary.md
+            
+            cat warnings-summary.md >> $GITHUB_STEP_SUMMARY
+            
+            # Warning threshold (fail if too many)
+            if [ $WARNING_COUNT -gt 50 ]; then
+              echo "❌ Too many warnings ($WARNING_COUNT > 50 threshold)"
+              echo "Please address compiler warnings before merging"
+              exit 1
+            fi
+          else
+            echo "✅ No compiler warnings found!" >> $GITHUB_STEP_SUMMARY
+          fi
 
       - name: Upload firmware artifacts
         uses: actions/upload-artifact@v4
         with:
           name: firmware-esp32-${{ matrix.environment.name }}
           path: .pio/build/${{ matrix.environment.name }}/firmware.*
+          retention-days: 30
+
+      - name: Upload build logs and warnings
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build-logs-esp32-${{ matrix.environment.name }}
+          path: |
+            build-output.log
+            warnings.txt
+            warnings-summary.md
           retention-days: 30
