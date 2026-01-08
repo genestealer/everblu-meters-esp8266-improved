@@ -19,7 +19,7 @@ void ScheduleManager::begin(const char *schedule, int readHourUtc, int readMinut
     setSchedule(schedule);
     setReadingTimeFromUtc(readHourUtc, readMinuteUtc);
 
-    Serial.printf("> ScheduleManager initialized: schedule=%s, read_time=%02d:%02d UTC (offset=%d min)\n",
+    Serial.printf("[SCHEDULE] Initialized: schedule=%s, read_time=%02d:%02d UTC (offset=%d min)\n",
                   s_schedule, s_readHourUtc, s_readMinuteUtc, s_timezoneOffsetMinutes);
 }
 
@@ -35,11 +35,11 @@ void ScheduleManager::setSchedule(const char *schedule)
     if (isValidSchedule(schedule))
     {
         s_schedule = schedule;
-        Serial.printf("> Reading schedule set to: %s\n", s_schedule);
+        Serial.printf("[SCHEDULE] Reading schedule set to: %s\n", s_schedule);
     }
     else
     {
-        Serial.printf("! Invalid schedule '%s' - falling back to 'Monday-Friday'\n", schedule);
+        Serial.printf("[SCHEDULE] [WARN] Invalid schedule '%s' - falling back to 'Monday-Friday'\n", schedule);
         s_schedule = "Monday-Friday";
     }
 }
@@ -117,7 +117,7 @@ bool ScheduleManager::autoAlignToMeterWindow(int meterTimeStartHour, int meterTi
 
     if (window == 0)
     {
-        Serial.println("! Cannot auto-align: meter window is invalid (0 hours)");
+        Serial.println("[SCHEDULE] [WARN] Cannot auto-align: meter window is invalid (0 hours)");
         return false;
     }
 
@@ -133,7 +133,7 @@ bool ScheduleManager::autoAlignToMeterWindow(int meterTimeStartHour, int meterTi
 
     setReadingTimeFromLocal(alignedHourLocal, s_readMinuteLocal);
 
-    Serial.printf("> Auto-aligned reading time to %02d:%02d local-offset (%02d:%02d UTC) "
+    Serial.printf("[SCHEDULE] Auto-aligned reading time to %02d:%02d local-offset (%02d:%02d UTC) "
                   "(meter window %02d-%02d local)\n",
                   s_readHourLocal, s_readMinuteLocal, s_readHourUtc, s_readMinuteUtc, timeStart, timeEnd);
 
@@ -149,7 +149,7 @@ void ScheduleManager::setTimezoneOffset(int offsetMinutes)
 {
     s_timezoneOffsetMinutes = offsetMinutes;
     recalculateLocalFromUtc();
-    Serial.printf("> Timezone offset set to %d minutes\n", s_timezoneOffsetMinutes);
+    Serial.printf("[SCHEDULE] Timezone offset set to %d minutes\n", s_timezoneOffsetMinutes);
 }
 
 void ScheduleManager::recalculateLocalFromUtc()

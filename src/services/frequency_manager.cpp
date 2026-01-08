@@ -49,13 +49,13 @@ bool FrequencyManager::validateCallbacks()
 void FrequencyManager::setRadioInitCallback(RadioInitCallback callback)
 {
     s_radioInitCallback = callback;
-    Serial.println("> FrequencyManager: Radio init callback registered");
+    Serial.println("[FREQ] FrequencyManager: Radio init callback registered");
 }
 
 void FrequencyManager::setMeterReadCallback(MeterReadCallback callback)
 {
     s_meterReadCallback = callback;
-    Serial.println("> FrequencyManager: Meter read callback registered");
+    Serial.println("[FREQ] FrequencyManager: Meter read callback registered");
 }
 
 float FrequencyManager::begin(float baseFrequency)
@@ -75,7 +75,7 @@ float FrequencyManager::begin(float baseFrequency)
     // Load stored offset
     s_storedOffset = loadFrequencyOffset();
 
-    Serial.printf("> FrequencyManager initialized: base=%.6f MHz, offset=%.6f MHz\n",
+    Serial.printf("[FREQ] Initialized: base=%.6f MHz, offset=%.6f MHz\n",
                   s_baseFrequency, s_storedOffset);
 
     return s_storedOffset;
@@ -106,7 +106,7 @@ void FrequencyManager::saveFrequencyOffset(float offset)
     StorageAbstraction::saveFloat(STORAGE_KEY, offset, STORAGE_MAGIC);
     s_storedOffset = offset;
 
-    Serial.printf("> Frequency offset %.6f MHz saved\n", offset);
+    Serial.printf("[FREQ] Frequency offset %.6f MHz saved\n", offset);
 }
 
 float FrequencyManager::loadFrequencyOffset()
@@ -115,7 +115,7 @@ float FrequencyManager::loadFrequencyOffset()
 
     if (offset == 0.0)
     {
-        Serial.println("> No valid frequency offset found in storage");
+        Serial.println("[FREQ] No valid frequency offset found in storage");
     }
 
     return offset;
@@ -123,8 +123,8 @@ float FrequencyManager::loadFrequencyOffset()
 
 void FrequencyManager::performFrequencyScan(void (*statusCallback)(const char *, const char *))
 {
-    Serial.println("> Starting frequency scan...");
-    Serial.println("> [NOTE] Wi-Fi/MQTT connections may temporarily drop and reconnect. This is expected.");
+    Serial.println("[FREQ] Starting frequency scan...");
+    Serial.println("[FREQ] [NOTE] Wi-Fi/MQTT connections may temporarily drop and reconnect. This is expected.");
 
     if (statusCallback)
     {
@@ -139,7 +139,7 @@ void FrequencyManager::performFrequencyScan(void (*statusCallback)(const char *,
     float scanEnd = s_baseFrequency + 0.03;
     float scanStep = 0.005;
 
-    Serial.printf("> Scanning from %.6f to %.6f MHz (step: %.6f MHz)\n", scanStart, scanEnd, scanStep);
+    Serial.printf("[FREQ] Scanning from %.6f to %.6f MHz (step: %.6f MHz)\n", scanStart, scanEnd, scanStep);
 
     for (float freq = scanStart; freq <= scanEnd; freq += scanStep)
     {
@@ -156,13 +156,13 @@ void FrequencyManager::performFrequencyScan(void (*statusCallback)(const char *,
         {
             bestRSSI = test_data.rssi_dbm;
             bestFreq = freq;
-            Serial.printf("> Better signal at %.6f MHz: RSSI=%d dBm\n", freq, test_data.rssi_dbm);
+            Serial.printf("[FREQ] Better signal at %.6f MHz: RSSI=%d dBm\n", freq, test_data.rssi_dbm);
         }
     }
 
     // Calculate and save the offset
     float offset = bestFreq - s_baseFrequency;
-    Serial.printf("> Frequency scan complete. Best frequency: %.6f MHz (offset: %.6f MHz, RSSI: %d dBm)\n",
+    Serial.printf("[FREQ] Frequency scan complete. Best frequency: %.6f MHz (offset: %.6f MHz, RSSI: %d dBm)\n",
                   bestFreq, offset, bestRSSI);
 
     if (bestRSSI > -120)
@@ -182,7 +182,7 @@ void FrequencyManager::performFrequencyScan(void (*statusCallback)(const char *,
     }
     else
     {
-        Serial.println("> Frequency scan failed - no valid signal found");
+        Serial.println("[FREQ] Frequency scan failed - no valid signal found");
 
         if (statusCallback)
         {
@@ -196,7 +196,7 @@ void FrequencyManager::performFrequencyScan(void (*statusCallback)(const char *,
 
 void FrequencyManager::performWideInitialScan(void (*statusCallback)(const char *, const char *))
 {
-    Serial.println("> Performing wide initial scan (first boot - no saved offset)...");
+    Serial.println("[FREQ] Performing wide initial scan (first boot - no saved offset)...");
 
     if (statusCallback)
     {
@@ -211,8 +211,8 @@ void FrequencyManager::performWideInitialScan(void (*statusCallback)(const char 
     float scanEnd = s_baseFrequency + 0.10;
     float scanStep = 0.010;
 
-    Serial.printf("> Wide scan from %.6f to %.6f MHz (step: %.6f MHz)\n", scanStart, scanEnd, scanStep);
-    Serial.println("> This may take 1-2 minutes on first boot...");
+    Serial.printf("[FREQ] Wide scan from %.6f to %.6f MHz (step: %.6f MHz)\n", scanStart, scanEnd, scanStep);
+    Serial.println("[FREQ] This may take 1-2 minutes on first boot...");
 
     for (float freq = scanStart; freq <= scanEnd; freq += scanStep)
     {
@@ -221,8 +221,8 @@ void FrequencyManager::performWideInitialScan(void (*statusCallback)(const char 
         // Check if radio initialization succeeds
         if (!s_radioInitCallback(freq))
         {
-            Serial.println("> Radio not responding - skipping wide initial scan");
-            Serial.println("> Check: 1) Wiring connections 2) 3.3V power supply 3) SPI pins");
+            Serial.println("[FREQ] Radio not responding - skipping wide initial scan");
+            Serial.println("[FREQ] Check: 1) Wiring connections 2) 3.3V power supply 3) SPI pins");
 
             if (statusCallback)
             {
@@ -240,14 +240,14 @@ void FrequencyManager::performWideInitialScan(void (*statusCallback)(const char 
         {
             bestRSSI = test_data.rssi_dbm;
             bestFreq = freq;
-            Serial.printf("> Found signal at %.6f MHz: RSSI=%d dBm\n", freq, test_data.rssi_dbm);
+            Serial.printf("[FREQ] Found signal at %.6f MHz: RSSI=%d dBm\n", freq, test_data.rssi_dbm);
         }
     }
 
     if (bestRSSI > -120)
     {
         // Found a signal - perform fine scan around it
-        Serial.printf("> Performing fine scan around %.6f MHz...\n", bestFreq);
+        Serial.printf("[FREQ] Performing fine scan around %.6f MHz...\n", bestFreq);
         float fineStart = bestFreq - 0.015;
         float fineEnd = bestFreq + 0.015;
         float fineStep = 0.003;
@@ -260,7 +260,7 @@ void FrequencyManager::performWideInitialScan(void (*statusCallback)(const char 
 
             if (!s_radioInitCallback(freq))
             {
-                Serial.println("> Radio not responding during fine scan - aborting");
+                Serial.println("[FREQ] Radio not responding during fine scan - aborting");
                 break;
             }
 
@@ -272,7 +272,7 @@ void FrequencyManager::performWideInitialScan(void (*statusCallback)(const char 
             {
                 fineBestRSSI = test_data.rssi_dbm;
                 fineBestFreq = freq;
-                Serial.printf("> Refined signal at %.6f MHz: RSSI=%d dBm\n", freq, test_data.rssi_dbm);
+                Serial.printf("[FREQ] Refined signal at %.6f MHz: RSSI=%d dBm\n", freq, test_data.rssi_dbm);
             }
         }
 
@@ -280,7 +280,7 @@ void FrequencyManager::performWideInitialScan(void (*statusCallback)(const char 
         bestRSSI = fineBestRSSI;
 
         float offset = bestFreq - s_baseFrequency;
-        Serial.printf("> Initial scan complete! Best frequency: %.6f MHz (offset: %.6f MHz, RSSI: %d dBm)\n",
+        Serial.printf("[FREQ] Initial scan complete! Best frequency: %.6f MHz (offset: %.6f MHz, RSSI: %d dBm)\n",
                       bestFreq, offset, bestRSSI);
 
         saveFrequencyOffset(offset);
@@ -296,12 +296,12 @@ void FrequencyManager::performWideInitialScan(void (*statusCallback)(const char 
     }
     else
     {
-        Serial.println("> Wide scan failed - no meter signal found!");
-        Serial.println("> Please check:");
-        Serial.println(">  1. Meter is within range (< 50m typically)");
-        Serial.println(">  2. Antenna is connected to CC1101");
-        Serial.println(">  3. Meter serial/year are correct");
-        Serial.println(">  4. Current time is within meter's wake hours");
+        Serial.println("[FREQ] Wide scan failed - no meter signal found!");
+        Serial.println("[FREQ] Please check:");
+        Serial.println("[FREQ]  1. Meter is within range (< 50m typically)");
+        Serial.println("[FREQ]  2. Antenna is connected to CC1101");
+        Serial.println("[FREQ]  3. Meter serial/year are correct");
+        Serial.println("[FREQ]  4. Current time is within meter's wake hours");
 
         if (statusCallback)
         {
@@ -322,7 +322,7 @@ void FrequencyManager::adaptiveFrequencyTracking(int8_t freqest)
     s_cumulativeFreqError += freqErrorMHz;
     s_successfulReadsCount++;
 
-    Serial.printf("> FREQEST: %d (%.4f kHz error), cumulative: %.4f kHz over %d reads\n",
+    Serial.printf("[FREQ] FREQEST: %d (%.4f kHz error), cumulative: %.4f kHz over %d reads\n",
                   freqest, freqErrorMHz * 1000, s_cumulativeFreqError * 1000, s_successfulReadsCount);
 
     // Only adapt after N successful reads to avoid over-correcting on noise
@@ -333,14 +333,14 @@ void FrequencyManager::adaptiveFrequencyTracking(int8_t freqest)
         // Only adjust if average error is significant (> 2 kHz)
         if (abs(avgError * 1000) > ADAPT_MIN_ERROR_KHZ)
         {
-            Serial.printf("> Adaptive adjustment: average error %.4f kHz over %d reads\n",
+            Serial.printf("[FREQ] Adaptive adjustment: average error %.4f kHz over %d reads\n",
                           avgError * 1000, s_adaptiveThreshold);
 
             // Adjust the stored offset (apply 50% of the measured error to avoid over-correction)
             float adjustment = avgError * ADAPT_CORRECTION_FACTOR;
             s_storedOffset += adjustment;
 
-            Serial.printf("> Adjusting frequency offset by %.6f MHz (new offset: %.6f MHz)\n",
+            Serial.printf("[FREQ] Adjusting frequency offset by %.6f MHz (new offset: %.6f MHz)\n",
                           adjustment, s_storedOffset);
 
             saveFrequencyOffset(s_storedOffset);
@@ -350,7 +350,7 @@ void FrequencyManager::adaptiveFrequencyTracking(int8_t freqest)
         }
         else
         {
-            Serial.printf("> Frequency stable (avg error %.4f kHz < %.1f kHz threshold)\n",
+            Serial.printf("[FREQ] Frequency stable (avg error %.4f kHz < %.1f kHz threshold)\n",
                           avgError * 1000, ADAPT_MIN_ERROR_KHZ);
         }
 

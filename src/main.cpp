@@ -344,14 +344,14 @@ static void initMeterTypeConfig()
     meterDeviceClass = "gas";
     meterIcon = "mdi:meter-gas";
     meterUnit = "m³";
-    Serial.println("> Meter type: GAS (readings in m³)");
+    Serial.println("[STATUS] Meter type: GAS (readings in m³)");
   }
   else
   {
     meterDeviceClass = "water";
     meterIcon = "mdi:water";
     meterUnit = "L";
-    Serial.println("> Meter type: WATER (readings in L)");
+    Serial.println("[STATUS] Meter type: WATER (readings in L)");
   }
 }
 
@@ -760,10 +760,10 @@ void onUpdateData()
       Serial.println("[ERROR] historyJson buffer full before monthly_usage - truncating");
       // Close what we have so far and publish best-effort JSON.
       historyJson[sizeof(historyJson) - 1] = '\0';
-      Serial.printf("Publishing JSON attributes (%d bytes): %s\n\n", strlen(historyJson), historyJson);
+      Serial.printf("[MQTT] Publishing JSON attributes (%d bytes): %s\n\n", strlen(historyJson), historyJson);
       mqtt.publish(String(mqttBaseTopic) + "/liters_attributes", historyJson, true);
       delay(5);
-      Serial.printf("> Published %d months historical data (current month usage: %u L)\n",
+      Serial.printf("[MQTT] Published %d months historical data (current month usage: %u L)\n",
                     num_history, currentMonthUsage);
       goto skip_history_publish;
     }
@@ -800,10 +800,10 @@ void onUpdateData()
     {
       Serial.println("[ERROR] historyJson buffer full before tail - truncating");
       historyJson[sizeof(historyJson) - 1] = '\0';
-      Serial.printf("Publishing JSON attributes (%d bytes): %s\n\n", strlen(historyJson), historyJson);
+      Serial.printf("[MQTT] Publishing JSON attributes (%d bytes): %s\n\n", strlen(historyJson), historyJson);
       mqtt.publish(String(mqttBaseTopic) + "/liters_attributes", historyJson, true);
       delay(5);
-      Serial.printf("> Published %d months historical data (current month usage: %u L)\n",
+      Serial.printf("[MQTT] Published %d months historical data (current month usage: %u L)\n",
                     num_history, currentMonthUsage);
       goto skip_history_publish;
     }
@@ -814,11 +814,11 @@ void onUpdateData()
     // Ensure null termination even if we had to truncate early.
     historyJson[sizeof(historyJson) - 1] = '\0';
 
-    Serial.printf("Publishing JSON attributes (%d bytes): %s\n\n", strlen(historyJson), historyJson);
+    Serial.printf("[MQTT] Publishing JSON attributes (%d bytes): %s\n\n", strlen(historyJson), historyJson);
     mqtt.publish(String(mqttBaseTopic) + "/liters_attributes", historyJson, true);
     delay(5);
 
-    Serial.printf("> Published %d months historical data (current month usage: %u L)\n",
+    Serial.printf("[MQTT] Published %d months historical data (current month usage: %u L)\n",
                   num_history, currentMonthUsage);
   }
 
@@ -885,7 +885,7 @@ skip_history_publish:;
       mqtt.publish(String(mqttBaseTopic) + "/reading_time", readingTimeFormatted2, true);
       delay(5);
 
-      Serial.printf("> Auto-aligned reading time to %02d:%02d local-offset (%02d:%02d UTC) (window %02d-%02d local)\n",
+      Serial.printf("[SCHEDULE] Auto-aligned reading time to %02d:%02d local-offset (%02d:%02d UTC) (window %02d-%02d local)\n",
                     g_readHourLocal, g_readMinuteLocal, g_readHourUtc, g_readMinuteUtc, timeStart, timeEnd);
     }
   }
@@ -941,7 +941,7 @@ void onScheduled()
     if (lastFailedAttempt > 0 && (millis() - lastFailedAttempt) < RETRY_COOLDOWN)
     {
       unsigned long remainingCooldown = (RETRY_COOLDOWN - (millis() - lastFailedAttempt)) / 1000;
-      Serial.printf("Still in cooldown period. %lu seconds remaining.\n", remainingCooldown);
+      Serial.printf("[WARN] Still in cooldown period. %lu seconds remaining.\n", remainingCooldown);
 
       char cooldownMsg[64];
       snprintf(cooldownMsg, sizeof(cooldownMsg), "Cooldown active, %lus remaining", remainingCooldown);
@@ -1035,7 +1035,7 @@ String buildDiscoveryJson(const char *name, const char *entity_id, const char *i
 // Description: Publishes Wi-Fi diagnostics (IP, RSSI, signal strength, etc.) to MQTT.
 void publishWifiDetails()
 {
-  Serial.println("> Publish Wi-Fi details...");
+  Serial.println("[MQTT] Publish Wi-Fi details...");
 
   // Get WiFi details (use String for network functions that return String)
   char wifiIP[16];
@@ -1097,14 +1097,14 @@ void publishWifiDetails()
   mqtt.publish(topicBuffer, uptimeISO, true);
   delay(5);
 
-  Serial.println("> Wi-Fi details published");
+  Serial.println("[MQTT] Wi-Fi details published");
 }
 
 // Function: publishMeterSettings
 // Description: Publishes meter configuration (year, serial, frequency) to MQTT.
 void publishMeterSettings()
 {
-  Serial.println("> Publish meter settings...");
+  Serial.println("[MQTT] Publish meter settings...");
 
   // Publish Meter Year, Serial (using char buffers instead of String)
   char valueBuffer[16];
@@ -1132,7 +1132,7 @@ void publishMeterSettings()
   mqtt.publish(topicBuffer, readingTimeFormatted, true);
   delay(5);
 
-  Serial.println("> Meter settings published");
+  Serial.println("[MQTT] Meter settings published");
 }
 
 // Function: publishDiscoveryMessage
@@ -1157,12 +1157,12 @@ static void publishDiscoveryMessage(const char *domain, const char *entity, cons
 // Description: Publishes all Home Assistant MQTT discovery messages with serial-specific entity IDs
 void publishHADiscovery()
 {
-  Serial.println("> Publishing Home Assistant discovery messages...");
+  Serial.println("[MQTT] Publishing Home Assistant discovery messages...");
 
   String json;
 
   // Reading (Total) - Main water/gas sensor
-  Serial.println("> Publishing Reading (Total) sensor discovery...");
+  Serial.println("[MQTT] Publishing Reading (Total) sensor discovery...");
   json = "{\n";
   json += "  \"name\": \"Reading (Total)\",\n";
   json += "  \"uniq_id\": \"" + String(METER_SERIAL) + "_everblu_meter_value\",\n";
@@ -1174,7 +1174,7 @@ void publishHADiscovery()
   json += "  \"qos\": 0,\n";
   json += "  \"avty_t\": \"" + String(mqttBaseTopic) + "/status\",\n";
   json += "  \"stat_t\": \"" + String(mqttBaseTopic) + "/liters\",\n";
-  Serial.printf("> Water Usage state topic: %s/liters\n", mqttBaseTopic);
+  Serial.printf("[MQTT] Water Usage state topic: %s/liters\n", mqttBaseTopic);
   json += "  \"json_attr_t\": \"" + String(mqttBaseTopic) + "/liters_attributes\",\n";
   json += "  \"sug_dsp_prc\": 0,\n";
   json += "  \"frc_upd\": true,\n";
@@ -1295,16 +1295,16 @@ void publishHADiscovery()
   json += "}";
   publishDiscoveryMessage("binary_sensor", "everblu_meter_active_reading", json);
 
-  Serial.println("> Home Assistant discovery messages published");
+  Serial.println("[MQTT] Home Assistant discovery messages published");
 }
 
 // Function: onConnectionEstablished
 // Description: Handles MQTT connection establishment, including Home Assistant discovery and OTA setup.
 void onConnectionEstablished()
 {
-  Serial.println("Connected to MQTT Broker :)");
+  Serial.println("[MQTT] Connected to MQTT Broker)");
 
-  Serial.println("> Configure time from NTP server. Please wait...");
+  Serial.println("[TIME] Configure time from NTP server. Please wait...");
   // Note, my VLAN has no WAN/internet, so I am useing Home Assistant Community Add-on: chrony to proxy the time
   configTzTime("UTC0", SECRET_NTP_SERVER);
 
@@ -1327,7 +1327,7 @@ void onConnectionEstablished()
   time_t tnow = time(nullptr);
   if (timeSynced)
   {
-    Serial.printf("✓ NTP sync successful after %lu ms\n", (unsigned long)(millis() - waitStart));
+    Serial.printf("[TIME] ✓ NTP sync successful after %lu ms\n", (unsigned long)(millis() - waitStart));
   }
   else
   {
@@ -1336,20 +1336,20 @@ void onConnectionEstablished()
   }
 
   struct tm *ptm = gmtime(&tnow);
-  Serial.printf("Current date (UTC) : %04d/%02d/%02d %02d:%02d/%02d - %ld\n", ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, (long)tnow);
+  Serial.printf("[TIME] current date (UTC) : %04d/%02d/%02d %02d:%02d/%02d - %ld\n", ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, (long)tnow);
   // Print simple offset and derived local time for debugging
   int offsetMin = TIMEZONE_OFFSET_MINUTES;
   time_t tlocal = tnow + (time_t)offsetMin * 60;
   struct tm *plocal = gmtime(&tlocal);
-  Serial.printf("Configured UTC offset: %+d minutes\n", offsetMin);
-  Serial.printf("Current date (UTC+offset): %04d/%02d/%02d %02d:%02d/%02d - %ld\n",
+  Serial.printf("[TIME] Configured UTC offset: %+d minutes\n", offsetMin);
+  Serial.printf("[TIME] Current date (UTC+offset): %04d/%02d/%02d %02d:%02d/%02d - %ld\n",
                 plocal->tm_year + 1900, plocal->tm_mon + 1, plocal->tm_mday,
                 plocal->tm_hour, plocal->tm_min, plocal->tm_sec, (long)tlocal);
 
   // Initialize schedule caches using validated UTC defaults
   updateResolvedScheduleFromUtc(DEFAULT_READING_HOUR_UTC, DEFAULT_READING_MINUTE_UTC);
 
-  Serial.println("> Configure Arduino OTA flash.");
+  Serial.println("[OTA] Configure Arduino OTA flash.");
   ArduinoOTA.onStart([]()
                      {
     String type;
@@ -1364,37 +1364,36 @@ void onConnectionEstablished()
   ArduinoOTA.onEnd([]()
                    { Serial.println("\nEnd updating."); });
   ArduinoOTA.onProgress([](unsigned int progress, unsigned int total)
-                        { Serial.printf("%u%%\r\n", (progress / (total / 100))); });
+                        { Serial.printf("[OTA] %u%%\r\n", (progress / (total / 100))); });
   ArduinoOTA.onError([](ota_error_t error)
                      {
-    Serial.printf("Error[%u]: ", error);
+    Serial.printf("[OTA] Error[%u]: ", error);
     if (error == OTA_AUTH_ERROR) {
-      Serial.println("Auth Failed");
+      Serial.println("[OTA] Auth Failed");
     }
     else if (error == OTA_BEGIN_ERROR) {
-      Serial.println("Begin Failed");
+      Serial.println("[OTA] Begin Failed");
     }
     else if (error == OTA_CONNECT_ERROR) {
-      Serial.println("Connect Failed");
+      Serial.println("[OTA] Connect Failed");
     }
     else if (error == OTA_RECEIVE_ERROR) {
-      Serial.println("Receive Failed");
+      Serial.println("[OTA] Receive Failed");
     }
     else if (error == OTA_END_ERROR) {
-      Serial.println("End Failed");
+      Serial.println("[OTA] End Failed");
     } });
   ArduinoOTA.setHostname("EVERBLUREADER");
   ArduinoOTA.begin();
-  Serial.println("> Ready");
-  Serial.print("> IP address: ");
+  Serial.print("[STATUS] IP address: ");
   Serial.println(WiFi.localIP());
 
   // Start WiFi serial monitor if enabled in configuration
 #if WIFI_SERIAL_MONITOR_ENABLED
   wifiSerialBegin();
-  Serial.println("> WiFi Serial Monitor: ENABLED");
+  Serial.println("[WIFI] WiFi Serial Monitor: ENABLED");
 #else
-  Serial.println("> WiFi Serial Monitor: DISABLED");
+  Serial.println("[WIFI] WiFi Serial Monitor: DISABLED");
 #endif
 
   char triggerTopic[80];
@@ -1413,7 +1412,7 @@ void onConnectionEstablished()
     // Check if we're in cooldown period
     if (lastFailedAttempt > 0 && (millis() - lastFailedAttempt) < RETRY_COOLDOWN) {
       unsigned long remainingCooldown = (RETRY_COOLDOWN - (millis() - lastFailedAttempt)) / 1000;
-      Serial.printf("Cannot trigger update: Still in cooldown period. %lu seconds remaining.\n", remainingCooldown);
+      Serial.printf("[WARN] Cannot trigger update: Still in cooldown period. %lu seconds remaining.\n", remainingCooldown);
       
       char cooldownMsg[64];
       snprintf(cooldownMsg, sizeof(cooldownMsg), "Cooldown active, %lus remaining", remainingCooldown);
@@ -1423,7 +1422,7 @@ void onConnectionEstablished()
       return;
     }
 
-    Serial.printf("Update data from meter from MQTT trigger (command: %s)\n", message.c_str());
+    Serial.printf("[MQTT] Update data from meter from MQTT trigger (command: %s)\n", message.c_str());
 
     _retry = 0;
     onUpdateData(); });
@@ -1487,7 +1486,7 @@ void onConnectionEstablished()
     Serial.println("Frequency scan command received via MQTT");
     performFrequencyScan(); });
 
-  Serial.println("> Send MQTT config for HA.");
+  Serial.println("[MQTT] Send MQTT config for HA.");
 
   // Publish all Home Assistant discovery messages with serial-specific entity IDs
   publishHADiscovery();
@@ -1534,7 +1533,7 @@ void onConnectionEstablished()
   mqtt.publish(topicBuffer, freqBuffer, true);
   delay(5);
 
-  Serial.println("> MQTT config sent");
+  Serial.println("[MQTT] MQTT config sent");
 
   // Publish initial Wi-Fi details
   publishWifiDetails();
@@ -1545,8 +1544,8 @@ void onConnectionEstablished()
   // Turn off LED to show everything is setup
   digitalWrite(LED_BUILTIN, HIGH); // turned off
 
-  Serial.println("> Setup done");
-  Serial.println("Ready to go...");
+  Serial.println("[STATUS] Setup done");
+  Serial.println("================================\n");
 
   onScheduled();
 }
@@ -1561,13 +1560,13 @@ void saveFrequencyOffset(float offset)
   EEPROM.put(FREQ_OFFSET_ADDR, magic);
   EEPROM.put(FREQ_OFFSET_ADDR + 2, offset);
   EEPROM.commit();
-  Serial.printf("> Frequency offset %.6f MHz saved to EEPROM\n", offset);
+  Serial.printf("[FREQ] Frequency offset %.6f MHz saved to EEPROM\n", offset);
 #elif defined(ESP32)
   // ESP32: Use Preferences
   preferences.begin("everblu", false);
   preferences.putFloat("freq_offset", offset);
   preferences.end();
-  Serial.printf("> Frequency offset %.6f MHz saved to Preferences\n", offset);
+  Serial.printf("[FREQ] Frequency offset %.6f MHz saved to Preferences\n", offset);
 #endif
   storedFrequencyOffset = offset;
 }
@@ -1587,17 +1586,17 @@ float loadFrequencyOffset()
     // Sanity check: offset should be reasonable (within ±0.1 MHz)
     if (offset >= -0.1 && offset <= 0.1)
     {
-      Serial.printf("> Loaded frequency offset %.6f MHz from EEPROM\n", offset);
+      Serial.printf("[FREQ] Loaded frequency offset %.6f MHz from EEPROM\n", offset);
       return offset;
     }
     else
     {
-      Serial.printf("> Invalid frequency offset %.6f MHz in EEPROM, using 0.0\n", offset);
+      Serial.printf("[FREQ] Invalid frequency offset %.6f MHz in EEPROM, using 0.0\n", offset);
     }
   }
   else
   {
-    Serial.println("> No valid frequency offset found in EEPROM");
+    Serial.println("[FREQ] No valid frequency offset found in EEPROM");
   }
 #elif defined(ESP32)
   // ESP32: Use Preferences
@@ -1609,17 +1608,17 @@ float loadFrequencyOffset()
     // Sanity check: offset should be reasonable (within ±0.1 MHz)
     if (offset >= -0.1 && offset <= 0.1)
     {
-      Serial.printf("> Loaded frequency offset %.6f MHz from Preferences\n", offset);
+      Serial.printf("[FREQ] Loaded frequency offset %.6f MHz from Preferences\n", offset);
       return offset;
     }
     else
     {
-      Serial.printf("> Invalid frequency offset %.6f MHz in Preferences, using 0.0\n", offset);
+      Serial.printf("[FREQ] Invalid frequency offset %.6f MHz in Preferences, using 0.0\n", offset);
     }
   }
   else
   {
-    Serial.println("> No frequency offset found in Preferences");
+    Serial.println("[FREQ] No frequency offset found in Preferences");
     preferences.end();
   }
 #endif
@@ -1630,8 +1629,8 @@ float loadFrequencyOffset()
 // Description: Scans nearby frequencies to find the best signal and updates the offset
 void performFrequencyScan()
 {
-  Serial.println("> Starting frequency scan...");
-  Serial.println("> [NOTE] Wi-Fi/MQTT connections may temporarily drop and reconnect while the scan is running. This is expected.");
+  Serial.println("[FREQ] Starting frequency scan...");
+  Serial.println("[FREQ] [NOTE] Wi-Fi/MQTT connections may temporarily drop and reconnect while the scan is running. This is expected.");
   char topicBuffer[MQTT_TOPIC_BUFFER_SIZE];
   snprintf(topicBuffer, sizeof(topicBuffer), "%s/cc1101_state", mqttBaseTopic);
   mqtt.publish(topicBuffer, "Frequency Scanning", true);
@@ -1647,7 +1646,7 @@ void performFrequencyScan()
   float scanEnd = baseFreq + 0.03;
   float scanStep = 0.005;
 
-  Serial.printf("> Scanning from %.6f to %.6f MHz (step: %.6f MHz)\n", scanStart, scanEnd, scanStep);
+  Serial.printf("[FREQ] Scanning from %.6f to %.6f MHz (step: %.6f MHz)\n", scanStart, scanEnd, scanStep);
 
   for (float freq = scanStart; freq <= scanEnd; freq += scanStep)
   {
@@ -1663,13 +1662,13 @@ void performFrequencyScan()
     {
       bestRSSI = test_data.rssi_dbm;
       bestFreq = freq;
-      Serial.printf("> Better signal at %.6f MHz: RSSI=%d dBm\n", freq, test_data.rssi_dbm);
+      Serial.printf("[FREQ] Better signal at %.6f MHz: RSSI=%d dBm\n", freq, test_data.rssi_dbm);
     }
   }
 
   // Calculate and save the offset
   float offset = bestFreq - baseFreq;
-  Serial.printf("> Frequency scan complete. Best frequency: %.6f MHz (offset: %.6f MHz, RSSI: %d dBm)\n",
+  Serial.printf("[FREQ] Frequency scan complete. Best frequency: %.6f MHz (offset: %.6f MHz, RSSI: %d dBm)\n",
                 bestFreq, offset, bestRSSI);
 
   if (bestRSSI > -120)
@@ -1691,7 +1690,7 @@ void performFrequencyScan()
   }
   else
   {
-    Serial.println("> Frequency scan failed - no valid signal found");
+    Serial.println("[FREQ] Frequency scan failed - no valid signal found");
     snprintf(topicBuffer, sizeof(topicBuffer), "%s/status_message", mqttBaseTopic);
     mqtt.publish(topicBuffer, "Frequency scan failed - no signal", true);
     // Restore original frequency
@@ -1707,7 +1706,7 @@ void performFrequencyScan()
 //              Scans ±100 kHz around the configured frequency in larger steps for faster discovery
 void performWideInitialScan()
 {
-  Serial.println("> Performing wide initial scan (first boot - no saved offset)...");
+  Serial.println("[FREQ] Performing wide initial scan (first boot - no saved offset)...");
   char topicBuffer[MQTT_TOPIC_BUFFER_SIZE];
   snprintf(topicBuffer, sizeof(topicBuffer), "%s/cc1101_state", mqttBaseTopic);
   mqtt.publish(topicBuffer, "Initial Frequency Scan", true);
@@ -1723,8 +1722,8 @@ void performWideInitialScan()
   float scanEnd = baseFreq + 0.10;
   float scanStep = 0.010;
 
-  Serial.printf("> Wide scan from %.6f to %.6f MHz (step: %.6f MHz)\n", scanStart, scanEnd, scanStep);
-  Serial.println("> This may take 1-2 minutes on first boot...");
+  Serial.printf("[FREQ] Wide scan from %.6f to %.6f MHz (step: %.6f MHz)\n", scanStart, scanEnd, scanStep);
+  Serial.println("[FREQ] This may take 1-2 minutes on first boot...");
 
   for (float freq = scanStart; freq <= scanEnd; freq += scanStep)
   {
@@ -1733,8 +1732,8 @@ void performWideInitialScan()
     // Check if CC1101 radio initialization succeeds before attempting communication
     if (!cc1101_init(freq))
     {
-      Serial.println("> CC1101 radio not responding - skipping wide initial scan");
-      Serial.println("> Check: 1) Wiring connections 2) 3.3V power supply 3) SPI pins");
+      Serial.println("[FREQ] CC1101 radio not responding - skipping wide initial scan");
+      Serial.println("[FREQ] Check: 1) Wiring connections 2) 3.3V power supply 3) SPI pins");
       snprintf(topicBuffer, sizeof(topicBuffer), "%s/status_message", mqttBaseTopic);
       mqtt.publish(topicBuffer, "ERROR: CC1101 radio not responding - cannot scan", true);
       snprintf(topicBuffer, sizeof(topicBuffer), "%s/cc1101_state", mqttBaseTopic);
@@ -1750,14 +1749,14 @@ void performWideInitialScan()
     {
       bestRSSI = test_data.rssi_dbm;
       bestFreq = freq;
-      Serial.printf("> Found signal at %.6f MHz: RSSI=%d dBm\n", freq, test_data.rssi_dbm);
+      Serial.printf("[FREQ] Found signal at %.6f MHz: RSSI=%d dBm\n", freq, test_data.rssi_dbm);
     }
   }
 
   if (bestRSSI > -120)
   {
     // Found a signal, now do a fine scan around it
-    Serial.printf("> Performing fine scan around %.6f MHz...\n", bestFreq);
+    Serial.printf("[FREQ] Performing fine scan around %.6f MHz...\n", bestFreq);
     float fineStart = bestFreq - 0.015;
     float fineEnd = bestFreq + 0.015;
     float fineStep = 0.003;
@@ -1771,7 +1770,7 @@ void performWideInitialScan()
       // Check if CC1101 radio initialization succeeds before attempting communication
       if (!cc1101_init(freq))
       {
-        Serial.println("> CC1101 radio not responding during fine scan - aborting");
+        Serial.println("[FREQ] CC1101 radio not responding during fine scan - aborting");
         break; // Exit fine scan if radio fails
       }
 
@@ -1783,7 +1782,7 @@ void performWideInitialScan()
       {
         fineBestRSSI = test_data.rssi_dbm;
         fineBestFreq = freq;
-        Serial.printf("> Refined signal at %.6f MHz: RSSI=%d dBm\n", freq, test_data.rssi_dbm);
+        Serial.printf("[FREQ] Refined signal at %.6f MHz: RSSI=%d dBm\n", freq, test_data.rssi_dbm);
       }
     }
 
@@ -1791,7 +1790,7 @@ void performWideInitialScan()
     bestRSSI = fineBestRSSI;
 
     float offset = bestFreq - baseFreq;
-    Serial.printf("> Initial scan complete! Best frequency: %.6f MHz (offset: %.6f MHz, RSSI: %d dBm)\n",
+    Serial.printf("[FREQ] Initial scan complete! Best frequency: %.6f MHz (offset: %.6f MHz, RSSI: %d dBm)\n",
                   bestFreq, offset, bestRSSI);
 
     saveFrequencyOffset(offset);
@@ -1810,12 +1809,12 @@ void performWideInitialScan()
   }
   else
   {
-    Serial.println("> Wide scan failed - no meter signal found!");
-    Serial.println("> Please check:");
-    Serial.println(">  1. Meter is within range (< 50m typically)");
-    Serial.println(">  2. Antenna is connected to CC1101");
-    Serial.println(">  3. Meter serial/year are correct in private.h");
-    Serial.println(">  4. Current time is within meter's wake hours");
+    Serial.println("[FREQ] Wide scan failed - no meter signal found!");
+    Serial.println("[FREQ] Please check:");
+    Serial.println("[FREQ]  1. Meter is within range (< 50m typically)");
+    Serial.println("[FREQ]  2. Antenna is connected to CC1101");
+    Serial.println("[FREQ]  3. Meter serial/year are correct in private.h");
+    Serial.println("[FREQ]  4. Current time is within meter's wake hours");
     snprintf(topicBuffer, sizeof(topicBuffer), "%s/status_message", mqttBaseTopic);
     mqtt.publish(topicBuffer, "Initial scan failed - check setup", true);
     cc1101_init(baseFreq);
@@ -1839,7 +1838,7 @@ void adaptiveFrequencyTracking(int8_t freqest)
   cumulativeFreqError += freqErrorMHz;
   successfulReadsBeforeAdapt++;
 
-  Serial.printf("> FREQEST: %d (%.4f kHz error), cumulative: %.4f kHz over %d reads\n",
+  Serial.printf("[FREQ] FREQEST: %d (%.4f kHz error), cumulative: %.4f kHz over %d reads\n",
                 freqest, freqErrorMHz * 1000, cumulativeFreqError * 1000, successfulReadsBeforeAdapt);
 
   // Only adapt after N successful reads to avoid over-correcting on noise
@@ -1850,14 +1849,14 @@ void adaptiveFrequencyTracking(int8_t freqest)
     // Only adjust if average error is significant (> 2 kHz)
     if (abs(avgError * 1000) > 2.0)
     {
-      Serial.printf("> Adaptive adjustment: average error %.4f kHz over %d reads\n",
+      Serial.printf("[FREQ] Adaptive adjustment: average error %.4f kHz over %d reads\n",
                     avgError * 1000, ADAPT_THRESHOLD);
 
       // Adjust the stored offset (apply 50% of the measured error to avoid over-correction)
       float adjustment = avgError * 0.5;
       storedFrequencyOffset += adjustment;
 
-      Serial.printf("> Adjusting frequency offset by %.6f MHz (new offset: %.6f MHz)\n",
+      Serial.printf("[FREQ] Adjusting frequency offset by %.6f MHz (new offset: %.6f MHz)\n",
                     adjustment, storedFrequencyOffset);
 
       saveFrequencyOffset(storedFrequencyOffset);
@@ -1873,7 +1872,7 @@ void adaptiveFrequencyTracking(int8_t freqest)
     }
     else
     {
-      Serial.printf("> Frequency stable (avg error %.4f kHz < 2 kHz threshold)\n", avgError * 1000);
+      Serial.printf("[FREQ] Frequency stable (avg error %.4f kHz < 2 kHz threshold)\n", avgError * 1000);
     }
 
     // Reset accumulators
@@ -2037,8 +2036,8 @@ void setup()
   Serial.println("Everblu Meters ESP8266/ESP32 Starting...");
   Serial.println("Water/Gas usage data for Home Assistant");
   Serial.println("https://github.com/genestealer/everblu-meters-esp8266-improved");
-  Serial.printf("Firmware version: %s\n", EVERBLU_FW_VERSION);
-  Serial.printf("Target meter: 20%02d-%07lu\n\n", METER_YEAR, (unsigned long)METER_SERIAL);
+  Serial.printf("[STATUS] Firmware version: %s\n", EVERBLU_FW_VERSION);
+  Serial.printf("[STATUS] Target meter: 20%02d-%07lu\n\n", METER_YEAR, (unsigned long)METER_SERIAL);
 
   // Initialize meter type configuration
   initMeterTypeConfig();
@@ -2065,9 +2064,9 @@ void setup()
 
   // Note: mqttBaseTopic and meterSerialStr are initialized at global scope
   // to ensure they're ready when EspMQTTClient constructor runs
-  Serial.printf("> MQTT base topic: %s\n", mqttBaseTopic);
-  Serial.printf("> Meter serial string: %s\n", meterSerialStr);
-  Serial.printf("> mqttBaseTopic length: %d\n", strlen(mqttBaseTopic));
+  Serial.printf("[MQTT] Base topic: %s\n", mqttBaseTopic);
+  Serial.printf("[MQTT] Meter serial string: %s\n", meterSerialStr);
+  Serial.printf("[MQTT] mqttBaseTopic length: %d\n", strlen(mqttBaseTopic));
 
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW); // turned on to start with
@@ -2075,18 +2074,18 @@ void setup()
   // Initialize persistent storage
 #if defined(ESP8266)
   EEPROM.begin(EEPROM_SIZE);
-  Serial.println("> EEPROM initialized");
+  Serial.println("[STORAGE] EEPROM initialized");
 
   // Clear EEPROM if requested (set CLEAR_EEPROM_ON_BOOT=1 in private.h)
   // Use this when replacing ESP board, CC1101 module, or moving to a different meter
 #if CLEAR_EEPROM_ON_BOOT
-  Serial.println("> CLEARING EEPROM (CLEAR_EEPROM_ON_BOOT = 1)...");
+  Serial.println("[STORAGE] CLEARING EEPROM (CLEAR_EEPROM_ON_BOOT = 1)...");
   for (int i = 0; i < EEPROM_SIZE; i++)
   {
     EEPROM.write(i, 0xFF);
   }
   EEPROM.commit();
-  Serial.println("> EEPROM cleared. Remember to set CLEAR_EEPROM_ON_BOOT = 0 after testing!");
+  Serial.println("[STORAGE] EEPROM cleared. Remember to set CLEAR_EEPROM_ON_BOOT = 0 after testing!");
 #endif
 #endif
 
@@ -2098,14 +2097,14 @@ void setup()
   // If no valid frequency offset found and auto-scan is enabled, perform wide initial scan
   if (noStoredOffset && autoScanEnabled)
   {
-    Serial.println("> No stored frequency offset found. Performing wide initial scan...");
+    Serial.println("[FREQ] No stored frequency offset found. Performing wide initial scan...");
     performWideInitialScan();
     // Reload the frequency offset after scan
     storedFrequencyOffset = loadFrequencyOffset();
   }
   else if (noStoredOffset)
   {
-    Serial.println("> AUTO_SCAN_ENABLED=0; skipping automatic frequency scan (offset remains 0.0 MHz).");
+    Serial.println("[FREQ] AUTO_SCAN_ENABLED=0; skipping automatic frequency scan (offset remains 0.0 MHz).");
   }
 
   // Increase the max packet size to handle large MQTT payloads
@@ -2127,19 +2126,19 @@ void setup()
   WiFi.setPhyMode(WIFI_PHY_MODE_11G);
   Serial.println("Wi-Fi PHY mode set to 11G.");
 #else
-  Serial.println("> Wi-Fi PHY mode 11G is disabled.");
+  Serial.println("[WIFI] Wi-Fi PHY mode 11G is disabled.");
 #endif
 #else
-  Serial.println("> Wi-Fi PHY mode setting not applicable on this platform.");
+  Serial.println("[WIFI] Wi-Fi PHY mode setting not applicable on this platform.");
 #endif
 
   // Validate and log the configured reading schedule
-  Serial.printf("> Reading schedule (configured): %s\n", readingSchedule);
+  Serial.printf("[SCHEDULE] Reading schedule (configured): %s\n", readingSchedule);
   validateReadingSchedule();
-  Serial.printf("> Reading schedule (effective): %s\n", readingSchedule);
+  Serial.printf("[SCHEDULE] Reading schedule (effective): %s\n", readingSchedule);
 
   // Log effective frequency and warn if default is used
-  Serial.printf("> Frequency (effective): %.6f MHz\n", (double)FREQUENCY);
+  Serial.printf("[FREQ] Frequency (effective): %.6f MHz\n", (double)FREQUENCY);
 #if FREQUENCY_DEFINED_DEFAULT
   Serial.println("[NOTE] FREQUENCY not set in private.h; using default 433.820000 MHz (RADIAN).");
 #endif
@@ -2151,11 +2150,11 @@ void setup()
 #endif
 
   // Set CC1101 radio frequency with automatic calibration
-  Serial.println("> Initializing CC1101 radio...");
+  Serial.println("[FREQ] Initializing CC1101 radio...");
   float effectiveFrequency = FREQUENCY + storedFrequencyOffset;
   if (storedFrequencyOffset != 0.0)
   {
-    Serial.printf("> Applying stored frequency offset: %.6f MHz (effective: %.6f MHz)\n",
+    Serial.printf("[FREQ] Applying stored frequency offset: %.6f MHz (effective: %.6f MHz)\n",
                   storedFrequencyOffset, effectiveFrequency);
   }
   if (!cc1101_init(effectiveFrequency))
@@ -2168,7 +2167,7 @@ void setup()
   }
   else
   {
-    Serial.println("> CC1101 radio initialized successfully");
+    Serial.println("[FREQ] CC1101 radio initialized successfully");
     cc1101RadioConnected = true;
   }
 
@@ -2189,7 +2188,7 @@ void setup()
   g_lastConnLogMs = 0;
   g_lastLedBlinkMs = millis();
 
-  Serial.println("> Waiting for Wi-Fi/MQTT... timeouts enabled (Wi-Fi 30s, MQTT 30s). Will retry automatically.");
+  Serial.println("[NET] Waiting for Wi-Fi/MQTT... timeouts enabled (Wi-Fi 30s, MQTT 30s). Will retry automatically.");
 }
 
 // ============================================================================

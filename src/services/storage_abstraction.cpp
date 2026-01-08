@@ -37,11 +37,11 @@ bool StorageAbstraction::saveFloat(const char *key, float value, uint16_t magic)
 
     if (success)
     {
-        Serial.printf("> Saved %s = %.6f to EEPROM\n", key, value);
+        Serial.printf("[STORAGE] Saved %s = %.6f to EEPROM\n", key, value);
     }
     else
     {
-        Serial.printf("> [ERROR] Failed to save %s to EEPROM\n", key);
+        Serial.printf("[STORAGE] [ERROR] Failed to save %s to EEPROM\n", key);
     }
 
     return success;
@@ -62,17 +62,17 @@ bool StorageAbstraction::saveFloat(const char *key, float value, uint16_t magic)
     bool success = (written > 0);
     if (success)
     {
-        Serial.printf("> Saved %s = %.6f to Preferences\n", key, value);
+        Serial.printf("[STORAGE] Saved %s = %.6f to Preferences\n", key, value);
     }
     else
     {
-        Serial.printf("> [ERROR] Failed to save %s to Preferences\n", key);
+        Serial.printf("[STORAGE] [ERROR] Failed to save %s to Preferences\n", key);
     }
 
     return success;
 
 #else
-    Serial.printf("> [ERROR] Storage not supported on this platform\n");
+    Serial.printf("[STORAGE] [ERROR] Storage not supported on this platform\n");
     return false;
 #endif
 }
@@ -87,7 +87,7 @@ float StorageAbstraction::loadFloat(const char *key, float defaultValue, uint16_
 
     if (storedMagic != magic)
     {
-        Serial.printf("> No valid data for %s in EEPROM (magic mismatch)\n", key);
+        Serial.printf("[STORAGE] No valid data for %s in EEPROM (magic mismatch)\n", key);
         return defaultValue;
     }
 
@@ -97,12 +97,12 @@ float StorageAbstraction::loadFloat(const char *key, float defaultValue, uint16_
     // Sanity check: ensure value is within acceptable range
     if (value < minValue || value > maxValue)
     {
-        Serial.printf("> Invalid %s value %.6f in EEPROM (out of range [%.2f, %.2f])\n",
+        Serial.printf("[STORAGE] Invalid %s value %.6f in EEPROM (out of range [%.2f, %.2f])\n",
                       key, value, minValue, maxValue);
         return defaultValue;
     }
 
-    Serial.printf("> Loaded %s = %.6f from EEPROM\n", key, value);
+    Serial.printf("[STORAGE] Loaded %s = %.6f from EEPROM\n", key, value);
     return value;
 
 #elif defined(ESP32)
@@ -116,7 +116,7 @@ float StorageAbstraction::loadFloat(const char *key, float defaultValue, uint16_
 
     if (storedMagic != magic)
     {
-        Serial.printf("> No valid data for %s in Preferences (magic mismatch)\n", key);
+        Serial.printf("[STORAGE] No valid data for %s in Preferences (magic mismatch)\n", key);
         preferences.end();
         return defaultValue;
     }
@@ -124,7 +124,7 @@ float StorageAbstraction::loadFloat(const char *key, float defaultValue, uint16_
     // Read the value
     if (!preferences.isKey(key))
     {
-        Serial.printf("> Key %s not found in Preferences\n", key);
+        Serial.printf("[STORAGE] Key %s not found in Preferences\n", key);
         preferences.end();
         return defaultValue;
     }
@@ -135,16 +135,16 @@ float StorageAbstraction::loadFloat(const char *key, float defaultValue, uint16_
     // Sanity check
     if (value < minValue || value > maxValue)
     {
-        Serial.printf("> Invalid %s value %.6f in Preferences (out of range [%.2f, %.2f])\n",
+        Serial.printf("[STORAGE] Invalid %s value %.6f in Preferences (out of range [%.2f, %.2f])\n",
                       key, value, minValue, maxValue);
         return defaultValue;
     }
 
-    Serial.printf("> Loaded %s = %.6f from Preferences\n", key, value);
+    Serial.printf("[STORAGE] Loaded %s = %.6f from Preferences\n", key, value);
     return value;
 
 #else
-    Serial.printf("> [ERROR] Storage not supported on this platform\n");
+    Serial.printf("[STORAGE] [ERROR] Storage not supported on this platform\n");
     return defaultValue;
 #endif
 }

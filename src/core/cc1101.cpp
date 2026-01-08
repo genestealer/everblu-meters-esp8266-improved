@@ -531,7 +531,7 @@ bool cc1101_init(float freq)
   static bool s_reported_ok = false;
   if (!s_reported_ok)
   {
-    printf("> CC1101 radio found OK (PARTNUM: 0x%02X, VERSION: 0x%02X)\n", partnum, version);
+    printf("[CC1101] Radio found OK (PARTNUM: 0x%02X, VERSION: 0x%02X)\n", partnum, version);
     s_reported_ok = true;
   }
 
@@ -543,7 +543,7 @@ bool cc1101_init(float freq)
   CC1101_CMD(SCAL);  // Calibrate frequency synthesizer and turn it off
   delay(5);          // Wait for calibration to complete (typically <1ms, but we add margin)
 
-  echo_debug(debug_out, "> Frequency synthesizer calibrated for %.6f MHz\n", freq);
+  echo_debug(debug_out, "[CC1101] Frequency synthesizer calibrated for %.6f MHz\n", freq);
 
   return true;
 }
@@ -865,8 +865,8 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
     if (num_values > 0)
     {
       data.history_available = true;
-      echo_debug(debug_out, "\n> Extracting historical data from buffer (size=%d):\n", size);
-      echo_debug(debug_out, "> Starting at byte 70: %d bytes available, %d complete values\n",
+      echo_debug(debug_out, "\n[CC1101] Extracting historical data from buffer (size=%d):\n", size);
+      echo_debug(debug_out, "[CC1101] Starting at byte 70: %d bytes available, %d complete values\n",
                  available_bytes, num_values);
 
       for (int i = 0; i < num_values; i++)
@@ -897,7 +897,7 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
         data.history[i] = 0;
       }
 
-      echo_debug(debug_out, "> Extracted %d historical values: %u L (oldest) → %u L (newest)\n",
+      echo_debug(debug_out, "[CC1101] Extracted %d historical values: %u L (oldest) → %u L (newest)\n",
                  num_values, data.history[0], data.history[num_values - 1]);
 
       // --- Sanity checks on historical data ---------------------------------
@@ -977,7 +977,7 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
   else
   {
     data.history_available = false;
-    echo_debug(debug_out, "> Buffer size %d < 118, historical data unavailable\n", size);
+    echo_debug(debug_out, "[CC1101] Buffer size %d < 118, historical data unavailable\n", size);
   }
 
   return data;
@@ -1252,7 +1252,7 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
   }
   if (l_tmo < rx_tmo_ms)
   {
-    echo_debug(debug_out, "> GDO0 triggered at %dms\n", l_tmo);
+    echo_debug(debug_out, "[CC1101] GDO0 triggered at %dms\n", l_tmo);
   }
   else
   {
@@ -1275,7 +1275,7 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
 
   if (l_tmo < rx_tmo_ms && l_byte_in_rx > 0)
   {
-    echo_debug(debug_out, "> First sync pattern received (%d bytes)\n", l_byte_in_rx);
+    echo_debug(debug_out, "[CC1101] First sync pattern received (%d bytes)\n", l_byte_in_rx);
   }
   else
   {
@@ -1339,7 +1339,7 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
   }
   if (l_tmo < rx_tmo_ms)
   {
-    echo_debug(debug_out, "> GDO0 triggered for frame start at %dms\n", l_tmo);
+    echo_debug(debug_out, "[CC1101] GDO0 triggered for frame start at %dms\n", l_tmo);
   }
   else
   {
@@ -1365,7 +1365,7 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
 
   if (l_tmo < rx_tmo_ms && l_total_byte > 0)
   {
-    echo_debug(debug_out, "> Frame received successfully (%d bytes)\n", l_total_byte);
+    echo_debug(debug_out, "[CC1101] Frame received successfully (%d bytes)\n", l_total_byte);
   }
   else
   {
@@ -1557,7 +1557,7 @@ struct tmeter_data get_meter_data(void)
     // If debug enabled, print the decoded (post-serial-decoding) meter data so we can inspect fields (timestamp etc.)
     if (debug_out)
     {
-      echo_debug(debug_out, "> Decoded meter data size = %d\n", meter_data_size);
+      echo_debug(debug_out, "[CC1101] Decoded meter data size = %d\n", meter_data_size);
       show_in_hex_one_line(meter_data, meter_data_size);
     }
 
