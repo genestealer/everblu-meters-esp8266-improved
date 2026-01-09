@@ -16,8 +16,11 @@ static const unsigned long SCHEDULE_CHECK_INTERVAL_MS = 500;
 // Statistics publish interval (milliseconds) - 5 minutes
 static const unsigned long STATS_PUBLISH_INTERVAL_MS = 300000;
 
+// Retry delay (milliseconds) - 5 seconds between retry attempts
+static const unsigned long RETRY_DELAY_MS = 5000;
+
 MeterReader::MeterReader(IConfigProvider *config, ITimeProvider *timeProvider, IDataPublisher *publisher)
-    : m_config(config), m_timeProvider(timeProvider), m_publisher(publisher), m_initialized(false), m_readingInProgress(false), m_isScheduledRead(false), m_retryCount(0), m_lastFailedAttempt(0), m_totalReadAttempts(0), m_successfulReads(0), m_failedReads(0), m_lastErrorMessage("None"), m_lastScheduleCheck(0), m_lastStatsPublish(0), m_readHourLocal(10), m_readMinuteLocal(0), m_lastReadDayMatch(false), m_lastReadTimeMatch(false)
+    : m_config(config), m_timeProvider(timeProvider), m_publisher(publisher), m_initialized(false), m_readingInProgress(false), m_isScheduledRead(false), m_haConnected(false), m_retryCount(0), m_lastFailedAttempt(0), m_nextRetryTime(0), m_totalReadAttempts(0), m_successfulReads(0), m_failedReads(0), m_lastErrorMessage("None"), m_lastScheduleCheck(0), m_lastStatsPublish(0), m_readHourLocal(10), m_readMinuteLocal(0), m_lastReadDayMatch(false), m_lastReadTimeMatch(false)
 {
 }
 
@@ -33,6 +36,15 @@ void MeterReader::begin()
     float frequency = m_config->getFrequency();
     FrequencyManager::begin(frequency);
     FrequencyManager::setAutoScanEnabled(m_config->isAutoScanEnabled());
+
+    // Initialize CC1101 at tuned frequency so we can publish hardware state
+    float effectiveFrequency = FrequencyManager::getTunedFrequency();
+    if (effectiveFrequency <= 0.0f)
+    {
+        effectiveFrequency = frequency + FrequencyManager::getOffset();
+    }
+
+    bool radio_ok = cc1101_init(effectiveFrequency);
 
     // Calculate local reading time from UTC and timezone offset
     int utcHour = m_config->getReadHourUTC();
@@ -53,6 +65,44 @@ void MeterReader::begin()
 
     m_initialized = true;
     Serial.println("[MeterReader] Initialization complete");
+
+    // In ESPHome builds, defer initial state publishing until HA connects.
+    // EverbluMeterComponent handles republishing when API is connected.
+#ifdef USE_ESPHOME
+    Serial.println("[MeterReader] Deferring initial state publish until Home Assistant connects");
+#else
+    // Publish comprehensive initial states for all status/diagnostic sensors
+    // so they don't show "Unknown" in Home Assistant (non-ESPHome builds)
+    if (m_publisher)
+    {
+        Serial.println("[MeterReader] Publishing initial sensor states...");
+
+        if (radio_ok)
+        {
+            m_publisher->publishRadioState("Idle");
+            m_publisher->publishStatusMessage("Ready");
+            m_publisher->publishError("None");
+        }
+        else
+        {
+            m_publisher->publishRadioState("unavailable");
+            m_publisher->publishStatusMessage("Error");
+            m_publisher->publishError("CC1101 radio not responding");
+        }
+
+        // Publish initial operational states
+        m_publisher->publishActiveReading(false);
+
+        // Publish initial statistics (all zeros)
+        m_publisher->publishStatistics(0, 0, 0);
+
+        Serial.println("[MeterReader] Initial states published");
+    }
+    else
+    {
+        Serial.println("[MeterReader] WARNING: Publisher not available, cannot publish initial states");
+    }
+#endif
 }
 
 void MeterReader::loop()
@@ -61,6 +111,16 @@ void MeterReader::loop()
         return;
 
     unsigned long now = millis();
+
+    // Check for pending retry
+    if (m_retryCount > 0 && m_nextRetryTime > 0 && now >= m_nextRetryTime)
+    {
+        Serial.printf("[MeterReader] Retry timer expired, attempting retry %d/%d\n",
+                      m_retryCount + 1, m_config->getMaxRetries());
+        m_nextRetryTime = 0;
+        performReading();
+        return;
+    }
 
     // Check schedule periodically
     if (now - m_lastScheduleCheck >= SCHEDULE_CHECK_INTERVAL_MS)
@@ -89,6 +149,14 @@ bool MeterReader::shouldPerformScheduledRead()
     // Don't trigger if already reading
     if (m_readingInProgress)
         return false;
+
+#ifdef USE_ESPHOME
+    // In ESPHome builds, avoid scheduled reads until HA API is connected
+    if (!m_haConnected)
+    {
+        return false;
+    }
+#endif
 
     // Don't trigger if time not synchronized
     if (!m_timeProvider->isTimeSynced())
@@ -221,8 +289,9 @@ void MeterReader::handleFailedRead()
 
     if (m_retryCount < m_config->getMaxRetries() - 1)
     {
-        // Schedule retry
+        // Schedule retry after delay
         m_retryCount++;
+        m_nextRetryTime = millis() + RETRY_DELAY_MS;
         m_lastErrorMessage = "Retrying after failure";
 
         m_publisher->publishStatusMessage("Retry scheduled");
@@ -232,10 +301,8 @@ void MeterReader::handleFailedRead()
 
         m_readingInProgress = false;
 
-        Serial.printf("[MeterReader] Will retry in 10 seconds (%d/%d)\n",
-                      m_retryCount + 1, m_config->getMaxRetries());
-
-        // Note: Retry will be triggered by scheduling system
+        Serial.printf("[MeterReader] Retry %d/%d scheduled in %lu seconds\n",
+                      m_retryCount + 1, m_config->getMaxRetries(), RETRY_DELAY_MS / 1000);
     }
     else
     {
@@ -261,6 +328,7 @@ void MeterReader::handleFailedRead()
 void MeterReader::resetRetryState()
 {
     m_retryCount = 0;
+    m_nextRetryTime = 0;
 }
 
 void MeterReader::performFrequencyScan(bool wideRange)
@@ -285,4 +353,9 @@ void MeterReader::getStatistics(unsigned long &totalAttempts, unsigned long &suc
     totalAttempts = m_totalReadAttempts;
     successfulReads = m_successfulReads;
     failedReads = m_failedReads;
+}
+
+void MeterReader::setHAConnected(bool connected)
+{
+    m_haConnected = connected;
 }

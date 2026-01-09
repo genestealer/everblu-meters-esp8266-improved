@@ -19,7 +19,10 @@
  * For more details, refer to the README file.
  */
 
-#include "private.h"          // Include private configuration (Wi-Fi, MQTT, etc.)
+// Only include private.h in standalone builds, not ESPHome
+#if !defined(USE_ESPHOME)
+#include "private.h" // Include private configuration (Wi-Fi, MQTT, etc.)
+#endif
 #include "core/version.h"     // Firmware version definition
 #include "core/wifi_serial.h" // WiFi serial monitor
 #include "core/cc1101.h"      // CC1101 RF transceiver and meter data

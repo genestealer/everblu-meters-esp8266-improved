@@ -99,6 +99,12 @@ public:
      */
     const char *getLastError() const { return m_lastErrorMessage; }
 
+    /**
+     * @brief Set Home Assistant connection state (ESPHome builds)
+     * @param connected true when HA is connected via ESPHome API
+     */
+    void setHAConnected(bool connected);
+
 private:
     /**
      * @brief Perform actual meter reading operation
@@ -142,10 +148,12 @@ private:
     bool m_initialized;
     bool m_readingInProgress;
     bool m_isScheduledRead;
+    bool m_haConnected;
 
     // Retry management
     int m_retryCount;
     unsigned long m_lastFailedAttempt;
+    unsigned long m_nextRetryTime;
 
     // Statistics
     unsigned long m_totalReadAttempts;

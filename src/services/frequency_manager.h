@@ -16,7 +16,11 @@
 #define FREQUENCY_MANAGER_H
 
 #include <Arduino.h>
+
+// Only include storage abstraction for standalone builds, not ESPHome
+#if !defined(USE_ESPHOME)
 #include "storage_abstraction.h"
+#endif
 
 // Meter data structure - define only if not already defined by cc1101.h
 // ESPHome or other projects should define this structure with equivalent fields

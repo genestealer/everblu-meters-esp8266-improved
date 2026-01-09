@@ -3,6 +3,7 @@
  * @brief Implementation of MQTT data publisher for standalone mode
  */
 
+#if !defined(USE_ESPHOME) && (__has_include(<EspMQTTClient.h>))
 #include "mqtt_data_publisher.h"
 #include "../../core/utils.h"
 #include "../../core/version.h"
@@ -258,3 +259,5 @@ String MQTTDataPublisher::buildDiscoveryJson(const char *name, const char *devic
 
     return json;
 }
+
+#endif // build when not ESPHome and EspMQTTClient is available

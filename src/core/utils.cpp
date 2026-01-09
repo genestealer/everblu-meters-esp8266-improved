@@ -10,7 +10,15 @@
 
 #include <Arduino.h>
 #include "wifi_serial.h" // Mirror Serial to WiFi
-#include <private.h>	 // Configuration file (Wi-Fi, MQTT, meter settings)
+#if !defined(USE_ESPHOME)
+#if defined(__has_include)
+#if __has_include("private.h")
+#include "private.h" // Configuration file (Wi-Fi, MQTT, meter settings)
+#endif
+#else
+/* No __has_include support; skip optional private.h */
+#endif
+#endif
 
 #include <string.h>
 
@@ -90,13 +98,23 @@ void show_in_bin(const uint8_t *buffer, size_t len)
 
 void echo_debug(bool l_flag, const char *fmt, ...)
 {
-	if (l_flag)
-	{
-		va_list args;
-		va_start(args, fmt);
-		vprintf(fmt, args);
-		fflush(stdout);
-	}
+	if (!l_flag)
+		return;
+
+	va_list args;
+	va_start(args, fmt);
+
+#if defined(USE_ESPHOME)
+	// Route through Serial so ESPHome logger/monitor shows messages reliably
+	char buf[256];
+	vsnprintf(buf, sizeof(buf), fmt, args);
+	Serial.print(buf);
+#else
+	vprintf(fmt, args);
+	fflush(stdout);
+#endif
+
+	va_end(args);
 }
 
 void print_time(void)
@@ -224,8 +242,8 @@ int encode2serial_1_3(uint8_t *inputBuffer, int inputBufferLen, uint8_t *outputB
 	// is encoded to:
 	// #0123456 7###0123 4567###0 1234567# ##012345 6s7# (# -> Start/Stop bit)
 
-	int bytepos;
-	int bitpos;
+	int bytepos = 0;
+	int bitpos = 0;
 	int i;
 	int j = 0;
 

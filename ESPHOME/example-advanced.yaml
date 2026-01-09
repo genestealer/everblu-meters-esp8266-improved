@@ -50,7 +50,7 @@ time:
 external_components:
   - source:
       type: local
-      path: components
+      path: custom_components
     components: [ everblu_meter ]
 
 everblu_meter:
@@ -59,14 +59,16 @@ everblu_meter:
   # Meter configuration
   meter_year: 23
   meter_serial: 12345678
+  gdo0_pin: 4
   meter_type: water
   
   # Radio configuration - custom frequency
   frequency: 433.85       # Fine-tuned frequency
   auto_scan: false        # Disable auto-scan for faster readings
+  debug_cc1101: true      # Enable detailed CC1101 radio debug logs
   
   # Advanced scheduling - weekend only
-  schedule: Saturday      # Read only on Saturdays
+  reading_schedule: Saturday      # Read only on Saturdays
   read_hour: 6           # Early morning reading
   read_minute: 30
   timezone_offset: 1     # CET/CEST
@@ -84,6 +86,12 @@ everblu_meter:
   
   # Fast updates for monitoring
   update_interval: 30s
+  
+  # Control buttons
+  request_reading_button:
+    name: "Read Meter Now"
+  frequency_scan_button:
+    name: "Scan Frequency"
   
   # Core sensors
   volume:
@@ -154,6 +162,10 @@ everblu_meter:
     on_release:
       then:
         - logger.log: "Meter reading completed"
+  
+  # Diagnostics
+  radio_connected:
+    name: "Radio Connected"
 
 # Template sensor for consumption calculation
 sensor:

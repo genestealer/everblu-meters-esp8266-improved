@@ -4,11 +4,14 @@
  */
 
 #include "esphome_data_publisher.h"
+#include "../../services/meter_history.h"
 
 #ifdef USE_ESPHOME
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/binary_sensor/binary_sensor.h"
+#include "esphome/core/log.h"
+static const char *const TAG_PUB = "everblu_publisher";
 #endif
 
 ESPHomeDataPublisher::ESPHomeDataPublisher()
@@ -18,6 +21,9 @@ ESPHomeDataPublisher::ESPHomeDataPublisher()
 void ESPHomeDataPublisher::publishMeterReading(const tmeter_data &data, const char *timestamp)
 {
 #ifdef USE_ESPHOME
+    ESP_LOGD(TAG_PUB, "Publishing meter reading: volume=%lu, battery=%.1f, counter=%lu", (unsigned long)data.volume, (double)data.battery_left, (unsigned long)data.reads_counter);
+    have_last_volume_ = true;
+    last_volume_ = data.volume;
     // Publish main meter reading
     if (volume_sensor_)
     {
@@ -76,17 +82,40 @@ void ESPHomeDataPublisher::publishMeterReading(const tmeter_data &data, const ch
 
 void ESPHomeDataPublisher::publishHistory(const uint32_t *history, bool historyAvailable)
 {
-    // History data could be published as:
-    // 1. Sensor attributes (not directly supported in ESPHome sensors)
-    // 2. Separate sensors for each month (would need 13 additional sensors)
-    // 3. Text sensor with JSON (could work)
-    //
-    // For now, we'll skip history in ESPHome mode since:
-    // - ESPHome has built-in statistics/history via InfluxDB integration
-    // - Users can use ESPHome's history features
-    // - Main readings are what matter most
+#ifdef USE_ESPHOME
+    if (!history_sensor_)
+    {
+        return; // Not configured
+    }
 
-    // Future: Could add a text sensor with JSON if needed
+    if (!historyAvailable || history == nullptr)
+    {
+        history_sensor_->publish_state("unavailable");
+        return;
+    }
+
+    // Build a JSON payload matching the legacy MQTT attributes
+    char history_json[512];
+    const uint32_t current_volume = have_last_volume_ ? last_volume_ : 0;
+    int written = MeterHistory::generateHistoryJson(history, current_volume, history_json, sizeof(history_json));
+
+    if (written <= 0)
+    {
+        ESP_LOGW(TAG_PUB, "History JSON generation failed (buffer=%u)", (unsigned)sizeof(history_json));
+        history_sensor_->publish_state("unavailable");
+        return;
+    }
+
+    ESP_LOGD(TAG_PUB, "Publishing history JSON (%d bytes)", written);
+    history_sensor_->publish_state(history_json);
+
+    // Mirror the legacy serial dump so users can see history in ESPHome logs
+    const int month_count = MeterHistory::countValidMonths(history);
+    if (month_count > 0)
+    {
+        MeterHistory::printToSerial(history, current_volume, "[HISTORY]");
+    }
+#endif
 }
 
 void ESPHomeDataPublisher::publishWiFiDetails(const char *ip, int rssi, int signalPercent,
@@ -115,6 +144,7 @@ void ESPHomeDataPublisher::publishMeterSettings(int meterYear, unsigned long met
 void ESPHomeDataPublisher::publishStatusMessage(const char *message)
 {
 #ifdef USE_ESPHOME
+    ESP_LOGD(TAG_PUB, "Status: %s", message ? message : "(null)");
     if (status_sensor_ && message)
     {
         status_sensor_->publish_state(message);
@@ -125,6 +155,7 @@ void ESPHomeDataPublisher::publishStatusMessage(const char *message)
 void ESPHomeDataPublisher::publishRadioState(const char *state)
 {
 #ifdef USE_ESPHOME
+    ESP_LOGD(TAG_PUB, "Radio state: %s", state ? state : "(null)");
     if (radio_state_sensor_ && state)
     {
         radio_state_sensor_->publish_state(state);
@@ -134,7 +165,12 @@ void ESPHomeDataPublisher::publishRadioState(const char *state)
     if (radio_connected_sensor_)
     {
         bool connected = (strcmp(state, "unavailable") != 0);
+        ESP_LOGD(TAG_PUB, "Publishing radio_connected: %s", connected ? "true" : "false");
         radio_connected_sensor_->publish_state(connected);
+    }
+    else
+    {
+        ESP_LOGW(TAG_PUB, "radio_connected_sensor not configured");
     }
 #endif
 }
@@ -142,6 +178,7 @@ void ESPHomeDataPublisher::publishRadioState(const char *state)
 void ESPHomeDataPublisher::publishActiveReading(bool active)
 {
 #ifdef USE_ESPHOME
+    ESP_LOGD(TAG_PUB, "Active reading: %s", active ? "true" : "false");
     if (active_reading_sensor_)
     {
         active_reading_sensor_->publish_state(active);
@@ -152,6 +189,7 @@ void ESPHomeDataPublisher::publishActiveReading(bool active)
 void ESPHomeDataPublisher::publishError(const char *error)
 {
 #ifdef USE_ESPHOME
+    ESP_LOGD(TAG_PUB, "Error: %s", error ? error : "(null)");
     if (error_sensor_ && error)
     {
         error_sensor_->publish_state(error);
@@ -163,6 +201,7 @@ void ESPHomeDataPublisher::publishStatistics(unsigned long totalAttempts, unsign
                                              unsigned long failedReads)
 {
 #ifdef USE_ESPHOME
+    ESP_LOGD(TAG_PUB, "Stats: total=%lu success=%lu failed=%lu", totalAttempts, successfulReads, failedReads);
     if (total_attempts_sensor_)
     {
         total_attempts_sensor_->publish_state(totalAttempts);
@@ -183,6 +222,7 @@ void ESPHomeDataPublisher::publishStatistics(unsigned long totalAttempts, unsign
 void ESPHomeDataPublisher::publishUptime(unsigned long uptimeSeconds, const char *uptimeISO)
 {
 #ifdef USE_ESPHOME
+    ESP_LOGD(TAG_PUB, "Uptime: %lu s", uptimeSeconds);
     if (uptime_sensor_)
     {
         uptime_sensor_->publish_state(uptimeSeconds);
@@ -193,6 +233,7 @@ void ESPHomeDataPublisher::publishUptime(unsigned long uptimeSeconds, const char
 void ESPHomeDataPublisher::publishFirmwareVersion(const char *version)
 {
 #ifdef USE_ESPHOME
+    ESP_LOGD(TAG_PUB, "Version: %s", version ? version : "(null)");
     if (version_sensor_ && version)
     {
         version_sensor_->publish_state(version);

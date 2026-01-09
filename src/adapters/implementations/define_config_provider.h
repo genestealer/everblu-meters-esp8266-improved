@@ -10,6 +10,9 @@
 #define DEFINE_CONFIG_PROVIDER_H
 
 #include "../config_provider.h"
+
+// Only build real provider when private.h exists (standalone mode)
+#if !defined(USE_ESPHOME) && (__has_include("private.h") || __has_include("../../private.h"))
 #include "private.h"
 
 /**
@@ -144,5 +147,39 @@ public:
         const char *getMqttClientId() const override { return SECRET_MQTT_CLIENT_ID; }
         const char *getNtpServer() const override { return SECRET_NTP_SERVER; }
 };
+
+#else
+
+// Stub implementation for ESPHome (config provided via YAML, not defines)
+class DefineConfigProvider : public IConfigProvider
+{
+public:
+        DefineConfigProvider() = default;
+        ~DefineConfigProvider() override = default;
+
+        uint8_t getMeterYear() const override { return 0; }
+        uint32_t getMeterSerial() const override { return 0; }
+        bool isMeterGas() const override { return false; }
+        int getGasVolumeDivisor() const override { return 100; }
+        float getFrequency() const override { return 433.82f; }
+        bool isAutoScanEnabled() const override { return true; }
+        const char *getReadingSchedule() const override { return "Monday-Friday"; }
+        int getReadHourUTC() const override { return 10; }
+        int getReadMinuteUTC() const override { return 0; }
+        int getTimezoneOffsetMinutes() const override { return 0; }
+        bool isAutoAlignReadingTime() const override { return true; }
+        bool useAutoAlignMidpoint() const override { return true; }
+        int getMaxRetries() const override { return 10; }
+        unsigned long getRetryCooldownMs() const override { return 3600000; }
+        const char *getWiFiSSID() const override { return ""; }
+        const char *getWiFiPassword() const override { return ""; }
+        const char *getMqttServer() const override { return ""; }
+        const char *getMqttUsername() const override { return ""; }
+        const char *getMqttPassword() const override { return ""; }
+        const char *getMqttClientId() const override { return ""; }
+        const char *getNtpServer() const override { return ""; }
+};
+
+#endif // real vs stub
 
 #endif // DEFINE_CONFIG_PROVIDER_H

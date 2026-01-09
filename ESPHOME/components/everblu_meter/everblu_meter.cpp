@@ -6,12 +6,36 @@
 #include "everblu_meter.h"
 #include "esphome/core/log.h"
 
+#ifdef USE_ESP8266
+#include <ESP8266WiFi.h>
+#elif defined(USE_ESP32)
+#include <WiFi.h>
+#endif
+
 namespace esphome
 {
     namespace everblu_meter
     {
 
         static const char *const TAG = "everblu_meter";
+
+        void EverbluMeterTriggerButton::press_action()
+        {
+            if (parent_ == nullptr)
+            {
+                ESP_LOGW(TAG, "Trigger button pressed but parent not set");
+                return;
+            }
+
+            if (is_frequency_scan_)
+            {
+                parent_->request_frequency_scan();
+            }
+            else
+            {
+                parent_->request_manual_read();
+            }
+        }
 
         void EverbluMeterComponent::setup()
         {
@@ -63,24 +87,173 @@ namespace esphome
             data_publisher_->set_error_sensor(error_sensor_);
             data_publisher_->set_radio_state_sensor(radio_state_sensor_);
             data_publisher_->set_timestamp_sensor(timestamp_sensor_);
+            data_publisher_->set_history_sensor(history_sensor_);
             data_publisher_->set_active_reading_sensor(active_reading_sensor_);
+            data_publisher_->set_radio_connected_sensor(radio_connected_sensor_);
 
-            // Create meter reader with all adapters
+            // Quick diagnostic: report how many sensors were linked
+            int numeric = 0;
+            numeric += (volume_sensor_ != nullptr);
+            numeric += (battery_sensor_ != nullptr);
+            numeric += (counter_sensor_ != nullptr);
+            numeric += (rssi_sensor_ != nullptr);
+            numeric += (rssi_percentage_sensor_ != nullptr);
+            numeric += (lqi_sensor_ != nullptr);
+            numeric += (lqi_percentage_sensor_ != nullptr);
+            numeric += (time_start_sensor_ != nullptr);
+            numeric += (time_end_sensor_ != nullptr);
+            numeric += (total_attempts_sensor_ != nullptr);
+            numeric += (successful_reads_sensor_ != nullptr);
+            numeric += (failed_reads_sensor_ != nullptr);
+
+            int texts = 0;
+            texts += (status_sensor_ != nullptr);
+            texts += (error_sensor_ != nullptr);
+            texts += (radio_state_sensor_ != nullptr);
+            texts += (timestamp_sensor_ != nullptr);
+            texts += (history_sensor_ != nullptr);
+
+            int binaries = 0;
+            binaries += (active_reading_sensor_ != nullptr);
+            binaries += (radio_connected_sensor_ != nullptr);
+
+            ESP_LOGD(TAG, "Linked sensors -> numeric: %d, text: %d, binary: %d", numeric, texts, binaries);
+
+            // Create meter reader with all adapters (but don't initialize yet)
             meter_reader_ = new MeterReader(config_provider_, time_provider_, data_publisher_);
 
-            // Initialize the meter reader
-            meter_reader_->begin();
+            // Initialize diagnostic binary sensors to a known state before HA connects
+            // Set radio as unavailable (disconnected) until meter init completes
+            if (data_publisher_)
+            {
+                data_publisher_->publishRadioState("unavailable");
+            }
 
-            ESP_LOGCONFIG(TAG, "EverBlu Meter setup complete");
+            ESP_LOGCONFIG(TAG, "EverBlu Meter setup complete (meter initialization deferred until WiFi connected)");
+        }
+
+        void EverbluMeterComponent::republish_initial_states()
+        {
+            if (!meter_reader_ || !meter_initialized_)
+            {
+                return;
+            }
+
+            ESP_LOGD(TAG, "Republishing initial states for Home Assistant...");
+
+            // Republish status sensors that were sent before HA connected
+            if (data_publisher_)
+            {
+                data_publisher_->publishRadioState("Idle");
+                data_publisher_->publishStatusMessage("Ready");
+                data_publisher_->publishError("None");
+                data_publisher_->publishActiveReading(false);
+                data_publisher_->publishStatistics(0, 0, 0);
+            }
         }
 
         void EverbluMeterComponent::loop()
         {
-            // Let the meter reader handle its periodic tasks
-            if (meter_reader_ != nullptr)
+            // Initialize meter reader once WiFi is connected (deferred from setup)
+            if (!meter_initialized_ && meter_reader_ != nullptr)
             {
+#ifdef USE_ESP32
+                if (WiFi.status() == WL_CONNECTED)
+#else
+                if (WiFi.isConnected())
+#endif
+                {
+                    // Start a short grace period to ensure WiFi component finishes its own 'Connected' logging
+                    if (wifi_ready_at_ == 0)
+                    {
+                        wifi_ready_at_ = millis();
+                        ESP_LOGD(TAG, "WiFi connected, starting grace period before meter init...");
+                        return;
+                    }
+
+                    // Wait ~500ms non-blocking before initializing (avoids log interleaving with WiFi)
+                    if ((millis() - wifi_ready_at_) < 500)
+                    {
+                        return;
+                    }
+
+                    ESP_LOGI(TAG, "Initializing meter reader after WiFi readiness...");
+                    meter_reader_->begin();
+                    meter_initialized_ = true;
+                    ESP_LOGI(TAG, "Meter reader initialized");
+                }
+                else
+                {
+                    // Still waiting for WiFi, skip rest of loop
+                    return;
+                }
+            }
+
+            // Let the meter reader handle its periodic tasks
+            if (meter_reader_ != nullptr && meter_initialized_)
+            {
+#ifdef USE_API
+                // Republish initial states when Home Assistant connects
+                // (initial publishes may happen before HA is ready to receive)
+                // Use is_connected(true) to check for state subscription (HA actively monitoring)
+                if (esphome::api::global_api_server != nullptr)
+                {
+                    bool is_ha_connected = esphome::api::global_api_server->is_connected(true);
+                    if (is_ha_connected && !last_api_client_count_)
+                    {
+                        ESP_LOGI(TAG, "Home Assistant connected, republishing initial states...");
+                        republish_initial_states();
+                        if (meter_reader_ != nullptr)
+                        {
+                            meter_reader_->setHAConnected(true);
+                        }
+                        last_api_client_count_ = true;
+                    }
+                    else if (!is_ha_connected)
+                    {
+                        if (meter_reader_ != nullptr)
+                        {
+                            meter_reader_->setHAConnected(false);
+                        }
+                        last_api_client_count_ = false;
+                    }
+                }
+#endif
+
+                // Optionally kick off a first read once time is synced so users see data without waiting
+                // Controlled by initial_read_on_boot_ (default: disabled to avoid boot-time blocking when meter is absent)
+                if (initial_read_on_boot_ && !initial_read_triggered_ && time_provider_ != nullptr && time_provider_->isTimeSynced())
+                {
+                    initial_read_triggered_ = true;
+                    meter_reader_->triggerReading(false);
+                }
+
                 meter_reader_->loop();
             }
+        }
+
+        void EverbluMeterComponent::request_manual_read()
+        {
+            if (meter_reader_ == nullptr)
+            {
+                ESP_LOGW(TAG, "Manual read ignored: meter reader not ready");
+                return;
+            }
+
+            ESP_LOGI(TAG, "Manual read requested via button");
+            meter_reader_->triggerReading(false);
+        }
+
+        void EverbluMeterComponent::request_frequency_scan()
+        {
+            if (meter_reader_ == nullptr)
+            {
+                ESP_LOGW(TAG, "Frequency scan ignored: meter reader not ready");
+                return;
+            }
+
+            ESP_LOGI(TAG, "Frequency scan requested via button");
+            meter_reader_->performFrequencyScan(false);
         }
 
         void EverbluMeterComponent::update()
@@ -110,6 +283,7 @@ namespace esphome
             ESP_LOGCONFIG(TAG, "  Auto Align Midpoint: %s", auto_align_midpoint_ ? "Enabled" : "Disabled");
             ESP_LOGCONFIG(TAG, "  Max Retries: %d", max_retries_);
             ESP_LOGCONFIG(TAG, "  Retry Cooldown: %lu ms", retry_cooldown_ms_);
+            ESP_LOGCONFIG(TAG, "  Initial Read On Boot: %s", initial_read_on_boot_ ? "Enabled" : "Disabled");
 
             ESP_LOGCONFIG(TAG, "  Sensors:");
             LOG_SENSOR("    ", "Volume", volume_sensor_);
@@ -128,7 +302,9 @@ namespace esphome
             LOG_TEXT_SENSOR("    ", "Error", error_sensor_);
             LOG_TEXT_SENSOR("    ", "Radio State", radio_state_sensor_);
             LOG_TEXT_SENSOR("    ", "Timestamp", timestamp_sensor_);
+            LOG_TEXT_SENSOR("    ", "History", history_sensor_);
             LOG_BINARY_SENSOR("    ", "Active Reading", active_reading_sensor_);
+            LOG_BINARY_SENSOR("    ", "Radio Connected", radio_connected_sensor_);
         }
 
     } // namespace everblu_meter

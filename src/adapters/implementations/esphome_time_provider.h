@@ -11,7 +11,7 @@
 
 #include "../time_provider.h"
 
-#ifdef USE_ESPHOME
+#if defined(USE_ESPHOME) || __has_include("esphome/components/time/real_time_clock.h")
 namespace esphome
 {
     namespace time
@@ -19,6 +19,7 @@ namespace esphome
         class RealTimeClock;
     }
 }
+#define EVERBLU_HAS_ESPHOME_TIME 1
 #endif
 
 /**
@@ -38,14 +39,13 @@ namespace esphome
 class ESPHomeTimeProvider : public ITimeProvider
 {
 public:
-#ifdef USE_ESPHOME
     /**
-     * @brief Constructor with ESPHome time component
-     * @param time_component Pointer to ESPHome RealTimeClock component
+     * @brief Constructor with ESPHome time component (pointer may be null)
      */
+#ifdef EVERBLU_HAS_ESPHOME_TIME
     explicit ESPHomeTimeProvider(esphome::time::RealTimeClock *time_component);
 #else
-    ESPHomeTimeProvider();
+    explicit ESPHomeTimeProvider(void *time_component = nullptr);
 #endif
 
     ~ESPHomeTimeProvider() override = default;
@@ -56,7 +56,7 @@ public:
     void requestSync() override;
 
 private:
-#ifdef USE_ESPHOME
+#ifdef EVERBLU_HAS_ESPHOME_TIME
     esphome::time::RealTimeClock *time_component_{nullptr};
 #endif
 };

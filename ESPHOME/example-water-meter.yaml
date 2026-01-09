@@ -39,7 +39,7 @@ time:
 external_components:
   - source:
       type: local
-      path: components
+      path: custom_components
     components: [ everblu_meter ]
 
 everblu_meter:
@@ -48,6 +48,7 @@ everblu_meter:
   # Meter identification (REQUIRED)
   meter_year: 21          # Last 2 digits of year (e.g., 21 for 2021)
   meter_serial: 12345678  # Your meter's serial number
+  gdo0_pin: 4             # GPIO connected to CC1101 GDO0 (D2 on D1 mini)
   
   # Meter type
   meter_type: water       # 'water' or 'gas'
@@ -55,9 +56,10 @@ everblu_meter:
   # Radio configuration
   frequency: 433.82       # MHz - adjust if needed for your region
   auto_scan: true         # Automatically scan for optimal frequency
+  debug_cc1101: true      # Enable detailed CC1101 radio debug logs
   
   # Reading schedule
-  schedule: Monday-Friday # Options: Monday-Friday, Saturday, Sunday, Everyday
+  reading_schedule: Monday-Friday # Options: Monday-Friday, Saturday, Sunday, Everyday
   read_hour: 10          # Hour to perform reading (0-23)
   read_minute: 0         # Minute to perform reading (0-59)
   timezone_offset: -5    # Hours from UTC (optional if using time component)
@@ -75,6 +77,12 @@ everblu_meter:
   
   # Update interval for sensor updates
   update_interval: 60s
+  
+  # Control buttons
+  request_reading_button:
+    name: "Read Meter Now"
+  frequency_scan_button:
+    name: "Scan Frequency"
   
   # Volume sensors
   volume:
@@ -177,3 +185,5 @@ everblu_meter:
   active_reading:
     name: "Reading Active"
     device_class: running
+  radio_connected:
+    name: "Radio Connected"

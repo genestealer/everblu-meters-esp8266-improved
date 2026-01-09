@@ -63,7 +63,15 @@ cd everblu-meters-esp8266-improved
 
 ### Step 2: Use External Components (Recommended)
 
-The easiest method is to use ESPHome's `external_components` feature directly in your YAML configuration. This automatically pulls all required files:
+**Important**: Before using external_components, you must prepare the component by copying source dependencies. Run this from the repository root:
+
+```bash
+./prepare-component-release.sh
+```
+
+This script copies all required files from `src/` into `ESPHOME/components/everblu_meter/src/`, making the component self-contained.
+
+Then use ESPHome's `external_components` feature in your YAML configuration:
 
 ```yaml
 external_components:
@@ -81,28 +89,23 @@ Alternatively, for local development:
 external_components:
   - source:
       type: local
-      path: /path/to/everblu-meters-esp8266-improved/ESPHOME
+      path: /path/to/everblu-meters-esp8266-improved/ESPHOME/components
     components: [ everblu_meter ]
 ```
 
 ### Step 2 Alternative: Manual Installation
 
-If you prefer to copy files locally, you need the complete component package:
+If you prefer to copy files locally:
 
 ```bash
-# Create component directory structure
-mkdir -p /config/esphome/custom_components/everblu_meter
+# From repository root
+./prepare-component-release.sh
 
-# Copy component files
-cp -r ESPHOME/components/everblu_meter/* /config/esphome/custom_components/everblu_meter/
-
-# Copy required source dependencies
-cp -r src/core /config/esphome/custom_components/everblu_meter/
-cp -r src/services /config/esphome/custom_components/everblu_meter/
-cp -r src/adapters /config/esphome/custom_components/everblu_meter/
+# Then copy to ESPHome config
+cp -r ESPHOME/components/everblu_meter /config/esphome/custom_components/
 ```
 
-**Note**: The component depends on source files from `src/core/`, `src/services/`, and `src/adapters/`. The `external_components` method (recommended above) handles this automatically.
+**Note**: The `prepare-component-release.sh` script must be run whenever source files are updated.
 
 ### Step 3: Create Your Configuration
 
@@ -129,9 +132,11 @@ The minimal configuration requires:
 ```yaml
 external_components:
   - source:
-      type: local
-      path: components
+      type: git
+      url: https://github.com/yourusername/everblu-meters-esp8266-improved
+      ref: main
     components: [ everblu_meter ]
+    refresh: 1d
 
 time:
   - platform: homeassistant
@@ -168,7 +173,7 @@ everblu_meter:
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `schedule` | string | `Monday-Friday` | When to read: `Monday-Friday`, `Saturday`, `Sunday`, or `Everyday` |
+| `reading_schedule` | string | `Monday-Friday` | When to read: `Monday-Friday`, `Saturday`, `Sunday`, or `Everyday` |
 | `read_hour` | int | `10` | Hour to perform reading (0-23) |
 | `read_minute` | int | `0` | Minute to perform reading (0-59) |
 | `timezone_offset` | int | `0` | Hours offset from UTC (-12 to +14) |
@@ -322,7 +327,7 @@ everblu_meter:
   meter_type: water
   
   # Weekend readings only
-  schedule: Saturday
+  reading_schedule: Saturday
   read_hour: 6
   read_minute: 30
   

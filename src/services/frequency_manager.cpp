@@ -228,7 +228,7 @@ void FrequencyManager::performWideInitialScan(void (*statusCallback)(const char 
 
             if (statusCallback)
             {
-                statusCallback("Error", "ERROR: Radio not responding - cannot scan");
+                statusCallback("Error", "[ERROR] Radio not responding - cannot scan");
             }
 
             return; // Exit scan

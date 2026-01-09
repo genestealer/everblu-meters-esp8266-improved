@@ -1,15 +1,18 @@
 #!/bin/bash
 # prepare-component-release.sh
-# Prepares the ESPHome component for standalone distribution by copying
-# all necessary source files into the component directory
+# Prepares the ESPHome component for distribution by copying all necessary
+# source files into a release directory structure that ESPHome can use.
+# No file modifications - pure copy to preserve include paths and structure.
 
 set -e  # Exit on error
 
 COMPONENT_DIR="ESPHOME/components/everblu_meter"
 SRC_DIR="src"
+RELEASE_ROOT="ESPHOME-release"
+RELEASE_DIR="$RELEASE_ROOT/everblu_meter"
 
 echo "=========================================="
-echo "EverBlu Meter Component Release Preparation"
+echo "EverBlu Meter Component Release Build"
 echo "=========================================="
 echo ""
 
@@ -22,105 +25,69 @@ if [ ! -d "$SRC_DIR" ] || [ ! -d "$COMPONENT_DIR" ]; then
     exit 1
 fi
 
-# Create backup if src already exists in component
-if [ -d "$COMPONENT_DIR/src" ]; then
-    echo "Warning: $COMPONENT_DIR/src already exists"
-    read -p "Create backup and continue? (y/n) " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        echo "Aborted."
-        exit 1
-    fi
-    BACKUP_DIR="$COMPONENT_DIR/src.backup.$(date +%Y%m%d_%H%M%S)"
-    echo "Creating backup: $BACKUP_DIR"
-    mv "$COMPONENT_DIR/src" "$BACKUP_DIR"
+# Clear any existing release output to ensure a clean package
+if [ -d "$RELEASE_ROOT" ]; then
+    echo "Clearing existing release directory..."
+    rm -rf "$RELEASE_ROOT"
 fi
 
-# Create source directories in component
-echo "Creating directory structure..."
-mkdir -p "$COMPONENT_DIR/src/core"
-mkdir -p "$COMPONENT_DIR/src/services"
-mkdir -p "$COMPONENT_DIR/src/adapters"
-mkdir -p "$COMPONENT_DIR/src/adapters/implementations"
+# Create release directory
+echo "Creating release directory..."
+mkdir -p "$RELEASE_DIR"
 
-# Copy core files
-echo "Copying core files..."
-cp "$SRC_DIR/core/cc1101.h" "$COMPONENT_DIR/src/core/"
-cp "$SRC_DIR/core/cc1101.cpp" "$COMPONENT_DIR/src/core/"
-cp "$SRC_DIR/core/utils.h" "$COMPONENT_DIR/src/core/"
-cp "$SRC_DIR/core/utils.cpp" "$COMPONENT_DIR/src/core/"
-cp "$SRC_DIR/core/version.h" "$COMPONENT_DIR/src/core/"
-echo "  ✓ cc1101.h, cc1101.cpp"
-echo "  ✓ utils.h, utils.cpp"
-echo "  ✓ version.h"
+# Copy component base files
+echo "Copying component files..."
+cp "$COMPONENT_DIR/__init__.py" "$RELEASE_DIR/"
+cp "$COMPONENT_DIR/everblu_meter.h" "$RELEASE_DIR/"
+cp "$COMPONENT_DIR/everblu_meter.cpp" "$RELEASE_DIR/"
+cp "$COMPONENT_DIR/README.md" "$RELEASE_DIR/" 2>/dev/null || true
 
-# Copy service files
-echo "Copying service files..."
-cp "$SRC_DIR/services/meter_reader.h" "$COMPONENT_DIR/src/services/"
-cp "$SRC_DIR/services/meter_reader.cpp" "$COMPONENT_DIR/src/services/"
-cp "$SRC_DIR/services/frequency_manager.h" "$COMPONENT_DIR/src/services/"
-cp "$SRC_DIR/services/frequency_manager.cpp" "$COMPONENT_DIR/src/services/"
-cp "$SRC_DIR/services/schedule_manager.h" "$COMPONENT_DIR/src/services/"
-cp "$SRC_DIR/services/schedule_manager.cpp" "$COMPONENT_DIR/src/services/"
-cp "$SRC_DIR/services/meter_history.h" "$COMPONENT_DIR/src/services/"
-cp "$SRC_DIR/services/meter_history.cpp" "$COMPONENT_DIR/src/services/"
-cp "$SRC_DIR/services/storage_abstraction.h" "$COMPONENT_DIR/src/services/"
-cp "$SRC_DIR/services/storage_abstraction.cpp" "$COMPONENT_DIR/src/services/"
-echo "  ✓ meter_reader.h, meter_reader.cpp"
-echo "  ✓ frequency_manager.h, frequency_manager.cpp"
-echo "  ✓ schedule_manager.h, schedule_manager.cpp"
-echo "  ✓ meter_history.h, meter_history.cpp"
-echo "  ✓ storage_abstraction.h, storage_abstraction.cpp"
+# Copy entire src/ directory structure as-is (preserves includes)
+echo "Copying source tree..."
+cp -r "$SRC_DIR"/* "$RELEASE_DIR/"
 
-# Copy adapter interfaces
-echo "Copying adapter interfaces..."
-cp "$SRC_DIR/adapters/config_provider.h" "$COMPONENT_DIR/src/adapters/"
-cp "$SRC_DIR/adapters/time_provider.h" "$COMPONENT_DIR/src/adapters/"
-cp "$SRC_DIR/adapters/data_publisher.h" "$COMPONENT_DIR/src/adapters/"
-echo "  ✓ config_provider.h"
-echo "  ✓ time_provider.h"
-echo "  ✓ data_publisher.h"
+# Remove main.cpp (standalone-only entry point, not for ESPHome)
+echo "Removing standalone-only files..."
+rm -f "$RELEASE_DIR/main.cpp"
+rm -f "$RELEASE_DIR/adapters/implementations/define_config_provider.h"
 
-# Copy ESPHome adapter implementations
-echo "Copying ESPHome adapters..."
-cp "$SRC_DIR/adapters/implementations/esphome_config_provider.h" "$COMPONENT_DIR/src/adapters/implementations/"
-cp "$SRC_DIR/adapters/implementations/esphome_config_provider.cpp" "$COMPONENT_DIR/src/adapters/implementations/"
-cp "$SRC_DIR/adapters/implementations/esphome_time_provider.h" "$COMPONENT_DIR/src/adapters/implementations/"
-cp "$SRC_DIR/adapters/implementations/esphome_time_provider.cpp" "$COMPONENT_DIR/src/adapters/implementations/"
-cp "$SRC_DIR/adapters/implementations/esphome_data_publisher.h" "$COMPONENT_DIR/src/adapters/implementations/"
-cp "$SRC_DIR/adapters/implementations/esphome_data_publisher.cpp" "$COMPONENT_DIR/src/adapters/implementations/"
-echo "  ✓ esphome_config_provider.h, esphome_config_provider.cpp"
-echo "  ✓ esphome_time_provider.h, esphome_time_provider.cpp"
-echo "  ✓ esphome_data_publisher.h, esphome_data_publisher.cpp"
+# Flatten headers and sources into a single folder for ESPHome
+echo "Flattening sources into a single folder..."
+find "$RELEASE_DIR" -mindepth 2 -type f \( -name "*.h" -o -name "*.hpp" -o -name "*.c" -o -name "*.cpp" \) -exec mv -f {} "$RELEASE_DIR/" \;
 
-# Copy meter definitions
-echo "Copying meter definitions..."
-cp "$SRC_DIR/everblu_meters.h" "$COMPONENT_DIR/src/"
-echo "  ✓ everblu_meters.h"
+# Remove MQTT publisher (not used in ESPHome)
+echo "Removing MQTT publisher (ESPHome not using it)..."
+find "$RELEASE_DIR" -maxdepth 1 -type f -name "mqtt_data_publisher.*" -exec rm -f {} +
+
+# Remove now-empty directories
+find "$RELEASE_DIR" -mindepth 1 -type d -empty -delete
+
+# Rewrite include paths to reflect flattened layout (preserve esphome/*)
+echo "Rewriting include paths for flattened layout..."
+find "$RELEASE_DIR" -type f \( -name "*.h" -o -name "*.cpp" \) -print0 | while IFS= read -r -d '' file; do
+    # Strip path prefixes like core/, services/, adapters/, src/, adapters/implementations/
+    # Keep includes that start with esphome/
+    sed -i.bak -E 's|#include\s+"(esphome/[^\"]+)"|#include "\1"|; t; s|#include\s+"([^"]*/)+([^"/]+)"|#include "\2"|g' "$file" && rm -f "$file.bak"
+done
 
 # Count files
-TOTAL_FILES=$(find "$COMPONENT_DIR/src" -type f | wc -l)
+TOTAL_FILES=$(find "$RELEASE_DIR" -type f | wc -l)
 
 echo ""
 echo "=========================================="
-echo "✓ Component prepared successfully!"
+echo "✓ Release package created successfully!"
 echo "=========================================="
 echo ""
 echo "Files copied: $TOTAL_FILES"
-echo "Target directory: $COMPONENT_DIR/src/"
+echo "Location: $RELEASE_DIR/"
 echo ""
-echo "Next steps:"
+echo "Directory structure:"
+echo "  ESPHOME-release/everblu_meter/"
+echo "  ├── __init__.py"
+echo "  ├── everblu_meter.h/.cpp"
+echo "  └── src/ (complete source tree with original includes)"
 echo ""
-echo "1. Update include paths in everblu_meter.h:"
-echo "   Change from: #include \"../../src/services/meter_reader.h\""
-echo "   Change to:   #include \"src/services/meter_reader.h\""
-echo ""
-echo "2. Test compilation:"
-echo "   esphome compile your-test-config.yaml"
-echo ""
-echo "3. Package for distribution:"
-echo "   cd ESPHOME/components"
-echo "   tar czf everblu_meter.tar.gz everblu_meter/"
-echo "   or"
-echo "   zip -r everblu_meter.zip everblu_meter/"
+echo "To use with ESPHome:"
+echo "  1. cp -r $RELEASE_DIR /config/esphome/custom_components/everblu_meter"
+echo "  2. Use external_components: local or git in YAML"
 echo ""

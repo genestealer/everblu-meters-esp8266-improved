@@ -6,13 +6,13 @@ Quick reference for EverBlu meter ESPHome configuration.
 
 ```bash
 # Copy component
-cp -r ESPHOME/components/everblu_meter /config/esphome/components/
+cp -r ESPHOME/components/everblu_meter /config/esphome/custom_components/
 
 # Use in YAML
 external_components:
   - source:
       type: local
-      path: components
+      path: custom_components
     components: [ everblu_meter ]
 ```
 
@@ -26,6 +26,7 @@ time:
 everblu_meter:
   meter_year: 21              # Required: 0-99
   meter_serial: 12345678      # Required: your meter serial
+  gdo0_pin: 4                 # Required: CC1101 GDO0 GPIO
   meter_type: water           # Required: water or gas
   time_id: ha_time           # Required: time component
   
@@ -40,6 +41,7 @@ everblu_meter:
 | `meter_year` | int | - | ✅ | Meter year (0-99) |
 | `meter_serial` | int | - | ✅ | Serial number |
 | `meter_type` | enum | - | ✅ | `water` or `gas` |
+| `gdo0_pin` | int | - | ✅ | CC1101 GDO0 GPIO |
 | `time_id` | id | - | ✅ | Time component ID |
 | `frequency` | float | 433.82 | ❌ | RF frequency (MHz) |
 | `auto_scan` | bool | true | ❌ | Auto frequency scan |
@@ -119,6 +121,7 @@ everblu_meter:
 everblu_meter:
   meter_year: 21
   meter_serial: 12345678
+  gdo0_pin: 4
   meter_type: water
   time_id: ha_time
   
@@ -136,6 +139,7 @@ everblu_meter:
 everblu_meter:
   meter_year: 22
   meter_serial: 87654321
+  gdo0_pin: 4
   meter_type: gas
   gas_volume_divisor: 100
   time_id: ha_time
@@ -153,6 +157,7 @@ everblu_meter:
 everblu_meter:
   meter_year: 21
   meter_serial: 12345678
+  gdo0_pin: 4
   meter_type: water
   time_id: ha_time
   
@@ -180,6 +185,7 @@ everblu_meter:
 everblu_meter:
   meter_year: 21
   meter_serial: 12345678
+  gdo0_pin: 4
   meter_type: water
   time_id: ha_time
   

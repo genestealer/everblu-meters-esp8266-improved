@@ -74,6 +74,7 @@ public:
     void set_error_sensor(esphome::text_sensor::TextSensor *sensor) { error_sensor_ = sensor; }
     void set_radio_state_sensor(esphome::text_sensor::TextSensor *sensor) { radio_state_sensor_ = sensor; }
     void set_timestamp_sensor(esphome::text_sensor::TextSensor *sensor) { timestamp_sensor_ = sensor; }
+    void set_history_sensor(esphome::text_sensor::TextSensor *sensor) { history_sensor_ = sensor; }
     void set_version_sensor(esphome::text_sensor::TextSensor *sensor) { version_sensor_ = sensor; }
 
     // Binary sensors
@@ -125,6 +126,7 @@ private:
     esphome::text_sensor::TextSensor *error_sensor_{nullptr};
     esphome::text_sensor::TextSensor *radio_state_sensor_{nullptr};
     esphome::text_sensor::TextSensor *timestamp_sensor_{nullptr};
+    esphome::text_sensor::TextSensor *history_sensor_{nullptr};
     esphome::text_sensor::TextSensor *version_sensor_{nullptr};
 
     // Binary sensors
@@ -135,6 +137,10 @@ private:
     // Helper methods
     int calculateRssiPercentage(int rssi_dbm) const;
     int calculateLqiPercentage(int lqi) const;
+
+    // Cache last volume so history JSON can include current month usage
+    uint32_t last_volume_{0};
+    bool have_last_volume_{false};
 };
 
 #endif // ESPHOME_DATA_PUBLISHER_H

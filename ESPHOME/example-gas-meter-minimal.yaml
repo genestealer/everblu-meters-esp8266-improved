@@ -29,7 +29,7 @@ time:
 external_components:
   - source:
       type: local
-      path: components
+      path: custom_components
     components: [ everblu_meter ]
 
 everblu_meter:
@@ -38,15 +38,26 @@ everblu_meter:
   # REQUIRED: Meter identification
   meter_year: 22
   meter_serial: 87654321
+  gdo0_pin: 4
   
   # REQUIRED: Meter type
   meter_type: gas
   gas_volume_divisor: 100  # Gas meters use divisor (100 or 1000)
+  debug_cc1101: true       # Enable detailed CC1101 radio debug logs
   
   # Optional: Link to time component
   time_id: ha_time
   
   # Minimal sensors - just the essentials
+  
+  # Control button (optional but handy)
+  request_reading_button:
+    name: "Read Gas Meter Now"
+  
+  # Radio status (diagnostic)
+  radio_connected:
+    name: "Radio Connected"
+  
   volume:
     name: "Gas Volume"
     unit_of_measurement: "m³"

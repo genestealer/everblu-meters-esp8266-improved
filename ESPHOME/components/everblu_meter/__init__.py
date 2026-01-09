@@ -7,12 +7,13 @@ using the RADIAN protocol over 433 MHz with a CC1101 transceiver.
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import sensor, text_sensor, binary_sensor, time as time_
+from esphome.components import sensor, text_sensor, binary_sensor, button, time as time_
 from esphome.const import (
     CONF_ID,
     CONF_FREQUENCY,
     CONF_TIME_ID,
     DEVICE_CLASS_ENERGY,
+    DEVICE_CLASS_CONNECTIVITY,
     DEVICE_CLASS_SIGNAL_STRENGTH,
     DEVICE_CLASS_TIMESTAMP,
     STATE_CLASS_TOTAL_INCREASING,
@@ -23,9 +24,14 @@ from esphome.const import (
 
 DEPENDENCIES = ["time"]
 CODEOWNERS = ["@your-github-username"]
+AUTO_LOAD = ["sensor", "text_sensor", "binary_sensor", "button"]
+
+# Tell ESPHome to include all source files in src/ subdirectories
+MULTI_CONF = False
 
 everblu_meter_ns = cg.esphome_ns.namespace("everblu_meter")
 EverbluMeterComponent = everblu_meter_ns.class_("EverbluMeterComponent", cg.PollingComponent)
+EverbluMeterTriggerButton = everblu_meter_ns.class_("EverbluMeterTriggerButton", button.Button)
 
 # Configuration keys
 CONF_METER_YEAR = "meter_year"
@@ -41,6 +47,8 @@ CONF_AUTO_ALIGN_TIME = "auto_align_time"
 CONF_AUTO_ALIGN_MIDPOINT = "auto_align_midpoint"
 CONF_MAX_RETRIES = "max_retries"
 CONF_RETRY_COOLDOWN = "retry_cooldown"
+CONF_INITIAL_READ_ON_BOOT = "initial_read_on_boot"
+CONF_DEBUG_CC1101 = "debug_cc1101"
 
 # Sensor configuration keys
 CONF_VOLUME = "volume"
@@ -56,10 +64,14 @@ CONF_STATUS = "status"
 CONF_ERROR = "error"
 CONF_RADIO_STATE = "radio_state"
 CONF_TIMESTAMP = "timestamp"
+CONF_HISTORY_JSON = "history_json"
 CONF_ACTIVE_READING = "active_reading"
+CONF_RADIO_CONNECTED = "radio_connected"
 CONF_TOTAL_ATTEMPTS = "total_attempts"
 CONF_SUCCESSFUL_READS = "successful_reads"
 CONF_FAILED_READS = "failed_reads"
+CONF_REQUEST_READING_BUTTON = "request_reading_button"
+CONF_FREQUENCY_SCAN_BUTTON = "frequency_scan_button"
 
 # Meter types
 METER_TYPE_WATER = "water"
@@ -71,12 +83,15 @@ SCHEDULE_MONDAY_SATURDAY = "Saturday"
 SCHEDULE_MONDAY_SUNDAY = "Sunday"
 SCHEDULE_EVERYDAY = "Everyday"
 
+CONF_GDO0_PIN = "gdo0_pin"
+
 CONFIG_SCHEMA = (
     cv.Schema(
         {
             cv.GenerateID(): cv.declare_id(EverbluMeterComponent),
             cv.Required(CONF_METER_YEAR): cv.int_range(min=0, max=99),
             cv.Required(CONF_METER_SERIAL): cv.uint32_t,
+            cv.Required(CONF_GDO0_PIN): cv.int_range(min=0, max=39),
             cv.Required(CONF_TIME_ID): cv.use_id(time_.RealTimeClock),
             cv.Optional(CONF_METER_TYPE, default=METER_TYPE_WATER): cv.enum(
                 {METER_TYPE_WATER: False, METER_TYPE_GAS: True}
@@ -92,6 +107,8 @@ CONFIG_SCHEMA = (
             cv.Optional(CONF_AUTO_ALIGN_MIDPOINT, default=True): cv.boolean,
             cv.Optional(CONF_MAX_RETRIES, default=10): cv.int_range(min=1, max=50),
             cv.Optional(CONF_RETRY_COOLDOWN, default="1h"): cv.positive_time_period_milliseconds,
+            cv.Optional(CONF_INITIAL_READ_ON_BOOT, default=False): cv.boolean,
+            cv.Optional(CONF_DEBUG_CC1101, default=False): cv.boolean,
             # Sensors
             cv.Optional(CONF_VOLUME): sensor.sensor_schema(
                 unit_of_measurement="L",
@@ -172,10 +189,20 @@ CONFIG_SCHEMA = (
                 device_class=DEVICE_CLASS_TIMESTAMP,
                 icon="mdi:clock",
             ),
+            cv.Optional(CONF_HISTORY_JSON): text_sensor.text_sensor_schema(
+                icon="mdi:history",
+            ),
             # Binary sensors
             cv.Optional(CONF_ACTIVE_READING): binary_sensor.binary_sensor_schema(
                 icon="mdi:radio",
             ),
+            cv.Optional(CONF_RADIO_CONNECTED): binary_sensor.binary_sensor_schema(
+                icon="mdi:radio-tower",
+                device_class=DEVICE_CLASS_CONNECTIVITY,
+                entity_category="diagnostic",
+            ),
+            cv.Optional(CONF_REQUEST_READING_BUTTON): button.button_schema(EverbluMeterTriggerButton),
+            cv.Optional(CONF_FREQUENCY_SCAN_BUTTON): button.button_schema(EverbluMeterTriggerButton),
         }
     )
     .extend(cv.polling_component_schema("24h"))
@@ -186,6 +213,23 @@ async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
 
+    # Add SPI library for CC1101
+    cg.add_library("SPI", None)
+
+    # No custom include paths needed when using flat release layout
+
+    # Define flags for conditional compilation in ESPHome environment
+    cg.add_define("USE_ESPHOME")
+    cg.add_define("WIFI_SERIAL_NO_REMAP")  # Don't remap Serial in ESPHome builds
+    # Provide compile-time values expected by core code as numeric preprocessor defines
+    # Use explicit -D flags to ensure visibility in all translation units
+    cg.add_build_flag(f"-DMETER_YEAR={config[CONF_METER_YEAR]}")
+    cg.add_build_flag(f"-DMETER_SERIAL={config[CONF_METER_SERIAL]}")
+    cg.add_build_flag(f"-DGDO0={config[CONF_GDO0_PIN]}")
+    
+    # Note: ESPHome automatically compiles all .cpp files in component directory
+    # No need to explicitly list source files - just ensure main.cpp is excluded from release
+    
     # Set basic configuration
     cg.add(var.set_meter_year(config[CONF_METER_YEAR]))
     cg.add(var.set_meter_serial(config[CONF_METER_SERIAL]))
@@ -201,6 +245,11 @@ async def to_code(config):
     cg.add(var.set_auto_align_midpoint(config[CONF_AUTO_ALIGN_MIDPOINT]))
     cg.add(var.set_max_retries(config[CONF_MAX_RETRIES]))
     cg.add(var.set_retry_cooldown(config[CONF_RETRY_COOLDOWN]))  # Already in ms
+    cg.add(var.set_initial_read_on_boot(config[CONF_INITIAL_READ_ON_BOOT]))
+
+    # Enable detailed CC1101 debug logs when requested
+    if config.get(CONF_DEBUG_CC1101, False):
+        cg.add_build_flag("-DDEBUG_CC1101=1")
 
     # Link time component
     time_component = await cg.get_variable(config[CONF_TIME_ID])
@@ -271,8 +320,26 @@ async def to_code(config):
     if CONF_TIMESTAMP in config:
         sens = await text_sensor.new_text_sensor(config[CONF_TIMESTAMP])
         cg.add(var.set_timestamp_sensor(sens))
+
+    if CONF_HISTORY_JSON in config:
+        sens = await text_sensor.new_text_sensor(config[CONF_HISTORY_JSON])
+        cg.add(var.set_history_sensor(sens))
     
     # Register binary sensors
     if CONF_ACTIVE_READING in config:
         sens = await binary_sensor.new_binary_sensor(config[CONF_ACTIVE_READING])
         cg.add(var.set_active_reading_sensor(sens))
+
+    if CONF_RADIO_CONNECTED in config:
+        sens = await binary_sensor.new_binary_sensor(config[CONF_RADIO_CONNECTED])
+        cg.add(var.set_radio_connected_sensor(sens))
+
+    if CONF_REQUEST_READING_BUTTON in config:
+        btn = await button.new_button(config[CONF_REQUEST_READING_BUTTON])
+        cg.add(btn.set_parent(var))
+        cg.add(btn.set_frequency_scan(False))
+
+    if CONF_FREQUENCY_SCAN_BUTTON in config:
+        btn = await button.new_button(config[CONF_FREQUENCY_SCAN_BUTTON])
+        cg.add(btn.set_parent(var))
+        cg.add(btn.set_frequency_scan(True))

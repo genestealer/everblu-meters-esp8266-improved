@@ -6,20 +6,21 @@ This directory contains the ESPHome custom component for reading EverBlu Cyble E
 
 1. **Copy the component** to your ESPHome configuration directory:
    ```bash
-   cp -r everblu_meter /config/esphome/components/
+  cp -r everblu_meter /config/esphome/custom_components/
    ```
 
 2. **Create your configuration** (see examples in parent directory):
    ```yaml
-   external_components:
-     - source:
-         type: local
-         path: components
-       components: [ everblu_meter ]
+  external_components:
+    - source:
+        type: local
+        path: custom_components
+      components: [ everblu_meter ]
    
    everblu_meter:
      meter_year: 21
      meter_serial: 12345678
+     gdo0_pin: 4
      meter_type: water
      volume:
        name: "Water Volume"
@@ -94,6 +95,7 @@ See [ESPHOME_INTEGRATION_GUIDE.md](../ESPHOME_INTEGRATION_GUIDE.md) for complete
 
 - `meter_year`: Meter manufacture year (last 2 digits)
 - `meter_serial`: Meter serial number
+- `gdo0_pin`: GPIO number connected to CC1101 GDO0 (sync detect)
 - `meter_type`: `water` or `gas`
 
 ### Optional
@@ -104,6 +106,8 @@ See [ESPHOME_INTEGRATION_GUIDE.md](../ESPHOME_INTEGRATION_GUIDE.md) for complete
 - `read_hour`/`read_minute`: Time to read (default: 10:00)
 - `max_retries`: Read attempts (default: 10)
 - `retry_cooldown`: Cooldown duration (default: 1h)
+- `request_reading_button`: Optional ESPHome button to trigger an on-demand reading
+- `frequency_scan_button`: Optional ESPHome button to start a narrow frequency scan
 
 ### Sensors
 
@@ -184,7 +188,7 @@ Ensure the `external_components` path is correct:
 external_components:
   - source:
       type: local
-      path: components  # Relative to your YAML file
+      path: custom_components  # Relative to your YAML file
     components: [ everblu_meter ]
 ```
 
@@ -192,7 +196,8 @@ external_components:
 
 1. **Missing headers**: Verify all files in `../../src/` are present
 2. **SPI errors**: Ensure SPI is configured for your board
-3. **Adapter errors**: Check `USE_ESPHOME` is defined during compilation
+3. **GDO0 not defined**: Ensure `gdo0_pin` is set in your YAML
+4. **Adapter errors**: Check `USE_ESPHOME` is defined during compilation
 
 ### Runtime Errors
 

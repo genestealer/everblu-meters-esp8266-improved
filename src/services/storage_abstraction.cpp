@@ -5,7 +5,11 @@
 
 #include "storage_abstraction.h"
 
-#if defined(ESP8266)
+// Prefer ESPHome preferences when available, even if a define was missed
+#if defined(USE_ESPHOME) || (__has_include("esphome/core/preferences.h"))
+#include "esphome/core/preferences.h"
+#define EVERBLU_USE_ESPHOME_PREFS 1
+#elif defined(ESP8266)
 #include <EEPROM.h>
 #elif defined(ESP32)
 #include <Preferences.h>
@@ -14,7 +18,10 @@ static Preferences preferences;
 
 bool StorageAbstraction::begin()
 {
-#if defined(ESP8266)
+#ifdef EVERBLU_USE_ESPHOME_PREFS
+    // ESPHome preferences are auto-initialized
+    return true;
+#elif defined(ESP8266)
     EEPROM.begin(EEPROM_SIZE);
     return true;
 #elif defined(ESP32)
@@ -27,7 +34,24 @@ bool StorageAbstraction::begin()
 
 bool StorageAbstraction::saveFloat(const char *key, float value, uint16_t magic)
 {
-#if defined(ESP8266)
+#ifdef EVERBLU_USE_ESPHOME_PREFS
+    // ESPHome preferences API
+    uint32_t hash = esphome::fnv1_hash(key);
+    esphome::ESPPreferenceObject pref = esphome::global_preferences->make_preference<float>(hash);
+    bool success = pref.save(&value);
+
+    if (success)
+    {
+        Serial.printf("[STORAGE] Saved %s = %.6f to ESPHome preferences\n", key, value);
+    }
+    else
+    {
+        Serial.printf("[STORAGE] [ERROR] Failed to save %s to ESPHome preferences\n", key);
+    }
+
+    return success;
+
+#elif defined(ESP8266)
     // ESP8266: Use EEPROM with magic number validation
     // Note: This assumes the first float key is at FREQ_OFFSET_ADDR
     // For multiple keys, you'd need a more sophisticated address mapping
@@ -80,7 +104,30 @@ bool StorageAbstraction::saveFloat(const char *key, float value, uint16_t magic)
 float StorageAbstraction::loadFloat(const char *key, float defaultValue, uint16_t magic,
                                     float minValue, float maxValue)
 {
-#if defined(ESP8266)
+#ifdef EVERBLU_USE_ESPHOME_PREFS
+    // ESPHome preferences API
+    uint32_t hash = esphome::fnv1_hash(key);
+    esphome::ESPPreferenceObject pref = esphome::global_preferences->make_preference<float>(hash);
+
+    float value = defaultValue;
+    if (!pref.load(&value))
+    {
+        Serial.printf("[STORAGE] No valid data for %s in ESPHome preferences\n", key);
+        return defaultValue;
+    }
+
+    // Sanity check: ensure value is within acceptable range
+    if (value < minValue || value > maxValue)
+    {
+        Serial.printf("[STORAGE] Invalid %s value %.6f in preferences (out of range [%.2f, %.2f])\n",
+                      key, value, minValue, maxValue);
+        return defaultValue;
+    }
+
+    Serial.printf("[STORAGE] Loaded %s = %.6f from ESPHome preferences\n", key, value);
+    return value;
+
+#elif defined(ESP8266)
     // ESP8266: Read from EEPROM with magic number validation
     uint16_t storedMagic = 0;
     EEPROM.get(FREQ_OFFSET_ADDR, storedMagic);
@@ -151,7 +198,13 @@ float StorageAbstraction::loadFloat(const char *key, float defaultValue, uint16_
 
 bool StorageAbstraction::hasKey(const char *key)
 {
-#if defined(ESP8266)
+#ifdef EVERBLU_USE_ESPHOME_PREFS
+    uint32_t hash = esphome::fnv1_hash(key);
+    esphome::ESPPreferenceObject pref = esphome::global_preferences->make_preference<float>(hash);
+    float tmp = 0.0f;
+    return pref.load(&tmp);
+
+#elif defined(ESP8266)
     // For ESP8266, check if magic number is valid
     uint16_t storedMagic = 0;
     EEPROM.get(FREQ_OFFSET_ADDR, storedMagic);
@@ -170,7 +223,13 @@ bool StorageAbstraction::hasKey(const char *key)
 
 bool StorageAbstraction::clearKey(const char *key)
 {
-#if defined(ESP8266)
+#ifdef EVERBLU_USE_ESPHOME_PREFS
+    uint32_t hash = esphome::fnv1_hash(key);
+    esphome::ESPPreferenceObject pref = esphome::global_preferences->make_preference<float>(hash);
+    float zero = 0.0f;
+    return pref.save(&zero);
+
+#elif defined(ESP8266)
     // Clear by setting magic to 0
     EEPROM.put(FREQ_OFFSET_ADDR, (uint16_t)0);
     return EEPROM.commit();
@@ -194,7 +253,11 @@ bool StorageAbstraction::clearKey(const char *key)
 
 bool StorageAbstraction::clearAll()
 {
-#if defined(ESP8266)
+#ifdef EVERBLU_USE_ESPHOME_PREFS
+    // Not supported via ESPHome API in bulk; caller can clear individual keys
+    return false;
+
+#elif defined(ESP8266)
     // Clear entire EEPROM
     for (int i = 0; i < EEPROM_SIZE; i++)
     {

@@ -1,11 +1,22 @@
 /*  CC1101 radio interface for Itron EverBlu Cyble Enhanced water meters */
 /*  Implements RADIAN protocol communication over 433 MHz RF */
 
-#include "private.h"     // Include the local config file for passwords etc. not for GitHub. Generate your own private.h file with the same content as private.example.h
-#include "utils.h"       // Include the local utils library for utility functions
-#include "cc1101.h"      // Include the local cc1101 library for CC1101 functions
-#include <Arduino.h>     // Include the Arduino library for basic functions
-#include "wifi_serial.h" // Mirror Serial to WiFi
+#include "utils.h"   // Utility functions
+#include "cc1101.h"  // CC1101 interface
+#include <Arduino.h> // Arduino core
+#if !defined(USE_ESPHOME)
+#if defined(__has_include)
+#if __has_include("private.h")
+#include "private.h" // Standalone firmware configuration (optional)
+#endif
+#else
+/* No __has_include support; skip optional private.h */
+#endif
+#endif
+#ifdef USE_ESPHOME
+#define WIFI_SERIAL_NO_REMAP
+#endif
+#include "wifi_serial.h" // Optional WiFi serial mirroring
 #include <SPI.h>         // Include the SPI library for SPI communication
 #if defined(ESP32)
 #include <esp_task_wdt.h>
@@ -16,6 +27,7 @@ static inline void FEED_WDT()
 {
 #if defined(ESP8266)
   ESP.wdtFeed();
+  yield(); // Yield to keep the SDK/WiFi task serviced during long radio operations
 #elif defined(ESP32)
   esp_task_wdt_reset();
   yield();
@@ -572,6 +584,7 @@ void cc1101_rec_mode(void)
   while ((marcstate != 0x0D) && (marcstate != 0x0E) && (marcstate != 0x0F)) // 0x0D = RX
   {
     marcstate = halRfReadReg(MARCSTATE_ADDR); // read out state of cc1100 to be sure in RX
+    FEED_WDT();                               // Avoid soft WDT while waiting for RX state
   }
 }
 
@@ -739,21 +752,21 @@ static bool validate_radian_crc(const uint8_t *decoded_buffer, size_t size)
 
   if (expected_len < 4)
   {
-    echo_debug(1, "ERROR: Invalid RADIAN length byte (%u)\n", length_field);
+    echo_debug(1, "[ERROR] Invalid RADIAN length byte (%u)\n", length_field);
     return false;
   }
 
   if (expected_len < size)
   {
     echo_debug(debug_out,
-               "WARN: Decoder produced %u bytes but length byte indicates %u - extra tail ignored for CRC\n",
+               "[WARN] Decoder produced %u bytes but length byte indicates %u - extra tail ignored for CRC\n",
                (unsigned)size, (unsigned)expected_len);
   }
 
   const size_t crc_offset = expected_len - 2;
   if (crc_offset + 1 >= size)
   {
-    echo_debug(debug_out, "WARN: Not enough data to read CRC bytes - accepting frame\n");
+    echo_debug(debug_out, "[WARN] Not enough data to read CRC bytes - accepting frame\n");
     return true;
   }
 
@@ -766,7 +779,7 @@ static bool validate_radian_crc(const uint8_t *decoded_buffer, size_t size)
   // byte fixes the persistent mismatches observed in the field.
   if (expected_len <= 3)
   {
-    echo_debug(1, "ERROR: RADIAN frame too short for CRC validation (len=%u)\n", (unsigned)expected_len);
+    echo_debug(1, "[ERROR] RADIAN frame too short for CRC validation (len=%u)\n", (unsigned)expected_len);
     return false;
   }
 
@@ -774,7 +787,7 @@ static bool validate_radian_crc(const uint8_t *decoded_buffer, size_t size)
 
   if (computed_crc != received_crc)
   {
-    echo_debug(1, "ERROR: RADIAN CRC mismatch (computed=0x%04X frame=0x%04X) - discarding frame\n",
+    echo_debug(1, "[ERROR] RADIAN CRC mismatch (computed=0x%04X frame=0x%04X) - discarding frame\n",
                computed_crc, received_crc);
     return false;
   }
@@ -790,7 +803,7 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
   // Bounds check: ensure buffer is large enough for basic data
   if (size < 30)
   {
-    echo_debug(1, "ERROR: Buffer too small for meter data (size=%d, need>=30)\n", size);
+    echo_debug(1, "[ERROR] Buffer too small for meter data (size=%d, need>=30)\n", size);
     return data;
   }
 
@@ -806,7 +819,7 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
   // behaviour compatible with good data.
   if (data.volume == 0 || data.volume == 0xFFFFFFFFUL)
   {
-    echo_debug(1, "ERROR: Parsed volume value is invalid (0x%08lX) - discarding frame\n",
+    echo_debug(1, "[ERROR] Parsed volume value is invalid (0x%08lX) - discarding frame\n",
                (unsigned long)data.volume);
     memset(&data, 0, sizeof(data));
     return data;
@@ -825,7 +838,7 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
     // and battery_left should not be 0xFF (usually reserved / invalid).
     if (data.time_start > 23 || data.time_end > 23)
     {
-      echo_debug(1, "ERROR: Invalid wake window %u-%u (expected 0-23) - discarding frame\n",
+      echo_debug(1, "[ERROR] Invalid wake window %u-%u (expected 0-23) - discarding frame\n",
                  data.time_start, data.time_end);
       memset(&data, 0, sizeof(data));
       return data;
@@ -833,21 +846,21 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
 
     if (data.battery_left == 0xFF)
     {
-      echo_debug(1, "ERROR: Invalid battery_left value 0xFF - discarding frame\n");
+      echo_debug(1, "[ERROR] Invalid battery_left value 0xFF - discarding frame\n");
       memset(&data, 0, sizeof(data));
       return data;
     }
 
     if (data.reads_counter == 0xFF)
     {
-      echo_debug(1, "ERROR: Invalid reads_counter value 0xFF (255) - discarding frame\n");
+      echo_debug(1, "[ERROR] Invalid reads_counter value 0xFF (255) - discarding frame\n");
       memset(&data, 0, sizeof(data));
       return data;
     }
   }
   else
   {
-    echo_debug(1, "WARN: Buffer size %d < 49, extended data unavailable\n", size);
+    echo_debug(1, "[WARN] Buffer size %d < 49, extended data unavailable\n", size);
   }
 
   // Extract 12 months of historical volume data if buffer is large enough
@@ -915,7 +928,7 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
       {
         if (data.history[i] < data.history[i - 1])
         {
-          echo_debug(1, "ERROR: Historical volume decreased at index %d (%u -> %u) - marking history invalid\n",
+          echo_debug(1, "[ERROR] Historical volume decreased at index %d (%u -> %u) - marking history invalid\n",
                      i, data.history[i - 1], data.history[i]);
           history_ok = false;
           break;
@@ -932,7 +945,7 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
           uint32_t delta = data.history[i] - data.history[i - 1];
           if (delta > MAX_REASONABLE_USAGE)
           {
-            echo_debug(1, "ERROR: Historical usage spike at index %d (delta=%u L) - marking history invalid\n",
+            echo_debug(1, "[ERROR] Historical usage spike at index %d (delta=%u L) - marking history invalid\n",
                        i, delta);
             history_ok = false;
             break;
@@ -954,7 +967,7 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
           const uint32_t MAX_FORWARD_TOLERANCE = 1000000UL; // 1M unit tolerance (liters for water, or internal units for gas)
           if (diff > MAX_FORWARD_TOLERANCE)
           {
-            echo_debug(1, "ERROR: Newest history value (%u) exceeds current volume (%u) by %u units - marking history invalid\n",
+            echo_debug(1, "[ERROR] Newest history value (%u) exceeds current volume (%u) by %u units - marking history invalid\n",
                        newest, data.volume, diff);
             history_ok = false;
           }
@@ -965,13 +978,13 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
       {
         data.history_available = false;
         memset(data.history, 0, sizeof(data.history));
-        echo_debug(1, "WARN: Discarded corrupted historical block while keeping primary meter fields\n");
+        echo_debug(1, "[WARN] Discarded corrupted historical block while keeping primary meter fields\n");
       }
     }
     else
     {
       data.history_available = false;
-      echo_debug(1, "WARN: Not enough data for historical values (only %d bytes from offset 70)\n", available_bytes);
+      echo_debug(1, "[WARN] Not enough data for historical values (only %d bytes from offset 70)\n", available_bytes);
     }
   }
   else
@@ -1039,6 +1052,13 @@ uint8_t decode_4bitpbit_serial(uint8_t *rxBuffer, int l_total_byte, uint8_t *dec
   {
     current_Rx_Byte = rxBuffer[i];
     // echo_debug(debug_out, "0x%02X ", rxBuffer[i]);
+
+    // Feed watchdog periodically during long decode operations
+    if (i > 0 && (i % 64) == 0)
+    {
+      FEED_WDT();
+    }
+
     for (j = 0; j < 8; j++)
     {
       if ((current_Rx_Byte & 0x80) == bit_pol)
@@ -1061,7 +1081,7 @@ uint8_t decode_4bitpbit_serial(uint8_t *rxBuffer, int l_total_byte, uint8_t *dec
             // Bounds check before writing to buffer
             if (dest_byte_cnt >= MAX_DECODED_SIZE)
             {
-              echo_debug(debug_out, "ERROR: Decode buffer overflow at byte %d\n", dest_byte_cnt);
+              echo_debug(debug_out, "[ERROR] Decode buffer overflow at byte %d\n", dest_byte_cnt);
               return dest_byte_cnt;
             }
             decoded_buffer[dest_byte_cnt] = decoded_buffer[dest_byte_cnt] >> 1;
@@ -1076,7 +1096,7 @@ uint8_t decode_4bitpbit_serial(uint8_t *rxBuffer, int l_total_byte, uint8_t *dec
             // log the error, skip the current malformed byte and continue
             // decoding. This makes the decoder more tolerant to single-bit
             // corruption or brief polarity glitches on the air.
-            echo_debug(debug_out, "ERROR: Stop bit error at bit 10 - skipping malformed byte\n");
+            echo_debug(debug_out, "[ERROR] Stop bit error at bit 10 - skipping malformed byte\n");
             if (framing_error_count < 255)
             {
               framing_error_count++;
@@ -1088,7 +1108,7 @@ uint8_t decode_4bitpbit_serial(uint8_t *rxBuffer, int l_total_byte, uint8_t *dec
             dest_byte_cnt++;
             if (dest_byte_cnt >= MAX_DECODED_SIZE)
             {
-              echo_debug(debug_out, "ERROR: Decode buffer size limit reached while skipping malformed byte\n");
+              echo_debug(debug_out, "[ERROR] Decode buffer size limit reached while skipping malformed byte\n");
               return dest_byte_cnt;
             }
             // Continue processing remaining samples
@@ -1102,7 +1122,7 @@ uint8_t decode_4bitpbit_serial(uint8_t *rxBuffer, int l_total_byte, uint8_t *dec
             // Additional bounds check before next iteration
             if (dest_byte_cnt >= MAX_DECODED_SIZE)
             {
-              echo_debug(debug_out, "ERROR: Decode buffer size limit reached\n");
+              echo_debug(debug_out, "[ERROR] Decode buffer size limit reached\n");
               return dest_byte_cnt;
             }
           }
@@ -1120,7 +1140,7 @@ uint8_t decode_4bitpbit_serial(uint8_t *rxBuffer, int l_total_byte, uint8_t *dec
   if (dest_byte_cnt > 0 && framing_error_count > (dest_byte_cnt / 2))
   {
     echo_debug(debug_out,
-               "ERROR: Decode quality too low (decoded=%u, framing_errors=%u) - discarding frame\n",
+               "[ERROR] Decode quality too low (decoded=%u, framing_errors=%u) - discarding frame\n",
                dest_byte_cnt, framing_error_count);
     return 0;
   }
@@ -1225,7 +1245,9 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
   int l_tmo = 0;
   uint8_t l_Rssi_dbm, l_lqi, l_freq_est;
 
-  echo_debug(debug_out, "\nsize_byte=%d  l_radian_frame_size_byte=%d\n", size_byte, l_radian_frame_size_byte);
+  echo_debug(1, "[RX] Starting receive_radian_frame: size=%d, expected_raw=%d, timeout=%dms\n",
+             size_byte, l_radian_frame_size_byte * 4, rx_tmo_ms);
+  echo_debug(debug_out, "[RX] size_byte=%d  l_radian_frame_size_byte=%d\n", size_byte, l_radian_frame_size_byte);
 
   if (l_radian_frame_size_byte * 4 > rxBuffer_size)
   {
@@ -1243,23 +1265,29 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
   halRfWriteReg(PKTLEN, 1);                      // Just one byte of sync pattern
   cc1101_rec_mode();
 
+  echo_debug(1, "[RX] Stage 1: Waiting for sync (GDO0)...\n");
   while ((digitalRead(GDO0) == FALSE) && (l_tmo < rx_tmo_ms))
   {
     delay(1);
     l_tmo++;
+    if (l_tmo % 10 == 0)
+      FEED_WDT(); // Feed watchdog frequently while waiting for sync
     if (l_tmo % 50 == 0)
-      FEED_WDT(); // Feed watchdog every 50ms
+      echo_debug(1, "[RX] ...still waiting for sync (%dms elapsed)\n", l_tmo);
   }
   if (l_tmo < rx_tmo_ms)
   {
+    echo_debug(1, "[RX] Stage 1: Sync detected at %dms\n", l_tmo);
     echo_debug(debug_out, "[CC1101] GDO0 triggered at %dms\n", l_tmo);
   }
   else
   {
-    echo_debug(debug_out, "ERROR: Timeout waiting for GDO0 (sync detection)\n");
+    echo_debug(1, "[RX] ERROR: Stage 1 timeout after %dms (no sync detected)\n", l_tmo);
+    echo_debug(debug_out, "[ERROR] Timeout waiting for GDO0 (sync detection)\n");
     return 0;
   }
 
+  echo_debug(1, "[RX] Stage 1: Waiting for sync bytes in FIFO...\n");
   while ((l_byte_in_rx == 0) && (l_tmo < rx_tmo_ms))
   {
     delay(5);
@@ -1275,17 +1303,20 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
 
   if (l_tmo < rx_tmo_ms && l_byte_in_rx > 0)
   {
+    echo_debug(1, "[RX] Stage 1: Complete - received %d sync bytes at %dms (RSSI will be checked)\n", l_byte_in_rx, l_tmo);
     echo_debug(debug_out, "[CC1101] First sync pattern received (%d bytes)\n", l_byte_in_rx);
   }
   else
   {
-    echo_debug(debug_out, "ERROR: Timeout waiting for sync pattern bytes\n");
+    echo_debug(1, "[RX] ERROR: Stage 1 timeout after %dms (no sync bytes in FIFO)\n", l_tmo);
+    echo_debug(debug_out, "[ERROR] Timeout waiting for sync pattern bytes\n");
     return 0;
   }
 
   l_lqi = halRfReadReg(LQI_ADDR);
   l_freq_est = halRfReadReg(FREQEST_ADDR);
   l_Rssi_dbm = cc1100_rssi_convert2dbm(halRfReadReg(RSSI_ADDR));
+  echo_debug(1, "[RX] Stage 1: RSSI=%ddBm, LQI=%u, FreqEst=%d\n", l_Rssi_dbm, l_lqi, (int8_t)l_freq_est);
   echo_debug(debug_out, " rssi=%u lqi=%u F_est=%u \n", l_Rssi_dbm, l_lqi, l_freq_est);
 
   fflush(stdout);
@@ -1320,6 +1351,7 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
   // See: docs/DREDZIK_IMPROVEMENTS_TEST_RESULTS.md for full details
   // =================================================================
 
+  echo_debug(1, "[RX] Stage 2: Reconfiguring for frame start (sync=0xFFF0, 9.6kbps)...\n");
   halRfWriteReg(SYNC1, SYNC1_PATTERN_FF);              // Sync word MSB: 0xFF
   halRfWriteReg(SYNC0, SYNC0_PATTERN_F0);              // Sync word LSB: 0xF0 (frame start marker)
   halRfWriteReg(MDMCFG4, MDMCFG4_RX_BW_58KHZ_9_6KBPS); // RX BW: 58 kHz with 9.6 kbps rate (4x oversampling)
@@ -1330,46 +1362,59 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
 
   l_total_byte = 0;
   l_byte_in_rx = 1;
+  echo_debug(1, "[RX] Stage 2: Waiting for frame start (GDO0)...\n");
   while ((digitalRead(GDO0) == FALSE) && (l_tmo < rx_tmo_ms))
   {
     delay(1);
     l_tmo++;
+    if (l_tmo % 10 == 0)
+      FEED_WDT(); // Feed watchdog frequently while waiting for frame start
     if (l_tmo % 50 == 0)
-      FEED_WDT(); // Feed watchdog every 50ms
+      echo_debug(1, "[RX] ...still waiting for frame start (%dms elapsed)\n", l_tmo);
   }
   if (l_tmo < rx_tmo_ms)
   {
+    echo_debug(1, "[RX] Stage 2: Frame start detected at %dms\n", l_tmo);
     echo_debug(debug_out, "[CC1101] GDO0 triggered for frame start at %dms\n", l_tmo);
   }
   else
   {
-    echo_debug(debug_out, "ERROR: Timeout waiting for GDO0 (frame start)\n");
+    echo_debug(1, "[RX] ERROR: Stage 2 timeout after %dms (no frame start)\n", l_tmo);
+    echo_debug(debug_out, "[ERROR] Timeout waiting for GDO0 (frame start)\n");
     return 0;
   }
-  while ((l_total_byte < (l_radian_frame_size_byte * 4)) && (l_tmo < rx_tmo_ms))
+  uint16_t l_expected_bytes = l_radian_frame_size_byte * 4;
+  echo_debug(1, "[RX] Stage 2: Receiving frame bytes (need %d bytes)...\n", l_expected_bytes);
+  while ((l_total_byte < l_expected_bytes) && (l_tmo < rx_tmo_ms))
   {
     delay(5);
     l_tmo += 5; // wait for some byte received
-    if (l_tmo % 50 == 0)
-      FEED_WDT(); // Feed watchdog every 50ms during frame receive
+    FEED_WDT(); // Feed watchdog during frame receive
     l_byte_in_rx = (halRfReadReg(RXBYTES_ADDR) & RXBYTES_MASK);
     if (l_byte_in_rx)
     {
-      // if (l_byte_in_rx + l_total_byte > (l_radian_frame_size_byte * 4))
-      //   l_byte_in_rx = (l_radian_frame_size_byte * 4) - l_total_byte;
+      // if (l_byte_in_rx + l_total_byte > l_expected_bytes)
+      //   l_byte_in_rx = l_expected_bytes - l_total_byte;
 
       SPIReadBurstReg(RX_FIFO_ADDR, &rxBuffer[l_total_byte], l_byte_in_rx); // Pull data
       l_total_byte += l_byte_in_rx;
+      // Report progress every ~100 bytes to show it's working
+      if (l_total_byte % 100 < l_byte_in_rx)
+        echo_debug(1, "[RX] ...received %d/%d bytes\n", l_total_byte, l_expected_bytes);
     }
   }
 
   if (l_tmo < rx_tmo_ms && l_total_byte > 0)
   {
+    echo_debug(1, "[RX] Stage 2: Complete - received %d bytes in %dms (expected %d)\n",
+               l_total_byte, l_tmo, l_expected_bytes);
     echo_debug(debug_out, "[CC1101] Frame received successfully (%d bytes)\n", l_total_byte);
   }
   else
   {
-    echo_debug(debug_out, "ERROR: Timeout or no data received (got %d bytes)\n", l_total_byte);
+    echo_debug(1, "[RX] ERROR: Stage 2 timeout after %dms - received %d/%d bytes\n",
+               l_tmo, l_total_byte, l_expected_bytes);
+    echo_debug(debug_out, "[ERROR] Timeout or no data received (got %d bytes)\n", l_total_byte);
     return 0;
   }
 
@@ -1469,6 +1514,7 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
 
 struct tmeter_data get_meter_data(void)
 {
+  echo_debug(1, "\n[METER] Starting meter read sequence...\n");
   struct tmeter_data sdata;
   uint8_t marcstate = 0xFF;
   uint8_t wupbuffer[] = {0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55};
@@ -1486,6 +1532,8 @@ struct tmeter_data get_meter_data(void)
   uint8_t txbuffer[100];
   Make_Radian_Master_req(txbuffer, METER_YEAR, METER_SERIAL);
 
+  echo_debug(1, "[METER] Transmitting wake-up + interrogation (Year=%d, Serial=%lu)...\n",
+             METER_YEAR, (unsigned long)METER_SERIAL);
   halRfWriteReg(MDMCFG2, MDMCFG2_NO_PREAMBLE_SYNC);  // No preamble/sync for WUP
   halRfWriteReg(PKTCTRL0, PKTCTRL0_INFINITE_LENGTH); // Infinite packet length
   SPIWriteBurstReg(TX_FIFO_ADDR, wupbuffer, 8);
@@ -1494,6 +1542,19 @@ struct tmeter_data get_meter_data(void)
   delay(10);                                // to give time for calibration
   marcstate = halRfReadReg(MARCSTATE_ADDR); // to  update 	CC1101_status_state
   echo_debug(debug_out, "MARCSTATE : raw:0x%02X  0x%02X free_byte:0x%02X sts:0x%02X sending 2s WUP...\n", marcstate, marcstate & 0x1F, CC1101_status_FIFO_FreeByte, CC1101_status_state);
+  // Ensure we actually enter TX before starting the WUP/data feeding loop.
+  // Sometimes after STX, the radio needs a brief extra moment to transition.
+  if (CC1101_status_state != 0x02)
+  {
+    uint8_t spin = 0; // up to ~100ms
+    while (CC1101_status_state != 0x02 && spin < 10)
+    {
+      FEED_WDT();
+      delay(10);
+      marcstate = halRfReadReg(MARCSTATE_ADDR); // refresh status to update CC1101_status_state
+      spin++;
+    }
+  }
   while ((CC1101_status_state == 0x02) && (tmo < TX_LOOP_OUT)) // in TX
   {
     // Feed watchdog to prevent reset during long operations (every ~10ms in this loop)
@@ -1529,6 +1590,7 @@ struct tmeter_data get_meter_data(void)
     marcstate = halRfReadReg(MARCSTATE_ADDR); // read out state of cc1100 to be sure in IDLE and TX is finished this update also CC1101_status_state
     // echo_debug(debug_out,"%ifree_byte:0x%02X sts:0x%02X\n",tmo,CC1101_status_FIFO_FreeByte,CC1101_status_state);
   }
+  echo_debug(1, "[METER] TX complete after %dms (MARCSTATE=0x%02X)\n", tmo * 10, marcstate & 0x1F);
   echo_debug(debug_out, "%i free_byte:0x%02X sts:0x%02X\n", tmo, CC1101_status_FIFO_FreeByte, CC1101_status_state);
   CC1101_CMD(SFTX); // flush the Tx_fifo content this clear the status state and put sate machin in IDLE
   // end of transition restore default register
@@ -1537,15 +1599,23 @@ struct tmeter_data get_meter_data(void)
 
   // delay(30); //43ms de bruit
   /*34ms 0101...01  14.25ms 000...000  14ms 1111...11111  83.5ms de data acquitement*/
+  echo_debug(1, "[METER] Waiting for ACK frame (18-byte frame, 150ms timeout)...\n");
   if (!receive_radian_frame(0x12, 150, rxBuffer, sizeof(rxBuffer)))
   {
-    echo_debug(debug_out, "ERROR: Timeout waiting for meter acknowledgement frame\n");
+    echo_debug(1, "[METER] No ACK frame received (meter may be asleep/out of range)\n");
+    echo_debug(debug_out, "[ERROR] Timeout waiting for meter acknowledgement frame\n");
+  }
+  else
+  {
+    echo_debug(1, "[METER] ACK frame received\n");
   }
   // delay(30); //50ms de 111111  , mais on a 7+3ms de printf et xxms calculs
   /*34ms 0101...01  14.25ms 000...000  14ms 1111...11111  582ms de data avec l'index */
-  rxBuffer_size = receive_radian_frame(0x7C, 1000, rxBuffer, sizeof(rxBuffer)); // Increased from 700ms to 1000ms to allow full meter response
+  echo_debug(1, "[METER] Waiting for data frame (124-byte frame, 700ms timeout)...\n");
+  rxBuffer_size = receive_radian_frame(0x7C, 700, rxBuffer, sizeof(rxBuffer)); // 700ms timeout matches working 91jj ESPHome implementation
   if (rxBuffer_size)
   {
+    echo_debug(1, "[METER] Data frame received - decoding %d raw bytes...\n", rxBuffer_size);
     if (debug_out)
     {
       //  echo_debug(debug_out, "rxBuffer:\n");
@@ -1555,24 +1625,29 @@ struct tmeter_data get_meter_data(void)
     meter_data_size = decode_4bitpbit_serial(rxBuffer, rxBuffer_size, meter_data);
     // show_in_hex(meter_data,meter_data_size);
     // If debug enabled, print the decoded (post-serial-decoding) meter data so we can inspect fields (timestamp etc.)
+    echo_debug(1, "[METER] Decoded %d bytes from %d raw bytes\n", meter_data_size, rxBuffer_size);
     if (debug_out)
     {
       echo_debug(debug_out, "[CC1101] Decoded meter data size = %d\n", meter_data_size);
       show_in_hex_one_line(meter_data, meter_data_size);
     }
 
+    echo_debug(1, "[METER] Validating CRC...\n");
     if (validate_radian_crc(meter_data, meter_data_size))
     {
+      echo_debug(1, "[METER] CRC valid - parsing meter data\n");
       sdata = parse_meter_report(meter_data, meter_data_size);
     }
     else
     {
+      echo_debug(1, "[METER] ERROR: CRC validation failed\n");
       meter_data_size = 0;
     }
   }
   else
   {
-    echo_debug(debug_out, "ERROR: Timeout waiting for meter data frame\n");
+    echo_debug(1, "[METER] ERROR: No data frame received (timeout)\n");
+    echo_debug(debug_out, "[ERROR] Timeout waiting for meter data frame\n");
   }
   sdata.rssi = halRfReadReg(RSSI_ADDR);                              // Read RSSI value from CC1101
   sdata.rssi_dbm = cc1100_rssi_convert2dbm(halRfReadReg(RSSI_ADDR)); // Read RSSI value from CC1101 and convert to dBm

@@ -14,18 +14,39 @@
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/time/real_time_clock.h"
+#include "esphome/components/button/button.h"
+
+#ifdef USE_API
+#include "esphome/components/api/api_server.h"
+#endif
 
 // Include core meter reading components
-// Note: These paths assume the component structure includes the src/ files
-#include "../../src/services/meter_reader.h"
-#include "../../src/adapters/implementations/esphome_config_provider.h"
-#include "../../src/adapters/implementations/esphome_time_provider.h"
-#include "../../src/adapters/implementations/esphome_data_publisher.h"
+// These are in src/ subdirectory within the component
+#include "services/meter_reader.h"
+#include "adapters/implementations/esphome_config_provider.h"
+#include "adapters/implementations/esphome_time_provider.h"
+#include "adapters/implementations/esphome_data_publisher.h"
 
 namespace esphome
 {
     namespace everblu_meter
     {
+
+        class EverbluMeterComponent;
+
+        class EverbluMeterTriggerButton : public button::Button
+        {
+        public:
+            void set_parent(EverbluMeterComponent *parent) { parent_ = parent; }
+            void set_frequency_scan(bool is_frequency_scan) { is_frequency_scan_ = is_frequency_scan; }
+
+        protected:
+            void press_action() override;
+
+        private:
+            EverbluMeterComponent *parent_{nullptr};
+            bool is_frequency_scan_{false};
+        };
 
         class EverbluMeterComponent : public PollingComponent
         {
@@ -55,6 +76,7 @@ namespace esphome
             void set_max_retries(int retries) { max_retries_ = retries; }
             void set_retry_cooldown(unsigned long ms) { retry_cooldown_ms_ = ms; }
             void set_time_component(time::RealTimeClock *time) { time_component_ = time; }
+            void set_initial_read_on_boot(bool v) { initial_read_on_boot_ = v; }
 
             // Sensor setters
             void set_volume_sensor(sensor::Sensor *sensor) { volume_sensor_ = sensor; }
@@ -74,8 +96,14 @@ namespace esphome
             void set_error_sensor(text_sensor::TextSensor *sensor) { error_sensor_ = sensor; }
             void set_radio_state_sensor(text_sensor::TextSensor *sensor) { radio_state_sensor_ = sensor; }
             void set_timestamp_sensor(text_sensor::TextSensor *sensor) { timestamp_sensor_ = sensor; }
+            void set_history_sensor(text_sensor::TextSensor *sensor) { history_sensor_ = sensor; }
 
             void set_active_reading_sensor(binary_sensor::BinarySensor *sensor) { active_reading_sensor_ = sensor; }
+            void set_radio_connected_sensor(binary_sensor::BinarySensor *sensor) { radio_connected_sensor_ = sensor; }
+
+            // External actions
+            void request_manual_read();
+            void request_frequency_scan();
 
         protected:
             // Configuration
@@ -93,6 +121,9 @@ namespace esphome
             bool auto_align_midpoint_{true};
             int max_retries_{10};
             unsigned long retry_cooldown_ms_{3600000};
+
+            // Internal state tracking
+            void republish_initial_states();
 
             // ESPHome components
             time::RealTimeClock *time_component_{nullptr};
@@ -115,14 +146,21 @@ namespace esphome
             text_sensor::TextSensor *error_sensor_{nullptr};
             text_sensor::TextSensor *radio_state_sensor_{nullptr};
             text_sensor::TextSensor *timestamp_sensor_{nullptr};
+            text_sensor::TextSensor *history_sensor_{nullptr};
 
             binary_sensor::BinarySensor *active_reading_sensor_{nullptr};
+            binary_sensor::BinarySensor *radio_connected_sensor_{nullptr};
 
             // Core meter reading components (adapters + orchestrator)
             ESPHomeConfigProvider *config_provider_{nullptr};
             ESPHomeTimeProvider *time_provider_{nullptr};
             ESPHomeDataPublisher *data_publisher_{nullptr};
             MeterReader *meter_reader_{nullptr};
+            bool initial_read_triggered_{false};
+            bool initial_read_on_boot_{false};
+            bool meter_initialized_{false};
+            bool last_api_client_count_{false};
+            uint32_t wifi_ready_at_{0};
         };
 
     } // namespace everblu_meter
