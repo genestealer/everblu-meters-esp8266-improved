@@ -87,9 +87,9 @@ Write-Host "Location: $RELEASE_DIR\" -ForegroundColor Green
 Write-Host ""
 Write-Host "Directory structure:" -ForegroundColor Green
 Write-Host "  ESPHOME-release/everblu_meter/" -ForegroundColor White
-Write-Host "  ├── __init__.py" -ForegroundColor White
-Write-Host "  ├── everblu_meter.h/.cpp" -ForegroundColor White
-Write-Host "  └── src/ (complete source tree with original includes)" -ForegroundColor White
+Write-Host "    __init__.py" -ForegroundColor White
+Write-Host "    everblu_meter.h/.cpp" -ForegroundColor White
+Write-Host "    src/ (complete source tree with original includes)" -ForegroundColor White
 Write-Host ""
 Write-Host "To use with ESPHome:" -ForegroundColor Green
 Write-Host "  1. Copy to ESPHome: Copy-Item -Recurse '$RELEASE_DIR' '/config/esphome/custom_components/everblu_meter'" -ForegroundColor Cyan
