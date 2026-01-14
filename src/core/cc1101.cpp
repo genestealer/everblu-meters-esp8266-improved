@@ -1248,8 +1248,6 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
   int8_t l_Rssi_dbm;
   uint8_t l_lqi, l_freq_est;
 
-  echo_debug(1, "[RX] Starting receive_radian_frame: size=%d, expected_raw=%d, timeout=%dms\n",
-             size_byte, l_radian_frame_size_byte * 4, rx_tmo_ms);
   echo_debug(debug_out, "[RX] size_byte=%d  l_radian_frame_size_byte=%d\n", size_byte, l_radian_frame_size_byte);
 
   if (l_radian_frame_size_byte * 4 > rxBuffer_size)
@@ -1268,29 +1266,22 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
   halRfWriteReg(PKTLEN, 1);                      // Just one byte of sync pattern
   cc1101_rec_mode();
 
-  echo_debug(1, "[RX] Stage 1: Waiting for sync (GDO0)...\n");
   while ((digitalRead(GDO0) == FALSE) && (l_tmo < rx_tmo_ms))
   {
     delay(1);
     l_tmo++;
-    if (l_tmo % 10 == 0)
-      FEED_WDT(); // Feed watchdog frequently while waiting for sync
     if (l_tmo % 50 == 0)
-      echo_debug(1, "[RX] ...still waiting for sync (%dms elapsed)\n", l_tmo);
+      FEED_WDT(); // Feed watchdog every 50ms
   }
   if (l_tmo < rx_tmo_ms)
   {
-    echo_debug(1, "[RX] Stage 1: Sync detected at %dms\n", l_tmo);
     echo_debug(debug_out, "[CC1101] GDO0 triggered at %dms\n", l_tmo);
   }
   else
   {
-    echo_debug(1, "[RX] ERROR: Stage 1 timeout after %dms (no sync detected)\n", l_tmo);
     echo_debug(debug_out, "[ERROR] Timeout waiting for GDO0 (sync detection)\n");
     return 0;
   }
-
-  echo_debug(1, "[RX] Stage 1: Waiting for sync bytes in FIFO...\n");
   while ((l_byte_in_rx == 0) && (l_tmo < rx_tmo_ms))
   {
     delay(5);
@@ -1306,12 +1297,10 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
 
   if (l_tmo < rx_tmo_ms && l_byte_in_rx > 0)
   {
-    echo_debug(1, "[RX] Stage 1: Complete - received %d sync bytes at %dms (RSSI will be checked)\n", l_byte_in_rx, l_tmo);
     echo_debug(debug_out, "[CC1101] First sync pattern received (%d bytes)\n", l_byte_in_rx);
   }
   else
   {
-    echo_debug(1, "[RX] ERROR: Stage 1 timeout after %dms (no sync bytes in FIFO)\n", l_tmo);
     echo_debug(debug_out, "[ERROR] Timeout waiting for sync pattern bytes\n");
     return 0;
   }
@@ -1319,7 +1308,6 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
   l_lqi = halRfReadReg(LQI_ADDR);
   l_freq_est = halRfReadReg(FREQEST_ADDR);
   l_Rssi_dbm = cc1100_rssi_convert2dbm(halRfReadReg(RSSI_ADDR));
-  echo_debug(1, "[RX] Stage 1: RSSI=%ddBm, LQI=%u, FreqEst=%d\n", l_Rssi_dbm, l_lqi, (int8_t)l_freq_est);
   echo_debug(debug_out, " rssi=%d lqi=%u F_est=%u \n", l_Rssi_dbm, l_lqi, l_freq_est);
 
   fflush(stdout);
@@ -1354,7 +1342,6 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
   // See: docs/DREDZIK_IMPROVEMENTS_TEST_RESULTS.md for full details
   // =================================================================
 
-  echo_debug(1, "[RX] Stage 2: Reconfiguring for frame start (sync=0xFFF0, 9.6kbps)...\n");
   halRfWriteReg(SYNC1, SYNC1_PATTERN_FF);              // Sync word MSB: 0xFF
   halRfWriteReg(SYNC0, SYNC0_PATTERN_F0);              // Sync word LSB: 0xF0 (frame start marker)
   halRfWriteReg(MDMCFG4, MDMCFG4_RX_BW_58KHZ_9_6KBPS); // RX BW: 58 kHz with 9.6 kbps rate (4x oversampling)
@@ -1363,60 +1350,56 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
   CC1101_CMD(SFRX);
   cc1101_rec_mode();
 
+  // Reset timing for Stage 2 so the timeout applies only to frame-start and
+  // payload reception (Stage 1 already consumed part of the rx_tmo budget).
+  l_tmo = 0;
   l_total_byte = 0;
   l_byte_in_rx = 1;
-  echo_debug(1, "[RX] Stage 2: Waiting for frame start (GDO0)...\n");
   while ((digitalRead(GDO0) == FALSE) && (l_tmo < rx_tmo_ms))
   {
     delay(1);
     l_tmo++;
-    if (l_tmo % 10 == 0)
-      FEED_WDT(); // Feed watchdog frequently while waiting for frame start
     if (l_tmo % 50 == 0)
-      echo_debug(1, "[RX] ...still waiting for frame start (%dms elapsed)\n", l_tmo);
+      FEED_WDT(); // Feed watchdog every 50ms
   }
   if (l_tmo < rx_tmo_ms)
   {
-    echo_debug(1, "[RX] Stage 2: Frame start detected at %dms\n", l_tmo);
     echo_debug(debug_out, "[CC1101] GDO0 triggered for frame start at %dms\n", l_tmo);
   }
   else
   {
-    echo_debug(1, "[RX] ERROR: Stage 2 timeout after %dms (no frame start)\n", l_tmo);
     echo_debug(debug_out, "[ERROR] Timeout waiting for GDO0 (frame start)\n");
     return 0;
   }
   uint16_t l_expected_bytes = l_radian_frame_size_byte * 4;
-  echo_debug(1, "[RX] Stage 2: Receiving frame bytes (need %d bytes)...\n", l_expected_bytes);
   while ((l_total_byte < l_expected_bytes) && (l_tmo < rx_tmo_ms))
   {
     delay(5);
     l_tmo += 5; // wait for some byte received
-    FEED_WDT(); // Feed watchdog during frame receive
+    if (l_tmo % 50 == 0)
+      FEED_WDT(); // Feed watchdog every 50ms during frame receive
     l_byte_in_rx = (halRfReadReg(RXBYTES_ADDR) & RXBYTES_MASK);
     if (l_byte_in_rx)
     {
-      // if (l_byte_in_rx + l_total_byte > l_expected_bytes)
-      //   l_byte_in_rx = l_expected_bytes - l_total_byte;
+      // Do not pull more than we expect; excess bytes are noise and will
+      // skew CRC. Clamp the burst to the remaining expected length.
+      if (l_byte_in_rx + l_total_byte > l_expected_bytes)
+        l_byte_in_rx = l_expected_bytes - l_total_byte;
 
-      SPIReadBurstReg(RX_FIFO_ADDR, &rxBuffer[l_total_byte], l_byte_in_rx); // Pull data
-      l_total_byte += l_byte_in_rx;
-      // Report progress every ~100 bytes to show it's working
-      if (l_total_byte % 100 < l_byte_in_rx)
-        echo_debug(1, "[RX] ...received %d/%d bytes\n", l_total_byte, l_expected_bytes);
+      if (l_byte_in_rx > 0)
+      {
+        SPIReadBurstReg(RX_FIFO_ADDR, &rxBuffer[l_total_byte], l_byte_in_rx); // Pull data
+        l_total_byte += l_byte_in_rx;
+      }
     }
   }
 
   if (l_tmo < rx_tmo_ms && l_total_byte > 0)
   {
-    echo_debug(1, "[RX] Stage 2: Complete - received %d bytes in %dms (expected %d)\n",
-               l_total_byte, l_tmo, l_expected_bytes);
     echo_debug(debug_out, "[CC1101] Frame received successfully (%d bytes)\n", l_total_byte);
   }
   else
   {
-    echo_debug(1, "[RX] ERROR: Stage 2 timeout after %dms - received %d/%d bytes\n",
-               l_tmo, l_total_byte, l_expected_bytes);
     echo_debug(debug_out, "[ERROR] Timeout or no data received (got %d bytes)\n", l_total_byte);
     return 0;
   }
