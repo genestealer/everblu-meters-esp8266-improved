@@ -136,6 +136,7 @@ namespace esphome
         {
             if (!meter_reader_ || !meter_initialized_)
             {
+                ESP_LOGW(TAG, "Cannot republish states: meter_initialized=%d, meter_reader=%p", meter_initialized_, meter_reader_);
                 return;
             }
 
@@ -144,11 +145,26 @@ namespace esphome
             // Republish status sensors that were sent before HA connected
             if (data_publisher_)
             {
+                ESP_LOGD(TAG, "Publishing: radio state=Idle");
                 data_publisher_->publishRadioState("Idle");
+
+                ESP_LOGD(TAG, "Publishing: status=Ready");
                 data_publisher_->publishStatusMessage("Ready");
+
+                ESP_LOGD(TAG, "Publishing: error=None");
                 data_publisher_->publishError("None");
+
+                ESP_LOGD(TAG, "Publishing: active_reading=false");
                 data_publisher_->publishActiveReading(false);
+
+                ESP_LOGD(TAG, "Publishing: statistics (0, 0, 0)");
                 data_publisher_->publishStatistics(0, 0, 0);
+
+                ESP_LOGD(TAG, "Republish complete");
+            }
+            else
+            {
+                ESP_LOGW(TAG, "Cannot republish: data_publisher is null");
             }
         }
 

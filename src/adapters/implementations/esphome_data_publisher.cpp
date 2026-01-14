@@ -144,10 +144,17 @@ void ESPHomeDataPublisher::publishMeterSettings(int meterYear, unsigned long met
 void ESPHomeDataPublisher::publishStatusMessage(const char *message)
 {
 #ifdef USE_ESPHOME
-    ESP_LOGD(TAG_PUB, "Status: %s", message ? message : "(null)");
-    if (status_sensor_ && message)
+    if (!message)
+        return;
+
+    if (status_sensor_)
     {
+        ESP_LOGD(TAG_PUB, "Publishing status: %s", message);
         status_sensor_->publish_state(message);
+    }
+    else
+    {
+        ESP_LOGW(TAG_PUB, "Status sensor not configured, cannot publish: %s", message);
     }
 #endif
 }
@@ -189,10 +196,17 @@ void ESPHomeDataPublisher::publishActiveReading(bool active)
 void ESPHomeDataPublisher::publishError(const char *error)
 {
 #ifdef USE_ESPHOME
-    ESP_LOGD(TAG_PUB, "Error: %s", error ? error : "(null)");
-    if (error_sensor_ && error)
+    if (!error)
+        return;
+
+    if (error_sensor_)
     {
+        ESP_LOGD(TAG_PUB, "Publishing error: %s", error);
         error_sensor_->publish_state(error);
+    }
+    else
+    {
+        ESP_LOGW(TAG_PUB, "Error sensor not configured, cannot publish: %s", error);
     }
 #endif
 }
@@ -201,11 +215,7 @@ void ESPHomeDataPublisher::publishStatistics(unsigned long totalAttempts, unsign
                                              unsigned long failedReads)
 {
 #ifdef USE_ESPHOME
-    ESP_LOGD(TAG_PUB, "Stats: total=%lu success=%lu failed=%lu", totalAttempts, successfulReads, failedReads);
-    if (total_attempts_sensor_)
-    {
-        total_attempts_sensor_->publish_state(totalAttempts);
-    }
+    ESP_LOGD(TAG_PUB, "Publishing stats: total=%lu success=%lu failed=%lu", totalAttempts, successfulReads, failedReads);
 
     if (successful_reads_sensor_)
     {

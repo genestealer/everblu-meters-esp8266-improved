@@ -66,13 +66,9 @@ void MeterReader::begin()
     m_initialized = true;
     Serial.println("[MeterReader] Initialization complete");
 
-    // In ESPHome builds, defer initial state publishing until HA connects.
-    // EverbluMeterComponent handles republishing when API is connected.
-#ifdef USE_ESPHOME
-    Serial.println("[MeterReader] Deferring initial state publish until Home Assistant connects");
-#else
-    // Publish comprehensive initial states for all status/diagnostic sensors
-    // so they don't show "Unknown" in Home Assistant (non-ESPHome builds)
+    // Publish initial states to all configured sensors
+    // In ESPHome mode, this gets republished when HA connects via the component
+    // In standalone mode, this ensures sensors don't show "Unknown"
     if (m_publisher)
     {
         Serial.println("[MeterReader] Publishing initial sensor states...");
@@ -102,7 +98,6 @@ void MeterReader::begin()
     {
         Serial.println("[MeterReader] WARNING: Publisher not available, cannot publish initial states");
     }
-#endif
 }
 
 void MeterReader::loop()

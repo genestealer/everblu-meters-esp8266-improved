@@ -644,7 +644,9 @@ uint8_t is_look_like_radian_frame(uint8_t *buffer, size_t len)
 uint8_t cc1101_check_packet_received(void)
 {
   uint8_t rxBuffer[100];
-  uint8_t l_nb_byte, l_Rssi_dbm, l_lqi, l_freq_est, pktLen;
+  uint8_t l_nb_byte;
+  int8_t l_Rssi_dbm;
+  uint8_t l_lqi, l_freq_est, pktLen;
   pktLen = 0;
   if (digitalRead(GDO0) == TRUE)
   {
@@ -684,7 +686,7 @@ uint8_t cc1101_check_packet_received(void)
     {
       echo_debug(debug_out, "\n");
       print_time();
-      echo_debug(debug_out, " bytes=%u rssi=%u lqi=%u F_est=%u ", pktLen, l_Rssi_dbm, l_lqi, l_freq_est);
+      echo_debug(debug_out, " bytes=%u rssi=%d lqi=%u F_est=%u ", pktLen, l_Rssi_dbm, l_lqi, l_freq_est);
       show_in_hex_one_line(rxBuffer, pktLen);
       // show_in_bin(rxBuffer,l_nb_byte);
     }
@@ -1243,7 +1245,8 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
   uint16_t l_total_byte = 0;
   uint16_t l_radian_frame_size_byte = ((size_byte * (8 + 3)) / 8) + 1;
   int l_tmo = 0;
-  uint8_t l_Rssi_dbm, l_lqi, l_freq_est;
+  int8_t l_Rssi_dbm;
+  uint8_t l_lqi, l_freq_est;
 
   echo_debug(1, "[RX] Starting receive_radian_frame: size=%d, expected_raw=%d, timeout=%dms\n",
              size_byte, l_radian_frame_size_byte * 4, rx_tmo_ms);
@@ -1317,7 +1320,7 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
   l_freq_est = halRfReadReg(FREQEST_ADDR);
   l_Rssi_dbm = cc1100_rssi_convert2dbm(halRfReadReg(RSSI_ADDR));
   echo_debug(1, "[RX] Stage 1: RSSI=%ddBm, LQI=%u, FreqEst=%d\n", l_Rssi_dbm, l_lqi, (int8_t)l_freq_est);
-  echo_debug(debug_out, " rssi=%u lqi=%u F_est=%u \n", l_Rssi_dbm, l_lqi, l_freq_est);
+  echo_debug(debug_out, " rssi=%d lqi=%u F_est=%u \n", l_Rssi_dbm, l_lqi, l_freq_est);
 
   fflush(stdout);
 

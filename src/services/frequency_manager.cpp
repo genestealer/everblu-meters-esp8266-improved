@@ -154,6 +154,8 @@ void FrequencyManager::performFrequencyScan(void (*statusCallback)(const char *,
         // Try to get meter data (via injected callback)
         struct tmeter_data test_data = s_meterReadCallback();
 
+        Serial.printf("[FREQ] Freq %.6f MHz: RSSI=%d dBm, reads=%d\n", freq, test_data.rssi_dbm, test_data.reads_counter);
+
         if (test_data.rssi_dbm > bestRSSI && test_data.reads_counter > 0)
         {
             bestRSSI = test_data.rssi_dbm;
