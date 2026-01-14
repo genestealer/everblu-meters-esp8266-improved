@@ -106,3 +106,47 @@ int encode2serial_1_3(uint8_t *inputBuffer, int inputBufferLen, uint8_t *outputB
  * @return Length of generated request frame in bytes
  */
 int Make_Radian_Master_req(uint8_t *outputBuffer, uint8_t year, uint32_t serial);
+
+/**
+ * @brief Convert 433 MHz meter RSSI to percentage
+ *
+ * Converts CC1101 RSSI measurement (in dBm) to 0-100% scale.
+ * Uses wider range (-120 to -40 dBm) appropriate for sub-GHz band.
+ *
+ * @param rssi_dbm Meter RSSI in dBm (typically -120 to -40)
+ * @return Signal strength as percentage (0-100)
+ */
+int calculateMeterdBmToPercentage(int rssi_dbm);
+
+/**
+ * @brief Convert LQI to percentage
+ *
+ * Converts CC1101 Link Quality Indicator (0-255) to 0-100% scale.
+ * LQI represents overall link quality including interference effects.
+ *
+ * @param lqi Link Quality Indicator (0-255, higher is better)
+ * @return Link quality as percentage (0-100)
+ */
+int calculateLQIToPercentage(int lqi);
+
+/**
+ * @brief Validate reading schedule string
+ *
+ * @param schedule Schedule string to validate
+ * @return true if schedule is one of: "Monday-Friday", "Monday-Saturday", "Monday-Sunday"
+ */
+bool isValidReadingSchedule(const char *schedule);
+
+/**
+ * @brief Print meter data summary to serial console
+ *
+ * Prints a formatted MQTT-style summary of meter data including:
+ * - Volume (L for water, m³ for gas)
+ * - Battery life, counter, RSSI, LQI with percentages
+ * - Time window information
+ *
+ * @param meter_data Meter data structure
+ * @param isMeterGas true if gas meter, false if water meter
+ * @param volumeDivisor Gas volume divisor (ignored for water meters)
+ */
+void printMeterDataSummary(const struct tmeter_data *meter_data, bool isMeterGas, int volumeDivisor);

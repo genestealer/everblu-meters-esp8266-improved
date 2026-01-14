@@ -9,21 +9,7 @@
 #include "../../core/version.h"
 #include <Arduino.h>
 
-// Utility functions for signal quality conversion
-static int calculateMeterdBmToPercentage(int rssi_dbm)
-{
-    // RSSI to percentage conversion
-    // -50 dBm = 100%, -100 dBm = 0%
-    int percentage = 2 * (rssi_dbm + 100);
-    return constrain(percentage, 0, 100);
-}
-
-static int calculateLQIToPercentage(int lqi)
-{
-    // LQI is 0-127, convert to percentage
-    // 127 = 100%, 0 = 0%
-    return map(constrain(lqi, 0, 127), 0, 127, 0, 100);
-}
+// Note: calculateMeterdBmToPercentage() and calculateLQIToPercentage() are now in utils.h/cpp
 
 MQTTDataPublisher::MQTTDataPublisher(EspMQTTClient &mqttClient, const char *baseTopic,
                                      bool meterIsGas, int gasVolumeDivisor)

@@ -23,9 +23,11 @@
 #if !defined(USE_ESPHOME)
 #include "private.h" // Include private configuration (Wi-Fi, MQTT, etc.)
 #endif
-#include "core/version.h"     // Firmware version definition
-#include "core/wifi_serial.h" // WiFi serial monitor
-#include "core/cc1101.h"      // CC1101 RF transceiver and meter data
+#include "core/version.h"              // Firmware version definition
+#include "core/wifi_serial.h"          // WiFi serial monitor
+#include "core/cc1101.h"               // CC1101 RF transceiver and meter data
+#include "core/utils.h"                // Utility functions
+#include "services/schedule_manager.h" // Schedule management
 #if defined(ESP8266)
 #include <ESP8266WiFi.h> // Wi-Fi library for ESP8266
 #include <ESP8266mDNS.h> // mDNS library for ESP8266
@@ -362,18 +364,7 @@ static void initMeterTypeConfig()
 // Schedule Validation API
 // ============================================================================
 
-/**
- * @brief Validate reading schedule string
- *
- * @param s Schedule string to validate
- * @return true if schedule is one of: "Monday-Friday", "Monday-Saturday", "Monday-Sunday"
- */
-static bool isValidReadingSchedule(const char *s)
-{
-  return (strcmp(s, "Monday-Friday") == 0 ||
-          strcmp(s, "Monday-Saturday") == 0 ||
-          strcmp(s, "Monday-Sunday") == 0);
-}
+// Note: isValidReadingSchedule() is now in utils.h/cpp
 
 /**
  * @brief Validate and correct reading schedule
@@ -428,31 +419,7 @@ static void updateResolvedScheduleFromUtc(int hourUtc, int minuteUtc)
   g_readMinuteLocal = localMin % 60;
 }
 
-/**
- * @brief Check if today is a scheduled reading day
- *
- * Evaluates whether the current day (based on tm structure) falls within
- * the configured reading schedule.
- *
- * @param ptm Pointer to tm structure with current date/time
- * @return true if today is a reading day according to schedule
- */
-bool isReadingDay(struct tm *ptm)
-{
-  if (strcmp(readingSchedule, "Monday-Friday") == 0)
-  {
-    return ptm->tm_wday >= 1 && ptm->tm_wday <= 5; // Monday to Friday
-  }
-  else if (strcmp(readingSchedule, "Monday-Saturday") == 0)
-  {
-    return ptm->tm_wday >= 1 && ptm->tm_wday <= 6; // Monday to Saturday
-  }
-  else if (strcmp(readingSchedule, "Monday-Sunday") == 0)
-  {
-    return true; // Every day
-  }
-  return false;
-}
+// Note: isReadingDay() is now in ScheduleManager class
 
 // ============================================================================
 // Signal Quality Conversion API
@@ -473,38 +440,7 @@ int calculateWiFiSignalStrengthPercentage(int rssi)
   return map(strength, -100, -50, 0, 100);   // Map RSSI to percentage (0-100%)
 }
 
-/**
- * @brief Convert 433 MHz meter RSSI to percentage
- *
- * Converts CC1101 RSSI measurement (in dBm) to 0-100% scale.
- * Uses wider range (-120 to -40 dBm) appropriate for sub-GHz band.
- *
- * @param rssi_dbm Meter RSSI in dBm (typically -120 to -40)
- * @return Signal strength as percentage (0-100)
- */
-int calculateMeterdBmToPercentage(int rssi_dbm)
-{
-  // Clamp RSSI to a reasonable range (e.g., -120 dBm to -40 dBm)
-  int clamped_rssi = constrain(rssi_dbm, -120, -40);
-
-  // Map the clamped RSSI value to a percentage (0-100%)
-  return map(clamped_rssi, -120, -40, 0, 100);
-}
-
-/**
- * @brief Convert LQI to percentage
- *
- * Converts CC1101 Link Quality Indicator (0-255) to 0-100% scale.
- * LQI represents overall link quality including interference effects.
- *
- * @param lqi Link Quality Indicator (0-255, higher is better)
- * @return Link quality as percentage (0-100)
- */
-int calculateLQIToPercentage(int lqi)
-{
-  int strength = constrain(lqi, 0, 255); // Clamp LQI to valid range
-  return map(strength, 0, 255, 0, 100);  // Map LQI to percentage
-}
+// Note: calculateMeterdBmToPercentage() and calculateLQIToPercentage() are now in utils.h/cpp
 
 // ------------------------------
 // Connectivity watchdog state
@@ -632,25 +568,8 @@ void onUpdateData()
   snprintf(timeStartFormatted, sizeof(timeStartFormatted), "%02d:00", timeStart);
   snprintf(timeEndFormatted, sizeof(timeEndFormatted), "%02d:00", timeEnd);
 
-  Serial.println("\n=== METER DATA ===");
-  if (meterIsGas)
-  {
-    Serial.printf("[METER DATA] %-25s: %.3f\n", meterUnit, meter_data.volume / (float)GAS_VOLUME_DIVISOR);
-  }
-  else
-  {
-    Serial.printf("[METER DATA] %-25s: %d\n", meterUnit, meter_data.volume);
-  }
-  Serial.printf("[METER DATA] %-25s: %d\n", "Battery (months)", meter_data.battery_left);
-  Serial.printf("[METER DATA] %-25s: %d\n", "Counter", meter_data.reads_counter);
-  Serial.printf("[METER DATA] %-25s: %d\n", "RSSI (raw)", meter_data.rssi);
-  Serial.printf("[METER DATA] %-25s: %d dBm\n", "RSSI", meter_data.rssi_dbm);
-  Serial.printf("[METER DATA] %-25s: %d%%\n", "RSSI (percentage)", calculateMeterdBmToPercentage(meter_data.rssi_dbm));
-  Serial.printf("[METER DATA] %-25s: %d\n", "Signal quality (LQI)", meter_data.lqi);
-  Serial.printf("[METER DATA] %-25s: %d%%\n", "LQI (percentage)", calculateLQIToPercentage(meter_data.lqi));
-  Serial.printf("[METER DATA] %-25s: %s\n", "Time window start", timeStartFormatted);
-  Serial.printf("[METER DATA] %-25s: %s\n", "Time window end", timeEndFormatted);
-  Serial.println("==================\n");
+  // Use shared utility function to print meter data
+  printMeterDataSummary(&meter_data, meterIsGas, GAS_VOLUME_DIVISOR);
 
   // Publish meter data to MQTT (using char buffers instead of String)
   // NOTE: meter_data.volume is the raw counter value from the meter (liters for water;
@@ -938,7 +857,7 @@ void onScheduled()
   // Check if today is a valid reading day
   const bool timeMatch = (ptm->tm_hour == g_readHourLocal && ptm->tm_min == g_readMinuteLocal);
 
-  if (isReadingDay(ptm) && timeMatch && ptm->tm_sec == 0)
+  if (ScheduleManager::isReadingDay(ptm) && timeMatch && ptm->tm_sec == 0)
   {
     // Check if we're still in cooldown period after failed attempts
     if (lastFailedAttempt > 0 && (millis() - lastFailedAttempt) < RETRY_COOLDOWN)

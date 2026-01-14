@@ -9,6 +9,7 @@
  */
 
 #include <Arduino.h>
+#include "cc1101.h"		 // For tmeter_data struct
 #include "wifi_serial.h" // Mirror Serial to WiFi
 #if !defined(USE_ESPHOME)
 #if defined(__has_include)
@@ -96,6 +97,59 @@ void show_in_bin(const uint8_t *buffer, size_t len)
 	printf("\n");
 }
 
+int calculateMeterdBmToPercentage(int rssi_dbm)
+{
+	// Clamp RSSI to a reasonable range (e.g., -120 dBm to -40 dBm)
+	int clamped_rssi = constrain(rssi_dbm, -120, -40);
+
+	// Map the clamped RSSI value to a percentage (0-100%)
+	return map(clamped_rssi, -120, -40, 0, 100);
+}
+
+int calculateLQIToPercentage(int lqi)
+{
+	int strength = constrain(lqi, 0, 255); // Clamp LQI to valid range
+	return map(strength, 0, 255, 0, 100);  // Map LQI to percentage
+}
+void printMeterDataSummary(const struct tmeter_data *meter_data, bool isMeterGas, int volumeDivisor)
+{
+	if (!meter_data)
+		return;
+
+	// Validate and set default volumeDivisor
+	if (volumeDivisor <= 0)
+		volumeDivisor = 100;
+
+	const char *volumeLabel = isMeterGas ? "Volume (m3)" : "Volume (L)";
+
+	char timeStartFormatted[6];
+	char timeEndFormatted[6];
+	int timeStart = constrain(meter_data->time_start, 0, 23);
+	int timeEnd = constrain(meter_data->time_end, 0, 23);
+	snprintf(timeStartFormatted, sizeof(timeStartFormatted), "%02d:00", timeStart);
+	snprintf(timeEndFormatted, sizeof(timeEndFormatted), "%02d:00", timeEnd);
+
+	Serial.println("\n=== METER DATA ===");
+	if (isMeterGas)
+	{
+		float cubicMeters = meter_data->volume / (float)volumeDivisor;
+		Serial.printf("[METER DATA] %-25s: %.3f\n", volumeLabel, cubicMeters);
+	}
+	else
+	{
+		Serial.printf("[METER DATA] %-25s: %d\n", volumeLabel, meter_data->volume);
+	}
+	Serial.printf("[METER DATA] %-25s: %d\n", "Battery (months)", meter_data->battery_left);
+	Serial.printf("[METER DATA] %-25s: %d\n", "Counter", meter_data->reads_counter);
+	Serial.printf("[METER DATA] %-25s: %d\n", "RSSI (raw)", meter_data->rssi);
+	Serial.printf("[METER DATA] %-25s: %d dBm\n", "RSSI", meter_data->rssi_dbm);
+	Serial.printf("[METER DATA] %-25s: %d%%\n", "RSSI (percentage)", calculateMeterdBmToPercentage(meter_data->rssi_dbm));
+	Serial.printf("[METER DATA] %-25s: %d\n", "Signal quality (LQI)", meter_data->lqi);
+	Serial.printf("[METER DATA] %-25s: %d%%\n", "LQI (percentage)", calculateLQIToPercentage(meter_data->lqi));
+	Serial.printf("[METER DATA] %-25s: %s\n", "Time window start", timeStartFormatted);
+	Serial.printf("[METER DATA] %-25s: %s\n", "Time window end", timeEndFormatted);
+	Serial.println("==================\n");
+}
 void echo_debug(bool l_flag, const char *fmt, ...)
 {
 	if (!l_flag)

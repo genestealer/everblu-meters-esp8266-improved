@@ -19,6 +19,26 @@ static const unsigned long STATS_PUBLISH_INTERVAL_MS = 300000;
 // Retry delay (milliseconds) - 5 seconds between retry attempts
 static const unsigned long RETRY_DELAY_MS = 5000;
 
+// Produce a concise, MQTT-style summary of the latest reading for ESPHome logs
+static void logReadableSummary(const tmeter_data &data, const IConfigProvider *config)
+{
+    const bool isGas = config->isMeterGas();
+    int volumeDivisor = config->getGasVolumeDivisor();
+    if (volumeDivisor <= 0)
+    {
+        volumeDivisor = 100; // Sensible fallback for gas meters
+    }
+
+    // Use shared utility function to print meter data
+    printMeterDataSummary(&data, isGas, volumeDivisor);
+
+    // Print historical data if available
+    if (data.history_available && MeterHistory::isHistoryValid(data.history))
+    {
+        MeterHistory::printToSerial(data.history, static_cast<uint32_t>(data.volume), "[HISTORY]");
+    }
+}
+
 MeterReader::MeterReader(IConfigProvider *config, ITimeProvider *timeProvider, IDataPublisher *publisher)
     : m_config(config), m_timeProvider(timeProvider), m_publisher(publisher), m_initialized(false), m_readingInProgress(false), m_isScheduledRead(false), m_haConnected(false), m_retryCount(0), m_lastFailedAttempt(0), m_nextRetryTime(0), m_totalReadAttempts(0), m_successfulReads(0), m_failedReads(0), m_lastErrorMessage("None"), m_lastScheduleCheck(0), m_lastStatsPublish(0), m_readHourLocal(10), m_readMinuteLocal(0), m_lastReadDayMatch(false), m_lastReadTimeMatch(false)
 {
@@ -254,6 +274,9 @@ void MeterReader::handleSuccessfulRead(const tmeter_data &data)
     char iso8601[32];
     time_t now = m_timeProvider->getCurrentTime();
     strftime(iso8601, sizeof(iso8601), "%FT%TZ", gmtime(&now));
+
+    // Emit a concise, MQTT-style summary into the ESPHome log
+    logReadableSummary(data, m_config);
 
     // Publish meter data
     m_publisher->publishMeterReading(data, iso8601);
