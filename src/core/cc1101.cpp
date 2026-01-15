@@ -3,6 +3,7 @@
 
 #include "utils.h"   // Utility functions
 #include "cc1101.h"  // CC1101 interface
+#include "logging.h" // Cross-platform logging
 #include <Arduino.h> // Arduino core
 #if !defined(USE_ESPHOME)
 #if defined(__has_include)
@@ -519,7 +520,7 @@ bool cc1101_init(float freq)
   // Initialize SPI bus for CC1101 communication (500 kHz)
   if ((wiringPiSPISetup(0, 500000)) < 0)
   {
-    printf("[ERROR] Failed to initialize SPI bus - check CC1101 wiring and connections\n");
+    LOG_E("everblu_meter", "Failed to initialize SPI bus - check CC1101 wiring and connections");
     return false;
   }
 
@@ -534,8 +535,8 @@ bool cc1101_init(float freq)
   // PARTNUM may be 0x00 on some variants, so we rely mainly on VERSION
   if (version == 0x00 || version == 0xFF)
   {
-    printf("[ERROR] CC1101 radio not responding (PARTNUM: 0x%02X, VERSION: 0x%02X)\n", partnum, version);
-    printf("       Check: 1) Wiring connections 2) 3.3V power supply 3) SPI pins\n");
+    LOG_E("everblu_meter", "CC1101 radio not responding (PARTNUM: 0x%02X, VERSION: 0x%02X)", partnum, version);
+    LOG_E("everblu_meter", "Check: 1) Wiring connections 2) 3.3V power supply 3) SPI pins");
     return false;
   }
 
@@ -543,7 +544,7 @@ bool cc1101_init(float freq)
   static bool s_reported_ok = false;
   if (!s_reported_ok)
   {
-    printf("[CC1101] Radio found OK (PARTNUM: 0x%02X, VERSION: 0x%02X)\n", partnum, version);
+    LOG_I("everblu_meter", "Radio found OK (PARTNUM: 0x%02X, VERSION: 0x%02X)", partnum, version);
     s_reported_ok = true;
   }
 
@@ -684,9 +685,8 @@ uint8_t cc1101_check_packet_received(void)
     }
     if (is_look_like_radian_frame(rxBuffer, pktLen))
     {
-      echo_debug(debug_out, "\n");
-      print_time();
-      echo_debug(debug_out, " bytes=%u rssi=%d lqi=%u F_est=%u ", pktLen, l_Rssi_dbm, l_lqi, l_freq_est);
+      echo_debug(debug_out, "[CC1101] Packet looks like RADIAN frame");
+      echo_debug(debug_out, "[CC1101] bytes=%u rssi=%d lqi=%u F_est=%u", pktLen, l_Rssi_dbm, l_lqi, l_freq_est);
       show_in_hex_one_line(rxBuffer, pktLen);
       // show_in_bin(rxBuffer,l_nb_byte);
     }
@@ -880,7 +880,8 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
     if (num_values > 0)
     {
       data.history_available = true;
-      echo_debug(debug_out, "\n[CC1101] Extracting historical data from buffer (size=%d):\n", size);
+      // Remove leading newline so ESPHome logs stay single-line per entry
+      echo_debug(debug_out, "[CC1101] Extracting historical data from buffer (size=%d):\n", size);
       echo_debug(debug_out, "[CC1101] Starting at byte 70: %d bytes available, %d complete values\n",
                  available_bytes, num_values);
 
@@ -1308,7 +1309,7 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
   l_lqi = halRfReadReg(LQI_ADDR);
   l_freq_est = halRfReadReg(FREQEST_ADDR);
   l_Rssi_dbm = cc1100_rssi_convert2dbm(halRfReadReg(RSSI_ADDR));
-  echo_debug(debug_out, " rssi=%d lqi=%u F_est=%u \n", l_Rssi_dbm, l_lqi, l_freq_est);
+  echo_debug(debug_out, "[CC1101] rssi=%d lqi=%u F_est=%u", l_Rssi_dbm, l_lqi, l_freq_est);
 
   fflush(stdout);
 
@@ -1500,7 +1501,8 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
 
 struct tmeter_data get_meter_data(void)
 {
-  echo_debug(1, "\n[METER] Starting meter read sequence...\n");
+  // Avoid leading newline so ESPHome log doesn't emit an empty line first
+  echo_debug(1, "[METER] Starting meter read sequence...\n");
   struct tmeter_data sdata;
   uint8_t marcstate = 0xFF;
   uint8_t wupbuffer[] = {0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55};
@@ -1577,7 +1579,7 @@ struct tmeter_data get_meter_data(void)
     // echo_debug(debug_out,"%ifree_byte:0x%02X sts:0x%02X\n",tmo,CC1101_status_FIFO_FreeByte,CC1101_status_state);
   }
   echo_debug(1, "[METER] TX complete after %dms (MARCSTATE=0x%02X)\n", tmo * 10, marcstate & 0x1F);
-  echo_debug(debug_out, "%i free_byte:0x%02X sts:0x%02X\n", tmo, CC1101_status_FIFO_FreeByte, CC1101_status_state);
+  echo_debug(debug_out, "[CC1101] tmo=%i free_byte:0x%02X sts:0x%02X", tmo, CC1101_status_FIFO_FreeByte, CC1101_status_state);
   CC1101_CMD(SFTX); // flush the Tx_fifo content this clear the status state and put sate machin in IDLE
   // end of transition restore default register
   halRfWriteReg(MDMCFG2, MDMCFG2_2FSK_16_16_SYNC); // Restore: 2-FSK, 16/16 sync bits

@@ -4,6 +4,7 @@
  */
 
 #include "meter_history.h"
+#include "../core/logging.h"
 #include <cstring>
 
 HistoryStats MeterHistory::calculateStats(const uint32_t history[13], uint32_t currentVolume)
@@ -167,13 +168,13 @@ void MeterHistory::printToSerial(const uint32_t history[13], uint32_t currentVol
 
     if (monthCount == 0)
     {
-        Serial.printf("%s No historical data available\n", headerPrefix);
+        LOG_I("everblu_meter", "%s No historical data available", headerPrefix);
         return;
     }
 
-    Serial.printf("\n=== HISTORICAL DATA (%d months) ===\n", monthCount);
-    Serial.printf("%s Month  Volume (L)  Usage (L)\n", headerPrefix);
-    Serial.printf("%s -----  ----------  ---------\n", headerPrefix);
+    LOG_I("everblu_meter", "=== HISTORICAL DATA (%d months) ===", monthCount);
+    LOG_I("everblu_meter", "%s Month  Volume (L)  Usage (L)", headerPrefix);
+    LOG_I("everblu_meter", "%s -----  ----------  ---------", headerPrefix);
 
     // Print each historical month
     for (int i = 0; i < monthCount; i++)
@@ -182,15 +183,15 @@ void MeterHistory::printToSerial(const uint32_t history[13], uint32_t currentVol
         getMonthLabel(i, monthCount, monthLabel, sizeof(monthLabel));
 
         uint32_t usage = calculateUsage(history[i], (i > 0) ? history[i - 1] : 0);
-        Serial.printf("%s  %s   %10u  %9u\n", headerPrefix, monthLabel, history[i], usage);
+        LOG_I("everblu_meter", "%s  %s   %10u  %9u", headerPrefix, monthLabel, history[i], usage);
     }
 
     // Print current month usage
     uint32_t currentMonthUsage = calculateUsage(currentVolume, history[monthCount - 1]);
-    Serial.printf("%s   Now  %10u  %9u (current month usage: %u L)\n",
-                  headerPrefix, currentVolume, currentMonthUsage, currentMonthUsage);
+    LOG_I("everblu_meter", "%s   Now  %10u  %9u (current month usage: %u L)",
+          headerPrefix, currentVolume, currentMonthUsage, currentMonthUsage);
 
-    Serial.println("===================================\n");
+    LOG_I("everblu_meter", "===================================");
 }
 
 bool MeterHistory::isHistoryValid(const uint32_t history[13])

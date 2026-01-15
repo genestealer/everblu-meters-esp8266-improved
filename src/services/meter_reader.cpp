@@ -8,6 +8,7 @@
 #include "meter_history.h"
 #include "../core/utils.h"
 #include "../core/wifi_serial.h"
+#include "../core/logging.h"
 #include <Arduino.h>
 
 // Schedule check interval (milliseconds)
@@ -46,7 +47,7 @@ MeterReader::MeterReader(IConfigProvider *config, ITimeProvider *timeProvider, I
 
 void MeterReader::begin()
 {
-    Serial.println("[MeterReader] Initializing...");
+    LOG_I("everblu_meter", "Initializing...");
 
     // Register FrequencyManager callbacks
     FrequencyManager::setRadioInitCallback(cc1101_init);
@@ -79,19 +80,19 @@ void MeterReader::begin()
     m_readHourLocal = localMin / 60;
     m_readMinuteLocal = localMin % 60;
 
-    Serial.printf("[MeterReader] Scheduled reading time: %02d:%02d UTC (%02d:%02d local)\n",
-                  utcHour, utcMinute, m_readHourLocal, m_readMinuteLocal);
-    Serial.printf("[MeterReader] Reading schedule: %s\n", m_config->getReadingSchedule());
+    LOG_I("everblu_meter", "Scheduled reading time: %02d:%02d UTC (%02d:%02d local)",
+          utcHour, utcMinute, m_readHourLocal, m_readMinuteLocal);
+    LOG_I("everblu_meter", "Reading schedule: %s", m_config->getReadingSchedule());
 
     m_initialized = true;
-    Serial.println("[MeterReader] Initialization complete");
+    LOG_I("everblu_meter", "Initialization complete");
 
     // Publish initial states to all configured sensors
     // In ESPHome mode, this gets republished when HA connects via the component
     // In standalone mode, this ensures sensors don't show "Unknown"
     if (m_publisher)
     {
-        Serial.println("[MeterReader] Publishing initial sensor states...");
+        LOG_I("everblu_meter", "Publishing initial sensor states...");
 
         if (radio_ok)
         {
@@ -112,11 +113,11 @@ void MeterReader::begin()
         // Publish initial statistics (all zeros)
         m_publisher->publishStatistics(0, 0, 0);
 
-        Serial.println("[MeterReader] Initial states published");
+        LOG_I("everblu_meter", "Initial states published");
     }
     else
     {
-        Serial.println("[MeterReader] WARNING: Publisher not available, cannot publish initial states");
+        LOG_W("everblu_meter", "Publisher not available, cannot publish initial states");
     }
 }
 
@@ -130,8 +131,8 @@ void MeterReader::loop()
     // Check for pending retry
     if (m_retryCount > 0 && m_nextRetryTime > 0 && now >= m_nextRetryTime)
     {
-        Serial.printf("[MeterReader] Retry timer expired, attempting retry %d/%d\n",
-                      m_retryCount + 1, m_config->getMaxRetries());
+        LOG_I("MeterReader", "Retry timer expired, attempting retry %d/%d",
+              m_retryCount + 1, m_config->getMaxRetries());
         m_nextRetryTime = 0;
         performReading();
         return;
@@ -214,14 +215,14 @@ void MeterReader::triggerReading(bool isScheduled)
 {
     if (m_readingInProgress)
     {
-        Serial.println("[MeterReader] Reading already in progress, skipping trigger");
+        LOG_W("everblu_meter", "Reading already in progress, skipping trigger");
         return;
     }
 
     m_isScheduledRead = isScheduled;
     m_readingInProgress = true;
 
-    Serial.printf("[MeterReader] Triggering %s reading...\n", isScheduled ? "scheduled" : "manual");
+    LOG_I("everblu_meter", "Triggering %s reading...", isScheduled ? "scheduled" : "manual");
 
     performReading();
 }
@@ -230,7 +231,7 @@ void MeterReader::performReading()
 {
     if (!m_publisher->isReady())
     {
-        Serial.println("[MeterReader] Publisher not ready, aborting read");
+        LOG_W("everblu_meter", "Publisher not ready, aborting read");
         m_readingInProgress = false;
         return;
     }
@@ -242,8 +243,8 @@ void MeterReader::performReading()
     // Increment attempt counter
     m_totalReadAttempts++;
 
-    Serial.printf("[MeterReader] Reading attempt %lu (retry %d/%d)\n",
-                  m_totalReadAttempts, m_retryCount, m_config->getMaxRetries());
+    LOG_I("everblu_meter", "Reading attempt %lu (retry %d/%d)",
+          m_totalReadAttempts, m_retryCount, m_config->getMaxRetries());
 
     // Perform actual meter read
     struct tmeter_data meter_data = get_meter_data();
@@ -261,7 +262,7 @@ void MeterReader::performReading()
 
 void MeterReader::handleSuccessfulRead(const tmeter_data &data)
 {
-    Serial.println("[MeterReader] Read successful!");
+    LOG_I("everblu_meter", "Read successful!");
 
     // Reset retry state
     resetRetryState();
@@ -297,13 +298,13 @@ void MeterReader::handleSuccessfulRead(const tmeter_data &data)
 
     m_readingInProgress = false;
 
-    Serial.println("[MeterReader] Data published successfully");
+    LOG_I("everblu_meter", "Data published successfully");
 }
 
 void MeterReader::handleFailedRead()
 {
-    Serial.printf("[MeterReader] Read failed (attempt %d/%d)\n",
-                  m_retryCount + 1, m_config->getMaxRetries());
+    LOG_W("everblu_meter", "Read failed (attempt %d/%d)",
+          m_retryCount + 1, m_config->getMaxRetries());
 
     if (m_retryCount < m_config->getMaxRetries() - 1)
     {
@@ -319,8 +320,8 @@ void MeterReader::handleFailedRead()
 
         m_readingInProgress = false;
 
-        Serial.printf("[MeterReader] Retry %d/%d scheduled in %lu seconds\n",
-                      m_retryCount + 1, m_config->getMaxRetries(), RETRY_DELAY_MS / 1000);
+        LOG_I("everblu_meter", "Retry %d/%d scheduled in %lu seconds",
+              m_retryCount + 1, m_config->getMaxRetries(), RETRY_DELAY_MS / 1000);
     }
     else
     {
@@ -339,7 +340,7 @@ void MeterReader::handleFailedRead()
         m_readingInProgress = false;
 
         unsigned long cooldownSec = m_config->getRetryCooldownMs() / 1000;
-        Serial.printf("[MeterReader] Entering cooldown period (%lu seconds)\n", cooldownSec);
+        LOG_W("everblu_meter", "Entering cooldown period (%lu seconds)", cooldownSec);
     }
 }
 
@@ -351,7 +352,7 @@ void MeterReader::resetRetryState()
 
 void MeterReader::performFrequencyScan(bool wideRange)
 {
-    Serial.printf("[MeterReader] Starting %s frequency scan...\n", wideRange ? "wide" : "narrow");
+    LOG_I("everblu_meter", "Starting %s frequency scan...", wideRange ? "wide" : "narrow");
 
     if (wideRange)
     {
@@ -362,7 +363,7 @@ void MeterReader::performFrequencyScan(bool wideRange)
         FrequencyManager::performFrequencyScan();
     }
 
-    Serial.println("[MeterReader] Frequency scan complete");
+    LOG_I("everblu_meter", "Frequency scan complete");
 }
 
 void MeterReader::getStatistics(unsigned long &totalAttempts, unsigned long &successfulReads,

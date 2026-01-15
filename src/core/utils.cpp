@@ -11,6 +11,7 @@
 #include <Arduino.h>
 #include "cc1101.h"		 // For tmeter_data struct
 #include "wifi_serial.h" // Mirror Serial to WiFi
+#include "logging.h"	 // Cross-platform logging
 #if !defined(USE_ESPHOME)
 #if defined(__has_include)
 #if __has_include("private.h")
@@ -28,37 +29,56 @@
 void show_in_hex_formatted(const uint8_t *buffer, size_t len, int mode)
 {
 	int i = 0;
+	char line_buf[256];
+	int line_pos = 0;
+
 	for (i = 0; i < len; i++)
 	{
 		if (mode == 0)
 		{
 			// Original show_in_hex: 16 bytes per line
 			if (!(i % 16))
-				puts("");
-			printf("%02X ", buffer[i]);
+			{
+				if (line_pos > 0)
+				{
+					line_buf[line_pos] = '\0';
+					LOG_D("everblu_meter", "%s", line_buf);
+					line_pos = 0;
+				}
+			}
+			line_pos += snprintf(line_buf + line_pos, sizeof(line_buf) - line_pos, "%02X ", buffer[i]);
 		}
 		else if (mode == 1)
 		{
 			// Array format with 16 per line
 			if (!(i % 16) && i > 0)
-				Serial.println("");
-			Serial.printf("0x%02X, ", buffer[i]);
+			{
+				if (line_pos > 0)
+				{
+					line_buf[line_pos] = '\0';
+					LOG_D("everblu_meter", "%s", line_buf);
+					line_pos = 0;
+				}
+			}
+			line_pos += snprintf(line_buf + line_pos, sizeof(line_buf) - line_pos, "0x%02X, ", buffer[i]);
 		}
 		else if (mode == 2)
 		{
 			// Single line format
-			Serial.printf("%02X ", buffer[i]);
+			line_pos += snprintf(line_buf + line_pos, sizeof(line_buf) - line_pos, "%02X ", buffer[i]);
 		}
 		else if (mode == 3)
 		{
 			// Single line with 'S' separator (for GET requests)
-			Serial.printf("%02XS", buffer[i]);
+			line_pos += snprintf(line_buf + line_pos, sizeof(line_buf) - line_pos, "%02XS", buffer[i]);
 		}
 	}
-	if (mode == 0)
-		printf("\n");
-	if (mode == 1 || mode == 2)
-		Serial.println("");
+
+	if (line_pos > 0)
+	{
+		line_buf[line_pos] = '\0';
+		LOG_D("everblu_meter", "%s", line_buf);
+	}
 }
 
 // Legacy function wrappers for backwards compatibility
@@ -86,15 +106,27 @@ void show_in_bin(const uint8_t *buffer, size_t len)
 {
 	const uint8_t *ptr;
 	uint8_t mask;
+	char bin_buf[512];
+	int bin_pos = 0;
+
 	for (ptr = buffer; len--; ptr++)
 	{
 		for (mask = 0x80; mask; mask >>= 1)
 		{
-			(mask & *ptr) > 0 ? printf("1") : printf("0");
+			bin_buf[bin_pos++] = (mask & *ptr) > 0 ? '1' : '0';
+			if (bin_pos >= sizeof(bin_buf) - 2)
+				break;
 		}
-		printf(" ");
+		bin_buf[bin_pos++] = ' ';
+		if (bin_pos >= sizeof(bin_buf) - 1)
+			break;
 	}
-	printf("\n");
+
+	if (bin_pos > 0)
+	{
+		bin_buf[bin_pos] = '\0';
+		LOG_D("everblu_meter", "%s", bin_buf);
+	}
 }
 
 int calculateMeterdBmToPercentage(int rssi_dbm)
@@ -129,26 +161,26 @@ void printMeterDataSummary(const struct tmeter_data *meter_data, bool isMeterGas
 	snprintf(timeStartFormatted, sizeof(timeStartFormatted), "%02d:00", timeStart);
 	snprintf(timeEndFormatted, sizeof(timeEndFormatted), "%02d:00", timeEnd);
 
-	Serial.println("\n=== METER DATA ===");
+	LOG_I("everblu_meter", "=== METER DATA ===");
 	if (isMeterGas)
 	{
 		float cubicMeters = meter_data->volume / (float)volumeDivisor;
-		Serial.printf("[METER DATA] %-25s: %.3f\n", volumeLabel, cubicMeters);
+		LOG_I("everblu_meter", "%-25s: %.3f", volumeLabel, cubicMeters);
 	}
 	else
 	{
-		Serial.printf("[METER DATA] %-25s: %d\n", volumeLabel, meter_data->volume);
+		LOG_I("everblu_meter", "%-25s: %d", volumeLabel, meter_data->volume);
 	}
-	Serial.printf("[METER DATA] %-25s: %d\n", "Battery (months)", meter_data->battery_left);
-	Serial.printf("[METER DATA] %-25s: %d\n", "Counter", meter_data->reads_counter);
-	Serial.printf("[METER DATA] %-25s: %d\n", "RSSI (raw)", meter_data->rssi);
-	Serial.printf("[METER DATA] %-25s: %d dBm\n", "RSSI", meter_data->rssi_dbm);
-	Serial.printf("[METER DATA] %-25s: %d%%\n", "RSSI (percentage)", calculateMeterdBmToPercentage(meter_data->rssi_dbm));
-	Serial.printf("[METER DATA] %-25s: %d\n", "Signal quality (LQI)", meter_data->lqi);
-	Serial.printf("[METER DATA] %-25s: %d%%\n", "LQI (percentage)", calculateLQIToPercentage(meter_data->lqi));
-	Serial.printf("[METER DATA] %-25s: %s\n", "Time window start", timeStartFormatted);
-	Serial.printf("[METER DATA] %-25s: %s\n", "Time window end", timeEndFormatted);
-	Serial.println("==================\n");
+	LOG_I("everblu_meter", "%-25s: %d", "Battery (months)", meter_data->battery_left);
+	LOG_I("everblu_meter", "%-25s: %d", "Counter", meter_data->reads_counter);
+	LOG_I("everblu_meter", "%-25s: %d", "RSSI (raw)", meter_data->rssi);
+	LOG_I("everblu_meter", "%-25s: %d dBm", "RSSI", meter_data->rssi_dbm);
+	LOG_I("everblu_meter", "%-25s: %d%%", "RSSI (percentage)", calculateMeterdBmToPercentage(meter_data->rssi_dbm));
+	LOG_I("everblu_meter", "%-25s: %d", "Signal quality (LQI)", meter_data->lqi);
+	LOG_I("everblu_meter", "%-25s: %d%%", "LQI (percentage)", calculateLQIToPercentage(meter_data->lqi));
+	LOG_I("everblu_meter", "%-25s: %s", "Time window start", timeStartFormatted);
+	LOG_I("everblu_meter", "%-25s: %s", "Time window end", timeEndFormatted);
+	LOG_I("everblu_meter", "==================");
 }
 void echo_debug(bool l_flag, const char *fmt, ...)
 {
@@ -158,14 +190,20 @@ void echo_debug(bool l_flag, const char *fmt, ...)
 	va_list args;
 	va_start(args, fmt);
 
-#if defined(USE_ESPHOME)
-	// Route through Serial so ESPHome logger/monitor shows messages reliably
 	char buf[256];
 	vsnprintf(buf, sizeof(buf), fmt, args);
-	Serial.print(buf);
+
+#if defined(USE_ESPHOME)
+	// ESPHome mode: Route through LOG system for WiFi-visible logs
+	// Strip trailing newline if present (LOG_* adds it automatically)
+	size_t len = strlen(buf);
+	if (len > 0 && buf[len - 1] == '\n')
+		buf[len - 1] = '\0';
+	// Use INFO level so messages are always visible in WiFi logs
+	LOG_I("everblu_meter", "%s", buf);
 #else
-	vprintf(fmt, args);
-	fflush(stdout);
+	// MQTT mode: Route through WiFiSerial for USB + WiFi visibility
+	WiFiSerial.print(buf);
 #endif
 
 	va_end(args);
@@ -185,7 +223,7 @@ void print_time(void)
 	timeinfo = localtime(&rawtime);
 
 	strftime(buffer, 80, "%d/%m/%Y %X", timeinfo);
-	printf("%s", buffer);
+	LOG_D("everblu_meter", "%s", buffer);
 }
 
 /*----------------------------------------------------------------------------*/

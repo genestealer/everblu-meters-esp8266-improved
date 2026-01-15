@@ -4,6 +4,7 @@
  */
 
 #include "frequency_manager.h"
+#include "../core/logging.h"
 #if defined(ESP32)
 #include <esp_task_wdt.h>
 #endif
@@ -77,8 +78,8 @@ float FrequencyManager::begin(float baseFrequency)
     // Load stored offset
     s_storedOffset = loadFrequencyOffset();
 
-    Serial.printf("[FREQ] Initialized: base=%.6f MHz, offset=%.6f MHz\n",
-                  s_baseFrequency, s_storedOffset);
+    LOG_I("everblu_meter", "Initialized: base=%.6f MHz, offset=%.6f MHz",
+          s_baseFrequency, s_storedOffset);
 
     return s_storedOffset;
 }
@@ -108,7 +109,7 @@ void FrequencyManager::saveFrequencyOffset(float offset)
     StorageAbstraction::saveFloat(STORAGE_KEY, offset, STORAGE_MAGIC);
     s_storedOffset = offset;
 
-    Serial.printf("[FREQ] Frequency offset %.6f MHz saved\n", offset);
+    LOG_I("everblu_meter", "Frequency offset %.6f MHz saved", offset);
 }
 
 float FrequencyManager::loadFrequencyOffset()
@@ -117,7 +118,7 @@ float FrequencyManager::loadFrequencyOffset()
 
     if (offset == 0.0)
     {
-        Serial.println("[FREQ] No valid frequency offset found in storage");
+        LOG_I("everblu_meter", "No valid frequency offset found in storage");
     }
 
     return offset;
@@ -125,8 +126,8 @@ float FrequencyManager::loadFrequencyOffset()
 
 void FrequencyManager::performFrequencyScan(void (*statusCallback)(const char *, const char *))
 {
-    Serial.println("[FREQ] Starting frequency scan...");
-    Serial.println("[FREQ] [NOTE] Wi-Fi/MQTT connections may temporarily drop and reconnect. This is expected.");
+    LOG_I("everblu_meter", "Starting frequency scan...");
+    LOG_I("everblu_meter", "[NOTE] Wi-Fi/MQTT connections may temporarily drop and reconnect. This is expected.");
 
     if (statusCallback)
     {
@@ -141,7 +142,7 @@ void FrequencyManager::performFrequencyScan(void (*statusCallback)(const char *,
     float scanEnd = s_baseFrequency + 0.03;
     float scanStep = 0.005;
 
-    Serial.printf("[FREQ] Scanning from %.6f to %.6f MHz (step: %.6f MHz)\n", scanStart, scanEnd, scanStep);
+    LOG_I("everblu_meter", "Scanning from %.6f to %.6f MHz (step: %.6f MHz)", scanStart, scanEnd, scanStep);
 
     for (float freq = scanStart; freq <= scanEnd; freq += scanStep)
     {
@@ -154,20 +155,20 @@ void FrequencyManager::performFrequencyScan(void (*statusCallback)(const char *,
         // Try to get meter data (via injected callback)
         struct tmeter_data test_data = s_meterReadCallback();
 
-        Serial.printf("[FREQ] Freq %.6f MHz: RSSI=%d dBm, reads=%d\n", freq, test_data.rssi_dbm, test_data.reads_counter);
+        LOG_I("everblu_meter", "Freq %.6f MHz: RSSI=%d dBm, reads=%d", freq, test_data.rssi_dbm, test_data.reads_counter);
 
         if (test_data.rssi_dbm > bestRSSI && test_data.reads_counter > 0)
         {
             bestRSSI = test_data.rssi_dbm;
             bestFreq = freq;
-            Serial.printf("[FREQ] Better signal at %.6f MHz: RSSI=%d dBm\n", freq, test_data.rssi_dbm);
+            LOG_I("everblu_meter", "Better signal at %.6f MHz: RSSI=%d dBm", freq, test_data.rssi_dbm);
         }
     }
 
     // Calculate and save the offset
     float offset = bestFreq - s_baseFrequency;
-    Serial.printf("[FREQ] Frequency scan complete. Best frequency: %.6f MHz (offset: %.6f MHz, RSSI: %d dBm)\n",
-                  bestFreq, offset, bestRSSI);
+    LOG_I("everblu_meter", "Frequency scan complete. Best frequency: %.6f MHz (offset: %.6f MHz, RSSI: %d dBm)",
+          bestFreq, offset, bestRSSI);
 
     if (bestRSSI > -120)
     {
@@ -215,8 +216,8 @@ void FrequencyManager::performWideInitialScan(void (*statusCallback)(const char 
     float scanEnd = s_baseFrequency + 0.10;
     float scanStep = 0.010;
 
-    Serial.printf("[FREQ] Wide scan from %.6f to %.6f MHz (step: %.6f MHz)\n", scanStart, scanEnd, scanStep);
-    Serial.println("[FREQ] This may take 1-2 minutes on first boot...");
+    LOG_I("everblu_meter", "Wide scan from %.6f to %.6f MHz (step: %.6f MHz)", scanStart, scanEnd, scanStep);
+    LOG_I("everblu_meter", "This may take 1-2 minutes on first boot...");
 
     for (float freq = scanStart; freq <= scanEnd; freq += scanStep)
     {
@@ -225,8 +226,8 @@ void FrequencyManager::performWideInitialScan(void (*statusCallback)(const char 
         // Check if radio initialization succeeds
         if (!s_radioInitCallback(freq))
         {
-            Serial.println("[FREQ] Radio not responding - skipping wide initial scan");
-            Serial.println("[FREQ] Check: 1) Wiring connections 2) 3.3V power supply 3) SPI pins");
+            LOG_E("everblu_meter", "Radio not responding - skipping wide initial scan");
+            LOG_E("everblu_meter", "Check: 1) Wiring connections 2) 3.3V power supply 3) SPI pins");
 
             if (statusCallback)
             {
@@ -244,14 +245,14 @@ void FrequencyManager::performWideInitialScan(void (*statusCallback)(const char 
         {
             bestRSSI = test_data.rssi_dbm;
             bestFreq = freq;
-            Serial.printf("[FREQ] Found signal at %.6f MHz: RSSI=%d dBm\n", freq, test_data.rssi_dbm);
+            LOG_I("everblu_meter", "Found signal at %.6f MHz: RSSI=%d dBm", freq, test_data.rssi_dbm);
         }
     }
 
     if (bestRSSI > -120)
     {
         // Found a signal - perform fine scan around it
-        Serial.printf("[FREQ] Performing fine scan around %.6f MHz...\n", bestFreq);
+        LOG_I("everblu_meter", "Performing fine scan around %.6f MHz...", bestFreq);
         float fineStart = bestFreq - 0.015;
         float fineEnd = bestFreq + 0.015;
         float fineStep = 0.003;
@@ -264,7 +265,7 @@ void FrequencyManager::performWideInitialScan(void (*statusCallback)(const char 
 
             if (!s_radioInitCallback(freq))
             {
-                Serial.println("[FREQ] Radio not responding during fine scan - aborting");
+                LOG_E("everblu_meter", "Radio not responding during fine scan - aborting");
                 break;
             }
 
@@ -276,7 +277,7 @@ void FrequencyManager::performWideInitialScan(void (*statusCallback)(const char 
             {
                 fineBestRSSI = test_data.rssi_dbm;
                 fineBestFreq = freq;
-                Serial.printf("[FREQ] Refined signal at %.6f MHz: RSSI=%d dBm\n", freq, test_data.rssi_dbm);
+                LOG_I("everblu_meter", "Refined signal at %.6f MHz: RSSI=%d dBm", freq, test_data.rssi_dbm);
             }
         }
 
@@ -284,8 +285,8 @@ void FrequencyManager::performWideInitialScan(void (*statusCallback)(const char 
         bestRSSI = fineBestRSSI;
 
         float offset = bestFreq - s_baseFrequency;
-        Serial.printf("[FREQ] Initial scan complete! Best frequency: %.6f MHz (offset: %.6f MHz, RSSI: %d dBm)\n",
-                      bestFreq, offset, bestRSSI);
+        LOG_I("everblu_meter", "Initial scan complete! Best frequency: %.6f MHz (offset: %.6f MHz, RSSI: %d dBm)",
+              bestFreq, offset, bestRSSI);
 
         saveFrequencyOffset(offset);
 
@@ -326,8 +327,8 @@ void FrequencyManager::adaptiveFrequencyTracking(int8_t freqest)
     s_cumulativeFreqError += freqErrorMHz;
     s_successfulReadsCount++;
 
-    Serial.printf("[FREQ] FREQEST: %d (%.4f kHz error), cumulative: %.4f kHz over %d reads\n",
-                  freqest, freqErrorMHz * 1000, s_cumulativeFreqError * 1000, s_successfulReadsCount);
+    LOG_I("everblu_meter", "FREQEST: %d (%.4f kHz error), cumulative: %.4f kHz over %d reads",
+          freqest, freqErrorMHz * 1000, s_cumulativeFreqError * 1000, s_successfulReadsCount);
 
     // Only adapt after N successful reads to avoid over-correcting on noise
     if (s_successfulReadsCount >= s_adaptiveThreshold)
@@ -337,15 +338,15 @@ void FrequencyManager::adaptiveFrequencyTracking(int8_t freqest)
         // Only adjust if average error is significant (> 2 kHz)
         if (abs(avgError * 1000) > ADAPT_MIN_ERROR_KHZ)
         {
-            Serial.printf("[FREQ] Adaptive adjustment: average error %.4f kHz over %d reads\n",
-                          avgError * 1000, s_adaptiveThreshold);
+            LOG_I("everblu_meter", "Adaptive adjustment: average error %.4f kHz over %d reads",
+                  avgError * 1000, s_adaptiveThreshold);
 
             // Adjust the stored offset (apply 50% of the measured error to avoid over-correction)
             float adjustment = avgError * ADAPT_CORRECTION_FACTOR;
             s_storedOffset += adjustment;
 
-            Serial.printf("[FREQ] Adjusting frequency offset by %.6f MHz (new offset: %.6f MHz)\n",
-                          adjustment, s_storedOffset);
+            LOG_I("everblu_meter", "Adjusting frequency offset by %.6f MHz (new offset: %.6f MHz)",
+                  adjustment, s_storedOffset);
 
             saveFrequencyOffset(s_storedOffset);
 
@@ -354,8 +355,8 @@ void FrequencyManager::adaptiveFrequencyTracking(int8_t freqest)
         }
         else
         {
-            Serial.printf("[FREQ] Frequency stable (avg error %.4f kHz < %.1f kHz threshold)\n",
-                          avgError * 1000, ADAPT_MIN_ERROR_KHZ);
+            LOG_I("everblu_meter", "Frequency stable (avg error %.4f kHz < %.1f kHz threshold)",
+                  avgError * 1000, ADAPT_MIN_ERROR_KHZ);
         }
 
         // Reset accumulators

@@ -4,6 +4,7 @@
  */
 
 #include "schedule_manager.h"
+#include "../core/logging.h"
 
 // Static member initialization
 const char *ScheduleManager::s_schedule = "Monday-Friday";
@@ -19,8 +20,8 @@ void ScheduleManager::begin(const char *schedule, int readHourUtc, int readMinut
     setSchedule(schedule);
     setReadingTimeFromUtc(readHourUtc, readMinuteUtc);
 
-    Serial.printf("[SCHEDULE] Initialized: schedule=%s, read_time=%02d:%02d UTC (offset=%d min)\n",
-                  s_schedule, s_readHourUtc, s_readMinuteUtc, s_timezoneOffsetMinutes);
+    LOG_I("everblu_meter", "Initialized: schedule=%s, read_time=%02d:%02d UTC (offset=%d min)",
+          s_schedule, s_readHourUtc, s_readMinuteUtc, s_timezoneOffsetMinutes);
 }
 
 bool ScheduleManager::isValidSchedule(const char *schedule)
@@ -35,11 +36,11 @@ void ScheduleManager::setSchedule(const char *schedule)
     if (isValidSchedule(schedule))
     {
         s_schedule = schedule;
-        Serial.printf("[SCHEDULE] Reading schedule set to: %s\n", s_schedule);
+        LOG_I("everblu_meter", "Reading schedule set to: %s", s_schedule);
     }
     else
     {
-        Serial.printf("[SCHEDULE] [WARN] Invalid schedule '%s' - falling back to 'Monday-Friday'\n", schedule);
+        LOG_W("everblu_meter", "Invalid schedule '%s' - falling back to 'Monday-Friday'", schedule);
         s_schedule = "Monday-Friday";
     }
 }
@@ -133,9 +134,9 @@ bool ScheduleManager::autoAlignToMeterWindow(int meterTimeStartHour, int meterTi
 
     setReadingTimeFromLocal(alignedHourLocal, s_readMinuteLocal);
 
-    Serial.printf("[SCHEDULE] Auto-aligned reading time to %02d:%02d local-offset (%02d:%02d UTC) "
-                  "(meter window %02d-%02d local)\n",
-                  s_readHourLocal, s_readMinuteLocal, s_readHourUtc, s_readMinuteUtc, timeStart, timeEnd);
+    LOG_I("everblu_meter", "Auto-aligned reading time to %02d:%02d local-offset (%02d:%02d UTC) "
+                           "(meter window %02d-%02d local)",
+          s_readHourLocal, s_readMinuteLocal, s_readHourUtc, s_readMinuteUtc, timeStart, timeEnd);
 
     return true;
 }
@@ -149,7 +150,7 @@ void ScheduleManager::setTimezoneOffset(int offsetMinutes)
 {
     s_timezoneOffsetMinutes = offsetMinutes;
     recalculateLocalFromUtc();
-    Serial.printf("[SCHEDULE] Timezone offset set to %d minutes\n", s_timezoneOffsetMinutes);
+    LOG_I("everblu_meter", "Timezone offset set to %d minutes", s_timezoneOffsetMinutes);
 }
 
 void ScheduleManager::recalculateLocalFromUtc()

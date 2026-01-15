@@ -4,6 +4,7 @@
  */
 
 #include "storage_abstraction.h"
+#include "../core/logging.h"
 
 // Prefer ESPHome preferences when available, even if a define was missed
 #if defined(USE_ESPHOME) || (__has_include("esphome/core/preferences.h"))
@@ -42,11 +43,11 @@ bool StorageAbstraction::saveFloat(const char *key, float value, uint16_t magic)
 
     if (success)
     {
-        Serial.printf("[STORAGE] Saved %s = %.6f to ESPHome preferences\n", key, value);
+        LOG_I("everblu_meter", "Saved %s = %.6f to ESPHome preferences", key, value);
     }
     else
     {
-        Serial.printf("[STORAGE] [ERROR] Failed to save %s to ESPHome preferences\n", key);
+        LOG_E("everblu_meter", "Failed to save %s to ESPHome preferences", key);
     }
 
     return success;
@@ -61,11 +62,11 @@ bool StorageAbstraction::saveFloat(const char *key, float value, uint16_t magic)
 
     if (success)
     {
-        Serial.printf("[STORAGE] Saved %s = %.6f to EEPROM\n", key, value);
+        LOG_I("everblu_meter", "Saved %s = %.6f to EEPROM", key, value);
     }
     else
     {
-        Serial.printf("[STORAGE] [ERROR] Failed to save %s to EEPROM\n", key);
+        LOG_E("everblu_meter", "Failed to save %s to EEPROM", key);
     }
 
     return success;
@@ -86,17 +87,17 @@ bool StorageAbstraction::saveFloat(const char *key, float value, uint16_t magic)
     bool success = (written > 0);
     if (success)
     {
-        Serial.printf("[STORAGE] Saved %s = %.6f to Preferences\n", key, value);
+        LOG_I("everblu_meter", "Saved %s = %.6f to Preferences", key, value);
     }
     else
     {
-        Serial.printf("[STORAGE] [ERROR] Failed to save %s to Preferences\n", key);
+        LOG_E("everblu_meter", "Failed to save %s to Preferences", key);
     }
 
     return success;
 
 #else
-    Serial.printf("[STORAGE] [ERROR] Storage not supported on this platform\n");
+    LOG_E("everblu_meter", "Storage not supported on this platform");
     return false;
 #endif
 }
@@ -112,19 +113,19 @@ float StorageAbstraction::loadFloat(const char *key, float defaultValue, uint16_
     float value = defaultValue;
     if (!pref.load(&value))
     {
-        Serial.printf("[STORAGE] No valid data for %s in ESPHome preferences\n", key);
+        LOG_I("everblu_meter", "No valid data for %s in ESPHome preferences", key);
         return defaultValue;
     }
 
     // Sanity check: ensure value is within acceptable range
     if (value < minValue || value > maxValue)
     {
-        Serial.printf("[STORAGE] Invalid %s value %.6f in preferences (out of range [%.2f, %.2f])\n",
-                      key, value, minValue, maxValue);
+        LOG_W("everblu_meter", "Invalid %s value %.6f in preferences (out of range [%.2f, %.2f])",
+              key, value, minValue, maxValue);
         return defaultValue;
     }
 
-    Serial.printf("[STORAGE] Loaded %s = %.6f from ESPHome preferences\n", key, value);
+    LOG_I("everblu_meter", "Loaded %s = %.6f from ESPHome preferences", key, value);
     return value;
 
 #elif defined(ESP8266)
@@ -134,7 +135,7 @@ float StorageAbstraction::loadFloat(const char *key, float defaultValue, uint16_
 
     if (storedMagic != magic)
     {
-        Serial.printf("[STORAGE] No valid data for %s in EEPROM (magic mismatch)\n", key);
+        LOG_I("everblu_meter", "No valid data for %s in EEPROM (magic mismatch)", key);
         return defaultValue;
     }
 
@@ -144,12 +145,12 @@ float StorageAbstraction::loadFloat(const char *key, float defaultValue, uint16_
     // Sanity check: ensure value is within acceptable range
     if (value < minValue || value > maxValue)
     {
-        Serial.printf("[STORAGE] Invalid %s value %.6f in EEPROM (out of range [%.2f, %.2f])\n",
-                      key, value, minValue, maxValue);
+        LOG_W("everblu_meter", "Invalid %s value %.6f in EEPROM (out of range [%.2f, %.2f])",
+              key, value, minValue, maxValue);
         return defaultValue;
     }
 
-    Serial.printf("[STORAGE] Loaded %s = %.6f from EEPROM\n", key, value);
+    LOG_I("everblu_meter", "Loaded %s = %.6f from EEPROM", key, value);
     return value;
 
 #elif defined(ESP32)
@@ -163,7 +164,7 @@ float StorageAbstraction::loadFloat(const char *key, float defaultValue, uint16_
 
     if (storedMagic != magic)
     {
-        Serial.printf("[STORAGE] No valid data for %s in Preferences (magic mismatch)\n", key);
+        LOG_I("everblu_meter", "No valid data for %s in Preferences (magic mismatch)", key);
         preferences.end();
         return defaultValue;
     }
@@ -171,7 +172,7 @@ float StorageAbstraction::loadFloat(const char *key, float defaultValue, uint16_
     // Read the value
     if (!preferences.isKey(key))
     {
-        Serial.printf("[STORAGE] Key %s not found in Preferences\n", key);
+        LOG_I("everblu_meter", "Key %s not found in Preferences", key);
         preferences.end();
         return defaultValue;
     }
@@ -182,16 +183,16 @@ float StorageAbstraction::loadFloat(const char *key, float defaultValue, uint16_
     // Sanity check
     if (value < minValue || value > maxValue)
     {
-        Serial.printf("[STORAGE] Invalid %s value %.6f in Preferences (out of range [%.2f, %.2f])\n",
-                      key, value, minValue, maxValue);
+        LOG_W("everblu_meter", "Invalid %s value %.6f in Preferences (out of range [%.2f, %.2f])",
+              key, value, minValue, maxValue);
         return defaultValue;
     }
 
-    Serial.printf("[STORAGE] Loaded %s = %.6f from Preferences\n", key, value);
+    LOG_I("everblu_meter", "Loaded %s = %.6f from Preferences", key, value);
     return value;
 
 #else
-    Serial.printf("[STORAGE] [ERROR] Storage not supported on this platform\n");
+    LOG_E("everblu_meter", "Storage not supported on this platform");
     return defaultValue;
 #endif
 }

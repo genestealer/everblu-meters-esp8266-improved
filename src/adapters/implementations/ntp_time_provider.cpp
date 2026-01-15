@@ -4,6 +4,7 @@
  */
 
 #include "ntp_time_provider.h"
+#include "../../core/logging.h"
 #include <Arduino.h>
 
 NTPTimeProvider::NTPTimeProvider()
@@ -14,7 +15,7 @@ NTPTimeProvider::NTPTimeProvider()
 void NTPTimeProvider::begin(const char *ntpServer)
 {
     m_ntpServer = ntpServer;
-    Serial.printf("[NTPTimeProvider] Configuring NTP server: %s\n", ntpServer);
+    LOG_I("everblu_meter", "Configuring NTP server: %s", ntpServer);
 
     configTzTime("UTC0", ntpServer);
 
@@ -24,7 +25,7 @@ void NTPTimeProvider::begin(const char *ntpServer)
 
 void NTPTimeProvider::requestSync()
 {
-    Serial.println("[NTPTimeProvider] Requesting time synchronization...");
+    LOG_I("everblu_meter", "Requesting time synchronization...");
 
     m_lastSyncAttempt = millis();
     unsigned long waitStart = millis();
@@ -35,17 +36,17 @@ void NTPTimeProvider::requestSync()
         if (probe >= MIN_VALID_EPOCH)
         {
             m_synced = true;
-            Serial.printf("[NTPTimeProvider] Sync successful after %lu ms\n",
-                          (unsigned long)(millis() - waitStart));
-            Serial.println("[NTPTimeProvider] Automatic scheduling is now ACTIVE");
+            LOG_I("everblu_meter", "Sync successful after %lu ms",
+                  (unsigned long)(millis() - waitStart));
+            LOG_I("everblu_meter", "Automatic scheduling is now ACTIVE");
             return;
         }
         delay(200);
     }
 
     m_synced = false;
-    Serial.printf("[NTPTimeProvider] Sync failed after %lu ms\n", SYNC_TIMEOUT_MS);
-    Serial.println("[NTPTimeProvider] Automatic scheduling is PAUSED (manual requests still available)");
+    LOG_W("everblu_meter", "Sync failed after %lu ms", SYNC_TIMEOUT_MS);
+    LOG_W("everblu_meter", "Automatic scheduling is PAUSED (manual requests still available)");
 }
 
 bool NTPTimeProvider::isTimeSynced() const
