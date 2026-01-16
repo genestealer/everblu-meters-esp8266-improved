@@ -101,6 +101,18 @@ public:
                                    unsigned long failedReads) = 0;
 
     /**
+     * @brief Publish frequency offset
+     * @param offsetMHz Frequency offset in MHz
+     */
+    virtual void publishFrequencyOffset(float offsetMHz) = 0;
+
+    /**
+     * @brief Publish tuned frequency (base frequency + offset)
+     * @param frequencyMHz Actual tuned frequency in MHz with offset applied
+     */
+    virtual void publishTunedFrequency(float frequencyMHz) = 0;
+
+    /**
      * @brief Publish uptime
      * @param uptimeSeconds System uptime in seconds
      * @param uptimeISO Uptime as ISO8601 duration string

@@ -79,6 +79,11 @@ public:
     void performFrequencyScan(bool wideRange);
 
     /**
+     * @brief Reset frequency offset to 0
+     */
+    void resetFrequencyOffset();
+
+    /**
      * @brief Get current read statistics
      * @param totalAttempts Output: total read attempts
      * @param successfulReads Output: successful reads

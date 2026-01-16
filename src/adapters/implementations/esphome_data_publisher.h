@@ -59,14 +59,16 @@ public:
     void set_rssi_percentage_sensor(esphome::sensor::Sensor *sensor) { rssi_percentage_sensor_ = sensor; }
     void set_lqi_sensor(esphome::sensor::Sensor *sensor) { lqi_sensor_ = sensor; }
     void set_lqi_percentage_sensor(esphome::sensor::Sensor *sensor) { lqi_percentage_sensor_ = sensor; }
-    void set_time_start_sensor(esphome::sensor::Sensor *sensor) { time_start_sensor_ = sensor; }
-    void set_time_end_sensor(esphome::sensor::Sensor *sensor) { time_end_sensor_ = sensor; }
+    void set_time_start_sensor(esphome::text_sensor::TextSensor *sensor) { time_start_sensor_ = sensor; }
+    void set_time_end_sensor(esphome::text_sensor::TextSensor *sensor) { time_end_sensor_ = sensor; }
     void set_frequency_sensor(esphome::sensor::Sensor *sensor) { frequency_sensor_ = sensor; }
 
     // Statistics sensors
     void set_total_attempts_sensor(esphome::sensor::Sensor *sensor) { total_attempts_sensor_ = sensor; }
     void set_successful_reads_sensor(esphome::sensor::Sensor *sensor) { successful_reads_sensor_ = sensor; }
     void set_failed_reads_sensor(esphome::sensor::Sensor *sensor) { failed_reads_sensor_ = sensor; }
+    void set_frequency_offset_sensor(esphome::sensor::Sensor *sensor) { frequency_offset_sensor_ = sensor; }
+    void set_tuned_frequency_sensor(esphome::sensor::Sensor *sensor) { tuned_frequency_sensor_ = sensor; }
     void set_uptime_sensor(esphome::sensor::Sensor *sensor) { uptime_sensor_ = sensor; }
 
     // Text sensors
@@ -76,6 +78,10 @@ public:
     void set_timestamp_sensor(esphome::text_sensor::TextSensor *sensor) { timestamp_sensor_ = sensor; }
     void set_history_sensor(esphome::text_sensor::TextSensor *sensor) { history_sensor_ = sensor; }
     void set_version_sensor(esphome::text_sensor::TextSensor *sensor) { version_sensor_ = sensor; }
+    void set_meter_serial_sensor(esphome::text_sensor::TextSensor *sensor) { meter_serial_sensor_ = sensor; }
+    void set_meter_year_sensor(esphome::text_sensor::TextSensor *sensor) { meter_year_sensor_ = sensor; }
+    void set_reading_schedule_sensor(esphome::text_sensor::TextSensor *sensor) { reading_schedule_sensor_ = sensor; }
+    void set_reading_time_utc_sensor(esphome::text_sensor::TextSensor *sensor) { reading_time_utc_sensor_ = sensor; }
 
     // Binary sensors
     void set_active_reading_sensor(esphome::binary_sensor::BinarySensor *sensor) { active_reading_sensor_ = sensor; }
@@ -96,6 +102,8 @@ public:
     void publishError(const char *error) override;
     void publishStatistics(unsigned long totalAttempts, unsigned long successfulReads,
                            unsigned long failedReads) override;
+    void publishFrequencyOffset(float offsetMHz) override;
+    void publishTunedFrequency(float frequencyMHz) override;
     void publishUptime(unsigned long uptimeSeconds, const char *uptimeISO) override;
     void publishFirmwareVersion(const char *version) override;
     void publishDiscovery() override;
@@ -111,15 +119,17 @@ private:
     esphome::sensor::Sensor *rssi_percentage_sensor_{nullptr};
     esphome::sensor::Sensor *lqi_sensor_{nullptr};
     esphome::sensor::Sensor *lqi_percentage_sensor_{nullptr};
-    esphome::sensor::Sensor *time_start_sensor_{nullptr};
-    esphome::sensor::Sensor *time_end_sensor_{nullptr};
+    esphome::text_sensor::TextSensor *time_start_sensor_{nullptr};
+    esphome::text_sensor::TextSensor *time_end_sensor_{nullptr};
     esphome::sensor::Sensor *frequency_sensor_{nullptr};
 
     // Statistics sensors
     esphome::sensor::Sensor *total_attempts_sensor_{nullptr};
     esphome::sensor::Sensor *successful_reads_sensor_{nullptr};
     esphome::sensor::Sensor *failed_reads_sensor_{nullptr};
+    esphome::sensor::Sensor *frequency_offset_sensor_{nullptr};
     esphome::sensor::Sensor *uptime_sensor_{nullptr};
+    esphome::sensor::Sensor *tuned_frequency_sensor_{nullptr};
 
     // Text sensors
     esphome::text_sensor::TextSensor *status_sensor_{nullptr};
@@ -128,6 +138,10 @@ private:
     esphome::text_sensor::TextSensor *timestamp_sensor_{nullptr};
     esphome::text_sensor::TextSensor *history_sensor_{nullptr};
     esphome::text_sensor::TextSensor *version_sensor_{nullptr};
+    esphome::text_sensor::TextSensor *meter_serial_sensor_{nullptr};
+    esphome::text_sensor::TextSensor *meter_year_sensor_{nullptr};
+    esphome::text_sensor::TextSensor *reading_schedule_sensor_{nullptr};
+    esphome::text_sensor::TextSensor *reading_time_utc_sensor_{nullptr};
 
     // Binary sensors
     esphome::binary_sensor::BinarySensor *active_reading_sensor_{nullptr};

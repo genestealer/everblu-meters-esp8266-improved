@@ -14,6 +14,7 @@ from esphome.const import (
     CONF_TIME_ID,
     DEVICE_CLASS_ENERGY,
     DEVICE_CLASS_CONNECTIVITY,
+    DEVICE_CLASS_RUNNING,
     DEVICE_CLASS_SIGNAL_STRENGTH,
     DEVICE_CLASS_TIMESTAMP,
     STATE_CLASS_TOTAL_INCREASING,
@@ -49,6 +50,7 @@ CONF_MAX_RETRIES = "max_retries"
 CONF_RETRY_COOLDOWN = "retry_cooldown"
 CONF_INITIAL_READ_ON_BOOT = "initial_read_on_boot"
 CONF_DEBUG_CC1101 = "debug_cc1101"
+CONF_ADAPTIVE_THRESHOLD = "adaptive_threshold"
 
 # Sensor configuration keys
 CONF_VOLUME = "volume"
@@ -65,13 +67,20 @@ CONF_ERROR = "error"
 CONF_RADIO_STATE = "radio_state"
 CONF_TIMESTAMP = "timestamp"
 CONF_HISTORY_JSON = "history_json"
+CONF_METER_SERIAL_SENSOR = "meter_serial_sensor"
+CONF_METER_YEAR_SENSOR = "meter_year_sensor"
+CONF_READING_SCHEDULE_SENSOR = "reading_schedule_sensor"
+CONF_READING_TIME_UTC_SENSOR = "reading_time_utc_sensor"
 CONF_ACTIVE_READING = "active_reading"
 CONF_RADIO_CONNECTED = "radio_connected"
 CONF_TOTAL_ATTEMPTS = "total_attempts"
 CONF_SUCCESSFUL_READS = "successful_reads"
 CONF_FAILED_READS = "failed_reads"
+CONF_FREQUENCY_OFFSET = "frequency_offset"
+CONF_TUNED_FREQUENCY = "tuned_frequency"
 CONF_REQUEST_READING_BUTTON = "request_reading_button"
 CONF_FREQUENCY_SCAN_BUTTON = "frequency_scan_button"
+CONF_RESET_FREQUENCY_BUTTON = "reset_frequency_button"
 
 # Meter types
 METER_TYPE_WATER = "water"
@@ -109,21 +118,18 @@ CONFIG_SCHEMA = (
             cv.Optional(CONF_RETRY_COOLDOWN, default="1h"): cv.positive_time_period_milliseconds,
             cv.Optional(CONF_INITIAL_READ_ON_BOOT, default=False): cv.boolean,
             cv.Optional(CONF_DEBUG_CC1101, default=False): cv.boolean,
+            cv.Optional(CONF_ADAPTIVE_THRESHOLD, default=1): cv.int_range(min=1, max=100),
             # Sensors
             cv.Optional(CONF_VOLUME): sensor.sensor_schema(
-                unit_of_measurement="L",
-                accuracy_decimals=0,
                 state_class=STATE_CLASS_TOTAL_INCREASING,
-                icon="mdi:water",
             ),
             cv.Optional(CONF_BATTERY): sensor.sensor_schema(
-                unit_of_measurement="years",
-                accuracy_decimals=1,
+                unit_of_measurement="months",
+                accuracy_decimals=0,
                 state_class=STATE_CLASS_MEASUREMENT,
-                icon="mdi:battery",
+                icon="mdi:battery-clock",
             ),
             cv.Optional(CONF_COUNTER): sensor.sensor_schema(
-                accuracy_decimals=0,
                 state_class=STATE_CLASS_TOTAL_INCREASING,
                 icon="mdi:counter",
             ),
@@ -132,48 +138,62 @@ CONFIG_SCHEMA = (
                 accuracy_decimals=0,
                 device_class=DEVICE_CLASS_SIGNAL_STRENGTH,
                 state_class=STATE_CLASS_MEASUREMENT,
+                icon="mdi:signal",
             ),
             cv.Optional(CONF_RSSI_PERCENTAGE): sensor.sensor_schema(
                 unit_of_measurement=UNIT_PERCENT,
                 accuracy_decimals=0,
                 state_class=STATE_CLASS_MEASUREMENT,
-                icon="mdi:signal",
+                icon="mdi:signal-cellular-3",
             ),
             cv.Optional(CONF_LQI): sensor.sensor_schema(
                 accuracy_decimals=0,
                 state_class=STATE_CLASS_MEASUREMENT,
-                icon="mdi:wifi-strength-4",
+                icon="mdi:signal",
             ),
             cv.Optional(CONF_LQI_PERCENTAGE): sensor.sensor_schema(
                 unit_of_measurement=UNIT_PERCENT,
                 accuracy_decimals=0,
                 state_class=STATE_CLASS_MEASUREMENT,
-                icon="mdi:wifi-strength-4",
+                icon="mdi:signal-cellular-outline",
             ),
-            cv.Optional(CONF_TIME_START): sensor.sensor_schema(
-                unit_of_measurement="h",
-                accuracy_decimals=0,
+            cv.Optional(CONF_TIME_START): text_sensor.text_sensor_schema(
                 icon="mdi:clock-start",
             ),
-            cv.Optional(CONF_TIME_END): sensor.sensor_schema(
-                unit_of_measurement="h",
-                accuracy_decimals=0,
+            cv.Optional(CONF_TIME_END): text_sensor.text_sensor_schema(
                 icon="mdi:clock-end",
             ),
             cv.Optional(CONF_TOTAL_ATTEMPTS): sensor.sensor_schema(
                 accuracy_decimals=0,
                 state_class=STATE_CLASS_TOTAL_INCREASING,
                 icon="mdi:counter",
+                entity_category="diagnostic",
             ),
             cv.Optional(CONF_SUCCESSFUL_READS): sensor.sensor_schema(
                 accuracy_decimals=0,
                 state_class=STATE_CLASS_TOTAL_INCREASING,
                 icon="mdi:check-circle",
+                entity_category="diagnostic",
             ),
             cv.Optional(CONF_FAILED_READS): sensor.sensor_schema(
                 accuracy_decimals=0,
                 state_class=STATE_CLASS_TOTAL_INCREASING,
                 icon="mdi:alert-circle",
+                entity_category="diagnostic",
+            ),
+            cv.Optional(CONF_FREQUENCY_OFFSET): sensor.sensor_schema(
+                unit_of_measurement="kHz",
+                accuracy_decimals=3,
+                state_class=STATE_CLASS_MEASUREMENT,
+                icon="mdi:sine-wave",
+                entity_category="diagnostic",
+            ),
+            cv.Optional(CONF_TUNED_FREQUENCY): sensor.sensor_schema(
+                unit_of_measurement="MHz",
+                accuracy_decimals=6,
+                state_class=STATE_CLASS_MEASUREMENT,
+                icon="mdi:radio-tower",
+                entity_category="diagnostic",
             ),
             # Text sensors
             cv.Optional(CONF_STATUS): text_sensor.text_sensor_schema(
@@ -181,9 +201,11 @@ CONFIG_SCHEMA = (
             ),
             cv.Optional(CONF_ERROR): text_sensor.text_sensor_schema(
                 icon="mdi:alert",
+                entity_category="diagnostic",
             ),
             cv.Optional(CONF_RADIO_STATE): text_sensor.text_sensor_schema(
                 icon="mdi:radio-tower",
+                entity_category="diagnostic",
             ),
             cv.Optional(CONF_TIMESTAMP): text_sensor.text_sensor_schema(
                 device_class=DEVICE_CLASS_TIMESTAMP,
@@ -192,9 +214,25 @@ CONFIG_SCHEMA = (
             cv.Optional(CONF_HISTORY_JSON): text_sensor.text_sensor_schema(
                 icon="mdi:history",
             ),
+            cv.Optional(CONF_METER_SERIAL_SENSOR): text_sensor.text_sensor_schema(
+                icon="mdi:barcode",
+                entity_category="diagnostic",
+            ),
+            cv.Optional(CONF_METER_YEAR_SENSOR): text_sensor.text_sensor_schema(
+                icon="mdi:calendar",
+                entity_category="diagnostic",
+            ),
+            cv.Optional(CONF_READING_SCHEDULE_SENSOR): text_sensor.text_sensor_schema(
+                icon="mdi:calendar-clock",
+                entity_category="diagnostic",
+            ),
+            cv.Optional(CONF_READING_TIME_UTC_SENSOR): text_sensor.text_sensor_schema(
+                icon="mdi:clock-outline",
+                entity_category="diagnostic",
+            ),
             # Binary sensors
             cv.Optional(CONF_ACTIVE_READING): binary_sensor.binary_sensor_schema(
-                icon="mdi:radio",
+                device_class=DEVICE_CLASS_RUNNING,
             ),
             cv.Optional(CONF_RADIO_CONNECTED): binary_sensor.binary_sensor_schema(
                 icon="mdi:radio-tower",
@@ -202,7 +240,16 @@ CONFIG_SCHEMA = (
                 entity_category="diagnostic",
             ),
             cv.Optional(CONF_REQUEST_READING_BUTTON): button.button_schema(EverbluMeterTriggerButton),
-            cv.Optional(CONF_FREQUENCY_SCAN_BUTTON): button.button_schema(EverbluMeterTriggerButton),
+            cv.Optional(CONF_FREQUENCY_SCAN_BUTTON): button.button_schema(
+                EverbluMeterTriggerButton,
+                icon="mdi:magnify-scan",
+                entity_category="config"
+            ),
+            cv.Optional(CONF_RESET_FREQUENCY_BUTTON): button.button_schema(
+                EverbluMeterTriggerButton,
+                icon="mdi:restore",
+                entity_category="config"
+            ),
         }
     )
     .extend(cv.polling_component_schema("24h"))
@@ -219,8 +266,9 @@ async def to_code(config):
     # No custom include paths needed when using flat release layout
 
     # Define flags for conditional compilation in ESPHome environment
-    cg.add_define("USE_ESPHOME")
-    cg.add_define("WIFI_SERIAL_NO_REMAP")  # Don't remap Serial in ESPHome builds
+    # Use build flags instead of defines to ensure propagation to ALL .cpp files
+    cg.add_build_flag("-DUSE_ESPHOME")
+    cg.add_build_flag("-DWIFI_SERIAL_NO_REMAP")  # Don't remap Serial in ESPHome builds
     # Provide compile-time values expected by core code as numeric preprocessor defines
     # Use explicit -D flags to ensure visibility in all translation units
     cg.add_build_flag(f"-DMETER_YEAR={config[CONF_METER_YEAR]}")
@@ -246,6 +294,7 @@ async def to_code(config):
     cg.add(var.set_max_retries(config[CONF_MAX_RETRIES]))
     cg.add(var.set_retry_cooldown(config[CONF_RETRY_COOLDOWN]))  # Already in ms
     cg.add(var.set_initial_read_on_boot(config[CONF_INITIAL_READ_ON_BOOT]))
+    cg.add(var.set_adaptive_threshold(config[CONF_ADAPTIVE_THRESHOLD]))
 
     # Enable detailed CC1101 debug logs when requested
     if config.get(CONF_DEBUG_CC1101, False):
@@ -257,7 +306,18 @@ async def to_code(config):
 
     # Register sensors
     if CONF_VOLUME in config:
-        sens = await sensor.new_sensor(config[CONF_VOLUME])
+        volume_cfg = dict(config[CONF_VOLUME])
+        if "unit_of_measurement" not in volume_cfg:
+            volume_cfg["unit_of_measurement"] = "m³" if config[CONF_METER_TYPE] == METER_TYPE_GAS else "L"
+        if "device_class" not in volume_cfg:
+            volume_cfg["device_class"] = "gas" if config[CONF_METER_TYPE] == METER_TYPE_GAS else "water"
+        if "icon" not in volume_cfg:
+            volume_cfg["icon"] = "mdi:gas-cylinder" if config[CONF_METER_TYPE] == METER_TYPE_GAS else "mdi:water"
+        if "accuracy_decimals" not in volume_cfg:
+            volume_cfg["accuracy_decimals"] = 0
+        if "state_class" not in volume_cfg:
+            volume_cfg["state_class"] = STATE_CLASS_TOTAL_INCREASING
+        sens = await sensor.new_sensor(volume_cfg)
         cg.add(var.set_volume_sensor(sens))
     
     if CONF_BATTERY in config:
@@ -265,7 +325,14 @@ async def to_code(config):
         cg.add(var.set_battery_sensor(sens))
     
     if CONF_COUNTER in config:
-        sens = await sensor.new_sensor(config[CONF_COUNTER])
+        counter_cfg = dict(config[CONF_COUNTER])
+        if "icon" not in counter_cfg:
+            counter_cfg["icon"] = "mdi:counter"
+        if "accuracy_decimals" not in counter_cfg:
+            counter_cfg["accuracy_decimals"] = 0
+        if "state_class" not in counter_cfg:
+            counter_cfg["state_class"] = STATE_CLASS_TOTAL_INCREASING
+        sens = await sensor.new_sensor(counter_cfg)
         cg.add(var.set_counter_sensor(sens))
     
     if CONF_RSSI in config:
@@ -285,11 +352,11 @@ async def to_code(config):
         cg.add(var.set_lqi_percentage_sensor(sens))
     
     if CONF_TIME_START in config:
-        sens = await sensor.new_sensor(config[CONF_TIME_START])
+        sens = await text_sensor.new_text_sensor(config[CONF_TIME_START])
         cg.add(var.set_time_start_sensor(sens))
     
     if CONF_TIME_END in config:
-        sens = await sensor.new_sensor(config[CONF_TIME_END])
+        sens = await text_sensor.new_text_sensor(config[CONF_TIME_END])
         cg.add(var.set_time_end_sensor(sens))
     
     if CONF_TOTAL_ATTEMPTS in config:
@@ -304,6 +371,14 @@ async def to_code(config):
         sens = await sensor.new_sensor(config[CONF_FAILED_READS])
         cg.add(var.set_failed_reads_sensor(sens))
     
+    if CONF_FREQUENCY_OFFSET in config:
+        sens = await sensor.new_sensor(config[CONF_FREQUENCY_OFFSET])
+        cg.add(var.set_frequency_offset_sensor(sens))
+    
+    if CONF_TUNED_FREQUENCY in config:
+        sens = await sensor.new_sensor(config[CONF_TUNED_FREQUENCY])
+        cg.add(var.set_tuned_frequency_sensor(sens))
+
     # Register text sensors
     if CONF_STATUS in config:
         sens = await text_sensor.new_text_sensor(config[CONF_STATUS])
@@ -324,6 +399,22 @@ async def to_code(config):
     if CONF_HISTORY_JSON in config:
         sens = await text_sensor.new_text_sensor(config[CONF_HISTORY_JSON])
         cg.add(var.set_history_sensor(sens))
+
+    if CONF_METER_SERIAL_SENSOR in config:
+        sens = await text_sensor.new_text_sensor(config[CONF_METER_SERIAL_SENSOR])
+        cg.add(var.set_meter_serial_sensor(sens))
+
+    if CONF_METER_YEAR_SENSOR in config:
+        sens = await text_sensor.new_text_sensor(config[CONF_METER_YEAR_SENSOR])
+        cg.add(var.set_meter_year_sensor(sens))
+
+    if CONF_READING_SCHEDULE_SENSOR in config:
+        sens = await text_sensor.new_text_sensor(config[CONF_READING_SCHEDULE_SENSOR])
+        cg.add(var.set_reading_schedule_sensor(sens))
+
+    if CONF_READING_TIME_UTC_SENSOR in config:
+        sens = await text_sensor.new_text_sensor(config[CONF_READING_TIME_UTC_SENSOR])
+        cg.add(var.set_reading_time_utc_sensor(sens))
     
     # Register binary sensors
     if CONF_ACTIVE_READING in config:
@@ -338,8 +429,16 @@ async def to_code(config):
         btn = await button.new_button(config[CONF_REQUEST_READING_BUTTON])
         cg.add(btn.set_parent(var))
         cg.add(btn.set_frequency_scan(False))
+        cg.add(btn.set_reset_frequency(False))
 
     if CONF_FREQUENCY_SCAN_BUTTON in config:
         btn = await button.new_button(config[CONF_FREQUENCY_SCAN_BUTTON])
         cg.add(btn.set_parent(var))
         cg.add(btn.set_frequency_scan(True))
+        cg.add(btn.set_reset_frequency(False))
+
+    if CONF_RESET_FREQUENCY_BUTTON in config:
+        btn = await button.new_button(config[CONF_RESET_FREQUENCY_BUTTON])
+        cg.add(btn.set_parent(var))
+        cg.add(btn.set_frequency_scan(False))
+        cg.add(btn.set_reset_frequency(True))

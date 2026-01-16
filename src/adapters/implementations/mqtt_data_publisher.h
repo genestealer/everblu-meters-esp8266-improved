@@ -34,6 +34,8 @@ public:
     void publishError(const char *error) override;
     void publishStatistics(unsigned long totalAttempts, unsigned long successfulReads,
                            unsigned long failedReads) override;
+    void publishFrequencyOffset(float offsetMHz) override;
+    void publishTunedFrequency(float frequencyMHz) override;
     void publishUptime(unsigned long uptimeSeconds, const char *uptimeISO) override;
     void publishFirmwareVersion(const char *version) override;
     void publishDiscovery() override;
@@ -76,6 +78,7 @@ public:
     void publishActiveReading(bool) override {}
     void publishError(const char *) override {}
     void publishStatistics(unsigned long, unsigned long, unsigned long) override {}
+    void publishFrequencyOffset(float) override {}
     void publishUptime(unsigned long, const char *) override {}
     void publishFirmwareVersion(const char *) override {}
     void publishDiscovery() override {}

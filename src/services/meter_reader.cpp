@@ -6,9 +6,18 @@
 #include "meter_reader.h"
 #include "schedule_manager.h"
 #include "meter_history.h"
+
+// Conditional includes based on build environment
+#ifdef USE_ESPHOME
+#include "utils.h"
+#include "wifi_serial.h"
+#include "logging.h"
+#else
 #include "../core/utils.h"
 #include "../core/wifi_serial.h"
 #include "../core/logging.h"
+#endif
+
 #include <Arduino.h>
 
 // Schedule check interval (milliseconds)
@@ -58,12 +67,11 @@ void MeterReader::begin()
     FrequencyManager::begin(frequency);
     FrequencyManager::setAutoScanEnabled(m_config->isAutoScanEnabled());
 
-    // Initialize CC1101 at tuned frequency so we can publish hardware state
-    float effectiveFrequency = FrequencyManager::getTunedFrequency();
-    if (effectiveFrequency <= 0.0f)
-    {
-        effectiveFrequency = frequency + FrequencyManager::getOffset();
-    }
+    // Note: Adaptive threshold is set by the platform (ESPHome/MQTT) after this method
+    // For MQTT: set via ADAPTIVE_THRESHOLD define in private.h
+    // For ESPHome: set via setAdaptiveThreshold() in everblu_meter.cpp
+
+    float effectiveFrequency = frequency + FrequencyManager::getOffset();
 
     bool radio_ok = cc1101_init(effectiveFrequency);
 
@@ -87,9 +95,16 @@ void MeterReader::begin()
     m_initialized = true;
     LOG_I("everblu_meter", "Initialization complete");
 
-    // Publish initial states to all configured sensors
-    // In ESPHome mode, this gets republished when HA connects via the component
-    // In standalone mode, this ensures sensors don't show "Unknown"
+#ifdef USE_ESPHOME
+    // In ESPHome mode avoid publishing zero/blank states on boot to prevent HA from overwriting restored history.
+    if (m_publisher)
+    {
+        char utc_time_buf[8];
+        snprintf(utc_time_buf, sizeof(utc_time_buf), "%02d:%02d", utcHour, utcMinute);
+        m_publisher->publishMeterSettings(m_config->getMeterYear(), m_config->getMeterSerial(), m_config->getReadingSchedule(), utc_time_buf, m_config->getFrequency());
+    }
+#else
+    // Standalone/MQTT mode: publish initial states so entities are not Unknown
     if (m_publisher)
     {
         LOG_I("everblu_meter", "Publishing initial sensor states...");
@@ -112,6 +127,8 @@ void MeterReader::begin()
 
         // Publish initial statistics (all zeros)
         m_publisher->publishStatistics(0, 0, 0);
+        m_publisher->publishFrequencyOffset(FrequencyManager::getOffset());
+        m_publisher->publishTunedFrequency(FrequencyManager::getTunedFrequency());
 
         LOG_I("everblu_meter", "Initial states published");
     }
@@ -119,6 +136,7 @@ void MeterReader::begin()
     {
         LOG_W("everblu_meter", "Publisher not available, cannot publish initial states");
     }
+#endif
 }
 
 void MeterReader::loop()
@@ -156,6 +174,8 @@ void MeterReader::loop()
         if (m_publisher->isReady())
         {
             m_publisher->publishStatistics(m_totalReadAttempts, m_successfulReads, m_failedReads);
+            m_publisher->publishFrequencyOffset(FrequencyManager::getOffset());
+            m_publisher->publishTunedFrequency(FrequencyManager::getTunedFrequency());
         }
     }
 }
@@ -243,8 +263,13 @@ void MeterReader::performReading()
     // Increment attempt counter
     m_totalReadAttempts++;
 
-    LOG_I("everblu_meter", "Reading attempt %lu (retry %d/%d)",
-          m_totalReadAttempts, m_retryCount, m_config->getMaxRetries());
+    // Log current radio frequency for diagnostics
+    float currentFreq = FrequencyManager::getTunedFrequency();
+    float currentOffset = FrequencyManager::getOffset();
+
+    LOG_I("everblu_meter", "Reading attempt %lu (retry %d/%d) at %.6f MHz (offset: %.3f kHz)",
+          m_totalReadAttempts, m_retryCount, m_config->getMaxRetries(),
+          currentFreq, currentOffset * 1000.0);
 
     // Perform actual meter read
     struct tmeter_data meter_data = get_meter_data();
@@ -271,6 +296,9 @@ void MeterReader::handleSuccessfulRead(const tmeter_data &data)
     m_successfulReads++;
     m_lastErrorMessage = "None";
 
+    // Perform adaptive frequency tracking based on FREQEST register
+    FrequencyManager::adaptiveFrequencyTracking(data.freqest);
+
     // Get timestamp
     char iso8601[32];
     time_t now = m_timeProvider->getCurrentTime();
@@ -290,6 +318,8 @@ void MeterReader::handleSuccessfulRead(const tmeter_data &data)
 
     // Publish updated statistics
     m_publisher->publishStatistics(m_totalReadAttempts, m_successfulReads, m_failedReads);
+    m_publisher->publishFrequencyOffset(FrequencyManager::getOffset());
+    m_publisher->publishTunedFrequency(FrequencyManager::getTunedFrequency());
 
     // Update status
     m_publisher->publishActiveReading(false);
@@ -333,6 +363,7 @@ void MeterReader::handleFailedRead()
         m_publisher->publishError(m_lastErrorMessage);
         m_publisher->publishStatusMessage("Failed after max retries");
         m_publisher->publishStatistics(m_totalReadAttempts, m_successfulReads, m_failedReads);
+        m_publisher->publishFrequencyOffset(FrequencyManager::getOffset());
         m_publisher->publishActiveReading(false);
         m_publisher->publishRadioState("Idle");
 
@@ -364,6 +395,35 @@ void MeterReader::performFrequencyScan(bool wideRange)
     }
 
     LOG_I("everblu_meter", "Frequency scan complete");
+
+    // Publish the updated frequency offset immediately after scan completes
+    if (m_publisher)
+    {
+        float offsetMHz = FrequencyManager::getOffset();
+        m_publisher->publishFrequencyOffset(offsetMHz);
+        m_publisher->publishTunedFrequency(FrequencyManager::getTunedFrequency());
+    }
+}
+
+void MeterReader::resetFrequencyOffset()
+{
+    LOG_I("everblu_meter", "Resetting frequency offset to 0");
+
+    // Reset offset to 0 and save
+    FrequencyManager::saveFrequencyOffset(0.0);
+
+    // Reinitialize radio with base frequency
+    float baseFrequency = FrequencyManager::getBaseFrequency();
+    cc1101_init(baseFrequency);
+
+    LOG_I("everblu_meter", "Radio reinitialized with base frequency: %.6f MHz", baseFrequency);
+
+    // Publish the reset values
+    if (m_publisher)
+    {
+        m_publisher->publishFrequencyOffset(0.0);
+        m_publisher->publishTunedFrequency(baseFrequency);
+    }
 }
 
 void MeterReader::getStatistics(unsigned long &totalAttempts, unsigned long &successfulReads,

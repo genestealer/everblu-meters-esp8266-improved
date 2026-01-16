@@ -121,6 +121,7 @@ See the Hardware section below for full wiring tables and pictures.
   - `METER_YEAR` and `METER_SERIAL` (from the meter label)
   - `METER_TYPE` - set to `"water"` (default) or `"gas"` depending on your meter type
   - `MAX_RETRIES` - maximum reading retry attempts before cooldown (optional, default is 10)
+  - `ADAPTIVE_THRESHOLD` - how many successful reads before adjusting frequency (optional, default is 1 = adjust after each read)
   - `WIFI_SERIAL_MONITOR_ENABLED` - set to `1` to enable WiFi serial monitor for remote debugging (default is `0` for security)
 - `platformio.ini`: select `env:huzzah` (ESP8266 HUZZAH) or `env:esp32dev` (ESP32 DevKit).
 

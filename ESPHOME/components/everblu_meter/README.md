@@ -106,6 +106,10 @@ See [ESPHOME_INTEGRATION_GUIDE.md](../ESPHOME_INTEGRATION_GUIDE.md) for complete
 - `read_hour`/`read_minute`: Time to read (default: 10:00)
 - `max_retries`: Read attempts (default: 10)
 - `retry_cooldown`: Cooldown duration (default: 1h)
+- `adaptive_threshold`: How many successful reads before adjusting frequency (default: 1)
+  - `1`: Adjust after every read (best for infrequent daily readings or drifting frequencies)
+  - `5`: Adjust after 5 successful reads (good balance)
+  - `10+`: Adjust only after many reads (best for stable, frequent readings)
 - `request_reading_button`: Optional ESPHome button to trigger an on-demand reading
 - `frequency_scan_button`: Optional ESPHome button to start a narrow frequency scan
 

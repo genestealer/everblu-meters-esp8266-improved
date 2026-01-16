@@ -14,9 +14,6 @@
 /* No __has_include support; skip optional private.h */
 #endif
 #endif
-#ifdef USE_ESPHOME
-#define WIFI_SERIAL_NO_REMAP
-#endif
 #include "wifi_serial.h" // Optional WiFi serial mirroring
 #include <SPI.h>         // Include the SPI library for SPI communication
 #if defined(ESP32)
@@ -557,6 +554,9 @@ bool cc1101_init(float freq)
   delay(5);          // Wait for calibration to complete (typically <1ms, but we add margin)
 
   echo_debug(debug_out, "[CC1101] Frequency synthesizer calibrated for %.6f MHz\n", freq);
+
+  // Put radio into RX listening mode so it can receive meter data
+  cc1101_rec_mode();
 
   return true;
 }

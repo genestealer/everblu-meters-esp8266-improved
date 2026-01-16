@@ -62,6 +62,14 @@ void setMHZ(float mhz);
 bool cc1101_init(float freq);
 
 /**
+ * @brief Put CC1101 radio into receive (RX) mode
+ *
+ * Configures the radio to listen for incoming meter transmissions.
+ * Must be called after initialization or frequency changes to enable reception.
+ */
+void cc1101_rec_mode(void);
+
+/**
  * @brief Read data from Everblu Cyble water/gas meter
  *
  * Performs a complete read cycle:

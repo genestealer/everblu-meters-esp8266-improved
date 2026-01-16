@@ -53,16 +53,80 @@ everblu_meter:
   # Control button (optional but handy)
   request_reading_button:
     name: "Read Gas Meter Now"
-  
-  # Radio status (diagnostic)
-  radio_connected:
-    name: "Radio Connected"
+  frequency_scan_button:
+    name: "Scan Frequency"
+  reset_frequency_button:
+    name: "Reset Frequency Offset"
   
   volume:
     name: "Gas Volume"
-    unit_of_measurement: "m³"
-    device_class: gas
-    state_class: total_increasing
-  
+
+  counter:
+    name: "Read Counter"
+
+  battery:
+    name: "Meter Battery"
+
+  rssi:
+    name: "Meter RSSI"
+
+  rssi_percentage:
+    name: "RSSI Percentage"
+
+  lqi:
+    name: "LQI"
+
+  lqi_percentage:
+    name: "LQI Percentage"
+
+  total_attempts:
+    name: "Total Read Attempts"
+
+  successful_reads:
+    name: "Successful Reads"
+
+  failed_reads:
+    name: "Failed Reads"
+
+  frequency_offset:
+    name: "Frequency Offset"
+
+  tuned_frequency:
+    name: "Tuned Frequency (MHz)"
+
+  meter_serial_sensor:
+    name: "Meter Serial"
+  meter_year_sensor:
+    name: "Meter Year"
+  reading_schedule_sensor:
+    name: "Reading Schedule"
+  reading_time_utc_sensor:
+    name: "Reading Time (UTC)"
+
+  # Timing sensors (24-hour format: HH:MM)
+  time_start:
+    name: "Reading Start Time"
+
+  time_end:
+    name: "Reading End Time"
+
   status:
     name: "Meter Status"
+
+  error:
+    name: "Last Error"
+
+  radio_state:
+    name: "CC1101 State"
+
+  timestamp:
+    name: "Last Reading Time"
+
+  history_json:
+    name: "Meter History (JSON)"
+
+  active_reading:
+    name: "Reading Active"
+
+  radio_connected:
+    name: "CC1101 Connected"

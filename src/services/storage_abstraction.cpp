@@ -6,7 +6,7 @@
 #include "storage_abstraction.h"
 #include "../core/logging.h"
 
-// Prefer ESPHome preferences when available, even if a define was missed
+// Fallback to ESPHome preferences
 #if defined(USE_ESPHOME) || (__has_include("esphome/core/preferences.h"))
 #include "esphome/core/preferences.h"
 #define EVERBLU_USE_ESPHOME_PREFS 1
@@ -36,14 +36,64 @@ bool StorageAbstraction::begin()
 bool StorageAbstraction::saveFloat(const char *key, float value, uint16_t magic)
 {
 #ifdef EVERBLU_USE_ESPHOME_PREFS
-    // ESPHome preferences API
+    // ESPHome preferences API - use a struct to ensure proper storage
+    if (esphome::global_preferences == nullptr)
+    {
+        LOG_E("everblu_meter", "Cannot save %s: global_preferences is null!", key);
+        return false;
+    }
+
+    // Create a unique hash for this key
     uint32_t hash = esphome::fnv1_hash(key);
-    esphome::ESPPreferenceObject pref = esphome::global_preferences->make_preference<float>(hash);
-    bool success = pref.save(&value);
+    LOG_D("everblu_meter", "Saving %s (hash: 0x%08X) = %.6f", key, hash, value);
+
+    // Use struct wrapper to ensure proper storage format
+    struct FloatStorage
+    {
+        uint16_t magic_number;
+        float data;
+    };
+
+    FloatStorage storage;
+    storage.magic_number = magic;
+    storage.data = value;
+
+    // Use ESPHome's standard flash-based preferences storage
+    esphome::ESPPreferenceObject pref = esphome::global_preferences->make_preference<FloatStorage>(hash);
+    bool success = pref.save(&storage);
 
     if (success)
     {
         LOG_I("everblu_meter", "Saved %s = %.6f to ESPHome preferences", key, value);
+
+        // Force sync to ensure data is written to flash
+        esphome::global_preferences->sync();
+        // Longer delay to ensure flash write completes on ESP8266
+        delay(100);
+
+        // Verify the save by reading back the value
+        FloatStorage readback;
+        readback.magic_number = 0;
+        readback.data = 0.0f;
+
+        if (pref.load(&readback))
+        {
+            if (readback.magic_number == magic && readback.data == value)
+            {
+                LOG_I("everblu_meter", "✓ Verification PASSED: Read back %.6f with magic 0x%04X", readback.data, readback.magic_number);
+            }
+            else
+            {
+                LOG_E("everblu_meter", "✗ Verification FAILED: Wrote %.6f (magic 0x%04X) but read back %.6f (magic 0x%04X)",
+                      value, magic, readback.data, readback.magic_number);
+                return false;
+            }
+        }
+        else
+        {
+            LOG_E("everblu_meter", "✗ Verification FAILED: Could not read back value for %s", key);
+            return false;
+        }
     }
     else
     {
@@ -106,16 +156,45 @@ float StorageAbstraction::loadFloat(const char *key, float defaultValue, uint16_
                                     float minValue, float maxValue)
 {
 #ifdef EVERBLU_USE_ESPHOME_PREFS
-    // ESPHome preferences API
-    uint32_t hash = esphome::fnv1_hash(key);
-    esphome::ESPPreferenceObject pref = esphome::global_preferences->make_preference<float>(hash);
-
-    float value = defaultValue;
-    if (!pref.load(&value))
+    // ESPHome preferences API - use same struct as save
+    if (esphome::global_preferences == nullptr)
     {
-        LOG_I("everblu_meter", "No valid data for %s in ESPHome preferences", key);
+        LOG_E("everblu_meter", "Cannot load %s: global_preferences is null!", key);
         return defaultValue;
     }
+
+    uint32_t hash = esphome::fnv1_hash(key);
+    LOG_D("everblu_meter", "Loading %s (hash: 0x%08X)", key, hash);
+
+    // Use struct wrapper matching the save format
+    struct FloatStorage
+    {
+        uint16_t magic_number;
+        float data;
+    };
+
+    // Use ESPHome's standard flash-based preferences storage
+    esphome::ESPPreferenceObject pref = esphome::global_preferences->make_preference<FloatStorage>(hash);
+
+    FloatStorage storage;
+    storage.magic_number = 0;
+    storage.data = defaultValue;
+
+    if (!pref.load(&storage))
+    {
+        LOG_I("everblu_meter", "No valid data for %s in ESPHome preferences (returning default: %.6f)", key, defaultValue);
+        return defaultValue;
+    }
+
+    // Validate magic number
+    if (storage.magic_number != magic)
+    {
+        LOG_W("everblu_meter", "Invalid magic number for %s: expected 0x%04X, got 0x%04X (returning default)",
+              key, magic, storage.magic_number);
+        return defaultValue;
+    }
+
+    float value = storage.data;
 
     // Sanity check: ensure value is within acceptable range
     if (value < minValue || value > maxValue)

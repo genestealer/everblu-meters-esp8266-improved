@@ -177,6 +177,22 @@ void MQTTDataPublisher::publishStatistics(unsigned long totalAttempts, unsigned 
     publish("failed_reads", buffer, true);
 }
 
+void MQTTDataPublisher::publishFrequencyOffset(float offsetMHz)
+{
+    char buffer[16];
+    // Convert MHz to kHz to match MQTT discovery
+    snprintf(buffer, sizeof(buffer), "%.3f", offsetMHz * 1000.0f);
+    publish("frequency_offset", buffer, true);
+}
+
+void MQTTDataPublisher::publishTunedFrequency(float frequencyMHz)
+{
+    char buffer[16];
+    // Publish in MHz with high precision (4 decimal places = kHz resolution)
+    snprintf(buffer, sizeof(buffer), "%.6f", frequencyMHz);
+    publish("tuned_frequency", buffer, true);
+}
+
 void MQTTDataPublisher::publishUptime(unsigned long uptimeSeconds, const char *uptimeISO)
 {
     char buffer[32];
