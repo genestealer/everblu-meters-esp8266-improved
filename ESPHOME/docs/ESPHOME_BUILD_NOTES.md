@@ -1,5 +1,7 @@
 # ESPHome Build Configuration Notes
 
+> **📖 Documentation**: See [README](README.md) for complete ESPHome documentation index.
+
 ## Source File Access
 
 The ESPHome component needs access to the source files in `../../src/`. There are several ways to handle this:

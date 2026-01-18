@@ -2,6 +2,11 @@
 
 This guide explains how to use the EverBlu Cyble Enhanced meter reader with ESPHome, allowing seamless integration with Home Assistant.
 
+> **📖 Quick Navigation**: 
+> - [Main Documentation](README.md) - Overview and links to all docs
+> - [Quick Reference](QUICK_REFERENCE.md) - Quick lookup for common tasks
+> - [Developer Guide](DEVELOPER_GUIDE.md) - Technical architecture details
+
 ## Table of Contents
 
 - [Overview](#overview)

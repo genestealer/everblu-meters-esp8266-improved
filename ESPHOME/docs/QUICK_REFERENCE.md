@@ -2,6 +2,8 @@
 
 Quick reference for EverBlu meter ESPHome configuration.
 
+> **📖 Complete Documentation**: See [README](README.md) for overview and links to all documentation.
+
 ## Installation
 
 ```bash

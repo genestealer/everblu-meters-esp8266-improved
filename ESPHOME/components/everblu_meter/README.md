@@ -89,7 +89,7 @@ Located in `../../src/`:
 
 ## Configuration Options
 
-See [ESPHOME_INTEGRATION_GUIDE.md](../ESPHOME_INTEGRATION_GUIDE.md) for complete documentation.
+See [ESPHOME_INTEGRATION_GUIDE.md](../../docs/ESPHOME_INTEGRATION_GUIDE.md) for complete documentation.
 
 ### Required
 
@@ -155,10 +155,10 @@ everblu_meter:
 
 ### Complete Examples
 
-See parent directory for complete examples:
-- `../example-water-meter.yaml` - Full featured water meter
-- `../example-gas-meter-minimal.yaml` - Minimal gas meter
-- `../example-advanced.yaml` - Advanced features
+See ESPHOME directory for complete examples:
+- `../../example-water-meter.yaml` - Full featured water meter
+- `../../example-gas-meter-minimal.yaml` - Minimal gas meter
+- `../../example-advanced.yaml` - Advanced features
 
 ## Development
 
@@ -209,7 +209,7 @@ external_components:
 2. **Time errors**: Ensure time component is configured and synchronized
 3. **Sensor errors**: Verify sensors are registered in YAML
 
-See [ESPHOME_INTEGRATION_GUIDE.md](../ESPHOME_INTEGRATION_GUIDE.md) for detailed troubleshooting.
+See [ESPHOME_INTEGRATION_GUIDE.md](../../docs/ESPHOME_INTEGRATION_GUIDE.md) for detailed troubleshooting.
 
 ## License
 
@@ -221,6 +221,8 @@ Based on the EverBlu Meters ESP8266 project with architectural improvements for 
 
 ## Links
 
-- **Documentation**: [ESPHOME_INTEGRATION_GUIDE.md](../ESPHOME_INTEGRATION_GUIDE.md)
+- **Documentation**: [ESPHome Docs](../../docs/README.md)
+- **Integration Guide**: [ESPHOME_INTEGRATION_GUIDE.md](../../docs/ESPHOME_INTEGRATION_GUIDE.md)
+- **Developer Guide**: [DEVELOPER_GUIDE.md](../../docs/DEVELOPER_GUIDE.md)
 - **Main README**: [../../README.md](../../README.md)
 - **GitHub**: https://github.com/yourusername/everblu-meters-esp8266-improved
