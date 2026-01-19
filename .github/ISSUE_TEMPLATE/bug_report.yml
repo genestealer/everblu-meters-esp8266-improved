@@ -32,6 +32,44 @@ body:
     validations:
       required: true
 
+  - type: dropdown
+    id: chip_family
+    attributes:
+      label: Chip family
+      description: Select the microcontroller family.
+      options:
+        - ESP8266
+        - ESP32
+    validations:
+      required: true
+
+  - type: dropdown
+    id: board_model
+    attributes:
+      label: Board / Model
+      description: Select your board from the supported PlatformIO environments or choose "Other".
+      options:
+        - Adafruit HUZZAH ESP8266 (huzzah)
+        - WeMos D1 Mini Pro (d1_mini_pro)
+        - WeMos D1 Mini (d1_mini)
+        - NodeMCU v2 (ESP-12E) (nodemcuv2)
+        - ESP32 DevKit (esp32dev)
+        - Other (not listed)
+    validations:
+      required: true
+
+  - type: input
+    id: board_model_other
+    attributes:
+      label: If "Other", enter model name
+      placeholder: e.g., TTGO T-Display, custom board
+      description: Only fill this if you selected "Other" above.
+    validations:
+      required: true
+    if:
+      field: board_model
+      equals: Other (not listed)
+
   - type: checkboxes
     id: checklist
     attributes:
