@@ -71,7 +71,11 @@ cd everblu-meters-esp8266-improved
 **Important**: Before using external_components, you must prepare the component by copying source dependencies. Run this from the repository root:
 
 ```bash
-./prepare-component-release.sh
+# Windows PowerShell
+pwsh ESPHOME/prepare-component-release.ps1
+
+# Linux/macOS
+bash ESPHOME/prepare-component-release.sh
 ```
 
 This script copies all required files from `src/` into `ESPHOME/components/everblu_meter/src/`, making the component self-contained.
@@ -104,7 +108,11 @@ If you prefer to copy files locally:
 
 ```bash
 # From repository root
-./prepare-component-release.sh
+# Windows PowerShell
+pwsh ESPHOME/prepare-component-release.ps1
+
+# Linux/macOS
+bash ESPHOME/prepare-component-release.sh
 
 # Then copy to ESPHome config
 cp -r ESPHOME/components/everblu_meter /config/esphome/custom_components/

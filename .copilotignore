@@ -1,0 +1,7 @@
+# GitHub Copilot Content Exclusion
+# Prevent Copilot from reading generated release artifacts.
+# Patterns follow .gitignore-style syntax.
+
+ESPHOME-release/
+ESPHOME-release/**
+**/ESPHOME-release/**

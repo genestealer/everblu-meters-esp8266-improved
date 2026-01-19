@@ -47,7 +47,11 @@ Before using the component, prepare it for distribution:
 
 ```bash
 # From repository root
-./ESPHOME/prepare-component-release.sh
+# Windows PowerShell
+pwsh ESPHOME/prepare-component-release.ps1
+
+# Linux/macOS
+bash ESPHOME/prepare-component-release.sh
 ```
 
 ### 2. Use as External Component

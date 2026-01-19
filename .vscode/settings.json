@@ -1,0 +1,11 @@
+// {
+//   "files.exclude": {
+//     "**/ESPHOME-release/**": true
+//   },
+//   "search.exclude": {
+//     "**/ESPHOME-release/**": true
+//   },
+//   "files.watcherExclude": {
+//     "**/ESPHOME-release/**": true
+//   }
+// }
