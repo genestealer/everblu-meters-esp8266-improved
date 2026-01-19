@@ -12,8 +12,8 @@ Complete ESPHome custom component for reading EverBlu Cyble Enhanced water and g
   - Full configuration reference
   - Sensor documentation
   - Troubleshooting guide
-  
-- **[Quick Reference](QUICK_REFERENCE.md)** - Quick lookup for common tasks
+
+- **[Configuration Reference](#configuration-reference)** - Quick lookup for common tasks on this page
   - Configuration parameter tables
   - Common configuration patterns
   - Wiring diagrams
@@ -53,7 +53,7 @@ external_components:
   - source:
       type: git
       url: https://github.com/genestealer/everblu-meters-esp8266-improved
-      ref: fix-esphome
+      ref: main
       path: ESPHOME-release
     components: [ everblu_meter ]
     refresh: 1d
@@ -85,10 +85,83 @@ everblu_meter:
     name: "Status"
 ```
 
+For a manual local install, copy the component into your ESPHome `custom_components` folder:
+
+```bash
+cp -r ESPHOME-release/everblu_meter /config/esphome/custom_components/
+```
+
 ### 2. Build and Upload
 
 ```bash
 esphome run your-config.yaml
+```
+
+## 🧰 Configuration Reference
+
+### Key Parameters
+
+| Parameter | Type | Default | Required | Description |
+|-----------|------|---------|----------|-------------|
+| `meter_year` | int | - | ✅ | Meter year (0-99) |
+| `meter_serial` | int | - | ✅ | Serial number |
+| `meter_type` | enum | - | ✅ | `water` or `gas` |
+| `gdo0_pin` | int | - | ✅ | CC1101 GDO0 GPIO |
+| `time_id` | id | - | ✅ | Time component ID |
+| `frequency` | float | 433.82 | ❌ | RF frequency (MHz) |
+| `auto_scan` | bool | true | ❌ | Auto frequency scan |
+| `schedule` | enum | Monday-Friday | ❌ | Reading schedule |
+| `read_hour` | int | 10 | ❌ | Read hour (0-23) |
+| `read_minute` | int | 0 | ❌ | Read minute (0-59) |
+| `max_retries` | int | 10 | ❌ | Max read attempts |
+| `retry_cooldown` | duration | 1h | ❌ | Cooldown time |
+| `gas_volume_divisor` | int | 100 | ❌ | Gas divisor (100/1000) |
+
+### Schedule Options
+
+- Monday-Friday - Weekdays (default)
+- Saturday - Saturdays only
+- Sunday - Sundays only
+- Everyday - All days
+
+### Custom Schedule Example
+
+```yaml
+everblu_meter:
+  meter_year: 21
+  meter_serial: 12345678
+  gdo0_pin: 4
+  meter_type: water
+  time_id: ha_time
+  
+  # Weekend-only, early morning
+  schedule: Saturday
+  read_hour: 6
+  read_minute: 30
+  
+  # Aggressive retries
+  max_retries: 15
+  retry_cooldown: 30min
+  
+  volume:
+    name: "Volume"
+```
+
+### Logging
+
+```yaml
+logger:
+  level: DEBUG
+  logs:
+    everblu_meter: VERBOSE  # Maximum detail
+    sensor: WARN            # Reduce sensor noise
+```
+
+### Timezone Adjustment
+
+```yaml
+everblu_meter:
+  timezone_offset: -5  # Hours from UTC
 ```
 
 ## 📋 Features
@@ -128,6 +201,19 @@ Three complete example configurations are provided:
 | CSN        | D8      | 15   |
 | GDO0       | D1      | 5    |
 | GDO2       | D2      | 4    |
+
+### Wiring (ESP32)
+
+| CC1101 | ESP32 |
+|--------|-------|
+| VCC    | 3.3V  |
+| GND    | GND   |
+| SCK    | 18    |
+| MISO   | 19    |
+| MOSI   | 23    |
+| CSN    | 5     |
+| GDO0   | 4     |
+| GDO2   | 2     |
 
 ⚠️ **Important**: The CC1101 requires 3.3V power. Do not connect to 5V!
 
@@ -265,6 +351,12 @@ everblu_meter:
   gas_volume_divisor: 1000  # Try 100 or 1000
 ```
 
+**Incorrect time or timezone:**
+```yaml
+everblu_meter:
+  timezone_offset: -5  # Hours from UTC
+```
+
 For detailed troubleshooting, see the [Integration Guide](ESPHOME_INTEGRATION_GUIDE.md#troubleshooting).
 
 ## 📜 License
@@ -286,6 +378,6 @@ Based on the EverBlu Meters ESP8266 project with architectural improvements for 
 
 **Need Help?**
 - 📖 Start with the [Integration Guide](ESPHOME_INTEGRATION_GUIDE.md)
-- 🔍 Check the [Quick Reference](QUICK_REFERENCE.md) for common tasks
+- 🔍 See the Configuration Reference above for parameters and quick fixes
 - 🐛 See [Troubleshooting](ESPHOME_INTEGRATION_GUIDE.md#troubleshooting) for common issues
 - 👨‍💻 Developers: See [Developer Guide](DEVELOPER_GUIDE.md) for architecture details

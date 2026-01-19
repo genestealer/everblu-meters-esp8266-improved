@@ -82,7 +82,7 @@ external_components:
   - source:
       type: git
       url: https://github.com/genestealer/everblu-meters-esp8266-improved
-      ref: fix-esphome
+      ref: main
     components: [ everblu_meter ]
     refresh: 1d
 ```

@@ -4,7 +4,7 @@ This guide explains how to use the EverBlu Cyble Enhanced meter reader with ESPH
 
 > **📖 Quick Navigation**: 
 > - [Main Documentation](README.md) - Overview and links to all docs
-> - [Quick Reference](QUICK_REFERENCE.md) - Quick lookup for common tasks
+> - [Configuration Reference](README.md#configuration-reference) - Quick lookup for common tasks
 > - [Developer Guide](DEVELOPER_GUIDE.md) - Technical architecture details
 
 ## Table of Contents
@@ -68,7 +68,7 @@ external_components:
   - source:
       type: git
       url: https://github.com/genestealer/everblu-meters-esp8266-improved
-      ref: fix-esphome
+      ref: main
       path: ESPHOME-release
     components: [ everblu_meter ]
     refresh: 1d
@@ -124,7 +124,7 @@ external_components:
   - source:
       type: git
       url: https://github.com/genestealer/everblu-meters-esp8266-improved
-      ref: fix-esphome
+      ref: main
       path: ESPHOME-release
     components: [ everblu_meter ]
     refresh: 1d
