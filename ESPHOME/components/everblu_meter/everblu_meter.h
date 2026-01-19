@@ -9,6 +9,12 @@
 
 #pragma once
 
+// Editor note: VS Code/IntelliSense may display include errors such as
+// "cannot open source file \"esphome/core/component.h\"". These headers are
+// provided by the ESPHome/PlatformIO build environment, and paths are resolved
+// during compilation. It is safe to ignore such squiggles in the editor for
+// esphome/* includes when working within ESPHome.
+
 #include "esphome/core/component.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"

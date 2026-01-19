@@ -4,7 +4,9 @@
  */
 
 #include "everblu_meter.h"
+#ifndef __INTELLISENSE__
 #include "esphome/core/log.h"
+#endif
 
 #ifdef USE_ESP8266
 #include <ESP8266WiFi.h>
