@@ -13,6 +13,12 @@ Complete ESPHome custom component for reading EverBlu Cyble Enhanced water and g
   - Sensor documentation
   - Troubleshooting guide
 
+- **[Home Assistant Integration](ESPHOME_HOME_ASSISTANT_INTEGRATION.md)** - Accessing meter data and historical readings in Home Assistant
+  - Template sensors and utility meters
+  - Historical data extraction
+  - Long-term consumption tracking
+  - Calibration and hardware change handling
+
 - **[Configuration Reference](#configuration-reference)** - Quick lookup for common tasks on this page
   - Configuration parameter tables
   - Common configuration patterns
@@ -378,6 +384,7 @@ Based on the EverBlu Meters ESP8266 project with architectural improvements for 
 
 **Need Help?**
 - 📖 Start with the [Integration Guide](ESPHOME_INTEGRATION_GUIDE.md)
+- 🏠 See [Home Assistant Integration](ESPHOME_HOME_ASSISTANT_INTEGRATION.md) for accessing meter data in Home Assistant
 - 🔍 See the Configuration Reference above for parameters and quick fixes
 - 🐛 See [Troubleshooting](ESPHOME_INTEGRATION_GUIDE.md#troubleshooting) for common issues
 - 👨‍💻 Developers: See [Developer Guide](DEVELOPER_GUIDE.md) for architecture details

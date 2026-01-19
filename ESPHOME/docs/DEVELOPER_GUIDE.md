@@ -1,6 +1,6 @@
 # ESPHome Integration - Developer Guide
 
-> **📚 For end-users**: See the complete [ESPHome Integration Guide](ESPHOME_INTEGRATION_GUIDE.md) for installation instructions, configuration, and troubleshooting.
+> **📚 For end-users**: See the complete [ESPHome Integration Guide](ESPHOME_INTEGRATION_GUIDE.md) for installation instructions, configuration, and troubleshooting. For Home Assistant integration details, see [Home Assistant Integration](ESPHOME_HOME_ASSISTANT_INTEGRATION.md).
 
 This document contains technical architecture details for developers who want to understand or extend the ESPHome integration.
 

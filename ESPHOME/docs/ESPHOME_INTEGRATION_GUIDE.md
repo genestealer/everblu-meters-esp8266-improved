@@ -5,6 +5,7 @@ This guide explains how to use the EverBlu Cyble Enhanced meter reader with ESPH
 > **📖 Quick Navigation**: 
 > - [Main Documentation](README.md) - Overview and links to all docs
 > - [Configuration Reference](README.md#configuration-reference) - Quick lookup for common tasks
+> - [Home Assistant Integration](ESPHOME_HOME_ASSISTANT_INTEGRATION.md) - Accessing meter data in Home Assistant
 > - [Developer Guide](DEVELOPER_GUIDE.md) - Technical architecture details
 
 ## Table of Contents
