@@ -1,6 +1,6 @@
 # Itron EverBlu Cyble Enhanced RF RADIAN Water/Gas Usage Data for MQTT Home Assistant & ESPHome External Component
 
-# Build & QA
+## Build & QA
 [![ESP8266 Build](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/build-esp8266.yml/badge.svg?branch=main)](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/build-esp8266.yml)
 [![ESP32 Build](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/build-esp32.yml/badge.svg?branch=main)](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/build-esp32.yml)
 [![Code Quality](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/code-quality.yml/badge.svg?branch=main)](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/code-quality.yml)
@@ -8,7 +8,7 @@
 [![Config Validation](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/config-validation.yml/badge.svg?branch=main)](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/config-validation.yml)
 [![Dependency Check](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/dependency-check.yml/badge.svg?branch=main)](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/dependency-check.yml)
 
-# Platforms & Capabilities
+## Platforms & Capabilities
 [![Made with PlatformIO](https://img.shields.io/badge/Made%20with-PlatformIO-orange?logo=platformio)](https://platformio.org)
 [![ESP8266](https://img.shields.io/badge/ESP-8266-blue?logo=espressif)](https://www.espressif.com/en/products/socs/esp8266)
 [![ESP32](https://img.shields.io/badge/ESP-32-blue?logo=espressif)](https://www.espressif.com/en/products/socs/esp32)
@@ -19,10 +19,13 @@
 [![ESPHome](https://img.shields.io/badge/ESPHome-Compatible-brightgreen?logo=esphome)](https://esphome.io)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.md)
 
+#
 Fetch water or gas usage data from Itron EverBlu Cyble Enhanced RF meters using the RADIAN protocol (Sontex, Itron) on 433 MHz with an ESP32/ESP8266 and CC1101 transceiver.
 Integrated with Home Assistant via MQTT AutoDiscovery and ESPHome external component
 
 **Supports both water meters (readings in liters) and gas meters (readings in cubic meters)**.
+
+#
 
 ### **ESPHome** - Release V2.1.0
 ESPHome integration is now production-ready. For setup and usage, see the ESPHome docs at [ESPHOME/README.md](ESPHOME/README.md)
@@ -55,8 +58,8 @@ Supported meters:
 - Built-in frame validation (CRC-16/KERMIT) plus signal diagnostics (RSSI/LQI).
 - Automatic CC1101 frequency calibration plus first-boot wide scan.
 
-<details>
-<summary>Full feature list</summary>
+
+### Full feature list
 
 - Fetch water or gas usage data from Itron EverBlu Cyble Enhanced RF meters.
 - **Water meter mode**: Readings in liters (L) with water device class
@@ -71,7 +74,7 @@ Supported meters:
 - Reading Schedule Configuration: Configure the days when the meter should be queried (e.g., Monday-Friday, Monday-Saturday, or Monday-Sunday).
 - Daily scheduled meter readings.
 
-</details>
+
 
 ### Advanced Frame Validation
 
