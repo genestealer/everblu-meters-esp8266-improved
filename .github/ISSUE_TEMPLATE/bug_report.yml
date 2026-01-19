@@ -102,4 +102,4 @@ body:
         <paste logs here>
       render: text
     validations:
-      required: true
+      required: false
