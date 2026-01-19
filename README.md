@@ -441,6 +441,73 @@ When running multiple ESP devices on the same MQTT broker, the firmware automati
 
 ---
 
+## Home Assistant Best Practice: Utility Meter Helper
+
+**Recommended:** Create a Home Assistant Utility Meter helper to preserve historical data across platform or meter changes.
+
+**Why?** If you switch between MQTT and ESPHome, change meter serial numbers, or replace hardware, a utility meter helper acts as a stable interface. You simply update the source sensor in the helper configuration, and all your historical data, dashboards, and automations remain intact.
+
+**Setup:**
+
+1. Go to **Settings** → **Devices & Services** → **Helpers**
+2. Click **Create Helper** → **Utility Meter**
+3. Configure:
+   - **Name**: "Master Water Meter" (or "Master Gas Meter")
+   - **Input sensor**: Select your current volume sensor (e.g., `sensor.water_volume`)
+   - **Meter type**: Select appropriate cycle (daily/monthly/yearly) or none
+   - **Tariffs**: Optional, leave blank for simple usage
+
+**Benefits:**
+- Historical data preserved when changing platforms (MQTT ↔ ESPHome)
+- Seamless meter serial number changes
+- Single point to update if you replace hardware
+- All dashboards and automations reference the stable utility meter entity
+
+**Example YAML (if configuring manually):**
+```yaml
+utility_meter:
+  master_water_meter:
+    source: sensor.water_volume
+    name: Master Water Meter
+```
+
+When you change platforms or meters, simply update the `source` to point to the new sensor - your history remains unbroken.
+
+### Historical Data from Meter
+
+Both MQTT and ESPHome modes expose a **history sensor** containing 12 months of historical readings stored in the meter itself. This data is retrieved directly from the meter and provided in JSON format.
+
+**Example JSON payload:**
+```json
+{
+  "history": [605696, 614107, 621401, 630219, 640054, 652789, 667441, 684214, 700917, 712720, 721549, 728836],
+  "monthly_usage": [605696, 8411, 7294, 8818, 9835, 12735, 14652, 16773, 16703, 11803, 8829, 7287],
+  "current_month_usage": 13043,
+  "months_available": 12
+}
+```
+
+**Fields:**
+- `history`: Array of 12 monthly readings (oldest to newest) in liters or m³
+- `monthly_usage`: Array of 12 monthly consumption values (first value is the oldest reading, subsequent values are differences)
+- `current_month_usage`: Current month's consumption so far
+- `months_available`: Number of months of data available (typically 12)
+
+**Use Cases:**
+- Import historical consumption into Home Assistant on first setup
+- Analyze past usage patterns
+- Compare current usage to previous months
+- Bootstrap energy dashboards with existing data
+- Verify meter readings against utility bills
+
+**Accessing the data:**
+- **MQTT**: Available in topic `everblu/cyble/{METER_SERIAL}/history`
+- **ESPHome**: Available as text sensor `sensor.{device}_history`
+
+**Tip:** Parse this JSON in Home Assistant using a template sensor to extract individual months or calculate averages.
+
+---
+
 ## Configuration
 
 ### Local Development Setup

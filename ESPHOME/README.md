@@ -244,6 +244,92 @@ Important: The CC1101 requires 3.3V power. Do not connect to 5V!
 - **All ESPHome Features**: Web server, logging, diagnostics, etc.
 - **Automatic Discovery**: Sensors appear in Home Assistant automatically
 
+## Home Assistant Best Practice: Utility Meter Helper
+
+**Recommended:** Create a Home Assistant Utility Meter helper to preserve historical data across platform or meter changes.
+
+**Why use a utility meter helper?**
+
+If you switch between ESPHome and MQTT, change meter serial numbers, or replace hardware, a utility meter helper acts as a stable interface. You simply update the source sensor in the helper configuration, and all your historical data, dashboards, and automations remain intact.
+
+**Quick Setup:**
+
+1. In Home Assistant: **Settings** → **Devices & Services** → **Helpers**
+2. **Create Helper** → **Utility Meter**
+3. Configure:
+   - **Name**: "Master Water Meter" (or "Master Gas Meter")
+   - **Input sensor**: Your volume sensor (e.g., `sensor.water_volume`)
+   - **Meter type**: Daily/monthly/yearly or none
+
+**Benefits:**
+- Preserve history when switching ESPHome ↔ MQTT
+- Seamless meter serial number updates
+- Single point to update for hardware changes
+- Stable entity ID for dashboards and automations
+
+**Example:**
+```yaml
+utility_meter:
+  master_water_meter:
+    source: sensor.water_volume  # Just update this when you change platforms
+    name: Master Water Meter
+```
+
+When changing platforms or meters, update only the `source` - your history stays intact!
+
+### Historical Data from Meter
+
+The ESPHome component exposes a **history text sensor** containing 12 months of historical readings stored directly in the meter. This data is retrieved from the meter itself and provided in JSON format.
+
+**Example JSON payload:**
+```json
+{
+  "history": [605696, 614107, 621401, 630219, 640054, 652789, 667441, 684214, 700917, 712720, 721549, 728836],
+  "monthly_usage": [605696, 8411, 7294, 8818, 9835, 12735, 14652, 16773, 16703, 11803, 8829, 7287],
+  "current_month_usage": 13043,
+  "months_available": 12
+}
+```
+
+**Data Structure:**
+- `history`: 12 monthly readings (oldest to newest) in L or m³
+- `monthly_usage`: 12 monthly consumption values (first is oldest reading, rest are differences)
+- `current_month_usage`: Current month consumption
+- `months_available`: Months of data (typically 12)
+
+**Use Cases:**
+- Bootstrap Home Assistant with 12 months of existing data on first setup
+- Analyze historical consumption patterns
+- Compare current vs. previous month usage
+- Verify readings against utility bills
+- Pre-populate energy dashboards
+
+**Accessing in Home Assistant:**
+
+The history sensor appears as `sensor.{device_name}_meter_history_json` (e.g., `sensor.water_meter_monitor_meter_history_json`). Parse it using template sensors:
+
+```yaml
+template:
+  - sensor:
+      - name: "Last Month Usage"
+        unit_of_measurement: "L"
+        state: >-
+          {% set data = states('sensor.water_meter_monitor_meter_history_json') | from_json %}
+          {{ data.monthly_usage[-1] if data.monthly_usage else 0 }}
+      
+      - name: "Average Monthly Usage"
+        unit_of_measurement: "L"
+        state: >-
+          {% set data = states('sensor.water_meter_monitor_meter_history_json') | from_json %}
+          {% if data.monthly_usage %}
+            {{ (data.monthly_usage[1:] | sum / (data.monthly_usage[1:] | length)) | round(0) }}
+          {% else %}
+            0
+          {% endif %}
+```
+
+**Note:** This is historical data from the meter's internal memory, updated when the meter is read. It's separate from Home Assistant's own historical database.
+
 ## Architecture
 
 The component uses a clean adapter pattern to separate platform-specific code from core meter reading logic:
