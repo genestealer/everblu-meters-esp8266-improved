@@ -1,9 +1,4 @@
-# everblu-meters-esp8266/esp32 - Itron EverBlu Cyble Enhanced RF RADIAN Water/Gas Usage Data for Home Assistant
-
-Fetch water or gas usage data from Itron EverBlu Cyble Enhanced RF meters using the RADIAN protocol (Sontex, Itron) on 433 MHz with an ESP32/ESP8266 and CC1101 transceiver.
-Integrated with Home Assistant via MQTT AutoDiscovery.
-
-**Supports both water meters (readings in liters) and gas meters (readings in cubic meters)**.
+# Itron EverBlu Cyble Enhanced RF RADIAN Water/Gas Usage Data for MQTT Home Assistant & ESPHome External Component
 
 [![ESP8266 Build](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/build-esp8266.yml/badge.svg?branch=main)](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/build-esp8266.yml)
 [![ESP32 Build](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/build-esp32.yml/badge.svg?branch=main)](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/build-esp32.yml)
@@ -11,7 +6,6 @@ Integrated with Home Assistant via MQTT AutoDiscovery.
 [![Memory & Size Tracking](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/memory-and-size.yml/badge.svg?branch=main)](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/memory-and-size.yml)
 [![Config Validation](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/config-validation.yml/badge.svg?branch=main)](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/config-validation.yml)
 [![Dependency Check](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/dependency-check.yml/badge.svg?branch=main)](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/dependency-check.yml)
-
 [![Made with PlatformIO](https://img.shields.io/badge/Made%20with-PlatformIO-orange?logo=platformio)](https://platformio.org)
 [![ESP8266](https://img.shields.io/badge/ESP-8266-blue?logo=espressif)](https://www.espressif.com/en/products/socs/esp8266)
 [![ESP32](https://img.shields.io/badge/ESP-32-blue?logo=espressif)](https://www.espressif.com/en/products/socs/esp32)
@@ -20,14 +14,21 @@ Integrated with Home Assistant via MQTT AutoDiscovery.
 [![MQTT](https://img.shields.io/badge/MQTT-Compatible-purple?logo=mqtt)](https://mqtt.org)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-41BDF5?logo=homeassistant)](https://www.home-assistant.io)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.md)
+[![ESPHome](https://img.shields.io/badge/ESPHome-Compatible-brightgreen?logo=esphome)](https://esphome.io)
 
+Fetch water or gas usage data from Itron EverBlu Cyble Enhanced RF meters using the RADIAN protocol (Sontex, Itron) on 433 MHz with an ESP32/ESP8266 and CC1101 transceiver.
+Integrated with Home Assistant via MQTT AutoDiscovery and ESPHome external component
 
-> **Big news:** ESPHome integration is now production-ready. For setup and usage, see the ESPHome docs at [ESPHOME/README.md](ESPHOME/README.md).
-> - Versioned external component in `ESPHOME-release` with the same 2.1.0 code as the main firmware
-> - Tested on ESP8266 and ESP32 with water and gas meters; supports the same sensors and calibration logic
-> - YAML stays simple: drop in the component, set `meter_year`, `meter_serial`, `meter_type`, and go
-> - Migration tip: if you move from MQTT firmware, keep the same meter serial values so your topics/entities stay aligned
-> 
+**Supports both water meters (readings in liters) and gas meters (readings in cubic meters)**.
+
+### **ESPHome** - Release V2.1.0
+ESPHome integration is now production-ready. For setup and usage, see the ESPHome docs at [ESPHOME/README.md](ESPHOME/README.md)
+ - Versioned external component in `ESPHOME-release` with the same 2.1.0 code as the main firmware
+ - Tested on ESP8266 and ESP32 with water and gas meters; supports the same sensors and calibration logic
+ - YAML stays simple: drop in the component, set `meter_year`, `meter_serial`, `meter_type`, and go
+ - Migration tip: if you move from MQTT firmware, keep the same meter serial values so your topics/entities stay aligned
+
+ 
 Based on regulatory paperwork, this may also work with the following models (untested):
 
 - AnyQuest Cyble Enhanced
