@@ -38,34 +38,32 @@ Complete ESPHome custom component for reading EverBlu Cyble Enhanced water and g
   - Source file access strategies
   - Distribution preparation
   - Build troubleshooting
+  - **Important**: When to run `prepare-component-release` scripts
+
+> **⚠️ Developer Note**: If you modify source files in `src/`, you must run `prepare-component-release.ps1/.sh` to update the `ESPHOME-release` folder.
 
 ## 🚀 Quick Start
 
-### 1. Prepare the Component
+### 1. Use as External Component
 
-Before using the component, prepare it for distribution:
-
-```bash
-# From repository root
-# Windows PowerShell
-pwsh ESPHOME/prepare-component-release.ps1
-
-# Linux/macOS
-bash ESPHOME/prepare-component-release.sh
-```
-
-### 2. Use as External Component
-
-Add to your ESPHome YAML configuration:
+The component is ready to use directly from the `ESPHOME-release` folder. Add to your ESPHome YAML configuration:
 
 ```yaml
 external_components:
   - source:
       type: git
-      url: https://github.com/genestealer/everblu-meters-esp8266-improved/tree/fix-esphome/ESPHOME-release.git
-      ref: main
+      url: https://github.com/genestealer/everblu-meters-esp8266-improved.git
+      ref: fix-esphome
+      path: ESPHOME-release
     components: [ everblu_meter ]
     refresh: 1d
+
+# Or use locally:
+# external_components:
+#   - source:
+#       type: local
+#       path: path/to/everblu-meters-esp8266-improved/ESPHOME-release
+#     components: [ everblu_meter ]
 
 time:
   - platform: homeassistant
@@ -87,7 +85,7 @@ everblu_meter:
     name: "Status"
 ```
 
-### 3. Build and Upload
+### 2. Build and Upload
 
 ```bash
 esphome run your-config.yaml

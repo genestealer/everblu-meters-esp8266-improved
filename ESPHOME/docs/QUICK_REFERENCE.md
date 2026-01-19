@@ -7,15 +7,18 @@ Quick reference for EverBlu meter ESPHome configuration.
 ## Installation
 
 ```bash
-# Copy component
-cp -r ESPHOME/components/everblu_meter /config/esphome/custom_components/
+# Copy component from ESPHOME-release folder
+cp -r ESPHOME-release/everblu_meter /config/esphome/custom_components/
 
-# Use in YAML
+# Or use external_components:
 external_components:
   - source:
-      type: local
-      path: custom_components
+      type: git
+      url: https://github.com/genestealer/everblu-meters-esp8266-improved.git
+      ref: fix-esphome
+      path: ESPHOME-release
     components: [ everblu_meter ]
+    refresh: 1d
 ```
 
 ## Minimal Configuration
