@@ -1,14 +1,14 @@
 {
-	// Keep the release folder out of search/watch
-	"files.exclude": {
-		"**/ESPHOME-release/**": true
-	},
-	"search.exclude": {
-		"**/ESPHOME-release/**": true
-	},
-	"files.watcherExclude": {
-		"**/ESPHOME-release/**": true
-	},
+	// // Keep the release folder out of search/watch
+	// "files.exclude": {
+	// 	"**/ESPHOME-release/**": true
+	// },
+	// "search.exclude": {
+	// 	"**/ESPHOME-release/**": true
+	// },
+	// "files.watcherExclude": {
+	// 	"**/ESPHOME-release/**": true
+	// },
 
 	// Use PlatformIO to provide accurate IntelliSense config
 	"C_Cpp.default.configurationProvider": "ms-vscode.platformio",
