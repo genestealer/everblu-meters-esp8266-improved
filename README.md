@@ -78,9 +78,12 @@ This project supports two integration methods:
 ```yaml
 external_components:
   - source:
-      type: local
-      path: components
+      type: git
+      url: https://github.com/genestealer/everblu-meters-esp8266-improved
+      ref: main
+      path: ESPHOME-release
     components: [ everblu_meter ]
+    refresh: 1d
 
 everblu_meter:
   meter_year: 21
