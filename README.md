@@ -36,6 +36,7 @@ Based on regulatory paperwork, this may also work with the following models (unt
 - AnyQuest Cyble Basic
 
 ![Home Assistant MQTT autodiscovery](docs/images/MQTT_HASS2.jpg)
+![ESPHOME](docs/images/esphome.jpg)
 
 Supported meters:
 
