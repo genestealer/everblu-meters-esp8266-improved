@@ -28,10 +28,12 @@ time:
 # EverBlu Meter Component
 external_components:
   - source:
-      type: local
-      path: custom_components
+      type: git
+      url: https://github.com/genestealer/everblu-meters-esp8266-improved
+      ref: main
+      path: ESPHOME-release
     components: [ everblu_meter ]
-
+    refresh: 1d
 everblu_meter:
   id: my_gas_meter
   
