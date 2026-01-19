@@ -2,6 +2,12 @@
 
 This guide explains how to use the EverBlu Cyble Enhanced meter reader with ESPHome, allowing seamless integration with Home Assistant.
 
+> **📖 Quick Navigation**: 
+> - [Main Documentation](README.md) - Overview and links to all docs
+> - [Configuration Reference](README.md#configuration-reference) - Quick lookup for common tasks
+> - [Home Assistant Integration](ESPHOME_HOME_ASSISTANT_INTEGRATION.md) - Accessing meter data in Home Assistant
+> - [Developer Guide](DEVELOPER_GUIDE.md) - Technical architecture details
+
 ## Table of Contents
 
 - [Overview](#overview)
@@ -54,31 +60,17 @@ Connect the CC1101 to your ESP board:
 
 ## Installation
 
-### Step 1: Clone the Repository
+### Step 1: Use External Components (Recommended)
 
-```bash
-git clone https://github.com/yourusername/everblu-meters-esp8266-improved.git
-cd everblu-meters-esp8266-improved
-```
-
-### Step 2: Use External Components (Recommended)
-
-**Important**: Before using external_components, you must prepare the component by copying source dependencies. Run this from the repository root:
-
-```bash
-./prepare-component-release.sh
-```
-
-This script copies all required files from `src/` into `ESPHOME/components/everblu_meter/src/`, making the component self-contained.
-
-Then use ESPHome's `external_components` feature in your YAML configuration:
+The component is ready to use directly from the `ESPHOME-release` folder. Use ESPHome's `external_components` feature in your YAML configuration:
 
 ```yaml
 external_components:
   - source:
       type: git
-      url: https://github.com/yourusername/everblu-meters-esp8266-improved
+      url: https://github.com/genestealer/everblu-meters-esp8266-improved
       ref: main
+      path: ESPHOME-release
     components: [ everblu_meter ]
     refresh: 1d
 ```
@@ -89,7 +81,7 @@ Alternatively, for local development:
 external_components:
   - source:
       type: local
-      path: /path/to/everblu-meters-esp8266-improved/ESPHOME/components
+      path: /path/to/everblu-meters-esp8266-improved/ESPHOME-release
     components: [ everblu_meter ]
 ```
 
@@ -98,14 +90,13 @@ external_components:
 If you prefer to copy files locally:
 
 ```bash
-# From repository root
-./prepare-component-release.sh
+# Clone repository
+git clone https://github.com/genestealer/everblu-meters-esp8266-improved
+cd everblu-meters-esp8266-improved
 
-# Then copy to ESPHome config
-cp -r ESPHOME/components/everblu_meter /config/esphome/custom_components/
+# Copy the ready-to-use component to ESPHome config
+cp -r ESPHOME-release/everblu_meter /config/esphome/custom_components/
 ```
-
-**Note**: The `prepare-component-release.sh` script must be run whenever source files are updated.
 
 ### Step 3: Create Your Configuration
 
@@ -133,8 +124,9 @@ The minimal configuration requires:
 external_components:
   - source:
       type: git
-      url: https://github.com/yourusername/everblu-meters-esp8266-improved
+      url: https://github.com/genestealer/everblu-meters-esp8266-improved
       ref: main
+      path: ESPHOME-release
     components: [ everblu_meter ]
     refresh: 1d
 

@@ -1,0 +1,449 @@
+/**
+ * @file utils.h
+ * @brief Utility functions for RADIAN protocol and debugging
+ *
+ * IMPORTANT LICENSING NOTICE:
+ * The RADIAN protocol implementation (radian_trx SW) shall not be distributed
+ * nor used for commercial products. It is exposed only to demonstrate CC1101
+ * capability to read water meter indexes. There is no warranty on radian_trx SW.
+ */
+
+#include <Arduino.h>
+#include "cc1101.h"		 // For tmeter_data struct
+#include "wifi_serial.h" // Mirror Serial to WiFi
+#include "logging.h"	 // Cross-platform logging
+#if !defined(USE_ESPHOME)
+#if defined(__has_include)
+#if __has_include("private.h")
+#include "private.h" // Configuration file (Wi-Fi, MQTT, meter settings)
+#endif
+#else
+/* No __has_include support; skip optional private.h */
+#endif
+#endif
+
+#include <string.h>
+
+// Consolidated hex display function with optional formatting
+// mode: 0=16 per line with newlines, 1=array format, 2=single line, 3=single line with 'S' separator
+void show_in_hex_formatted(const uint8_t *buffer, size_t len, int mode)
+{
+	int i = 0;
+	char line_buf[256];
+	int line_pos = 0;
+
+	for (i = 0; i < len; i++)
+	{
+		if (mode == 0)
+		{
+			// Original show_in_hex: 16 bytes per line
+			if (!(i % 16))
+			{
+				if (line_pos > 0)
+				{
+					line_buf[line_pos] = '\0';
+					LOG_D("everblu_meter", "%s", line_buf);
+					line_pos = 0;
+				}
+			}
+			line_pos += snprintf(line_buf + line_pos, sizeof(line_buf) - line_pos, "%02X ", buffer[i]);
+		}
+		else if (mode == 1)
+		{
+			// Array format with 16 per line
+			if (!(i % 16) && i > 0)
+			{
+				if (line_pos > 0)
+				{
+					line_buf[line_pos] = '\0';
+					LOG_D("everblu_meter", "%s", line_buf);
+					line_pos = 0;
+				}
+			}
+			line_pos += snprintf(line_buf + line_pos, sizeof(line_buf) - line_pos, "0x%02X, ", buffer[i]);
+		}
+		else if (mode == 2)
+		{
+			// Single line format
+			line_pos += snprintf(line_buf + line_pos, sizeof(line_buf) - line_pos, "%02X ", buffer[i]);
+		}
+		else if (mode == 3)
+		{
+			// Single line with 'S' separator (for GET requests)
+			line_pos += snprintf(line_buf + line_pos, sizeof(line_buf) - line_pos, "%02XS", buffer[i]);
+		}
+	}
+
+	if (line_pos > 0)
+	{
+		line_buf[line_pos] = '\0';
+		LOG_D("everblu_meter", "%s", line_buf);
+	}
+}
+
+// Legacy function wrappers for backwards compatibility
+void show_in_hex(const uint8_t *buffer, size_t len)
+{
+	show_in_hex_formatted(buffer, len, 0);
+}
+
+void show_in_hex_array(const uint8_t *buffer, size_t len)
+{
+	show_in_hex_formatted(buffer, len, 1);
+}
+
+void show_in_hex_one_line(const uint8_t *buffer, size_t len)
+{
+	show_in_hex_formatted(buffer, len, 2);
+}
+
+void show_in_hex_one_line_GET(const uint8_t *buffer, size_t len)
+{
+	show_in_hex_formatted(buffer, len, 3);
+}
+
+void show_in_bin(const uint8_t *buffer, size_t len)
+{
+	const uint8_t *ptr;
+	uint8_t mask;
+	char bin_buf[512];
+	int bin_pos = 0;
+
+	for (ptr = buffer; len--; ptr++)
+	{
+		for (mask = 0x80; mask; mask >>= 1)
+		{
+			bin_buf[bin_pos++] = (mask & *ptr) > 0 ? '1' : '0';
+			if (bin_pos >= sizeof(bin_buf) - 2)
+				break;
+		}
+		bin_buf[bin_pos++] = ' ';
+		if (bin_pos >= sizeof(bin_buf) - 1)
+			break;
+	}
+
+	if (bin_pos > 0)
+	{
+		bin_buf[bin_pos] = '\0';
+		LOG_D("everblu_meter", "%s", bin_buf);
+	}
+}
+
+int calculateMeterdBmToPercentage(int rssi_dbm)
+{
+	// Clamp RSSI to a reasonable range (e.g., -120 dBm to -40 dBm)
+	int clamped_rssi = constrain(rssi_dbm, -120, -40);
+
+	// Map the clamped RSSI value to a percentage (0-100%)
+	return map(clamped_rssi, -120, -40, 0, 100);
+}
+
+int calculateLQIToPercentage(int lqi)
+{
+	int strength = constrain(lqi, 0, 255); // Clamp LQI to valid range
+	return map(strength, 0, 255, 0, 100);  // Map LQI to percentage
+}
+void printMeterDataSummary(const struct tmeter_data *meter_data, bool isMeterGas, int volumeDivisor)
+{
+	if (!meter_data)
+		return;
+
+	// Validate and set default volumeDivisor
+	if (volumeDivisor <= 0)
+		volumeDivisor = 100;
+
+	const char *volumeLabel = isMeterGas ? "Volume (m3)" : "Volume (L)";
+
+	char timeStartFormatted[6];
+	char timeEndFormatted[6];
+	int timeStart = constrain(meter_data->time_start, 0, 23);
+	int timeEnd = constrain(meter_data->time_end, 0, 23);
+	snprintf(timeStartFormatted, sizeof(timeStartFormatted), "%02d:00", timeStart);
+	snprintf(timeEndFormatted, sizeof(timeEndFormatted), "%02d:00", timeEnd);
+
+	LOG_I("everblu_meter", "=== METER DATA ===");
+	if (isMeterGas)
+	{
+		float cubicMeters = meter_data->volume / (float)volumeDivisor;
+		LOG_I("everblu_meter", "%-25s: %.3f", volumeLabel, cubicMeters);
+	}
+	else
+	{
+		LOG_I("everblu_meter", "%-25s: %d", volumeLabel, meter_data->volume);
+	}
+	LOG_I("everblu_meter", "%-25s: %d", "Battery (months)", meter_data->battery_left);
+	LOG_I("everblu_meter", "%-25s: %d", "Counter", meter_data->reads_counter);
+	LOG_I("everblu_meter", "%-25s: %d", "RSSI (raw)", meter_data->rssi);
+	LOG_I("everblu_meter", "%-25s: %d dBm", "RSSI", meter_data->rssi_dbm);
+	LOG_I("everblu_meter", "%-25s: %d%%", "RSSI (percentage)", calculateMeterdBmToPercentage(meter_data->rssi_dbm));
+	LOG_I("everblu_meter", "%-25s: %d", "Signal quality (LQI)", meter_data->lqi);
+	LOG_I("everblu_meter", "%-25s: %d%%", "LQI (percentage)", calculateLQIToPercentage(meter_data->lqi));
+	LOG_I("everblu_meter", "%-25s: %s", "Time window start", timeStartFormatted);
+	LOG_I("everblu_meter", "%-25s: %s", "Time window end", timeEndFormatted);
+	LOG_I("everblu_meter", "==================");
+}
+void echo_debug(bool l_flag, const char *fmt, ...)
+{
+	if (!l_flag)
+		return;
+
+	va_list args;
+	va_start(args, fmt);
+
+	char buf[256];
+	vsnprintf(buf, sizeof(buf), fmt, args);
+
+#if defined(USE_ESPHOME)
+	// ESPHome mode: Route through LOG system for WiFi-visible logs
+	// Strip trailing newline if present (LOG_* adds it automatically)
+	size_t len = strlen(buf);
+	if (len > 0 && buf[len - 1] == '\n')
+		buf[len - 1] = '\0';
+	// Use INFO level so messages are always visible in WiFi logs
+	LOG_I("everblu_meter", "%s", buf);
+#else
+	// MQTT mode: Route through WiFiSerial for USB + WiFi visibility
+	WiFiSerial.print(buf);
+#endif
+
+	va_end(args);
+}
+
+void print_time(void)
+{ /*
+	 time_t mytime;
+	 mytime = time(NULL);
+	 printf(ctime(&mytime));*/
+
+	time_t rawtime;
+	struct tm *timeinfo;
+	char buffer[80];
+
+	time(&rawtime);
+	timeinfo = localtime(&rawtime);
+
+	strftime(buffer, 80, "%d/%m/%Y %X", timeinfo);
+	LOG_D("everblu_meter", "%s", buffer);
+}
+
+/*----------------------------------------------------------------------------*/
+#define CRC_START_KERMIT 0x0000
+#define CRC_POLY_KERMIT 0x8408
+static uint8_t crc_tab_init = 0;
+static uint16_t crc_tab[256];
+/*----------------------------------------------------------------------------*/
+/* https://www.libcrc.org/
+ * static void init_crc_tab( void );
+ *
+ * For optimal performance, the  CRC Kermit routine uses a lookup table with
+ * values that can be used directly in the XOR arithmetic in the algorithm.
+ * This lookup table is calculated by the init_crc_tab() routine, the first
+ * time the CRC function is called.
+ */
+
+static void init_crc_tab(void)
+{
+
+	uint16_t i;
+	uint16_t j;
+	uint16_t crc;
+	uint16_t c;
+
+	for (i = 0; i < 256; i++)
+	{
+
+		crc = 0;
+		c = i;
+
+		for (j = 0; j < 8; j++)
+		{
+
+			if ((crc ^ c) & 0x0001)
+				crc = (crc >> 1) ^ CRC_POLY_KERMIT;
+			else
+				crc = crc >> 1;
+
+			c = c >> 1;
+		}
+
+		crc_tab[i] = crc;
+	}
+
+	crc_tab_init = 1;
+
+} /* init_crc_tab */
+
+/* https://www.libcrc.org/
+ * uint16_t crc_kermit( const unsigned char *input_str, size_t num_bytes );
+ *
+ * The function crc_kermit() calculates the 16 bits Kermit CRC in one pass for
+ * a byte string of which the beginning has been passed to the function. The
+ * number of bytes to check is also a parameter.
+ */
+
+uint16_t crc_kermit(const unsigned char *input_ptr, size_t num_bytes)
+{
+
+	uint16_t crc;
+	uint16_t tmp;
+	uint16_t short_c;
+	uint16_t low_byte;
+	uint16_t high_byte;
+	const unsigned char *ptr;
+	size_t a;
+
+	if (!crc_tab_init)
+		init_crc_tab();
+
+	crc = CRC_START_KERMIT;
+	ptr = input_ptr;
+
+	for (a = 0; a < num_bytes; a++)
+	{
+
+		short_c = 0x00ff & (uint16_t)*ptr;
+		tmp = crc ^ short_c;
+		crc = (crc >> 8) ^ crc_tab[tmp & 0xff];
+
+		ptr++;
+	}
+
+	low_byte = (crc & 0xff00) >> 8;
+	high_byte = (crc & 0x00ff) << 8;
+	crc = low_byte | high_byte;
+
+	return crc;
+
+} /* crc_kermit */
+
+/*----------------------------------------------------------------------------*/
+/**
+ * Reverses the bit order of the input data and adds a start bit before and a stop bit
+ * after each byte.
+ *
+ * @param inputBuffer Points to the unencoded data.
+ * @param inputBufferLen Number of bytes of unencoded data.
+ * @param outputBuffer Points to the encoded data.
+ * @param outputBufferLen Number of bytes of encoded data.
+ */
+int encode2serial_1_3(uint8_t *inputBuffer, int inputBufferLen, uint8_t *outputBuffer)
+{
+
+	// Adds a start and stop bit and reverses the bit order.
+	// 76543210 76543210 76543210 76543210
+	// is encoded to:
+	// #0123456 7###0123 4567###0 1234567# ##012345 6s7# (# -> Start/Stop bit)
+
+	int bytepos = 0;
+	int bitpos = 0;
+	int i;
+	int j = 0;
+
+	for (i = 0; i < (inputBufferLen * 8); i++)
+	{
+		// printf("\ni=%u",i);
+		if (i % 8 == 0)
+		{
+			if (i > 0)
+			{
+				// printf(" j=%u stopBIT",j);
+				//  Insert stop bit (3)
+				bytepos = j / 8;
+				bitpos = j % 8;
+				outputBuffer[bytepos] |= 1 << (7 - bitpos);
+				j++;
+
+				bytepos = j / 8;
+				bitpos = j % 8;
+				outputBuffer[bytepos] |= 1 << (7 - bitpos);
+				j++;
+
+				bytepos = j / 8;
+				bitpos = j % 8;
+				outputBuffer[bytepos] |= 1 << (7 - bitpos);
+				j++;
+			} // stop bit
+
+			// Insert start bit (0)
+			bytepos = j / 8;
+			bitpos = j % 8;
+			// printf(" j=%u startBIT",j);
+			outputBuffer[bytepos] &= ~(1 << (7 - bitpos));
+			j++;
+		} // start stop bit
+
+		bytepos = i / 8;
+		bitpos = i % 8;
+		uint8_t mask = 1 << bitpos;
+		if ((inputBuffer[bytepos] & mask) > 0)
+		{
+			bytepos = j / 8;
+			bitpos = 7 - (j % 8);
+			outputBuffer[bytepos] |= 1 << bitpos;
+		}
+		else
+		{
+			bytepos = j / 8;
+			bitpos = 7 - (j % 8);
+			outputBuffer[bytepos] &= ~(1 << bitpos);
+		}
+
+		j++;
+	} // for
+
+	// insert additional stop bit until end of byte
+	while (j % 8 > 0)
+	{
+		bytepos = j / 8;
+		bitpos = 7 - (j % 8);
+		outputBuffer[bytepos] |= 1 << bitpos;
+		j++;
+	}
+	outputBuffer[bytepos + 1] = 0xFF;
+	return bytepos + 2;
+}
+
+int Make_Radian_Master_req(uint8_t *outputBuffer, uint8_t year, uint32_t serial)
+{
+	uint16_t crc;
+	uint8_t to_encode[] = {0x13, 0x10, 0x00, 0x45, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x45, 0x20, 0x0A, 0x50, 0x14, 0x00, 0x0A, 0x40, 0xFF, 0xFF}; // the last 2 bytes are reserved for the CRC as well as the serial number
+	uint8_t synch_pattern[] = {0x50, 0x00, 0x00, 0x00, 0x03, 0xFF, 0xFF, 0xFF, 0xFF};
+	uint8_t TS_len_u8;
+
+	to_encode[4] = year;
+	to_encode[5] = (uint8_t)((serial & 0x00FF0000) >> 16);
+	to_encode[6] = (uint8_t)((serial & 0x0000FF00) >> 8);
+	to_encode[7] = (uint8_t)(serial & 0x000000FF);
+	crc = crc_kermit(to_encode, sizeof(to_encode) - 2);
+	// printf("crc:%x\n",crc);
+	to_encode[sizeof(to_encode) - 2] = (uint8_t)((crc & 0xFF00) >> 8);
+	to_encode[sizeof(to_encode) - 1] = (uint8_t)(crc & 0x00FF);
+	// show_in_hex_one_line(to_encode,sizeof(to_encode));
+	memcpy(outputBuffer, synch_pattern, sizeof(synch_pattern));
+	TS_len_u8 = encode2serial_1_3(to_encode, sizeof(to_encode), &outputBuffer[sizeof(synch_pattern)]);
+	return TS_len_u8 + sizeof(synch_pattern);
+}
+
+// -----------------------------------------------------------------------------
+// Configuration validation helpers
+// -----------------------------------------------------------------------------
+
+bool isValidReadingSchedule(const char *schedule)
+{
+	// Reject null or empty schedules
+	if (schedule == nullptr || schedule[0] == '\0')
+	{
+		return false;
+	}
+
+	// Allowed values based on unit tests
+	if (strcmp(schedule, "Monday-Friday") == 0)
+		return true;
+	if (strcmp(schedule, "Monday-Saturday") == 0)
+		return true;
+	if (strcmp(schedule, "Monday-Sunday") == 0)
+		return true;
+
+	// Everything else is considered invalid for now
+	return false;
+}

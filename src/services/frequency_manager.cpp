@@ -5,6 +5,7 @@
 
 #include "frequency_manager.h"
 #include "../core/logging.h"
+#include "storage_abstraction.h"
 #if defined(ESP32)
 #include <esp_task_wdt.h>
 #endif
@@ -109,7 +110,7 @@ void FrequencyManager::saveFrequencyOffset(float offset)
     StorageAbstraction::saveFloat(STORAGE_KEY, offset, STORAGE_MAGIC);
     s_storedOffset = offset;
 
-    LOG_I("everblu_meter", "Frequency offset %.6f MHz saved", offset);
+    LOG_I("everblu_meter", "Frequency offset %.3f kHz saved", offset * 1000.0);
 }
 
 float FrequencyManager::loadFrequencyOffset()
@@ -128,6 +129,9 @@ void FrequencyManager::performFrequencyScan(void (*statusCallback)(const char *,
 {
     LOG_I("everblu_meter", "Starting frequency scan...");
     LOG_I("everblu_meter", "[NOTE] Wi-Fi/MQTT connections may temporarily drop and reconnect. This is expected.");
+
+    // Reset adaptive tracking so the new offset has a chance to stabilize
+    resetAdaptiveTracking();
 
     if (statusCallback)
     {
@@ -182,8 +186,14 @@ void FrequencyManager::performFrequencyScan(void (*statusCallback)(const char *,
             statusCallback("Idle", msg);
         }
 
-        // Reinitialize with the best frequency
-        s_radioInitCallback(bestFreq);
+        // Reinitialize with the tuned frequency to ensure consistency with normal operation
+        // This ensures the radio uses the same frequency calculation as getTunedFrequency()
+        // Wait a moment before reinitializing to let radio settle after scan
+        delay(100);
+        s_radioInitCallback(s_baseFrequency + s_storedOffset);
+        // Additional stabilization delay after reinitialization
+        delay(100);
+        LOG_I("everblu_meter", "Radio reinitialized with new frequency: %.6f MHz", s_baseFrequency + s_storedOffset);
     }
     else
     {
@@ -194,14 +204,20 @@ void FrequencyManager::performFrequencyScan(void (*statusCallback)(const char *,
             statusCallback("Idle", "Frequency scan failed - no signal");
         }
 
-        // Restore original frequency
+        // Restore original frequency with stabilization delay
+        delay(100);
         s_radioInitCallback(s_baseFrequency + s_storedOffset);
+        delay(100);
+        LOG_I("everblu_meter", "Radio restored to frequency: %.6f MHz", s_baseFrequency + s_storedOffset);
     }
 }
 
 void FrequencyManager::performWideInitialScan(void (*statusCallback)(const char *, const char *))
 {
     Serial.println("[FREQ] Performing wide initial scan (first boot - no saved offset)...");
+
+    // Reset adaptive tracking so the new offset has a chance to stabilize
+    resetAdaptiveTracking();
 
     if (statusCallback)
     {
@@ -297,7 +313,11 @@ void FrequencyManager::performWideInitialScan(void (*statusCallback)(const char 
             statusCallback("Idle", msg);
         }
 
-        s_radioInitCallback(bestFreq);
+        // Reinitialize with stabilization delays
+        delay(100);
+        s_radioInitCallback(s_baseFrequency + s_storedOffset);
+        delay(100);
+        LOG_I("everblu_meter", "Radio reinitialized with new frequency: %.6f MHz", s_baseFrequency + s_storedOffset);
     }
     else
     {
@@ -345,8 +365,8 @@ void FrequencyManager::adaptiveFrequencyTracking(int8_t freqest)
             float adjustment = avgError * ADAPT_CORRECTION_FACTOR;
             s_storedOffset += adjustment;
 
-            LOG_I("everblu_meter", "Adjusting frequency offset by %.6f MHz (new offset: %.6f MHz)",
-                  adjustment, s_storedOffset);
+            LOG_I("everblu_meter", "Adjusting frequency offset by %.3f kHz (new offset: %.3f kHz)",
+                  adjustment * 1000.0, s_storedOffset * 1000.0);
 
             saveFrequencyOffset(s_storedOffset);
 
@@ -368,6 +388,7 @@ void FrequencyManager::resetAdaptiveTracking()
 {
     s_cumulativeFreqError = 0.0;
     s_successfulReadsCount = 0;
+    LOG_I("everblu_meter", "Adaptive frequency tracking reset");
 }
 
 bool FrequencyManager::shouldPerformAutoScan()

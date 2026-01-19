@@ -64,7 +64,7 @@ This release adds complete ESPHome integration as an alternative to the standalo
 
 **New Documentation Files**:
 - `ESPHOME/ESPHOME_INTEGRATION_GUIDE.md` - Complete integration guide (500+ lines)
-- `ESPHOME/QUICK_REFERENCE.md` - Quick reference card (350+ lines)
+- `ESPHOME/docs/README.md` - Quick start and configuration reference
 - `ESPHOME/components/everblu_meter/README.md` - Component documentation
 
 **Example Configurations**:
@@ -250,7 +250,7 @@ Complete testing checklist available: [`docs/ESPHOME_TESTING_CHECKLIST.md`](docs
 
 #### Essential Reading
 
-- **Quick Start**: [`ESPHOME/QUICK_REFERENCE.md`](ESPHOME/QUICK_REFERENCE.md)
+- **Quick Start**: [`ESPHOME/docs/README.md`](ESPHOME/docs/README.md)
 - **Full Guide**: [`ESPHOME/ESPHOME_INTEGRATION_GUIDE.md`](ESPHOME/ESPHOME_INTEGRATION_GUIDE.md)
 - **Component**: [`ESPHOME/components/everblu_meter/README.md`](ESPHOME/components/everblu_meter/README.md)
 
@@ -300,7 +300,7 @@ esphome run my-meter.yaml
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/everblu-meters-esp8266-improved.git
+git clone https://github.com/genestealer/everblu-meters-esp8266-improved.git
 cd everblu-meters-esp8266-improved
 
 # Configure

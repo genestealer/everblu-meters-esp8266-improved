@@ -49,9 +49,12 @@ time:
 # EverBlu Meter Component
 external_components:
   - source:
-      type: local
-      path: custom_components
+      type: git
+      url: https://github.com/genestealer/everblu-meters-esp8266-improved
+      ref: main
+      path: ESPHOME-release
     components: [ everblu_meter ]
+    refresh: 1d
 
 everblu_meter:
   id: my_meter
@@ -81,6 +84,11 @@ everblu_meter:
   max_retries: 15                    # More attempts
   retry_cooldown: 30min              # Shorter cooldown
   
+  # Adaptive frequency tracking
+  # How many successful reads before adjusting frequency (1 = adjust after each read)
+  # Use higher values (5-10) if you have frequent reads and stable conditions
+  adaptive_threshold: 1
+  
   # Time component
   time_id: ha_time
   
@@ -92,48 +100,75 @@ everblu_meter:
     name: "Read Meter Now"
   frequency_scan_button:
     name: "Scan Frequency"
+  reset_frequency_button:
+    name: "Reset Frequency Offset"
   
   # Core sensors
   volume:
     id: water_volume
     name: "Water Volume"
-    unit_of_measurement: "L"
-    device_class: water
-    state_class: total_increasing
     filters:
       - or:
         - throttle: 10s          # Limit updates
         - delta: 0.1             # Only on change
-  
+
+  counter:
+    name: "Read Counter"
+
   battery:
     name: "Meter Battery"
-    unit_of_measurement: "years"
     filters:
       - throttle: 1h             # Battery doesn't change often
-  
-  # Monitoring sensors
+
+  rssi:
+    name: "Meter RSSI"
+
   rssi_percentage:
     name: "Signal Quality"
-    unit_of_measurement: "%"
     filters:
       - sliding_window_moving_average:
           window_size: 5         # Smooth signal readings
           send_every: 1
-  
+
+  lqi:
+    name: "LQI"
+
   lqi_percentage:
     name: "Link Quality"
-    unit_of_measurement: "%"
   
   # Performance metrics
+  total_attempts:
+    name: "Total Read Attempts"
+
   successful_reads:
     name: "Successful Reads"
-    state_class: total_increasing
-  
+
   failed_reads:
     name: "Failed Reads"
-    state_class: total_increasing
+
+  frequency_offset:
+    name: "Frequency Offset"
+
+  tuned_frequency:
+    name: "Tuned Frequency (MHz)"
+
+  meter_serial_sensor:
+    name: "Meter Serial"
+  meter_year_sensor:
+    name: "Meter Year"
+  reading_schedule_sensor:
+    name: "Reading Schedule"
+  reading_time_utc_sensor:
+    name: "Reading Time (UTC)"
   
-  # Status monitoring
+  # Timing sensors (24-hour format: HH:MM)
+  time_start:
+    name: "Reading Start Time"
+  
+  time_end:
+    name: "Reading End Time"
+  
+  # Status sensors
   status:
     name: "Meter Status"
     on_value:
@@ -141,7 +176,7 @@ everblu_meter:
         - if:
             condition:
               text_sensor.state:
-                id: status
+                id: meter_status
                 state: "Error"
             then:
               - logger.log:
@@ -150,11 +185,19 @@ everblu_meter:
   
   error:
     name: "Last Error"
-  
+
+  radio_state:
+    name: "CC1101 State"
+
   timestamp:
     name: "Last Reading"
   
+  history_json:
+    name: "Meter History (JSON)"
+  
+  # Binary sensors
   active_reading:
+    id: meter_active_reading
     name: "Reading In Progress"
     on_press:
       then:
@@ -163,9 +206,8 @@ everblu_meter:
       then:
         - logger.log: "Meter reading completed"
   
-  # Diagnostics
   radio_connected:
-    name: "Radio Connected"
+    name: "CC1101 Connected"
 
 # Template sensor for consumption calculation
 sensor:

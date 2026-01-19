@@ -61,15 +61,19 @@ void ESPHomeDataPublisher::publishMeterReading(const tmeter_data &data, const ch
         lqi_percentage_sensor_->publish_state(calculateLqiPercentage(data.lqi));
     }
 
-    // Wake window times
+    // Wake window times (formatted as HH:MM)
     if (time_start_sensor_)
     {
-        time_start_sensor_->publish_state(data.time_start);
+        char time_start_str[6];
+        snprintf(time_start_str, sizeof(time_start_str), "%02d:00", data.time_start);
+        time_start_sensor_->publish_state(time_start_str);
     }
 
     if (time_end_sensor_)
     {
-        time_end_sensor_->publish_state(data.time_end);
+        char time_end_str[6];
+        snprintf(time_end_str, sizeof(time_end_str), "%02d:00", data.time_end);
+        time_end_sensor_->publish_state(time_end_str);
     }
 
     // Timestamp
@@ -134,6 +138,31 @@ void ESPHomeDataPublisher::publishMeterSettings(int meterYear, unsigned long met
     if (frequency_sensor_)
     {
         frequency_sensor_->publish_state(frequency);
+    }
+
+    // Publish diagnostic settings so HA sees configured values
+    if (meter_serial_sensor_)
+    {
+        char serial_buf[16];
+        snprintf(serial_buf, sizeof(serial_buf), "%lu", meterSerial);
+        meter_serial_sensor_->publish_state(serial_buf);
+    }
+
+    if (meter_year_sensor_)
+    {
+        char year_buf[8];
+        snprintf(year_buf, sizeof(year_buf), "%02d", meterYear);
+        meter_year_sensor_->publish_state(year_buf);
+    }
+
+    if (reading_schedule_sensor_ && schedule)
+    {
+        reading_schedule_sensor_->publish_state(schedule);
+    }
+
+    if (reading_time_utc_sensor_ && readingTime)
+    {
+        reading_time_utc_sensor_->publish_state(readingTime);
     }
 
     // Other settings are typically static config in ESPHome
@@ -217,6 +246,11 @@ void ESPHomeDataPublisher::publishStatistics(unsigned long totalAttempts, unsign
 #ifdef USE_ESPHOME
     ESP_LOGD(TAG_PUB, "Publishing stats: total=%lu success=%lu failed=%lu", totalAttempts, successfulReads, failedReads);
 
+    if (total_attempts_sensor_)
+    {
+        total_attempts_sensor_->publish_state(totalAttempts);
+    }
+
     if (successful_reads_sensor_)
     {
         successful_reads_sensor_->publish_state(successfulReads);
@@ -225,6 +259,31 @@ void ESPHomeDataPublisher::publishStatistics(unsigned long totalAttempts, unsign
     if (failed_reads_sensor_)
     {
         failed_reads_sensor_->publish_state(failedReads);
+    }
+#endif
+}
+
+void ESPHomeDataPublisher::publishFrequencyOffset(float offsetMHz)
+{
+#ifdef USE_ESPHOME
+    if (frequency_offset_sensor_)
+    {
+        // Convert MHz to kHz like MQTT version
+        float offsetKHz = offsetMHz * 1000.0f;
+        ESP_LOGD(TAG_PUB, "Publishing frequency offset: %.3f kHz", offsetKHz);
+        frequency_offset_sensor_->publish_state(offsetKHz);
+    }
+#endif
+}
+
+void ESPHomeDataPublisher::publishTunedFrequency(float frequencyMHz)
+{
+#ifdef USE_ESPHOME
+    if (tuned_frequency_sensor_)
+    {
+        // Publish in MHz with high precision (6 decimal places = kHz resolution)
+        ESP_LOGD(TAG_PUB, "Publishing tuned frequency: %.6f MHz", frequencyMHz);
+        tuned_frequency_sensor_->publish_state(frequencyMHz);
     }
 #endif
 }

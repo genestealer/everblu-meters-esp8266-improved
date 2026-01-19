@@ -169,7 +169,15 @@ float storedFrequencyOffset = 0.0;
 bool autoScanEnabled = (AUTO_SCAN_ENABLED != 0); // Enable automatic scan on first boot if no offset found
 int successfulReadsBeforeAdapt = 0;              // Track successful reads for adaptive tuning
 float cumulativeFreqError = 0.0;                 // Accumulate FREQEST readings for adaptive adjustment
-const int ADAPT_THRESHOLD = 10;                  // Adapt frequency after N successful reads
+
+// Define the adaptive frequency tracking threshold if missing from private.h
+// Controls how many successful reads trigger a frequency adjustment
+// Default: 1 (adjust after every read, ideal for once-per-day schedules)
+// Increase to 5-10 for more stable reading conditions
+#ifndef ADAPTIVE_THRESHOLD
+#define ADAPTIVE_THRESHOLD 1
+#endif
+const int ADAPT_THRESHOLD = ADAPTIVE_THRESHOLD;
 
 #if defined(ESP32)
 Preferences preferences;
@@ -2091,6 +2099,7 @@ void setup()
   {
     Serial.println("[FREQ] CC1101 radio initialized successfully");
     cc1101RadioConnected = true;
+    Serial.printf("[FREQ] Adaptive frequency threshold set to %d reads\n", ADAPT_THRESHOLD);
   }
 
   /*

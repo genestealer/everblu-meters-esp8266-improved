@@ -2,33 +2,92 @@
 
 All notable changes to this project will be documented in this file.
 
-The release process is automated via GitHub Actions and is triggered by tags matching `v*.*.*`. See `.github/workflows/release.yml`.
+Releases are created manually by tagging commits with version tags matching `v*.*.*` (e.g., `v2.1.0`). Users should build from source and configure `private.h` with their own meter settings.
+
+## [v2.1.0] - 2026-01-19
+
+**🎉 ESPHome Integration is NOW FULLY WORKING! 🎉**
+
+Major production release with fully functional ESPHome component integration.
+
+### Added
+
+- **ESPHome Integration**: Full production support with 15+ sensors, Home Assistant binary state gating, and button controls
+- **Adaptive Frequency Tracking**: Intelligent frequency offset optimization based on successful reads with configurable thresholds
+- **Enhanced Sensors**: Read attempts counter, frequency offset monitoring, tuned frequency reporting, and meter status indicators
+- **Dual-Mode Release Package**: `ESPHOME-release/` directory for ESPHome distribution, dynamically built from shared source
+- **Release Build Scripts**: Cross-platform PowerShell and bash scripts to prepare component distribution
+- **Storage Persistence**: Frequency offset persistence with verification (note: offset discovery not persistent between ESPHome reboots)
+- **Button Controls**: Manual read triggers, frequency offset reset, and radio reinitialization commands
+
+### Changed
+
+- Updated YAML configuration examples (advanced, minimal, water meter) with new sensors and features
+- Enhanced data publishing in both ESPHome and MQTT adapters for new metrics
+- Improved logging for frequency adjustments and read attempts
+- IntelliSense optimization for ESPHome component development
+- Documentation and repository URL updates for release clarity
+
+### Fixed
+
+- ESPHome radio initialization and sensor availability handling
+- Log routing in ESPHome to capture all MeterReader logs in UI
+- Repository URL references in documentation
+- VSCode configuration for ESPHOME-release folder integration
+
+### Known Issues
+
+- CC1101 discovered best frequency not persistent between ESPHome reboots (frequency offset offset discovery mechanism needs refinement)
+- All core functionality remains operational despite this limitation
+
+### Testing
+
+- ESPHome integration fully tested on hardware
+- Standalone MQTT mode validated on ESP8266
+- Dual-mode shared codebase verified with ~95% code reuse
+
+### Dual-Mode Architecture
+
+The `ESPHOME-release/` folder is **dynamically built** from shared source files via `prepare-component-release.ps1` (Windows) or `prepare-component-release.sh` (Unix):
+
+1. **Single Source, Dual Distribution**: Core business logic in `src/` is shared between standalone MQTT and ESPHome modes
+2. **Release Preparation**: Build scripts copy entire `src/` tree + ESPHome adapter layer into `ESPHOME-release/everblu_meter/`
+3. **Include Path Preservation**: No file modifications—pure structural copy preserves all relative includes
+4. **Component Integration**: ESPHome loads all `.cpp`/`.h` files directly from the release package
+5. **Maintenance Simplification**: Bug fixes and features in `src/` automatically included in next component distribution
+
+This approach eliminates code duplication while supporting both MQTT discovery and native ESPHome integration seamlessly.
 
 ## [v2.0.0] - 2026-01-08
 
 Major architectural refactor with ESPHome integration support.
 
 ### Added
+
 - **ESPHome Integration** (⚠️ UNTESTED): Custom component with 15+ sensors, example YAMLs, and documentation
 - **Dependency Injection Pattern**: Abstract interfaces (IConfigProvider, ITimeProvider, IDataPublisher) for platform-agnostic operation
 - **Dual-Mode Support**: Choose between standalone MQTT or ESPHome with ~95% code sharing
 - WiFi Serial Monitor support for remote debugging
 
 ### Changed
+
 - Reorganized code structure: `adapters/`, `core/`, `services/` directories
 - MeterReader now platform-agnostic using dependency injection
 - Improved separation of concerns and maintainability
 
 ### Fixed
+
 - Missing includes causing compilation failures
 - WiFi Serial Monitor now captures all MeterReader logs
 - ESP32 build error with watchdog timer include
 
 ### Testing
+
 - ✅ Standalone MQTT mode tested on ESP8266
 - ⚠️ ESPHome integration UNTESTED - use with caution
 
 ### Breaking Changes
+
 - Source code structure reorganized
 - Internal APIs changed due to adapter pattern
 
@@ -42,7 +101,8 @@ Major architectural refactor with ESPHome integration support.
 
 What's changed since v1.1.6:
 
-### Fixed
+### Fixed in v1.1.6
+
 - Automatically append METER_SERIAL to MQTT client ID to prevent conflicts when running multiple devices on the same broker (#35)
 - Restored Home Assistant button discovery by removing unsupported per-button availability payloads
 - Device now gracefully handles missing CC1101 radio without continuous reboots

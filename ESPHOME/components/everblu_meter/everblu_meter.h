@@ -9,6 +9,12 @@
 
 #pragma once
 
+// Editor note: VS Code/IntelliSense may display include errors such as
+// "cannot open source file \"esphome/core/component.h\"". These headers are
+// provided by the ESPHome/PlatformIO build environment, and paths are resolved
+// during compilation. It is safe to ignore such squiggles in the editor for
+// esphome/* includes when working within ESPHome.
+
 #include "esphome/core/component.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
@@ -39,6 +45,7 @@ namespace esphome
         public:
             void set_parent(EverbluMeterComponent *parent) { parent_ = parent; }
             void set_frequency_scan(bool is_frequency_scan) { is_frequency_scan_ = is_frequency_scan; }
+            void set_reset_frequency(bool is_reset) { is_reset_frequency_ = is_reset; }
 
         protected:
             void press_action() override;
@@ -46,6 +53,7 @@ namespace esphome
         private:
             EverbluMeterComponent *parent_{nullptr};
             bool is_frequency_scan_{false};
+            bool is_reset_frequency_{false};
         };
 
         class EverbluMeterComponent : public PollingComponent
@@ -77,6 +85,7 @@ namespace esphome
             void set_retry_cooldown(unsigned long ms) { retry_cooldown_ms_ = ms; }
             void set_time_component(time::RealTimeClock *time) { time_component_ = time; }
             void set_initial_read_on_boot(bool v) { initial_read_on_boot_ = v; }
+            void set_adaptive_threshold(int threshold) { adaptive_threshold_ = threshold; }
 
             // Sensor setters
             void set_volume_sensor(sensor::Sensor *sensor) { volume_sensor_ = sensor; }
@@ -86,17 +95,23 @@ namespace esphome
             void set_rssi_percentage_sensor(sensor::Sensor *sensor) { rssi_percentage_sensor_ = sensor; }
             void set_lqi_sensor(sensor::Sensor *sensor) { lqi_sensor_ = sensor; }
             void set_lqi_percentage_sensor(sensor::Sensor *sensor) { lqi_percentage_sensor_ = sensor; }
-            void set_time_start_sensor(sensor::Sensor *sensor) { time_start_sensor_ = sensor; }
-            void set_time_end_sensor(sensor::Sensor *sensor) { time_end_sensor_ = sensor; }
+            void set_time_start_sensor(text_sensor::TextSensor *sensor) { time_start_sensor_ = sensor; }
+            void set_time_end_sensor(text_sensor::TextSensor *sensor) { time_end_sensor_ = sensor; }
             void set_total_attempts_sensor(sensor::Sensor *sensor) { total_attempts_sensor_ = sensor; }
             void set_successful_reads_sensor(sensor::Sensor *sensor) { successful_reads_sensor_ = sensor; }
             void set_failed_reads_sensor(sensor::Sensor *sensor) { failed_reads_sensor_ = sensor; }
+            void set_frequency_offset_sensor(sensor::Sensor *sensor) { frequency_offset_sensor_ = sensor; }
+            void set_tuned_frequency_sensor(sensor::Sensor *sensor) { tuned_frequency_sensor_ = sensor; }
 
             void set_status_sensor(text_sensor::TextSensor *sensor) { status_sensor_ = sensor; }
             void set_error_sensor(text_sensor::TextSensor *sensor) { error_sensor_ = sensor; }
             void set_radio_state_sensor(text_sensor::TextSensor *sensor) { radio_state_sensor_ = sensor; }
             void set_timestamp_sensor(text_sensor::TextSensor *sensor) { timestamp_sensor_ = sensor; }
             void set_history_sensor(text_sensor::TextSensor *sensor) { history_sensor_ = sensor; }
+            void set_meter_serial_sensor(text_sensor::TextSensor *sensor) { meter_serial_sensor_ = sensor; }
+            void set_meter_year_sensor(text_sensor::TextSensor *sensor) { meter_year_sensor_ = sensor; }
+            void set_reading_schedule_sensor(text_sensor::TextSensor *sensor) { reading_schedule_sensor_ = sensor; }
+            void set_reading_time_utc_sensor(text_sensor::TextSensor *sensor) { reading_time_utc_sensor_ = sensor; }
 
             void set_active_reading_sensor(binary_sensor::BinarySensor *sensor) { active_reading_sensor_ = sensor; }
             void set_radio_connected_sensor(binary_sensor::BinarySensor *sensor) { radio_connected_sensor_ = sensor; }
@@ -104,6 +119,7 @@ namespace esphome
             // External actions
             void request_manual_read();
             void request_frequency_scan();
+            void request_reset_frequency();
 
         protected:
             // Configuration
@@ -121,6 +137,7 @@ namespace esphome
             bool auto_align_midpoint_{true};
             int max_retries_{10};
             unsigned long retry_cooldown_ms_{3600000};
+            int adaptive_threshold_{1};
 
             // Internal state tracking
             void republish_initial_states();
@@ -136,17 +153,23 @@ namespace esphome
             sensor::Sensor *rssi_percentage_sensor_{nullptr};
             sensor::Sensor *lqi_sensor_{nullptr};
             sensor::Sensor *lqi_percentage_sensor_{nullptr};
-            sensor::Sensor *time_start_sensor_{nullptr};
-            sensor::Sensor *time_end_sensor_{nullptr};
+            text_sensor::TextSensor *time_start_sensor_{nullptr};
+            text_sensor::TextSensor *time_end_sensor_{nullptr};
             sensor::Sensor *total_attempts_sensor_{nullptr};
             sensor::Sensor *successful_reads_sensor_{nullptr};
             sensor::Sensor *failed_reads_sensor_{nullptr};
+            sensor::Sensor *frequency_offset_sensor_{nullptr};
+            sensor::Sensor *tuned_frequency_sensor_{nullptr};
 
             text_sensor::TextSensor *status_sensor_{nullptr};
             text_sensor::TextSensor *error_sensor_{nullptr};
             text_sensor::TextSensor *radio_state_sensor_{nullptr};
             text_sensor::TextSensor *timestamp_sensor_{nullptr};
             text_sensor::TextSensor *history_sensor_{nullptr};
+            text_sensor::TextSensor *meter_serial_sensor_{nullptr};
+            text_sensor::TextSensor *meter_year_sensor_{nullptr};
+            text_sensor::TextSensor *reading_schedule_sensor_{nullptr};
+            text_sensor::TextSensor *reading_time_utc_sensor_{nullptr};
 
             binary_sensor::BinarySensor *active_reading_sensor_{nullptr};
             binary_sensor::BinarySensor *radio_connected_sensor_{nullptr};

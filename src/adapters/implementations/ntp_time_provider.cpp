@@ -4,7 +4,14 @@
  */
 
 #include "ntp_time_provider.h"
+
+// Conditional includes based on build environment
+#ifdef USE_ESPHOME
+#include "logging.h"
+#else
 #include "../../core/logging.h"
+#endif
+
 #include <Arduino.h>
 
 NTPTimeProvider::NTPTimeProvider()

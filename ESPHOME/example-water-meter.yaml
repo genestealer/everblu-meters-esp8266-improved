@@ -38,9 +38,12 @@ time:
 # EverBlu Meter Component
 external_components:
   - source:
-      type: local
-      path: custom_components
+      type: git
+      url: https://github.com/genestealer/everblu-meters-esp8266-improved
+      ref: main
+      path: ESPHOME-release
     components: [ everblu_meter ]
+    refresh: 1d
 
 everblu_meter:
   id: my_water_meter
@@ -50,140 +53,95 @@ everblu_meter:
   meter_serial: 12345678  # Your meter's serial number
   gdo0_pin: 4             # GPIO connected to CC1101 GDO0 (D2 on D1 mini)
   
-  # Meter type
-  meter_type: water       # 'water' or 'gas'
-  
-  # Radio configuration
-  frequency: 433.82       # MHz - adjust if needed for your region
-  auto_scan: true         # Automatically scan for optimal frequency
-  debug_cc1101: true      # Enable detailed CC1101 radio debug logs
-  
-  # Reading schedule
-  reading_schedule: Monday-Friday # Options: Monday-Friday, Saturday, Sunday, Everyday
-  read_hour: 10          # Hour to perform reading (0-23)
-  read_minute: 0         # Minute to perform reading (0-59)
-  timezone_offset: -5    # Hours from UTC (optional if using time component)
-  
-  # Time alignment features
-  auto_align_time: true      # Align readings to configured time
-  auto_align_midpoint: true  # Use midpoint of reading window
-  
-  # Retry configuration
-  max_retries: 10                    # Maximum read attempts
-  retry_cooldown: 1h                 # Cooldown between retry sessions
+  # Optional: set meter_type to 'gas' for gas meters (defaults to water)
   
   # Link to time component
   time_id: homeassistant_time
-  
-  # Update interval for sensor updates
-  update_interval: 60s
   
   # Control buttons
   request_reading_button:
     name: "Read Meter Now"
   frequency_scan_button:
     name: "Scan Frequency"
+  reset_frequency_button:
+    name: "Reset Frequency Offset"
   
   # Volume sensors
   volume:
     name: "Water Volume"
-    unit_of_measurement: "L"
-    accuracy_decimals: 0
-    device_class: water
-    state_class: total_increasing
-    icon: "mdi:water"
   
   counter:
-    name: "Water Counter"
-    unit_of_measurement: "L"
-    accuracy_decimals: 0
-    state_class: total_increasing
-    icon: "mdi:counter"
+    name: "Read Counter"
   
   # Battery sensor
   battery:
     name: "Meter Battery"
-    unit_of_measurement: "years"
-    accuracy_decimals: 1
-    icon: "mdi:battery"
   
   # Radio quality sensors
   rssi:
-    name: "RSSI"
-    unit_of_measurement: "dBm"
-    accuracy_decimals: 0
-    device_class: signal_strength
-    icon: "mdi:signal"
+    name: "Meter RSSI"
   
   rssi_percentage:
     name: "RSSI Percentage"
-    unit_of_measurement: "%"
-    accuracy_decimals: 0
-    icon: "mdi:signal"
   
   lqi:
     name: "LQI"
-    accuracy_decimals: 0
-    icon: "mdi:wifi-strength-4"
   
   lqi_percentage:
     name: "LQI Percentage"
-    unit_of_measurement: "%"
-    accuracy_decimals: 0
-    icon: "mdi:wifi-strength-4"
-  
-  # Timing sensors
-  time_start:
-    name: "Reading Start Time"
-    unit_of_measurement: "ms"
-    accuracy_decimals: 0
-    icon: "mdi:clock-start"
-  
-  time_end:
-    name: "Reading End Time"
-    unit_of_measurement: "ms"
-    accuracy_decimals: 0
-    icon: "mdi:clock-end"
   
   # Statistics sensors
   total_attempts:
     name: "Total Read Attempts"
-    accuracy_decimals: 0
-    state_class: total_increasing
-    icon: "mdi:counter"
   
   successful_reads:
     name: "Successful Reads"
-    accuracy_decimals: 0
-    state_class: total_increasing
-    icon: "mdi:check-circle"
   
   failed_reads:
     name: "Failed Reads"
-    accuracy_decimals: 0
-    state_class: total_increasing
-    icon: "mdi:alert-circle"
+  
+  frequency_offset:
+    name: "Frequency Offset"
+
+  tuned_frequency:
+    name: "Tuned Frequency (MHz)"
+
+  # Diagnostic text sensors
+  meter_serial_sensor:
+    name: "Meter Serial"
+  meter_year_sensor:
+    name: "Meter Year"
+  reading_schedule_sensor:
+    name: "Reading Schedule"
+  reading_time_utc_sensor:
+    name: "Reading Time (UTC)"
+  
+  # Timing sensors (24-hour format: HH:MM)
+  time_start:
+    name: "Reading Start Time"
+  
+  time_end:
+    name: "Reading End Time"
   
   # Status text sensors
   status:
     name: "Meter Status"
-    icon: "mdi:information"
   
   error:
     name: "Last Error"
-    icon: "mdi:alert"
   
   radio_state:
-    name: "Radio State"
-    icon: "mdi:radio-tower"
+    name: "CC1101 State"
   
   timestamp:
     name: "Last Reading Time"
-    icon: "mdi:clock-outline"
+  
+  history_json:
+    name: "Meter History (JSON)"
   
   # Binary sensors
   active_reading:
     name: "Reading Active"
-    device_class: running
+  
   radio_connected:
-    name: "Radio Connected"
+    name: "CC1101 Connected"

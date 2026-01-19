@@ -155,6 +155,22 @@
 // Default: 10 retries
 #define MAX_RETRIES 10
 
+// Adaptive frequency tracking threshold
+// Controls how many successful meter reads trigger an automatic frequency adjustment
+// based on the CC1101's FREQEST register (frequency error estimate)
+//
+// Values:
+//   1 (default):  Adjust frequency after every successful read
+//                 Best for infrequent readings (once-per-day) or drifting frequencies
+//   5:            Adjust after 5 successful reads
+//                 Good balance for detecting drift vs avoiding noise
+//   10 or higher: Adjust only after many reads
+//                 Best for stable, frequent readings (multiple per hour)
+//
+// The adjustment only occurs if the average frequency error exceeds 2 kHz
+// and applies 50% of the measured error to avoid over-correction.
+#define ADAPTIVE_THRESHOLD 1
+
 // ============================================================================
 // WIFI SERIAL MONITOR CONFIGURATION
 // ============================================================================

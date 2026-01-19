@@ -1,0 +1,21 @@
+{
+	// // Keep the release folder out of search/watch
+	// "files.exclude": {
+	// 	"**/ESPHOME-release/**": true
+	// },
+	// "search.exclude": {
+	// 	"**/ESPHOME-release/**": true
+	// },
+	// "files.watcherExclude": {
+	// 	"**/ESPHOME-release/**": true
+	// },
+
+	// Use PlatformIO to provide accurate IntelliSense config
+	"C_Cpp.default.configurationProvider": "ms-vscode.platformio",
+
+	// Point C/C++ extension at PlatformIO's compile_commands.json (generated at project root)
+	"C_Cpp.default.compileCommands": "${workspaceFolder}/compile_commands.json",
+
+	// Optional: suppress noisy error squiggles in editor
+	"C_Cpp.errorSquiggles": "disabled"
+}

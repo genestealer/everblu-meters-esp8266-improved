@@ -1,5 +1,23 @@
 # ESPHome Build Configuration Notes
 
+> **📖 Documentation**: See [README](README.md) for complete ESPHome documentation index.
+
+## Important: For Developers Only
+
+**End users**: You don't need to read this document. Just use the `ESPHOME-release` folder directly.
+
+**Developers**: If you modify source files in `src/`, you must run the preparation script to update `ESPHOME-release`:
+
+```bash
+# Windows PowerShell
+pwsh ESPHOME/prepare-component-release.ps1
+
+# Linux/macOS
+bash ESPHOME/prepare-component-release.sh
+```
+
+This copies updated files from `src/` into `ESPHOME-release/everblu_meter/src/`.
+
 ## Source File Access
 
 The ESPHome component needs access to the source files in `../../src/`. There are several ways to handle this:
@@ -63,7 +81,7 @@ Use ESPHome's `external_components` with the full repository:
 external_components:
   - source:
       type: git
-      url: https://github.com/yourusername/everblu-meters-esp8266-improved.git
+      url: https://github.com/genestealer/everblu-meters-esp8266-improved
       ref: main
     components: [ everblu_meter ]
     refresh: 1d
@@ -91,23 +109,27 @@ cg.add_library("everblu_src", "../../src")
 
 ## Recommended Approach
 
-For **distribution** and **ease of use**: **Option 1** (copy files)
+For **end users**: Use the ready-to-use `ESPHOME-release` folder directly
 
-For **development**: **Option 2** (symbolic links) or **Option 3** (git external_components)
+For **developers modifying source code**: Run `prepare-component-release.ps1/.sh` after changes to update `ESPHOME-release`
+
+For **active development/testing**: **Option 2** (symbolic links) or **Option 3** (git external_components with full repo)
 
 ## Current Implementation
 
-The current implementation uses **relative paths** (`../../src/`), which works with **Option 3** (external_components pointing to the git repo).
+The `ESPHOME-release` folder contains a pre-built, self-contained component ready for end users.
+
+Developers modifying source files in `src/` must run the preparation script to update `ESPHOME-release/everblu_meter/src/`.
 
 ## Build Script
 
-Here's a script to prepare the component for standalone distribution:
+Here's the script that developers run to update the ESPHOME-release component after modifying source files:
 
 ```bash
 #!/bin/bash
 # prepare-component-release.sh
 
-COMPONENT_DIR="ESPHOME/components/everblu_meter"
+COMPONENT_DIR="ESPHOME-release/everblu_meter"
 SRC_DIR="src"
 
 echo "Preparing EverBlu Meter component for release..."
