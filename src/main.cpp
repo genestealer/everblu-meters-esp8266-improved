@@ -2257,7 +2257,7 @@ void loop()
   }
   else
   {
-    // Both Wi-Fi and MQTT are up — ensure LED is steady off and reset timers
+    // Both Wi-Fi and MQTT are up - ensure LED is steady off and reset timers
     if (!g_ledState)
     {
       digitalWrite(LED_BUILTIN, HIGH); // off

@@ -155,7 +155,7 @@ Pattern repeated across all 5 retry attempts:
 ## Recommendations for Future Contributors
 
 1. **Hardware Validation Required:** Never implement protocol-level changes without testing against actual target hardware
-2. **Respect Empirical Data:** If it works with hardware, it works. If it breaks with hardware, it's broken—regardless of theory
+2. **Respect Empirical Data:** If it works with hardware, it works. If it breaks with hardware, it's broken-regardless of theory
 3. **Test Incrementally:** Test individual changes one at a time (as done here) to isolate problems
 4. **Document Rationale:** Explain WHY complex logic exists (as now done in code comments)
 5. **Preserve Working State:** Keep git history clean; revert failed experiments promptly

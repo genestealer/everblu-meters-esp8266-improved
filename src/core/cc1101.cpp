@@ -1206,7 +1206,7 @@ uint8_t decode_4bitpbit_serial(uint8_t *rxBuffer, int l_total_byte, uint8_t *dec
    Dredzik suggested removing 4x oversampling (native 2.4 kbps RX throughout).
    Test result: FAILED - Sync detected but frame reception timed out on all 5 attempts.
 
-   Conclusion: 4x oversampling is NOT redundant optimization—it is essential.
+   Conclusion: 4x oversampling is NOT redundant optimization-it is essential.
    See docs/DREDZIK_IMPROVEMENTS_TEST_RESULTS.md for complete test details.
 
    Technical Details:

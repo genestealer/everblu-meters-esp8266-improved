@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document details the changes made to transition from manual frequency scanning and static calibration to automatic frequency calibration using the CC1101's built-in capabilities. Additionally, it explains why frequency discovery was removed from MQTT/Home Assistant—it's a radio hardware configuration parameter, not a meter sensor value.
+This document details the changes made to transition from manual frequency scanning and static calibration to automatic frequency calibration using the CC1101's built-in capabilities. Additionally, it explains why frequency discovery was removed from MQTT/Home Assistant-it's a radio hardware configuration parameter, not a meter sensor value.
 
 ---
 
@@ -181,12 +181,12 @@ Serial.printf("> Frequency (effective): %.6f MHz\n", (double)FREQUENCY);
 7. Recompile and upload
 
 #### New Workflow (Simple)
-1. **Option A (Quick Start)**: Skip frequency config entirely—use default 433.82 MHz
+1. **Option A (Quick Start)**: Skip frequency config entirely-use default 433.82 MHz
 2. **Option B (Precise)**: 
    - Use frequency scanning mode to find optimal frequency
    - Set `FREQUENCY` in `private.h`
    - Compile and upload
-3. Done—automatic calibration handles the rest
+3. Done-automatic calibration handles the rest
 
 ---
 
@@ -268,7 +268,7 @@ If you have an existing configuration with manual frequency and calibration valu
 **New `private.h`**:
 ```cpp
 #define FREQUENCY 433.82  // Keep this
-// Remove all FSCAL defines—no longer needed
+// Remove all FSCAL defines-no longer needed
 // Remove SCAN_FREQUENCY_433MHZ if present
 ```
 
@@ -279,7 +279,7 @@ If you have an existing configuration with manual frequency and calibration valu
 // Wi-Fi and MQTT config...
 #define METER_SERIAL 12345678
 #define METER_YEAR 2021
-// Frequency will default to 433.82 MHz—no FREQUENCY define needed
+// Frequency will default to 433.82 MHz-no FREQUENCY define needed
 ```
 
 **Optimized `private.h`** (custom frequency):

@@ -52,7 +52,7 @@ The `ESPHOME-release/` folder is **dynamically built** from shared source files 
 
 1. **Single Source, Dual Distribution**: Core business logic in `src/` is shared between standalone MQTT and ESPHome modes
 2. **Release Preparation**: Build scripts copy entire `src/` tree + ESPHome adapter layer into `ESPHOME-release/everblu_meter/`
-3. **Include Path Preservation**: No file modifications—pure structural copy preserves all relative includes
+3. **Include Path Preservation**: No file modifications-pure structural copy preserves all relative includes
 4. **Component Integration**: ESPHome loads all `.cpp`/`.h` files directly from the release package
 5. **Maintenance Simplification**: Bug fixes and features in `src/` automatically included in next component distribution
 
