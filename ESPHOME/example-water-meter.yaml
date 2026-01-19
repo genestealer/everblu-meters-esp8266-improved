@@ -3,8 +3,12 @@
 
 esphome:
   name: everblu-water-meter
-  platform: ESP8266
+
+esp8266:
+  # WARNING: Arduino framework is required; ESP-IDF is not supported for everblu_meter
   board: d1_mini
+  framework:
+    version: recommended  # Arduino core (explicit)
 
 # WiFi configuration
 wifi:

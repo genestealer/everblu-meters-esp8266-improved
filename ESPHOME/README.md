@@ -64,6 +64,17 @@ external_components:
     components: [ everblu_meter ]
     refresh: 1d
 
+# Force Arduino framework (required for everblu_meter)
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+# For ESP8266, Arduino is the only framework, but you can be explicit:
+# esp8266:
+#   board: d1_mini
+#   framework:
+#     version: recommended
+
 # Or use locally:
 # external_components:
 #   - source:

@@ -26,6 +26,7 @@ ESPHome integration is now production-ready. For setup and usage, see the ESPHom
  - Versioned external component in `ESPHOME-release` with the same 2.1.0 code as the main firmware
  - Tested on ESP8266 and ESP32 with water and gas meters; supports the same sensors and calibration logic
  - YAML stays simple: drop in the component, set `meter_year`, `meter_serial`, `meter_type`, and go
+ - Build with the Arduino framework (set `esp32.framework.type: arduino`; ESP-IDF is not supported for this component)
  - Migration tip: if you move from MQTT firmware, keep the same meter serial values so your topics/entities stay aligned
 
  

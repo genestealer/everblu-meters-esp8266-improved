@@ -3,8 +3,12 @@
 
 esphome:
   name: everblu-meter-advanced
-  platform: ESP32
+
+esp32:
+  # WARNING: Arduino framework is required; ESP-IDF builds fail because everblu_meter depends on Arduino headers
   board: esp32dev
+  framework:
+    type: arduino
 
 # WiFi configuration
 wifi:
