@@ -127,6 +127,7 @@ external_components:
 everblu_meter:
   meter_year: 21
   meter_serial: 12345678
+  gdo0_pin: 4
   meter_type: water
   volume:
     name: "Water Volume"

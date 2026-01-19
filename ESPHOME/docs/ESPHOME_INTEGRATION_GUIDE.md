@@ -137,6 +137,7 @@ time:
 everblu_meter:
   meter_year: 21              # Last 2 digits of manufacture year
   meter_serial: 12345678      # Your meter's serial number
+  gdo0_pin: 4                 # GPIO connected to CC1101 GDO0 (D2 on D1 mini)
   meter_type: water           # 'water' or 'gas'
   time_id: ha_time
   
@@ -273,6 +274,7 @@ Simple configuration with essential sensors:
 everblu_meter:
   meter_year: 21
   meter_serial: 12345678
+  gdo0_pin: 4
   meter_type: water
   time_id: ha_time
   
@@ -316,6 +318,7 @@ Full monitoring with all sensors and custom scheduling:
 everblu_meter:
   meter_year: 23
   meter_serial: 12345678
+  gdo0_pin: 4
   meter_type: water
   
   # Weekend readings only
@@ -456,13 +459,14 @@ sensor:
 
 ### Multiple Meters
 
-You can configure multiple meters on one ESP:
+You SHOULD be able to configure multiple meters on one ESP (I have not been able to test this):
 
 ```yaml
 everblu_meter:
   - id: water_meter
     meter_year: 21
     meter_serial: 12345678
+    gdo0_pin: 4
     meter_type: water
     volume:
       name: "Water Volume"
@@ -470,6 +474,7 @@ everblu_meter:
   - id: gas_meter
     meter_year: 22
     meter_serial: 87654321
+    gdo0_pin: 4
     meter_type: gas
     volume:
       name: "Gas Volume"
