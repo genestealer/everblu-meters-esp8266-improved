@@ -21,6 +21,13 @@ Integrated with Home Assistant via MQTT AutoDiscovery.
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-41BDF5?logo=homeassistant)](https://www.home-assistant.io)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.md)
 
+
+> **Big news:** ESPHome integration is now production-ready. For setup and usage, see the ESPHome docs at [ESPHOME/README.md](ESPHOME/README.md).
+> - Versioned external component in `ESPHOME-release` with the same 2.1.0 code as the main firmware
+> - Tested on ESP8266 and ESP32 with water and gas meters; supports the same sensors and calibration logic
+> - YAML stays simple: drop in the component, set `meter_year`, `meter_serial`, `meter_type`, and go
+> - Migration tip: if you move from MQTT firmware, keep the same meter serial values so your topics/entities stay aligned
+> 
 Based on regulatory paperwork, this may also work with the following models (untested):
 
 - AnyQuest Cyble Enhanced
