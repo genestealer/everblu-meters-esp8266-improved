@@ -62,7 +62,7 @@ Connect the CC1101 to your ESP board:
 ### Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/everblu-meters-esp8266-improved.git
+git clone https://github.com/genestealer/everblu-meters-esp8266-improved/tree/fix-esphome/ESPHOME-release.git
 cd everblu-meters-esp8266-improved
 ```
 

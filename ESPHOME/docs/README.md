@@ -62,7 +62,7 @@ Add to your ESPHome YAML configuration:
 external_components:
   - source:
       type: git
-      url: https://github.com/yourusername/everblu-meters-esp8266-improved.git
+      url: https://github.com/genestealer/everblu-meters-esp8266-improved/tree/fix-esphome/ESPHOME-release.git
       ref: main
     components: [ everblu_meter ]
     refresh: 1d

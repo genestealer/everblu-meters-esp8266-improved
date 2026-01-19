@@ -300,7 +300,7 @@ esphome run my-meter.yaml
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/everblu-meters-esp8266-improved.git
+git clone https://github.com/genestealer/everblu-meters-esp8266-improved/tree/fix-esphome/ESPHOME-release.git
 cd everblu-meters-esp8266-improved
 
 # Configure
