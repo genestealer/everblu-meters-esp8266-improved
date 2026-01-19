@@ -52,7 +52,7 @@ The component is ready to use directly from the `ESPHOME-release` folder. Add to
 external_components:
   - source:
       type: git
-      url: https://github.com/genestealer/everblu-meters-esp8266-improved.git
+      url: https://github.com/genestealer/everblu-meters-esp8266-improved
       ref: fix-esphome
       path: ESPHOME-release
     components: [ everblu_meter ]

@@ -81,7 +81,7 @@ Use ESPHome's `external_components` with the full repository:
 external_components:
   - source:
       type: git
-      url: https://github.com/genestealer/everblu-meters-esp8266-improved.git
+      url: https://github.com/genestealer/everblu-meters-esp8266-improved
       ref: fix-esphome
     components: [ everblu_meter ]
     refresh: 1d

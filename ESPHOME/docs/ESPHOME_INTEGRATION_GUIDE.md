@@ -67,14 +67,9 @@ The component is ready to use directly from the `ESPHOME-release` folder. Use ES
 external_components:
   - source:
       type: git
-      url: https://github.com/genestealer/everblu-meters-esp8266-improved.git
+      url: https://github.com/genestealer/everblu-meters-esp8266-improved
       ref: fix-esphome
       path: ESPHOME-release
-    components: [ everblu_meter ]
-    refresh: 1d
-      type: git
-      url: https://github.com/yourusername/everblu-meters-esp8266-improved
-      ref: main
     components: [ everblu_meter ]
     refresh: 1d
 ```
@@ -87,9 +82,6 @@ external_components:
       type: local
       path: /path/to/everblu-meters-esp8266-improved/ESPHOME-release
     components: [ everblu_meter ]
-      type: local
-      path: /path/to/everblu-meters-esp8266-improved/ESPHOME/components
-    components: [ everblu_meter ]
 ```
 
 ### Step 2 Alternative: Manual Installation
@@ -98,7 +90,7 @@ If you prefer to copy files locally:
 
 ```bash
 # Clone repository
-git clone https://github.com/genestealer/everblu-meters-esp8266-improved.git
+git clone https://github.com/genestealer/everblu-meters-esp8266-improved
 cd everblu-meters-esp8266-improved
 
 # Copy the ready-to-use component to ESPHome config
@@ -131,8 +123,9 @@ The minimal configuration requires:
 external_components:
   - source:
       type: git
-      url: https://github.com/yourusername/everblu-meters-esp8266-improved
-      ref: main
+      url: https://github.com/genestealer/everblu-meters-esp8266-improved
+      ref: fix-esphome
+      path: ESPHOME-release
     components: [ everblu_meter ]
     refresh: 1d
 

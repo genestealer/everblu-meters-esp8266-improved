@@ -14,7 +14,7 @@ cp -r ESPHOME-release/everblu_meter /config/esphome/custom_components/
 external_components:
   - source:
       type: git
-      url: https://github.com/genestealer/everblu-meters-esp8266-improved.git
+      url: https://github.com/genestealer/everblu-meters-esp8266-improved
       ref: fix-esphome
       path: ESPHOME-release
     components: [ everblu_meter ]
