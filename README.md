@@ -113,25 +113,10 @@ This project supports two integration methods:
 - ✅ All ESPHome features (OTA, logging, etc.)
 - ✅ No MQTT broker required
 
-**Quick start**:
-```yaml
-external_components:
-  - source:
-      type: git
-      url: https://github.com/genestealer/everblu-meters-esp8266-improved
-      ref: main
-      path: ESPHOME-release
-    components: [ everblu_meter ]
-    refresh: 1d
-
-everblu_meter:
-  meter_year: 21
-  meter_serial: 12345678
-  gdo0_pin: 4
-  meter_type: water
-  volume:
-    name: "Water Volume"
-```
+Examples: use the ready-made ESPHome configs:
+- [ESPHOME/example-water-meter.yaml](ESPHOME/example-water-meter.yaml)
+- [ESPHOME/example-gas-meter-minimal.yaml](ESPHOME/example-gas-meter-minimal.yaml)
+- [ESPHOME/example-advanced.yaml](ESPHOME/example-advanced.yaml)
 
 📖 **Full documentation**: [ESPHOME/ESPHOME_INTEGRATION_GUIDE.md](ESPHOME/ESPHOME_INTEGRATION_GUIDE.md)
 
