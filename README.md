@@ -69,9 +69,39 @@ Supported meters:
 
 </details>
 
+### Advanced Frame Validation
+
+The firmware implements multiple layers of validation to ensure data integrity:
+
+1. **Custom Serial Decoding**: RADIAN protocol uses a proprietary serial encoding with 1 start bit + 8 data bits (LSB first) + 3 stop bits per byte. Each bit is oversampled 4x for noise immunity (logical '1' = 0xF0, logical '0' = 0x0F). The decoder verifies bit-level transitions, counts consecutive samples, validates start/stop bits, and extracts clean data bytes. This is NOT standard Manchester encoding-it's custom serial framing that must be decoded in software.
+
+2. **CRC-16/KERMIT Checksum**: Each RADIAN frame includes a 16-bit checksum (polynomial 0x8408, init 0x0000). Technically this is a Frame Check Sequence (FCS), not a true CRC, but it's highly effective at catching transmission errors and corrupted frames. The firmware rejects any frame that fails this check.
+
+3. **Frame Structure Validation**: 
+   - Preamble pattern matching (0xAAAAAAAA sync word)
+   - Fixed-length frame verification (58 bytes expected)
+   - Header field sanity checks (protocol version, frame type)
+   - Meter serial number matching (only accepts frames from your configured meter)
+
+4. **Temporal Validation**:
+   - Wake window verification (Time Start/End must be valid 24-hour format)
+   - Reading counter continuity checks (detects duplicate or out-of-sequence frames)
+   - Battery level sanity bounds (0-200 months typical range)
+
+5. **Signal Quality Filtering**:
+   - RSSI threshold (configurable, default -90 dBm)
+   - LQI (Link Quality Indicator) assessment
+   - Frequency error estimation for adaptive tuning
+
+**Result**: You only get data when the firmware is highly confident the reading is genuine and accurate. No false positives, no corrupted values making it into Home Assistant.
+
+---
+
 ## Integration Options
 
 This project supports two integration methods:
+
+**Important:** The ESPHome component uses the **same proven codebase** as the mature MQTT firmware version. All the core CC1101 radio handling, RADIAN protocol decoding, frequency calibration, and frame validation logic is shared between both implementations. This means you get years of testing and refinement in both integration methods.
 
 ### Option 1: ESPHome Component (Recommended)
 
