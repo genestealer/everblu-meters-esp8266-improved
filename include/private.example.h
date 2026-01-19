@@ -35,6 +35,18 @@
 // 0 = disable (default)
 #define ENABLE_MQTT_DEBUGGING 0
 
+// Meter number prefix in entity IDs
+// Controls whether the meter serial number is included as a prefix in MQTT entity IDs
+// and Home Assistant entity names. This is useful for distinguishing entities when
+// running multiple meters on the same broker.
+//
+// 1 (default): Include meter serial as prefix (e.g., "123456_everblu_meter_value")
+//              Use this for multiple meters or to preserve multi-meter MQTT history
+// 0:           Omit meter serial prefix (e.g., "everblu_meter_value")
+//              Use this for single meters where you want to keep existing Home Assistant history
+//
+#define ENABLE_METER_PREFIX_IN_ENTITY_IDS 1
+
 // ============================================================================
 // TIME AND SCHEDULING
 // ============================================================================
