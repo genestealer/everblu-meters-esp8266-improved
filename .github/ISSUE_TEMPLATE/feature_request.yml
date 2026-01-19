@@ -1,0 +1,56 @@
+name: "Feature request"
+description: "Suggest an idea or enhancement"
+title: "[Feature]: <short summary>"
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for your suggestion! Sharing context helps us evaluate and prioritize.
+
+  - type: dropdown
+    id: integration
+    attributes:
+      label: Integration target
+      description: Which integration does this primarily affect?
+      options:
+        - ESPHome
+        - MQTT
+        - Both (ESPHome + MQTT)
+        - Not applicable / Other
+    validations:
+      required: false
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What problem would this feature solve?
+      placeholder: Describe the use case and why it matters.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How would you like this to work?
+      placeholder: Outline the idea at a high level.
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any alternative solutions or workarounds you’ve tried.
+    validations:
+      required: false
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional context
+      description: Links, screenshots, related issues, or references.
+    validations:
+      required: false

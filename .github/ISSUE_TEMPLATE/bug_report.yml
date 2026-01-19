@@ -1,0 +1,105 @@
+name: "Bug report"
+description: "Report a problem and include required details"
+title: "[Bug]: <short summary>"
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug! Please complete all required fields.
+
+        • Tell us whether you use the ESPHome integration or the MQTT integration.
+        • Attach DEBUG-level logs. See docs/LOGGING_SYSTEM.md for guidance.
+
+  - type: dropdown
+    id: integration
+    attributes:
+      label: Integration type
+      description: Which integration are you using with this project?
+      options:
+        - ESPHome
+        - MQTT
+        - Both (ESPHome + MQTT)
+        - Other / Unsure
+    validations:
+      required: true
+
+  - type: input
+    id: firmware_version
+    attributes:
+      label: Firmware version (EVERBLU_FW_VERSION)
+      description: Found in src/core/version.h or shown at startup in logs.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched the existing issues for duplicates
+          required: true
+        - label: I am using the latest release or recent commit
+          required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened, and what did you expect to happen?
+      placeholder: Clear and concise description of the issue.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Steps and any minimal configuration to reproduce the issue.
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: versions
+    attributes:
+      label: Versions / environment
+      description: ESPHome version, firmware commit/branch, PlatformIO version, Home Assistant version (if applicable), OS, etc.
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: hardware
+    attributes:
+      label: Hardware details
+      description: Board model (ESP8266 variant), CC1101 module details, wiring, power, antenna, etc.
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Minimal configuration
+      description: Provide a minimal YAML/CPP config that reproduces the problem (redact secrets).
+      render: yaml
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Debug logs (REQUIRED)
+      description: |
+        Please paste DEBUG-level logs that capture the issue. Redact any sensitive information.
+        See docs/LOGGING_SYSTEM.md for how to enable and collect detailed logs.
+      placeholder: |
+        <paste logs here>
+      render: text
+    validations:
+      required: true
