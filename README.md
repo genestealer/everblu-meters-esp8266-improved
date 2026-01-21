@@ -26,7 +26,7 @@ Integrated with Home Assistant via MQTT AutoDiscovery and ESPHome external compo
 
 **Supports both water meters (readings in liters) and gas meters (readings in cubic meters)**.
 
-#
+---
 
 ### **ESPHome** - Release V2.1.0
 ESPHome integration is now production-ready. For setup and usage, see the ESPHome docs at [ESPHOME/README.md](ESPHOME/README.md)
@@ -36,6 +36,29 @@ ESPHome integration is now production-ready. For setup and usage, see the ESPHom
  - Build with the Arduino framework (set `esp32.framework.type: arduino`; ESP-IDF is not supported for this component)
  - Migration tip: if you move from MQTT firmware, keep the same meter serial values so your topics/entities stay aligned
 
+---
+
+
+## ⚠️ Important: Utility Read Counter Compatibility
+
+The meter includes a built-in **read counter** that increments each time it's queried. When your water/gas company performs wireless readings, they expect this counter to match their scheduled read count. If you regularly read your meter yourself:
+
+- The counter will be **higher than expected** when the utility reads it
+- Their equipment may flag this discrepancy or refuse to download data
+- They may suspect tampering or out-of-sync equipment
+
+**This is not an MQTT or ESP issue** - it's how the RADIAN protocol and meter hardware work.
+
+### Recommended Actions
+
+1. **Record your initial counter value** when you first start using this device (check Home Assistant sensor or MQTT topic `/counter`)
+2. **If the utility reports issues**:
+   - They can still take a **manual reading** from the physical meter display (traditional method)
+   - Or you can **loop the counter** back to the expected value: the read counter wraps at 255 back to 0, so making enough reads before their scheduled visit can "reset" it (automate this in Home Assistant if needed)
+
+**Note:** Most utilities won't notice or care, but it's good to be aware of this if they mention unexpected counter values during their wireless reading attempts.
+
+---
  
 Based on regulatory paperwork, this may also work with the following models (untested):
 
