@@ -115,6 +115,6 @@ Write-Host "    everblu_meter.h/.cpp" -ForegroundColor White
 Write-Host "    src/ (complete source tree with original includes)" -ForegroundColor White
 Write-Host ""
 Write-Host "To use with ESPHome:" -ForegroundColor Green
-Write-Host "  1. Copy to ESPHome: Copy-Item -Recurse '$RELEASE_DIR' '/config/esphome/custom_components/everblu_meter'" -ForegroundColor Cyan
-Write-Host "  2. In YAML use external_components: local path or git" -ForegroundColor Cyan
+Write-Host "  1. Use external_components with git source (recommended)" -ForegroundColor Cyan
+Write-Host "  2. Or use external_components with local path: $RELEASE_DIR" -ForegroundColor Cyan
 Write-Host ""

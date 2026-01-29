@@ -85,17 +85,24 @@ external_components:
     components: [ everblu_meter ]
 ```
 
-### Step 2 Alternative: Manual Installation
+### Step 2 Alternative: Local Path
 
-If you prefer to copy files locally:
+If you prefer to use a local copy:
 
 ```bash
 # Clone repository
 git clone https://github.com/genestealer/everblu-meters-esp8266-improved
 cd everblu-meters-esp8266-improved
+```
 
-# Copy the ready-to-use component to ESPHome config
-cp -r ESPHOME-release/everblu_meter /config/esphome/custom_components/
+Then use the local path in your YAML:
+
+```yaml
+external_components:
+  - source:
+      type: local
+      path: /path/to/everblu-meters-esp8266-improved/ESPHOME-release
+    components: [ everblu_meter ]
 ```
 
 ### Step 3: Create Your Configuration

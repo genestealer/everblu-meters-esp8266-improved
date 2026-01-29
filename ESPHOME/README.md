@@ -102,10 +102,14 @@ everblu_meter:
     name: "Status"
 ```
 
-For a manual local install, copy the component into your ESPHome `custom_components` folder:
+For a manual local install, use the `external_components` feature with a local path:
 
-```bash
-cp -r ESPHOME-release/everblu_meter /config/esphome/custom_components/
+```yaml
+external_components:
+  - source:
+      type: local
+      path: /path/to/ESPHOME-release
+    components: [ everblu_meter ]
 ```
 
 ### 2. Build and Upload
