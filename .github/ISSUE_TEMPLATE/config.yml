@@ -1,1 +1,5 @@
 blank_issues_enabled: false
+contact_links:
+  - name: Report a Bug (Recommended)
+    url: https://github.com/psykokwak-com/everblu-meters-esp8266/issues/new?template=bug_report.yml
+    about: Report a problem with the firmware or integration

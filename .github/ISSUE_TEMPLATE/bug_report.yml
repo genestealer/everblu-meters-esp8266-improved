@@ -65,10 +65,7 @@ body:
       placeholder: e.g., TTGO T-Display, custom board
       description: Only fill this if you selected "Other" above.
     validations:
-      required: true
-    if:
-      field: board_model
-      equals: Other (not listed)
+      required: false
 
   - type: checkboxes
     id: checklist
