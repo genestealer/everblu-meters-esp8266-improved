@@ -27,7 +27,7 @@ Then recompile and upload. Done! Your entities will keep their original names wi
 | Scenario | Setting | Reason |
 |----------|---------|--------|
 | Running a **single meter** for over a year | `0` | Preserve Home Assistant history |
-| Running **multiple meters** on same broker | `1` | Avoid entity ID conflicts |
+| Running **multiple meters** on same broker | `1` | Avoid MQTT topic collisions and data corruption |
 | First time setup | `1` | Recommended default |
 | Upgrading from v1.15 | `0` | Restore old entity naming |
 
