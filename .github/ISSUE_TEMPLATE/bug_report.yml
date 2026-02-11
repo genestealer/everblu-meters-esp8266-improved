@@ -40,8 +40,18 @@ body:
       options:
         - ESP8266
         - ESP32
+        - Other
     validations:
       required: true
+
+  - type: input
+    id: chip_family_other
+    attributes:
+      label: If "Other", enter chip family
+      placeholder: e.g. RP2040
+      description: Only fill this if you selected "Other" above.
+    validations:
+      required: false
 
   - type: dropdown
     id: board_model
