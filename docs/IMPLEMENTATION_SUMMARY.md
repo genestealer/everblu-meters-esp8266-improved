@@ -128,14 +128,14 @@ All meters use:
   - everblu_meter_counter
 ```
 
-### MQTT Topic Format
+### MQTT Topic and Entity ID Format
 
-**MQTT topics themselves are NOT affected** - they remain structured by the base topic:
+The `ENABLE_METER_PREFIX_IN_ENTITY_IDS` setting controls whether the meter serial is included in both MQTT topics and Home Assistant entity IDs/discovery paths.
 
-- **Prefix enabled:** `everblu/cyble/{METER_SERIAL}/*`
-- **Prefix disabled:** `everblu/cyble/*`
+- **Prefix enabled:** MQTT base topic `everblu/cyble/{METER_SERIAL}/*`
+- **Prefix disabled:** MQTT base topic `everblu/cyble/*`
 
-The prefix only affects Home Assistant entity IDs and discovery message paths.
+Home Assistant entity IDs and discovery message paths follow the same prefix behavior described above.
 
 ---
 
