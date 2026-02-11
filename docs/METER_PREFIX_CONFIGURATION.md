@@ -189,13 +189,20 @@ entity_id: sensor.2777550_everblu_meter_battery
 3. Your history remains with the old entity IDs
 4. To view historical data, you may need to use the entity history panel
 
-### Multi-meter setup shows conflicting entity names
+### Multi-meter setup shows conflicting entity names or data corruption
 
-**Cause:** You have multiple devices with prefix disabled
+**Cause:** You have multiple devices with prefix disabled, causing MQTT topic collisions
+
+**Critical Issue:** When the prefix is disabled on multiple meters, all devices publish to the **exact same MQTT topics** (e.g., `everblu/cyble/liters`). This causes:
+- **Data corruption:** Each meter overwrites the other meter's data
+- **Conflicting entity IDs:** Home Assistant cannot distinguish between meters
+- **Unreliable readings:** The last meter to publish wins, so readings are inconsistent
+
 **Solution:** 
 - Set all devices to: `#define ENABLE_METER_PREFIX_IN_ENTITY_IDS 1`
 - Restart all devices
 - Home Assistant will discover them with unique prefixed entity IDs
+- Each meter will use unique MQTT topics (e.g., `everblu/cyble/257750/liters`, `everblu/cyble/2777550/liters`)
 
 ## Technical Details
 
