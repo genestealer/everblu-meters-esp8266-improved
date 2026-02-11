@@ -14,7 +14,13 @@
 #include <stdbool.h>
 #ifdef USE_ESPHOME
 // Forward declaration for ESPHome SPI device
-namespace esphome { namespace spi { class SPIDevice; } }
+namespace esphome
+{
+  namespace spi
+  {
+    class SPIDevice;
+  }
+}
 
 /**
  * @brief Configure CC1101 to use ESPHome SPI device
@@ -27,7 +33,6 @@ namespace esphome { namespace spi { class SPIDevice; } }
  */
 void cc1101_set_spi_device(esphome::spi::SPIDevice<> *device, int cs_pin);
 #endif
-
 
 /**
  * @struct tmeter_data
