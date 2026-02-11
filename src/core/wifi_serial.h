@@ -17,6 +17,9 @@
 class WifiSerialStream;
 extern WifiSerialStream WiFiSerial;
 
+// Serial can be HardwareSerial or USBCDC depending on board/USB mode.
+using SerialType = decltype(::Serial);
+
 /**
  * Combined USB + WiFi serial stream
  * Mirrors writes to both hardware Serial and the active WiFi client.
@@ -24,7 +27,7 @@ extern WifiSerialStream WiFiSerial;
 class WifiSerialStream : public Print
 {
 public:
-    explicit WifiSerialStream(HardwareSerial &usb) : _usb(usb) {}
+    explicit WifiSerialStream(SerialType &usb) : _usb(usb) {}
 
     // Basic Serial-compatible API
     void begin(unsigned long baud) { _usb.begin(baud); }
@@ -44,7 +47,7 @@ public:
     void loop();
 
 private:
-    HardwareSerial &_usb;
+    SerialType &_usb;
 };
 
 // C-style helpers retained for minimal integration
