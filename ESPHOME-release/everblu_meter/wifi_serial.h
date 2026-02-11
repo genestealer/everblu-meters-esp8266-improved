@@ -28,8 +28,10 @@ public:
     explicit WifiSerialStream(Stream &usb) : _usb(usb) {}
 
     // Basic Serial-compatible API
-    void begin(unsigned long baud) { _usb.begin(baud); }
-    void setDebugOutput(bool enable) { _usb.setDebugOutput(enable); }
+    // Note: Stream base class doesn't have begin() or setDebugOutput()
+    // These are provided as no-ops for compatibility
+    void begin(unsigned long baud) { /* Stream doesn't have begin, ignored */ }
+    void setDebugOutput(bool enable) { /* Stream doesn't have setDebugOutput, ignored */ }
     void flush();
     int available();
     int read();

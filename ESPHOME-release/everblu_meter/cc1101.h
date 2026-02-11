@@ -13,25 +13,25 @@
 #include <stdint.h>
 #include <stdbool.h>
 #ifdef USE_ESPHOME
-// Forward declaration for ESPHome SPI device
-namespace esphome
-{
-  namespace spi
-  {
-    class SPIDevice;
-  }
-}
-
 /**
  * @brief Configure CC1101 to use ESPHome SPI device
  *
  * Must be called before cc1101_init() when compiling with ESPHome.
  * Provides the SPI device and CS pin for CC1101 communication.
  *
- * @param device Pointer to ESPHome SPIDevice instance
+ * @param device Pointer to ESPHome SPIDevice instance (as void* for generic handling)
  * @param cs_pin GPIO pin number for chip select
  */
-void cc1101_set_spi_device(esphome::spi::SPIDevice<> *device, int cs_pin);
+void cc1101_set_spi_device(void *device, int cs_pin);
+
+/**
+ * @brief Set GDO0 pin for ESPHome mode
+ *
+ * Must be called before cc1101_init() when compiling with ESPHome.
+ *
+ * @param gdo0_pin GPIO pin number for GDO0 interrupt signal
+ */
+void cc1101_set_gdo0_pin(int gdo0_pin);
 #endif
 
 /**

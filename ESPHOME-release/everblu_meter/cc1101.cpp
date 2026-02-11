@@ -204,16 +204,28 @@ static const uint8_t debug_out = (uint8_t)(DEBUG_CC1101);
 #define TEST1 0x2D   // Various test settings
 #define TEST0 0x2E   // Various test settings
 #ifdef USE_ESPHOME
-// ESPHome SPI device integration
-#include "esphome/components/spi/spi.h"
-static esphome::spi::SPIDevice<> *_esphome_spi_device = nullptr;
+// ESPHome SPI integration - just stores CS pin, uses Arduino SPI library
+// (ESPHome SPIDevice parent configures the bus)
 static int _spi_cs_pin = -1;
+static int _gdo0_pin = -1;
 
-void cc1101_set_spi_device(esphome::spi::SPIDevice<> *device, int cs_pin)
+void cc1101_set_spi_device(void *device, int cs_pin)
 {
-  _esphome_spi_device = device;
+  // device pointer not needed - we use Arduino SPI directly
+  (void)device;
   _spi_cs_pin = cs_pin;
 }
+
+void cc1101_set_gdo0_pin(int gdo0_pin)
+{
+  _gdo0_pin = gdo0_pin;
+}
+
+// Macro to get GDO0 pin - use variable in ESPHome mode, build flag otherwise
+#define GET_GDO0_PIN() (_gdo0_pin)
+#else
+// Non-ESPHome mode: GDO0 comes from build flag
+#define GET_GDO0_PIN() (GDO0)
 #endif
 
 // Change these define according to your ESP8266 board
@@ -236,17 +248,17 @@ int _spi_speed = 0;
 int wiringPiSPIDataRW(int channel, unsigned char *data, int len)
 {
 #ifdef USE_ESPHOME
-  // Use ESPHome SPI device
-  if (!_esphome_spi_device || _spi_cs_pin < 0)
+  // ESPHome mode: Use Arduino SPI directly (bus already configured by SPIDevice parent)
+  if (!_spi_speed || _spi_cs_pin < 0)
     return -1;
 
-  _esphome_spi_device->enable();
+  SPI.beginTransaction(SPISettings(_spi_speed, MSBFIRST, SPI_MODE0));
   digitalWrite(_spi_cs_pin, LOW);
-  _esphome_spi_device->transfer_array(data, data, len);
+  SPI.transfer(data, len);
   digitalWrite(_spi_cs_pin, HIGH);
-  _esphome_spi_device->disable();
+  SPI.endTransaction();
 #else
-  // Use Arduino SPI
+  // Arduino SPI
   if (!_spi_speed)
     return -1;
 
@@ -261,17 +273,17 @@ int wiringPiSPIDataRW(int channel, unsigned char *data, int len)
 }
 
 int wiringPiSPISetup(int channel, int speed)
+{
 #ifdef USE_ESPHOME
-    // ESPHome mode: SPI is already configured, just set up CS pin
-    if (_spi_cs_pin >= 0)
-{
-  pinMode(_spi_cs_pin, OUTPUT);
-  digitalWrite(_spi_cs_pin, HIGH);
-}
-_spi_speed = speed; // Store for potential future use
+  // ESPHome mode: SPI is already configured, just set up CS pin
+  if (_spi_cs_pin >= 0)
+  {
+    pinMode(_spi_cs_pin, OUTPUT);
+    digitalWrite(_spi_cs_pin, HIGH);
+  }
+  _spi_speed = speed; // Store for potential future use
 #else
-// Arduino mode: Set up SPI manually
-{
+  // Arduino mode: Set up SPI manually
   _spi_speed = speed;
 
   pinMode(SPI_SS, OUTPUT);
@@ -287,7 +299,7 @@ _spi_speed = speed; // Store for potential future use
 #endif
 #endif
 
-return 0;
+  return 0;
 }
 
 /*----------------------------[END config register]------------------------------*/
@@ -544,7 +556,7 @@ void cc1101_configureRF_0(float freq)
 
 bool cc1101_init(float freq)
 {
-  pinMode(GDO0, INPUT_PULLUP);
+  pinMode(GET_GDO0_PIN(), INPUT_PULLUP);
 
   // Initialize SPI bus for CC1101 communication (500 kHz)
   if ((wiringPiSPISetup(0, 500000)) < 0)
@@ -681,14 +693,14 @@ uint8_t cc1101_check_packet_received(void)
   int8_t l_Rssi_dbm;
   uint8_t l_lqi, l_freq_est, pktLen;
   pktLen = 0;
-  if (digitalRead(GDO0) == TRUE)
+  if (digitalRead(GET_GDO0_PIN()) == TRUE)
   {
     // get RF info at beginning of the frame
     l_lqi = halRfReadReg(LQI_ADDR);
     l_freq_est = halRfReadReg(FREQEST_ADDR);
     l_Rssi_dbm = cc1100_rssi_convert2dbm(halRfReadReg(RSSI_ADDR));
 
-    while (digitalRead(GDO0) == TRUE)
+    while (digitalRead(GET_GDO0_PIN()) == TRUE)
     {
       delay(2); // Reduced from 5ms to 2ms for faster FIFO reading (prevents overflow)
 
@@ -1299,7 +1311,7 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
   halRfWriteReg(PKTLEN, 1);                      // Just one byte of sync pattern
   cc1101_rec_mode();
 
-  while ((digitalRead(GDO0) == FALSE) && (l_tmo < rx_tmo_ms))
+  while ((digitalRead(GET_GDO0_PIN()) == FALSE) && (l_tmo < rx_tmo_ms))
   {
     delay(1);
     l_tmo++;
@@ -1388,7 +1400,7 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
   l_tmo = 0;
   l_total_byte = 0;
   l_byte_in_rx = 1;
-  while ((digitalRead(GDO0) == FALSE) && (l_tmo < rx_tmo_ms))
+  while ((digitalRead(GET_GDO0_PIN()) == FALSE) && (l_tmo < rx_tmo_ms))
   {
     delay(1);
     l_tmo++;

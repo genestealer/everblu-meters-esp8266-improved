@@ -8,7 +8,6 @@ using the RADIAN protocol over 433 MHz with a CC1101 transceiver.
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import sensor, text_sensor, binary_sensor, button, time as time_, spi
-from esphome import pins
 from esphome.const import (
     CONF_ID,
     CONF_FREQUENCY,
@@ -103,7 +102,7 @@ CONFIG_SCHEMA = (
                         cv.GenerateID(spi.CONF_SPI_ID): cv.use_id(spi.SPIComponent),
             cv.Required(CONF_METER_YEAR): cv.int_range(min=0, max=99),
             cv.Required(CONF_METER_SERIAL): cv.uint32_t,
-            cv.Required(CONF_CS_PIN): pins.gpio_output_pin_schema,
+            cv.Required(CONF_CS_PIN): cv.int_range(min=0, max=50),
             cv.Required(CONF_GDO0_PIN): cv.int_range(min=0, max=50),
             cv.Required(CONF_TIME_ID): cv.use_id(time_.RealTimeClock),
             cv.Optional(CONF_METER_TYPE, default=METER_TYPE_WATER): cv.enum(
@@ -264,12 +263,13 @@ async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
 
-    # Register as SPI device - ESPHome will manage SPI bus and provide SPIDevice interface
-    await spi.register_spi_device(var, config)
+    # Set SPI parent (component inherits from SPIDevice)
+    parent = await cg.get_variable(config[spi.CONF_SPI_ID])
+    cg.add(var.set_spi_parent(parent))
 
-    # Configure CS pin for CC1101
-    cs_pin = await cg.gpio_pin_expression(config[CONF_CS_PIN])
-    cg.add(var.set_cs_pin(cs_pin))
+    # Configure CS and GDO0 pins for CC1101 (raw GPIO numbers for Arduino pinMode/digitalRead)
+    cg.add(var.set_cs_pin(config[CONF_CS_PIN]))
+    cg.add(var.set_gdo0_pin(config[CONF_GDO0_PIN]))
 
     # No custom include paths needed when using flat release layout
 
@@ -281,7 +281,6 @@ async def to_code(config):
     # Use explicit -D flags to ensure visibility in all translation units
     cg.add_build_flag(f"-DMETER_YEAR={config[CONF_METER_YEAR]}")
     cg.add_build_flag(f"-DMETER_SERIAL={config[CONF_METER_SERIAL]}")
-    cg.add_build_flag(f"-DGDO0={config[CONF_GDO0_PIN]}")
     
     # Note: ESPHome automatically compiles all .cpp files in component directory
     # No need to explicitly list source files - just ensure main.cpp is excluded from release

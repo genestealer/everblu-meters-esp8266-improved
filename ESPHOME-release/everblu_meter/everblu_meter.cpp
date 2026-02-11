@@ -142,16 +142,27 @@ namespace esphome
             binaries += (radio_connected_sensor_ != nullptr);
 
             ESP_LOGD(TAG, "Linked sensors -> numeric: %d, text: %d, binary: %d", numeric, texts, binaries);
+
             // Initialize CC1101 SPI device before creating meter reader
-            if (cs_pin_ != nullptr)
+            if (cs_pin_ >= 0)
             {
-                cs_pin_->setup();
-                cc1101_set_spi_device(this, cs_pin_->get_pin());
-                ESP_LOGD(TAG, "CC1101 SPI device configured with CS pin: %d", cs_pin_->get_pin());
+                cc1101_set_spi_device(static_cast<void *>(static_cast<esphome::spi::SPIClient *>(this)), cs_pin_);
+                ESP_LOGD(TAG, "CC1101 SPI device configured with CS pin: %d", cs_pin_);
             }
             else
             {
                 ESP_LOGE(TAG, "CS pin not configured for CC1101!");
+            }
+
+            // Configure GDO0 pin for CC1101
+            if (gdo0_pin_ >= 0)
+            {
+                cc1101_set_gdo0_pin(gdo0_pin_);
+                ESP_LOGD(TAG, "CC1101 GDO0 pin configured: %d", gdo0_pin_);
+            }
+            else
+            {
+                ESP_LOGE(TAG, "GDO0 pin not configured for CC1101!");
             }
 
             // Create meter reader with all adapters (but don't initialize yet)
