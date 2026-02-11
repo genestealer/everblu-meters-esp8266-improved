@@ -122,6 +122,10 @@ body:
     attributes:
       label: Minimal configuration
       description: Provide a minimal YAML/CPP config that reproduces the problem (redact secrets).
+      placeholder: |
+        ```yaml
+        # Your ESPHome/config YAML here
+        ```
       render: yaml
     validations:
       required: false
