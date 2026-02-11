@@ -3,9 +3,7 @@
  * Provides TCP serial server that mirrors Serial output over WiFi
  */
 
-#ifndef WIFI_SERIAL_NO_REMAP
 #define WIFI_SERIAL_NO_REMAP
-#endif
 #include "wifi_serial.h"
 #include "version.h"
 
