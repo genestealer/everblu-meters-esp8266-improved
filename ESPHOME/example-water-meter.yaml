@@ -62,6 +62,19 @@ everblu_meter:
   # Link to time component
   time_id: homeassistant_time
   
+  # Optional: Timezone offset in MINUTES (default: 0 = UTC)
+  # ⚠️ IMPORTANT: ESPHome's 'timezone' setting above is NOT automatically used!
+  # You must manually set this parameter for scheduling in your local timezone.
+  # This is a static offset (doesn't auto-adjust for DST).
+  # Examples: 60 = UTC+1, -300 = UTC-5, 660 = UTC+11 (Melbourne summer)
+  # timezone_offset: -240  # US Eastern EDT (UTC-4)
+  
+  # Optional: Reading schedule (default: Monday-Friday at 10:00 UTC)
+  # read_hour is always in UTC - timezone_offset converts this to your local time
+  # reading_schedule: "Monday-Friday"  # Options: "Monday-Friday", "Saturday", "Sunday", "Everyday"
+  # read_hour: 10        # Hour in UTC (0-23)
+  # read_minute: 0       # Minute (0-59)
+  
   # Control buttons
   request_reading_button:
     name: "Read Meter Now"

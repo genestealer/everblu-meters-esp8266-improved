@@ -54,6 +54,13 @@ everblu_meter:
   # Optional: Link to time component
   time_id: ha_time
   
+  # Optional: Timezone offset in MINUTES (default: 0 = UTC)
+  # ⚠️ IMPORTANT: Set this to match your local timezone!
+  # ESPHome's 'timezone' setting above is NOT automatically used by everblu_meter.
+  # This is a static offset - doesn't handle DST automatically.
+  # Examples: 60 = UTC+1, -300 = UTC-5, 660 = UTC+11
+  # timezone_offset: 60  # Central Europe CET (UTC+1)
+  
   # Minimal sensors - just the essentials
   
   # Control button (optional but handy)

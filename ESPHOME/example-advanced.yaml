@@ -76,9 +76,10 @@ everblu_meter:
   
   # Advanced scheduling - weekend only
   reading_schedule: Saturday      # Read only on Saturdays
-  read_hour: 6           # Early morning reading
+  read_hour: 6           # Early morning reading (in UTC)
   read_minute: 30
-  timezone_offset: 1     # CET/CEST
+  timezone_offset: 60    # CET (UTC+1) - offset in MINUTES
+                         # NOTE: Static offset, update when DST changes (CEST = 120)
   
   # Timing features
   auto_align_time: true

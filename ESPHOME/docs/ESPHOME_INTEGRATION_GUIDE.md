@@ -174,9 +174,40 @@ everblu_meter:
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `reading_schedule` | string | `Monday-Friday` | When to read: `Monday-Friday`, `Saturday`, `Sunday`, or `Everyday` |
-| `read_hour` | int | `10` | Hour to perform reading (0-23) |
+| `read_hour` | int | `10` | Hour to perform reading (0-23, in UTC) |
 | `read_minute` | int | `0` | Minute to perform reading (0-59) |
-| `timezone_offset` | int | `0` | Hours offset from UTC (-12 to +14) |
+| `timezone_offset` | int | `0` | **Minutes** offset from UTC (-720 to +720). Example: `660` for UTC+11, `-300` for UTC-5 |
+
+**Important: Timezone Configuration**
+
+⚠️ **Known Limitation**: The `timezone_offset` parameter is currently **required** for scheduling in your local timezone. The ESPHome time component's `timezone` setting (e.g., `timezone: Australia/Melbourne`) is **not automatically used** by the everblu_meter component.
+
+This is a design limitation inherited from the MQTT/standalone version:
+- **MQTT/Standalone mode**: Uses NTP which only provides UTC time, so manual offset is necessary
+- **ESPHome mode**: Could leverage ESPHome's timezone-aware time (which handles DST automatically), but currently doesn't
+
+**Current Workaround:**
+- You must manually specify `timezone_offset` in **minutes** (not hours)
+- The offset is added to UTC to get your local time
+- Positive values for east of UTC, negative for west
+- This is a **static offset** - it doesn't automatically adjust for Daylight Saving Time
+
+Common timezone examples:
+```yaml
+# Examples (timezone_offset in minutes):
+timezone_offset: 660   # Melbourne/Sydney AEDT (UTC+11) - Summer
+timezone_offset: 600   # Melbourne/Sydney AEST (UTC+10) - Winter
+timezone_offset: 60    # Central Europe CET (UTC+1) - Winter
+timezone_offset: 120   # Central Europe CEST (UTC+2) - Summer
+timezone_offset: -300  # US Eastern EST (UTC-5) - Winter
+timezone_offset: -240  # US Eastern EDT (UTC-4) - Summer
+timezone_offset: -480  # US Pacific PST (UTC-8) - Winter
+timezone_offset: -420  # US Pacific PDT (UTC-7) - Summer
+```
+
+**Note on DST**: If your region observes Daylight Saving Time, you'll need to manually update `timezone_offset` when DST changes. Alternatively, you can choose a single offset (e.g., standard time year-round), but the meter will be read at different local clock times depending on DST.
+
+**Future Enhancement**: A future version could be enhanced to automatically use ESPHome's `timezone` setting, eliminating the need for manual offset and providing automatic DST handling.
 
 #### Time Alignment
 
@@ -410,6 +441,39 @@ See [example-advanced.yaml](example-advanced.yaml) for complete configuration.
 2. **Wait for sync**: Allow 1-2 minutes after boot
 3. **Check network**: Verify WiFi connection to Home Assistant
 4. **Manual timezone**: Set `timezone_offset` if time component unavailable
+
+### Wrong Read Time / Timezone Issues
+
+**Symptoms**: Logs show "Timezone Offset: 0" but you're not in UTC timezone, or readings happen at wrong time
+
+**Problem**: The `timezone` setting in the ESPHome `time:` component (e.g., `timezone: Australia/Melbourne`) is **not automatically used** by the `everblu_meter` component. This is a known design limitation.
+
+**Why**: The architecture was designed for both MQTT (which needs manual offset) and ESPHome modes using the same core logic. ESPHome's timezone-aware time API isn't currently leveraged, even though it could handle DST automatically.
+
+**Solution**: You must explicitly set `timezone_offset` in the `everblu_meter` configuration:
+
+```yaml
+everblu_meter:
+  # ... other settings ...
+  read_hour: 10          # Hour in UTC (0-23)
+  read_minute: 0
+  timezone_offset: 660   # Melbourne AEDT (UTC+11) - value in MINUTES, not hours!
+```
+
+**Common timezone values (in minutes)**:
+- Melbourne/Sydney AEDT (UTC+11): `660` (Summer)
+- Melbourne/Sydney AEST (UTC+10): `600` (Winter)
+- Tokyo (UTC+9): `540`
+- Central Europe CET (UTC+1): `60` (Winter)
+- Central Europe CEST (UTC+2): `120` (Summer)
+- UK GMT (UTC+0): `0` (Winter)
+- UK BST (UTC+1): `60` (Summer)
+- US Eastern EST (UTC-5): `-300` (Winter)
+- US Eastern EDT (UTC-4): `-240` (Summer)
+- US Pacific PST (UTC-8): `-480` (Winter)
+- US Pacific PDT (UTC-7): `-420` (Summer)
+
+**DST Handling**: Since this is a static offset, you'll need to manually update `timezone_offset` when daylight saving time changes. Or, use standard time year-round (e.g., always use `600` for Sydney) and accept that readings happen at different clock times in summer vs winter.
 
 ### Component Not Found
 
