@@ -134,7 +134,9 @@ body:
         Please paste DEBUG-level logs that capture the issue. Redact any sensitive information.
         See docs/LOGGING_SYSTEM.md for how to enable and collect detailed logs.
       placeholder: |
+        ```
         <paste logs here>
-      render: text
+        ```
+      render: shell
     validations:
       required: false
