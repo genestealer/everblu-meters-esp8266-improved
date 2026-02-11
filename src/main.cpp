@@ -298,7 +298,7 @@ const char *readingSchedule = DEFAULT_READING_SCHEDULE;
 
 // Helper variables for generating serial-prefixed MQTT topics and entity IDs
 // These must be initialized before EspMQTTClient is constructed (for LWT topic)
-// Format: everblu/cyble/{METER_SERIAL}
+// Format: everblu/cyble/{METER_SERIAL} (or everblu/cyble if meter prefix is disabled)
 // NOTE: METER_SERIAL must be defined as a numeric value in private.h
 // Compile-time validation ensures METER_SERIAL is non-zero
 #define STRINGIFY(x) #x
@@ -313,15 +313,25 @@ const char *readingSchedule = DEFAULT_READING_SCHEDULE;
 #error "METER_SERIAL cannot be zero - please set a valid meter serial number in private.h"
 #endif
 
+// Define meter prefix option if not defined in private.h (default to enabled)
+#ifndef ENABLE_METER_PREFIX_IN_ENTITY_IDS
+#define ENABLE_METER_PREFIX_IN_ENTITY_IDS 1
+#endif
+
 // Buffer size calculations for MQTT topics:
 // - meterSerialStr: METER_SERIAL as string (max 10 digits for ULONG_MAX) + null = 16 bytes (safe)
-// - mqttBaseTopic: "everblu/cyble/" (15) + METER_SERIAL (10) + null (1) = 26 bytes minimum
+// - mqttBaseTopic: "everblu/cyble/" (15) + optional METER_SERIAL (10) + null (1) = 26 bytes minimum
 //   Buffer size: 64 bytes provides 2.4x safety margin for future extensions
-// - mqttLwtTopic: mqttBaseTopic (25) + "/status" (7) + null (1) = 33 bytes minimum
-//   Buffer size: 80 bytes provides 2.4x safety margin
-char meterSerialStr[16] = TOSTRING(METER_SERIAL);                          // String representation of METER_SERIAL
-char mqttBaseTopic[64] = "everblu/cyble/" TOSTRING(METER_SERIAL);          // Base MQTT topic
+// - mqttLwtTopic: mqttBaseTopic (25-35) + "/status" (7) + null (1) = 33-43 bytes minimum
+//   Buffer size: 80 bytes provides adequate safety margin
+char meterSerialStr[16] = TOSTRING(METER_SERIAL); // String representation of METER_SERIAL
+#if ENABLE_METER_PREFIX_IN_ENTITY_IDS
+char mqttBaseTopic[64] = "everblu/cyble/" TOSTRING(METER_SERIAL);          // Base MQTT topic with meter serial
 char mqttLwtTopic[80] = "everblu/cyble/" TOSTRING(METER_SERIAL) "/status"; // LWT status topic with serial number
+#else
+char mqttBaseTopic[64] = "everblu/cyble";       // Base MQTT topic without meter serial
+char mqttLwtTopic[80] = "everblu/cyble/status"; // LWT status topic without serial number
+#endif
 
 // Standard buffer size for constructing MQTT topic strings
 // Calculation: mqttBaseTopic (max 63) + longest suffix "/wifi_signal_percentage" (24) + null (1) = 88 bytes
@@ -908,6 +918,17 @@ void onScheduled()
 // Used to reduce the size of the JSON payload
 // https://www.home-assistant.io/integrations/mqtt/#supported-abbreviations-in-mqtt-discovery-messages
 
+// Helper function to conditionally build meter prefix for entity IDs
+// Returns meter serial with underscore suffix if ENABLE_METER_PREFIX_IN_ENTITY_IDS is 1, empty otherwise
+String getMeterPrefix()
+{
+#if ENABLE_METER_PREFIX_IN_ENTITY_IDS
+  return String(METER_SERIAL) + "_";
+#else
+  return "";
+#endif
+}
+
 // Helper function to build JSON device block with METER_SERIAL
 String buildDeviceJson()
 {
@@ -916,8 +937,14 @@ String buildDeviceJson()
   String json;
   json.reserve(300);
 
+#if ENABLE_METER_PREFIX_IN_ENTITY_IDS
   json = "\"ids\": [\"" + String(METER_SERIAL) + "\"],\n";
   json += "    \"name\": \"EverBlu Meter " + String(METER_SERIAL) + "\",\n";
+#else
+  // When meter prefix is disabled, use a fixed device ID for single-meter setup
+  json = "\"ids\": [\"everblu_meter_device\"],\n";
+  json += "    \"name\": \"EverBlu Meter\",\n";
+#endif
   json += "    \"mdl\": \"Itron EverBlu Cyble Enhanced Water and Gas Meter ESP8266/ESP32\",\n";
   json += "    \"mf\": \"Genestealer\",\n";
   json += "    \"sw\": \"" EVERBLU_FW_VERSION "\",\n";
@@ -937,8 +964,8 @@ String buildDiscoveryJson(const char *name, const char *entity_id, const char *i
 
   json = "{\n";
   json += "  \"name\": \"" + String(name) + "\",\n";
-  json += "  \"uniq_id\": \"" + String(METER_SERIAL) + "_" + String(entity_id) + "\",\n";
-  json += "  \"obj_id\": \"" + String(METER_SERIAL) + "_" + String(entity_id) + "\",\n";
+  json += "  \"uniq_id\": \"" + getMeterPrefix() + String(entity_id) + "\",\n";
+  json += "  \"obj_id\": \"" + getMeterPrefix() + String(entity_id) + "\",\n";
   if (icon)
     json += "  \"ic\": \"" + String(icon) + "\",\n";
   if (unit)
@@ -1074,10 +1101,14 @@ static void publishDiscoveryMessage(const char *domain, const char *entity, cons
 {
   // Buffer sizes increased for safety margin to prevent overflow
   // Worst case: "homeassistant/" (14) + "binary_sensor/" (14) +
-  // METER_SERIAL (10) + "_" (1) + entity (50) + "/config" (7) + null (1) = ~97 bytes
+  // optional METER_SERIAL (10) + "_" (1) + entity (50) + "/config" (7) + null (1) = ~97 bytes
   char configTopic[256];
   char entityId[128];
+#if ENABLE_METER_PREFIX_IN_ENTITY_IDS
   snprintf(entityId, sizeof(entityId), "%lu_%s", (unsigned long)METER_SERIAL, entity);
+#else
+  snprintf(entityId, sizeof(entityId), "%s", entity);
+#endif
   snprintf(configTopic, sizeof(configTopic), "homeassistant/%s/%s/config", domain, entityId);
   mqtt.publish(configTopic, jsonPayload.c_str(), true);
   delay(5);
@@ -1095,8 +1126,8 @@ void publishHADiscovery()
   Serial.println("[MQTT] Publishing Reading (Total) sensor discovery...");
   json = "{\n";
   json += "  \"name\": \"Reading (Total)\",\n";
-  json += "  \"uniq_id\": \"" + String(METER_SERIAL) + "_everblu_meter_value\",\n";
-  json += "  \"obj_id\": \"" + String(METER_SERIAL) + "_everblu_meter_value\",\n";
+  json += "  \"uniq_id\": \"" + getMeterPrefix() + "everblu_meter_value\",\n";
+  json += "  \"obj_id\": \"" + getMeterPrefix() + "everblu_meter_value\",\n";
   json += "  \"ic\": \"" + String(meterIcon) + "\",\n";
   json += "  \"unit_of_meas\": \"" + String(meterUnit) + "\",\n";
   json += "  \"dev_cla\": \"" + String(meterDeviceClass) + "\",\n";
@@ -1115,8 +1146,8 @@ void publishHADiscovery()
   // Read Counter
   json = "{\n";
   json += "  \"name\": \"Read Counter\",\n";
-  json += "  \"uniq_id\": \"" + String(METER_SERIAL) + "_everblu_meter_counter\",\n";
-  json += "  \"obj_id\": \"" + String(METER_SERIAL) + "_everblu_meter_counter\",\n";
+  json += "  \"uniq_id\": \"" + getMeterPrefix() + "everblu_meter_counter\",\n";
+  json += "  \"obj_id\": \"" + getMeterPrefix() + "everblu_meter_counter\",\n";
   json += "  \"ic\": \"mdi:counter\",\n";
   json += "  \"qos\": 0,\n";
   json += "  \"avty_t\": \"" + String(mqttBaseTopic) + "/status\",\n";
@@ -1129,8 +1160,8 @@ void publishHADiscovery()
   // Last Read (timestamp)
   json = "{\n";
   json += "  \"name\": \"Last Read\",\n";
-  json += "  \"uniq_id\": \"" + String(METER_SERIAL) + "_everblu_meter_timestamp\",\n";
-  json += "  \"obj_id\": \"" + String(METER_SERIAL) + "_everblu_meter_timestamp\",\n";
+  json += "  \"uniq_id\": \"" + getMeterPrefix() + "everblu_meter_timestamp\",\n";
+  json += "  \"obj_id\": \"" + getMeterPrefix() + "everblu_meter_timestamp\",\n";
   json += "  \"ic\": \"mdi:clock\",\n";
   json += "  \"dev_cla\": \"timestamp\",\n";
   json += "  \"qos\": 0,\n";
@@ -1144,8 +1175,8 @@ void publishHADiscovery()
   // Request Reading Button
   json = "{\n";
   json += "  \"name\": \"Request Reading Now\",\n";
-  json += "  \"uniq_id\": \"" + String(METER_SERIAL) + "_everblu_meter_request\",\n";
-  json += "  \"obj_id\": \"" + String(METER_SERIAL) + "_everblu_meter_request\",\n";
+  json += "  \"uniq_id\": \"" + getMeterPrefix() + "everblu_meter_request\",\n";
+  json += "  \"obj_id\": \"" + getMeterPrefix() + "everblu_meter_request\",\n";
   json += "  \"qos\": 0,\n";
   json += "  \"avty_t\": \"" + String(mqttBaseTopic) + "/status\",\n";
   json += "  \"cmd_t\": \"" + String(mqttBaseTopic) + "/trigger_force\",\n";
@@ -1185,8 +1216,8 @@ void publishHADiscovery()
   // Buttons
   json = "{\n";
   json += "  \"name\": \"Restart Device\",\n";
-  json += "  \"uniq_id\": \"" + String(METER_SERIAL) + "_everblu_meter_restart\",\n";
-  json += "  \"obj_id\": \"" + String(METER_SERIAL) + "_everblu_meter_restart\",\n";
+  json += "  \"uniq_id\": \"" + getMeterPrefix() + "everblu_meter_restart\",\n";
+  json += "  \"obj_id\": \"" + getMeterPrefix() + "everblu_meter_restart\",\n";
   json += "  \"qos\": 0,\n";
   json += "  \"avty_t\": \"" + String(mqttBaseTopic) + "/status\",\n";
   json += "  \"cmd_t\": \"" + String(mqttBaseTopic) + "/restart\",\n";
@@ -1198,8 +1229,8 @@ void publishHADiscovery()
 
   json = "{\n";
   json += "  \"name\": \"Scan Frequency\",\n";
-  json += "  \"uniq_id\": \"" + String(METER_SERIAL) + "_everblu_meter_freq_scan\",\n";
-  json += "  \"obj_id\": \"" + String(METER_SERIAL) + "_everblu_meter_freq_scan\",\n";
+  json += "  \"uniq_id\": \"" + getMeterPrefix() + "everblu_meter_freq_scan\",\n";
+  json += "  \"obj_id\": \"" + getMeterPrefix() + "everblu_meter_freq_scan\",\n";
   json += "  \"ic\": \"mdi:magnify-scan\",\n";
   json += "  \"qos\": 0,\n";
   json += "  \"avty_t\": \"" + String(mqttBaseTopic) + "/status\",\n";
@@ -1213,8 +1244,8 @@ void publishHADiscovery()
   // Binary sensor for active reading
   json = "{\n";
   json += "  \"name\": \"Active Reading\",\n";
-  json += "  \"uniq_id\": \"" + String(METER_SERIAL) + "_everblu_meter_active_reading\",\n";
-  json += "  \"obj_id\": \"" + String(METER_SERIAL) + "_everblu_meter_active_reading\",\n";
+  json += "  \"uniq_id\": \"" + getMeterPrefix() + "everblu_meter_active_reading\",\n";
+  json += "  \"obj_id\": \"" + getMeterPrefix() + "everblu_meter_active_reading\",\n";
   json += "  \"dev_cla\": \"running\",\n";
   json += "  \"qos\": 0,\n";
   json += "  \"avty_t\": \"" + String(mqttBaseTopic) + "/status\",\n";
