@@ -235,7 +235,7 @@ A: Yes, but Home Assistant will see it as new entities. The old entities' histor
 A: No, the prefix is determined at compile-time and has zero runtime overhead.
 
 **Q: What happens to my MQTT topics?**
-A: MQTT topics are NOT affected by this setting (unless you modified the base topic initialization, which is a separate setting).
+A: The base MQTT topic is affected by this setting. When the prefix is disabled, the base topic is `everblu/cyble`. When the prefix is enabled, the base topic becomes `everblu/cyble/{METER_SERIAL}`. Entity IDs and Home Assistant entity names follow the same prefix rule.
 
 **Q: Can I use this for meter replacement?**
 A: Yes! If you replace your meter with a new one and want to preserve history, keep the prefix disabled and the new meter will use the same entity IDs.
