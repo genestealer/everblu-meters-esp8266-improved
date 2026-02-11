@@ -2,6 +2,44 @@
 
 Complete ESPHome custom component for reading EverBlu Cyble Enhanced water and gas meters. This integration provides seamless Home Assistant integration without requiring an MQTT broker.
 
+## Troubleshooting
+
+### Corrupted or Invalid Volume Readings
+
+If you're seeing:
+- Volume reading as 0, small values, or negative numbers
+- Historical data showing impossible decreases
+- Battery showing as 0 months
+
+**Enable hex dump debugging:**
+
+```yaml
+everblu_meter:
+  debug_cc1101: true  # Show raw 200-byte payload (default: false)
+```
+
+This will output detailed hex dumps of the decoded frame, helping identify:
+- Wrong byte offsets for your meter variant
+- Regional/manufacturing differences in data layout
+- Specific bytes causing parsing errors
+
+**📖 Complete troubleshooting guide:** [../docs/TROUBLESHOOTING_CORRUPTED_READINGS.md](../docs/TROUBLESHOOTING_CORRUPTED_READINGS.md)
+
+### No Meter Response
+
+1. **Check hardware connections** (see hardware setup section)
+2. **Verify frequency**: Try frequency scan button
+3. **Check wake window**: Meter may only respond during specific hours
+4. **Increase retries**: `max_retries: 15`
+
+### Signal Quality Issues
+
+- **Low RSSI (<-90 dBm)**: Move ESP closer or improve antenna
+- **Enable auto_scan**: `auto_scan: true` (helps with frequency drift)
+- **Try different times**: Signal quality varies by time of day
+
+---
+
 ## Documentation
 
 ### For End Users
@@ -93,6 +131,9 @@ everblu_meter:
   gdo0_pin: 4
   time_id: ha_time
   
+  # Optional: Enable for troubleshooting corrupted readings (default: false)
+  # debug_cc1101: true
+  
   volume:
     name: "Water Volume"
     device_class: water
@@ -137,6 +178,7 @@ esphome run your-config.yaml
 | `max_retries` | int | 10 | No | Max read attempts |
 | `retry_cooldown` | duration | 1h | No | Cooldown time |
 | `gas_volume_divisor` | int | 100 | No | Gas divisor (100/1000) |
+| `debug_cc1101` | bool | false | No | Enable hex dump for debugging |
 
 ### Schedule Options
 
@@ -396,6 +438,7 @@ everblu_meter:
   meter_type: water
   gdo0_pin: 4
   time_id: ha_time
+  debug_cc1101: false  # Optional: Enable hex dump debugging (default: false)
   volume:
     name: "Water Volume"
 ```
@@ -409,6 +452,7 @@ everblu_meter:
   gdo0_pin: 4
   time_id: ha_time
   gas_volume_divisor: 100
+  debug_cc1101: false  # Optional: Enable hex dump debugging (default: false)
   volume:
     name: "Gas Volume"
 ```
@@ -421,6 +465,7 @@ everblu_meter:
   meter_type: water
   gdo0_pin: 4
   time_id: ha_time
+  debug_cc1101: false  # Optional: Enable hex dump debugging (default: false)
   
   volume:
     name: "Volume"

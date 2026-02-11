@@ -756,6 +756,29 @@ See `ADAPTIVE_FREQUENCY_FEATURES.md` for deeper technical notes.
 
 ## Troubleshooting
 
+### 🔴 Corrupted or Invalid Volume Readings
+
+**Symptoms:**
+- Volume reads as 0, very small values, or negative numbers
+- Historical data shows impossible decreases
+- Battery showing as 0 months
+- CRC passes but data is clearly wrong
+
+**Solution:**
+Enable hex dump debugging to see the raw 200-byte decoded frame:
+
+**ESPHome:** Add `debug_cc1101: true` to your YAML config  
+**MQTT:** Set `#define DEBUG_CC1101 1` in `include/private.h`
+
+This outputs detailed byte-by-byte data to help identify:
+- Wrong byte offsets for your specific meter variant
+- Regional/manufacturing date differences in data layout
+- Corrupted fields causing parsing errors
+
+**📖 Complete guide:** [docs/TROUBLESHOOTING_CORRUPTED_READINGS.md](docs/TROUBLESHOOTING_CORRUPTED_READINGS.md)
+
+---
+
 ### ESP32 build: ModuleNotFoundError: No module named 'intelhex'
 
 This is a PlatformIO tooling dependency used by `esptool.py` to build ESP32 bootloader/partition images.
