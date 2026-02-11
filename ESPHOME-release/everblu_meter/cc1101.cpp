@@ -203,9 +203,22 @@ static const uint8_t debug_out = (uint8_t)(DEBUG_CC1101);
 #define TEST2 0x2C   // Various test settings
 #define TEST1 0x2D   // Various test settings
 #define TEST0 0x2E   // Various test settings
+#ifdef USE_ESPHOME
+// ESPHome SPI device integration
+#include "esphome/components/spi/spi.h"
+static esphome::spi::SPIDevice<> *_esphome_spi_device = nullptr;
+static int _spi_cs_pin = -1;
+
+void cc1101_set_spi_device(esphome::spi::SPIDevice<> *device, int cs_pin)
+{
+  _esphome_spi_device = device;
+  _spi_cs_pin = cs_pin;
+}
+#endif
+
 
 // Change these define according to your ESP8266 board
-#ifdef ESP8266
+#if defined(ESP8266) && !defined(USE_ESPHOME)
 #define SPI_CSK PIN_SPI_SCK
 #define SPI_MISO PIN_SPI_MISO
 #define SPI_MOSI PIN_SPI_MOSI
@@ -213,7 +226,7 @@ static const uint8_t debug_out = (uint8_t)(DEBUG_CC1101);
 #endif
 
 // Change these define according to your ESP32 board
-#ifdef ESP32
+#if defined(ESP32) && !defined(USE_ESPHOME)
 #define SPI_CSK SCK
 #define SPI_MISO MISO
 #define SPI_MOSI MOSI
@@ -223,28 +236,47 @@ static const uint8_t debug_out = (uint8_t)(DEBUG_CC1101);
 int _spi_speed = 0;
 int wiringPiSPIDataRW(int channel, unsigned char *data, int len)
 {
+#ifdef USE_ESPHOME
+  // Use ESPHome SPI device
+  if (!_esphome_spi_device || _spi_cs_pin < 0)
+    return -1;
+
+  _esphome_spi_device->enable();
+  digitalWrite(_spi_cs_pin, LOW);
+  _esphome_spi_device->transfer_array(data, data, len);
+  digitalWrite(_spi_cs_pin, HIGH);
+  _esphome_spi_device->disable();
+#else
+  // Use Arduino SPI
   if (!_spi_speed)
     return -1;
 
   SPI.beginTransaction(SPISettings(_spi_speed, MSBFIRST, SPI_MODE0));
-  digitalWrite(SPI_SS, 0);
-
-  // echo_debug(debug_out, "wiringPiSPIDataRW(0x%02X, %d)\n", (len > 0) ? data[0] : 'X' , len);
-
+  digitalWrite(SPI_SS, LOW);
   SPI.transfer(data, len);
-
-  digitalWrite(SPI_SS, 1);
+  digitalWrite(SPI_SS, HIGH);
   SPI.endTransaction();
+#endif
 
   return 0;
 }
 
 int wiringPiSPISetup(int channel, int speed)
+#ifdef USE_ESPHOME
+  // ESPHome mode: SPI is already configured, just set up CS pin
+  if (_spi_cs_pin >= 0)
+  {
+    pinMode(_spi_cs_pin, OUTPUT);
+    digitalWrite(_spi_cs_pin, HIGH);
+  }
+  _spi_speed = speed; // Store for potential future use
+#else
+  // Arduino mode: Set up SPI manually
 {
   _spi_speed = speed;
 
   pinMode(SPI_SS, OUTPUT);
-  digitalWrite(SPI_SS, 1);
+  digitalWrite(SPI_SS, HIGH);
 
 #ifdef ESP8266
   SPI.pins(SPI_CSK, SPI_MISO, SPI_MOSI, SPI_SS);
@@ -253,6 +285,7 @@ int wiringPiSPISetup(int channel, int speed)
 
 #ifdef ESP32
   SPI.begin(SPI_CSK, SPI_MISO, SPI_MOSI, SPI_SS);
+#endif
 #endif
 
   return 0;

@@ -21,6 +21,8 @@
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/time/real_time_clock.h"
 #include "esphome/components/button/button.h"
+#include "esphome/components/spi/spi.h"
+#include "esphome/core/gpio.h"
 
 #ifdef USE_API
 #include "esphome/components/api/api_server.h"
@@ -56,7 +58,7 @@ namespace esphome
             bool is_reset_frequency_{false};
         };
 
-        class EverbluMeterComponent : public PollingComponent
+        class EverbluMeterComponent : public PollingComponent, public spi::SPIDevice<spi::BIT_ORDER_MSB_FIRST, spi::CLOCK_POLARITY_LOW, spi::CLOCK_PHASE_LEADING, spi::DATA_RATE_1MHZ>
         {
         public:
             EverbluMeterComponent() = default;
@@ -86,6 +88,7 @@ namespace esphome
             void set_time_component(time::RealTimeClock *time) { time_component_ = time; }
             void set_initial_read_on_boot(bool v) { initial_read_on_boot_ = v; }
             void set_adaptive_threshold(int threshold) { adaptive_threshold_ = threshold; }
+            void set_cs_pin(GPIOPin *pin) { cs_pin_ = pin; }
 
             // Sensor setters
             void set_volume_sensor(sensor::Sensor *sensor) { volume_sensor_ = sensor; }
@@ -141,6 +144,9 @@ namespace esphome
 
             // Internal state tracking
             void republish_initial_states();
+            // SPI pin
+            GPIOPin *cs_pin_{nullptr};
+
 
             // ESPHome components
             time::RealTimeClock *time_component_{nullptr};

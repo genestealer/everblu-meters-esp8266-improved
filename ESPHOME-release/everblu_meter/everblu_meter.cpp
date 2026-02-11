@@ -8,6 +8,9 @@
 #include "esphome/core/log.h"
 #endif
 
+// Include CC1101 header for SPI device setup
+#include "cc1101.h"
+
 #ifdef USE_ESP8266
 #include <ESP8266WiFi.h>
 #elif defined(USE_ESP32)
@@ -139,6 +142,18 @@ namespace esphome
             binaries += (radio_connected_sensor_ != nullptr);
 
             ESP_LOGD(TAG, "Linked sensors -> numeric: %d, text: %d, binary: %d", numeric, texts, binaries);
+            // Initialize CC1101 SPI device before creating meter reader
+            if (cs_pin_ != nullptr)
+            {
+                cs_pin_->setup();
+                cc1101_set_spi_device(this, cs_pin_->get_pin());
+                ESP_LOGD(TAG, "CC1101 SPI device configured with CS pin: %d", cs_pin_->get_pin());
+            }
+            else
+            {
+                ESP_LOGE(TAG, "CS pin not configured for CC1101!");
+            }
+
 
             // Create meter reader with all adapters (but don't initialize yet)
             meter_reader_ = new MeterReader(config_provider_, time_provider_, data_publisher_);

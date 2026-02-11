@@ -7,7 +7,8 @@ using the RADIAN protocol over 433 MHz with a CC1101 transceiver.
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import sensor, text_sensor, binary_sensor, button, time as time_
+from esphome.components import sensor, text_sensor, binary_sensor, button, time as time_, spi
+from esphome import pins
 from esphome.const import (
     CONF_ID,
     CONF_FREQUENCY,
@@ -23,8 +24,8 @@ from esphome.const import (
     UNIT_DECIBEL_MILLIWATT,
 )
 
-DEPENDENCIES = ["time"]
-CODEOWNERS = ["@your-github-username"]
+DEPENDENCIES = ["time", "spi"]
+CODEOWNERS = ["@genestealer"]
 AUTO_LOAD = ["sensor", "text_sensor", "binary_sensor", "button"]
 
 # Tell ESPHome to include all source files in src/ subdirectories
@@ -93,14 +94,17 @@ SCHEDULE_MONDAY_SUNDAY = "Sunday"
 SCHEDULE_EVERYDAY = "Everyday"
 
 CONF_GDO0_PIN = "gdo0_pin"
+CONF_CS_PIN = "cs_pin"
 
 CONFIG_SCHEMA = (
     cv.Schema(
         {
             cv.GenerateID(): cv.declare_id(EverbluMeterComponent),
+                        cv.GenerateID(spi.CONF_SPI_ID): cv.use_id(spi.SPIComponent),
             cv.Required(CONF_METER_YEAR): cv.int_range(min=0, max=99),
             cv.Required(CONF_METER_SERIAL): cv.uint32_t,
-            cv.Required(CONF_GDO0_PIN): cv.int_range(min=0, max=39),
+            cv.Required(CONF_CS_PIN): pins.gpio_output_pin_schema,
+            cv.Required(CONF_GDO0_PIN): cv.int_range(min=0, max=50),
             cv.Required(CONF_TIME_ID): cv.use_id(time_.RealTimeClock),
             cv.Optional(CONF_METER_TYPE, default=METER_TYPE_WATER): cv.enum(
                 {METER_TYPE_WATER: False, METER_TYPE_GAS: True}
@@ -260,8 +264,12 @@ async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
 
-    # Add SPI library for CC1101
-    cg.add_library("SPI", None)
+    # Register as SPI device - ESPHome will manage SPI bus and provide SPIDevice interface
+    await spi.register_spi_device(var, config)
+
+    # Configure CS pin for CC1101
+    cs_pin = await cg.gpio_pin_expression(config[CONF_CS_PIN])
+    cg.add(var.set_cs_pin(cs_pin))
 
     # No custom include paths needed when using flat release layout
 
