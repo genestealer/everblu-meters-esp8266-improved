@@ -147,7 +147,6 @@ namespace esphome
             // SPI pin
             GPIOPin *cs_pin_{nullptr};
 
-
             // ESPHome components
             time::RealTimeClock *time_component_{nullptr};
 

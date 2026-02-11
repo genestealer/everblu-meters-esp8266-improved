@@ -216,7 +216,6 @@ void cc1101_set_spi_device(esphome::spi::SPIDevice<> *device, int cs_pin)
 }
 #endif
 
-
 // Change these define according to your ESP8266 board
 #if defined(ESP8266) && !defined(USE_ESPHOME)
 #define SPI_CSK PIN_SPI_SCK
@@ -263,15 +262,15 @@ int wiringPiSPIDataRW(int channel, unsigned char *data, int len)
 
 int wiringPiSPISetup(int channel, int speed)
 #ifdef USE_ESPHOME
-  // ESPHome mode: SPI is already configured, just set up CS pin
-  if (_spi_cs_pin >= 0)
-  {
-    pinMode(_spi_cs_pin, OUTPUT);
-    digitalWrite(_spi_cs_pin, HIGH);
-  }
-  _spi_speed = speed; // Store for potential future use
+    // ESPHome mode: SPI is already configured, just set up CS pin
+    if (_spi_cs_pin >= 0)
+{
+  pinMode(_spi_cs_pin, OUTPUT);
+  digitalWrite(_spi_cs_pin, HIGH);
+}
+_spi_speed = speed; // Store for potential future use
 #else
-  // Arduino mode: Set up SPI manually
+// Arduino mode: Set up SPI manually
 {
   _spi_speed = speed;
 
@@ -288,7 +287,7 @@ int wiringPiSPISetup(int channel, int speed)
 #endif
 #endif
 
-  return 0;
+return 0;
 }
 
 /*----------------------------[END config register]------------------------------*/

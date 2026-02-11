@@ -154,7 +154,6 @@ namespace esphome
                 ESP_LOGE(TAG, "CS pin not configured for CC1101!");
             }
 
-
             // Create meter reader with all adapters (but don't initialize yet)
             meter_reader_ = new MeterReader(config_provider_, time_provider_, data_publisher_);
 
