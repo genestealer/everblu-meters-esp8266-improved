@@ -298,7 +298,7 @@ const char *readingSchedule = DEFAULT_READING_SCHEDULE;
 
 // Helper variables for generating serial-prefixed MQTT topics and entity IDs
 // These must be initialized before EspMQTTClient is constructed (for LWT topic)
-// Format: everblu/cyble/{METER_SERIAL} (or everblu/cyble/ if meter prefix is disabled)
+// Format: everblu/cyble/{METER_SERIAL} (or everblu/cyble if meter prefix is disabled)
 // NOTE: METER_SERIAL must be defined as a numeric value in private.h
 // Compile-time validation ensures METER_SERIAL is non-zero
 #define STRINGIFY(x) #x
