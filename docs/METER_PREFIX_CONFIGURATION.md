@@ -85,9 +85,9 @@ If you have multiple EverBlu meters on the same MQTT broker:
 
 ### MQTT Topics
 
-MQTT **topic names** are NOT affected by this setting:
-- With prefix disabled: Still uses `everblu/cyble` base topic (meter serial NOT in topic path)
-- With prefix enabled: Still uses `everblu/cyble/{METER_SERIAL}` base topic
+MQTT **topic names** ARE affected by this setting:
+- With prefix disabled: Uses `everblu/cyble` base topic (meter serial NOT in topic path)
+- With prefix enabled: Uses `everblu/cyble/{METER_SERIAL}` base topic
 
 ### Home Assistant Entity IDs
 
