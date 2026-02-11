@@ -12,6 +12,7 @@ from esphome.const import (
     CONF_ID,
     CONF_FREQUENCY,
     CONF_TIME_ID,
+    CONF_CS_PIN,
     DEVICE_CLASS_ENERGY,
     DEVICE_CLASS_CONNECTIVITY,
     DEVICE_CLASS_RUNNING,
@@ -93,16 +94,14 @@ SCHEDULE_MONDAY_SUNDAY = "Sunday"
 SCHEDULE_EVERYDAY = "Everyday"
 
 CONF_GDO0_PIN = "gdo0_pin"
-CONF_CS_PIN = "cs_pin"
 
 CONFIG_SCHEMA = (
     cv.Schema(
         {
             cv.GenerateID(): cv.declare_id(EverbluMeterComponent),
-                        cv.GenerateID(spi.CONF_SPI_ID): cv.use_id(spi.SPIComponent),
+            cv.GenerateID(spi.CONF_SPI_ID): cv.use_id(spi.SPIComponent),
             cv.Required(CONF_METER_YEAR): cv.int_range(min=0, max=99),
             cv.Required(CONF_METER_SERIAL): cv.uint32_t,
-            cv.Required(CONF_CS_PIN): cv.int_range(min=0, max=50),
             cv.Required(CONF_GDO0_PIN): cv.int_range(min=0, max=50),
             cv.Required(CONF_TIME_ID): cv.use_id(time_.RealTimeClock),
             cv.Optional(CONF_METER_TYPE, default=METER_TYPE_WATER): cv.enum(
@@ -256,6 +255,7 @@ CONFIG_SCHEMA = (
         }
     )
     .extend(cv.polling_component_schema("24h"))
+    .extend(spi.spi_device_schema(cs_pin_required=True))
 )
 
 
@@ -263,12 +263,11 @@ async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
 
-    # Set SPI parent (component inherits from SPIDevice)
-    parent = await cg.get_variable(config[spi.CONF_SPI_ID])
-    cg.add(var.set_spi_parent(parent))
+    # Register SPI device (replaces manual set_spi_parent setup)
+    # This properly integrates with ESPHome's SPI architecture and CS pin management
+    await spi.register_spi_device(var, config)
 
-    # Configure CS and GDO0 pins for CC1101 (raw GPIO numbers for Arduino pinMode/digitalRead)
-    cg.add(var.set_cs_pin(config[CONF_CS_PIN]))
+    # CS pin is managed by SPIDevice; only pass GDO0 for CC1101 interrupts
     cg.add(var.set_gdo0_pin(config[CONF_GDO0_PIN]))
 
     # No custom include paths needed when using flat release layout

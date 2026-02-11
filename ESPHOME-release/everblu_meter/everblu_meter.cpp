@@ -50,6 +50,9 @@ namespace esphome
         {
             ESP_LOGCONFIG(TAG, "Setting up EverBlu Meter...");
 
+            // Initialize ESPHome SPI device before any SPI transactions
+            this->spi_setup();
+
             // Reset initialization state on every setup (after reboot/OTA)
             meter_initialized_ = false;
             wifi_ready_at_ = 0;
@@ -144,15 +147,12 @@ namespace esphome
             ESP_LOGD(TAG, "Linked sensors -> numeric: %d, text: %d, binary: %d", numeric, texts, binaries);
 
             // Initialize CC1101 SPI device before creating meter reader
-            if (cs_pin_ >= 0)
-            {
-                cc1101_set_spi_device(static_cast<void *>(static_cast<esphome::spi::SPIClient *>(this)), cs_pin_);
-                ESP_LOGD(TAG, "CC1101 SPI device configured with CS pin: %d", cs_pin_);
-            }
-            else
-            {
-                ESP_LOGE(TAG, "CS pin not configured for CC1101!");
-            }
+            auto *spi_device = static_cast<spi::SPIDevice<spi::BIT_ORDER_MSB_FIRST,
+                                                          spi::CLOCK_POLARITY_LOW,
+                                                          spi::CLOCK_PHASE_LEADING,
+                                                          spi::DATA_RATE_1MHZ> *>(this);
+            cc1101_set_spi_device(static_cast<void *>(spi_device), -1);
+            ESP_LOGD(TAG, "CC1101 SPI device configured");
 
             // Configure GDO0 pin for CC1101
             if (gdo0_pin_ >= 0)
@@ -196,8 +196,16 @@ namespace esphome
                     frequency_);
 
                 // Publish initial status states
-                ESP_LOGD(TAG, "Publishing: radio state=Idle");
-                data_publisher_->publishRadioState("Idle");
+                // Preserve radio state after init failure - don't overwrite "unavailable" with "Idle"
+                if (meter_reader_->isRadioConnected())
+                {
+                    ESP_LOGD(TAG, "Publishing: radio state=Idle");
+                    data_publisher_->publishRadioState("Idle");
+                }
+                else
+                {
+                    ESP_LOGD(TAG, "Skipping radio state publish - radio init failed, preserving 'unavailable' state");
+                }
 
                 ESP_LOGD(TAG, "Publishing: status=Ready");
                 data_publisher_->publishStatusMessage("Ready");

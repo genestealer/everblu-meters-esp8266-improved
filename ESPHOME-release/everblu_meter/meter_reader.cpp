@@ -50,7 +50,7 @@ static void logReadableSummary(const tmeter_data &data, const IConfigProvider *c
 }
 
 MeterReader::MeterReader(IConfigProvider *config, ITimeProvider *timeProvider, IDataPublisher *publisher)
-    : m_config(config), m_timeProvider(timeProvider), m_publisher(publisher), m_initialized(false), m_readingInProgress(false), m_isScheduledRead(false), m_haConnected(false), m_retryCount(0), m_lastFailedAttempt(0), m_nextRetryTime(0), m_totalReadAttempts(0), m_successfulReads(0), m_failedReads(0), m_lastErrorMessage("None"), m_lastScheduleCheck(0), m_lastStatsPublish(0), m_readHourLocal(10), m_readMinuteLocal(0), m_lastReadDayMatch(false), m_lastReadTimeMatch(false)
+    : m_config(config), m_timeProvider(timeProvider), m_publisher(publisher), m_initialized(false), m_readingInProgress(false), m_isScheduledRead(false), m_haConnected(false), m_radioConnected(false), m_retryCount(0), m_lastFailedAttempt(0), m_nextRetryTime(0), m_totalReadAttempts(0), m_successfulReads(0), m_failedReads(0), m_lastErrorMessage("None"), m_lastScheduleCheck(0), m_lastStatsPublish(0), m_readHourLocal(10), m_readMinuteLocal(0), m_lastReadDayMatch(false), m_lastReadTimeMatch(false)
 {
 }
 
@@ -74,6 +74,7 @@ void MeterReader::begin()
     float effectiveFrequency = frequency + FrequencyManager::getOffset();
 
     bool radio_ok = cc1101_init(effectiveFrequency);
+    m_radioConnected = radio_ok; // Store radio initialization status for republish checks
 
     // Calculate local reading time from UTC and timezone offset
     int utcHour = m_config->getReadHourUTC();
@@ -97,11 +98,20 @@ void MeterReader::begin()
 
 #ifdef USE_ESPHOME
     // In ESPHome mode avoid publishing zero/blank states on boot to prevent HA from overwriting restored history.
+    // However, publish radio failure state immediately to ensure visibility
     if (m_publisher)
     {
         char utc_time_buf[8];
         snprintf(utc_time_buf, sizeof(utc_time_buf), "%02d:%02d", utcHour, utcMinute);
         m_publisher->publishMeterSettings(m_config->getMeterYear(), m_config->getMeterSerial(), m_config->getReadingSchedule(), utc_time_buf, m_config->getFrequency());
+
+        // Publish radio failure state immediately (success state published in republish_initial_states)
+        if (!radio_ok)
+        {
+            m_publisher->publishRadioState("unavailable");
+            m_publisher->publishStatusMessage("Error");
+            m_publisher->publishError("CC1101 radio not responding (PARTNUM: 0x00, VERSION: 0x00) - check SPI wiring");
+        }
     }
 #else
     // Standalone/MQTT mode: publish initial states so entities are not Unknown

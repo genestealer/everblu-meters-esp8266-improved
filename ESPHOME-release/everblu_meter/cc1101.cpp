@@ -16,6 +16,9 @@
 #endif
 #include "wifi_serial.h" // Optional WiFi serial mirroring
 #include <SPI.h>         // Include the SPI library for SPI communication
+#ifdef USE_ESPHOME
+#include "esphome/components/spi/spi.h" // ESPHome SPI device interface
+#endif
 #if defined(ESP32)
 #include <esp_task_wdt.h>
 #endif
@@ -204,15 +207,20 @@ static const uint8_t debug_out = (uint8_t)(DEBUG_CC1101);
 #define TEST1 0x2D   // Various test settings
 #define TEST0 0x2E   // Various test settings
 #ifdef USE_ESPHOME
-// ESPHome SPI integration - just stores CS pin, uses Arduino SPI library
-// (ESPHome SPIDevice parent configures the bus)
+// ESPHome SPI integration - store SPIDevice instance and CS pin
+// The EverbluMeterComponent inherits from this SPIDevice specialization.
+using CC1101SpiDevice = esphome::spi::SPIDevice<esphome::spi::BIT_ORDER_MSB_FIRST,
+                                                esphome::spi::CLOCK_POLARITY_LOW,
+                                                esphome::spi::CLOCK_PHASE_LEADING,
+                                                esphome::spi::DATA_RATE_1MHZ>;
+static CC1101SpiDevice *_spi_device = nullptr;
 static int _spi_cs_pin = -1;
 static int _gdo0_pin = -1;
 
 void cc1101_set_spi_device(void *device, int cs_pin)
 {
-  // device pointer not needed - we use Arduino SPI directly
-  (void)device;
+  // Store the SPIDevice pointer for ESPHome SPI transactions
+  _spi_device = static_cast<CC1101SpiDevice *>(device);
   _spi_cs_pin = cs_pin;
 }
 
@@ -248,15 +256,14 @@ int _spi_speed = 0;
 int wiringPiSPIDataRW(int channel, unsigned char *data, int len)
 {
 #ifdef USE_ESPHOME
-  // ESPHome mode: Use Arduino SPI directly (bus already configured by SPIDevice parent)
-  if (!_spi_speed || _spi_cs_pin < 0)
+  // ESPHome mode: Use SPIDevice methods (enable/transfer_array/disable)
+  // The SPIDevice handles bus configuration, speed, and transaction management
+  if (!_spi_device)
     return -1;
 
-  SPI.beginTransaction(SPISettings(_spi_speed, MSBFIRST, SPI_MODE0));
-  digitalWrite(_spi_cs_pin, LOW);
-  SPI.transfer(data, len);
-  digitalWrite(_spi_cs_pin, HIGH);
-  SPI.endTransaction();
+  _spi_device->enable();
+  _spi_device->transfer_array(data, len);
+  _spi_device->disable();
 #else
   // Arduino SPI
   if (!_spi_speed)
@@ -275,12 +282,7 @@ int wiringPiSPIDataRW(int channel, unsigned char *data, int len)
 int wiringPiSPISetup(int channel, int speed)
 {
 #ifdef USE_ESPHOME
-  // ESPHome mode: SPI is already configured, just set up CS pin
-  if (_spi_cs_pin >= 0)
-  {
-    pinMode(_spi_cs_pin, OUTPUT);
-    digitalWrite(_spi_cs_pin, HIGH);
-  }
+  // ESPHome mode: SPI is already configured by SPIDevice
   _spi_speed = speed; // Store for potential future use
 #else
   // Arduino mode: Set up SPI manually
