@@ -8,9 +8,10 @@
 #include "esphome/core/log.h"
 #endif
 
+#include "version.h"
+
 // Include CC1101 header for SPI device setup
 #include "cc1101.h"
-
 #ifdef USE_ESP8266
 #include <ESP8266WiFi.h>
 #elif defined(USE_ESP32)
@@ -106,6 +107,7 @@ namespace esphome
             data_publisher_->set_radio_state_sensor(radio_state_sensor_);
             data_publisher_->set_timestamp_sensor(timestamp_sensor_);
             data_publisher_->set_history_sensor(history_sensor_);
+            data_publisher_->set_version_sensor(version_sensor_);
             data_publisher_->set_meter_serial_sensor(meter_serial_sensor_);
             data_publisher_->set_meter_year_sensor(meter_year_sensor_);
             data_publisher_->set_reading_schedule_sensor(reading_schedule_sensor_);
@@ -135,6 +137,7 @@ namespace esphome
             texts += (radio_state_sensor_ != nullptr);
             texts += (timestamp_sensor_ != nullptr);
             texts += (history_sensor_ != nullptr);
+            texts += (version_sensor_ != nullptr);
             texts += (meter_serial_sensor_ != nullptr);
             texts += (meter_year_sensor_ != nullptr);
             texts += (reading_schedule_sensor_ != nullptr);
@@ -212,6 +215,9 @@ namespace esphome
 
                 ESP_LOGD(TAG, "Publishing: error=None");
                 data_publisher_->publishError("None");
+
+                ESP_LOGD(TAG, "Publishing: firmware version=%s", EVERBLU_FW_VERSION);
+                data_publisher_->publishFirmwareVersion(EVERBLU_FW_VERSION);
 
                 ESP_LOGD(TAG, "Publishing: active_reading=false");
                 data_publisher_->publishActiveReading(false);
@@ -334,6 +340,7 @@ namespace esphome
             ESP_LOGCONFIG(TAG, "  Meter Year: %u", meter_year_);
             ESP_LOGCONFIG(TAG, "  Meter Serial: %u", meter_serial_);
             ESP_LOGCONFIG(TAG, "  Meter Type: %s", is_gas_ ? "Gas" : "Water");
+            ESP_LOGCONFIG(TAG, "  Everblu Meter Component Version: %s", EVERBLU_FW_VERSION);
             if (is_gas_)
             {
                 ESP_LOGCONFIG(TAG, "  Gas Volume Divisor: %d", gas_volume_divisor_);

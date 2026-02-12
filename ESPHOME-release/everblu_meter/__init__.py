@@ -68,6 +68,7 @@ CONF_ERROR = "error"
 CONF_RADIO_STATE = "radio_state"
 CONF_TIMESTAMP = "timestamp"
 CONF_HISTORY_JSON = "history_json"
+CONF_FIRMWARE_VERSION = "firmware_version"
 CONF_METER_SERIAL_SENSOR = "meter_serial_sensor"
 CONF_METER_YEAR_SENSOR = "meter_year_sensor"
 CONF_READING_SCHEDULE_SENSOR = "reading_schedule_sensor"
@@ -215,6 +216,10 @@ CONFIG_SCHEMA = (
             ),
             cv.Optional(CONF_HISTORY_JSON): text_sensor.text_sensor_schema(
                 icon="mdi:history",
+            ),
+            cv.Optional(CONF_FIRMWARE_VERSION): text_sensor.text_sensor_schema(
+                icon="mdi:tag",
+                entity_category="diagnostic",
             ),
             cv.Optional(CONF_METER_SERIAL_SENSOR): text_sensor.text_sensor_schema(
                 icon="mdi:barcode",
@@ -405,6 +410,10 @@ async def to_code(config):
     if CONF_HISTORY_JSON in config:
         sens = await text_sensor.new_text_sensor(config[CONF_HISTORY_JSON])
         cg.add(var.set_history_sensor(sens))
+
+    if CONF_FIRMWARE_VERSION in config:
+        sens = await text_sensor.new_text_sensor(config[CONF_FIRMWARE_VERSION])
+        cg.add(var.set_version_sensor(sens))
 
     if CONF_METER_SERIAL_SENSOR in config:
         sens = await text_sensor.new_text_sensor(config[CONF_METER_SERIAL_SENSOR])

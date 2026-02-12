@@ -198,6 +198,9 @@ everblu_meter:
   
   history_json:
     name: "Meter History (JSON)"
+
+  firmware_version:
+    name: "Firmware Version"
   
   # Binary sensors
   active_reading:

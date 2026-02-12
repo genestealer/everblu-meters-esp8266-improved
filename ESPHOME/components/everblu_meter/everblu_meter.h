@@ -110,6 +110,7 @@ namespace esphome
             void set_radio_state_sensor(text_sensor::TextSensor *sensor) { radio_state_sensor_ = sensor; }
             void set_timestamp_sensor(text_sensor::TextSensor *sensor) { timestamp_sensor_ = sensor; }
             void set_history_sensor(text_sensor::TextSensor *sensor) { history_sensor_ = sensor; }
+            void set_version_sensor(text_sensor::TextSensor *sensor) { version_sensor_ = sensor; }
             void set_meter_serial_sensor(text_sensor::TextSensor *sensor) { meter_serial_sensor_ = sensor; }
             void set_meter_year_sensor(text_sensor::TextSensor *sensor) { meter_year_sensor_ = sensor; }
             void set_reading_schedule_sensor(text_sensor::TextSensor *sensor) { reading_schedule_sensor_ = sensor; }
@@ -171,6 +172,7 @@ namespace esphome
             text_sensor::TextSensor *radio_state_sensor_{nullptr};
             text_sensor::TextSensor *timestamp_sensor_{nullptr};
             text_sensor::TextSensor *history_sensor_{nullptr};
+            text_sensor::TextSensor *version_sensor_{nullptr};
             text_sensor::TextSensor *meter_serial_sensor_{nullptr};
             text_sensor::TextSensor *meter_year_sensor_{nullptr};
             text_sensor::TextSensor *reading_schedule_sensor_{nullptr};
