@@ -1532,6 +1532,17 @@ struct tmeter_data get_meter_data(void)
 
   echo_debug(1, "[METER] Transmitting wake-up + interrogation (Year=%d, Serial=%lu)...\n",
              METER_YEAR, (unsigned long)METER_SERIAL);
+
+  // === Critical: Reset radio state before TX ===
+  // If the radio is stuck in RXFIFO_OVERFLOW (0x11) or any non-IDLE state from
+  // a previous cycle, STX will be ignored. Force IDLE and flush both FIFOs.
+  CC1101_CMD(SIDLE);  // Force radio to IDLE (required before flushing FIFOs)
+  delay(1);           // Brief settle time
+  CC1101_CMD(SFRX);   // Flush RX FIFO (clears RXFIFO_OVERFLOW state)
+  CC1101_CMD(SFTX);   // Flush TX FIFO (clears any stale data / TXFIFO_UNDERFLOW)
+  delay(1);           // Brief settle time after flush
+  echo_debug(debug_out, "[CC1101] Pre-TX reset: IDLE + FIFO flush complete\n");
+
   halRfWriteReg(MDMCFG2, MDMCFG2_NO_PREAMBLE_SYNC);  // No preamble/sync for WUP
   halRfWriteReg(PKTCTRL0, PKTCTRL0_INFINITE_LENGTH); // Infinite packet length
   SPIWriteBurstReg(TX_FIFO_ADDR, wupbuffer, 8);
@@ -1587,9 +1598,19 @@ struct tmeter_data get_meter_data(void)
     tmo++;
     marcstate = halRfReadReg(MARCSTATE_ADDR); // read out state of cc1100 to be sure in IDLE and TX is finished this update also CC1101_status_state
     // echo_debug(debug_out,"%ifree_byte:0x%02X sts:0x%02X\n",tmo,CC1101_status_FIFO_FreeByte,CC1101_status_state);
+
+    // Detect TXFIFO_UNDERFLOW (MARCSTATE 0x16) early and abort instead of
+    // spinning for the full 2020ms timeout. The FIFO underflowed mid-TX,
+    // so continuing to feed data is pointless.
+    if ((marcstate & 0x1F) == 0x16) // TXFIFO_UNDERFLOW
+    {
+      echo_debug(1, "[CC1101] TXFIFO_UNDERFLOW detected at tmo=%d, aborting TX loop\n", tmo);
+      break;
+    }
   }
   echo_debug(1, "[METER] TX complete after %dms (MARCSTATE=0x%02X)\n", tmo * 10, marcstate & 0x1F);
   echo_debug(debug_out, "[CC1101] tmo=%i free_byte:0x%02X sts:0x%02X", tmo, CC1101_status_FIFO_FreeByte, CC1101_status_state);
+  CC1101_CMD(SIDLE); // Ensure IDLE before flushing (required by CC1101 datasheet)
   CC1101_CMD(SFTX); // flush the Tx_fifo content this clear the status state and put sate machin in IDLE
   // end of transition restore default register
   halRfWriteReg(MDMCFG2, MDMCFG2_2FSK_16_16_SYNC); // Restore: 2-FSK, 16/16 sync bits
