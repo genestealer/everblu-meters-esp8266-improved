@@ -697,9 +697,8 @@ uint8_t cc1101_check_packet_received(void)
   pktLen = 0;
   if (digitalRead(GET_GDO0_PIN()) == TRUE)
   {
-    // get RF info at beginning of the frame
-    l_lqi = halRfReadReg(LQI_ADDR);
-    l_freq_est = halRfReadReg(FREQEST_ADDR);
+    // Read RSSI immediately while signal is present (carrier active)
+    // RSSI register needs to be sampled during packet reception for accuracy
     l_Rssi_dbm = cc1100_rssi_convert2dbm(halRfReadReg(RSSI_ADDR));
 
     while (digitalRead(GET_GDO0_PIN()) == TRUE)
@@ -729,6 +728,11 @@ uint8_t cc1101_check_packet_received(void)
         break;
       }
     }
+    // Read LQI and FREQEST after packet completes (GDO0 goes low)
+    // These registers are latched at end-of-packet and contain final quality metrics
+    l_lqi = halRfReadReg(LQI_ADDR);
+    l_freq_est = halRfReadReg(FREQEST_ADDR);
+    
     if (is_look_like_radian_frame(rxBuffer, pktLen))
     {
       echo_debug(debug_out, "[CC1101] Packet looks like RADIAN frame");
