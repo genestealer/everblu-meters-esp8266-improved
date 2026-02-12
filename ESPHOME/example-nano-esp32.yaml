@@ -1,0 +1,125 @@
+# EverBlu Water Meter - Arduino Nano ESP32 Configuration
+# This example is specifically configured for Arduino Nano ESP32 (Arduino Nano Every with ESP32S3)
+# Note: The platformio_options below are REQUIRED for this board to compile successfully
+
+esphome:
+  name: everblu-nano-esp32
+
+esp32:
+  # Arduino Nano ESP32 uses ESP32S3 chip
+  board: arduino_nano_esp32
+  framework:
+    type: arduino
+
+  # CRITICAL: These platformio options are required for Nano ESP32
+  # to resolve USBSerial compilation errors
+  platformio_options:
+    build_unflags:
+      - -DARDUINO_USB_CDC_ON_BOOT=0
+      - -DARDUINO_USB_CDC_ON_BOOT=1
+      - -DARDUINO_USB_MODE=0
+      - -DARDUINO_USB_MODE=1
+    build_flags:
+      - -DARDUINO_USB_CDC_ON_BOOT=1
+      - -DARDUINO_USB_MODE=1
+
+# WiFi configuration
+wifi:
+  ssid: "YourWiFiSSID"
+  password: "YourWiFiPassword"
+  
+  # Enable fallback hotspot
+  ap:
+    ssid: "EverBlu Fallback"
+    password: "ConfigMe123"
+
+# Enable logging
+logger:
+  level: DEBUG
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "your-32-byte-base64-encoded-key-here"
+
+# Enable OTA updates
+ota:
+  password: "YourOTAPassword"
+
+# Time component (required for scheduled readings)
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+    timezone: Europe/London
+
+# EverBlu Meter Component
+external_components:
+  - source:
+      type: git
+      url: https://github.com/psykokwak-com/everblu-meters-esp8266-improved
+      ref: feature/esphome-spi-integration
+      path: ESPHOME-release
+    components: [ everblu_meter ]
+    refresh: 1d
+
+everblu_meter:
+  id: my_water_meter
+  
+  # Meter identification (REQUIRED)
+  meter_year: 21          # Last 2 digits of year (e.g., 21 for 2021)
+  meter_serial: 12345678  # Your meter's serial number
+  gdo0_pin: 4             # GPIO connected to CC1101 GDO0
+  
+  # Optional: set meter_type to 'gas' for gas meters (defaults to water)
+  
+  # Link to time component
+  time_id: homeassistant_time
+  
+  # Control buttons
+  request_reading_button:
+    name: "Read Meter Now"
+  frequency_scan_button:
+    name: "Scan Frequency"
+  reset_frequency_button:
+    name: "Reset Frequency Offset"
+  
+  # Volume sensors
+  volume:
+    name: "Water Volume"
+  
+  counter:
+    name: "Read Counter"
+  
+  # Battery sensor
+  battery:
+    name: "Meter Battery"
+  
+  # Radio quality sensors
+  rssi:
+    name: "Meter RSSI"
+  
+  rssi_percentage:
+    name: "RSSI Percentage"
+  
+  lqi:
+    name: "LQI"
+  
+  lqi_percentage:
+    name: "LQI Percentage"
+  
+  # Statistics sensors
+  total_attempts:
+    name: "Total Read Attempts"
+  
+  successful_reads:
+    name: "Successful Reads"
+  
+  failed_reads:
+    name: "Failed Reads"
+  
+  consecutive_failures:
+    name: "Consecutive Failures"
+  
+  # Last frequency offset used
+  frequency_offset:
+    name: "Frequency Offset"

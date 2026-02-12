@@ -118,6 +118,43 @@ external_components:
 esphome run your-config.yaml
 ```
 
+## Board-Specific Configuration
+
+### Arduino Nano ESP32 (ESP32S3)
+
+If using an **Arduino Nano ESP32** board, you must add the following `platformio_options` to your ESPHome configuration to avoid USB CDC compilation errors:
+
+```yaml
+esp32:
+  board: arduino_nano_esp32
+  framework:
+    type: arduino
+  
+  # REQUIRED for Arduino Nano ESP32 to compile successfully
+  platformio_options:
+    build_unflags:
+      - -DARDUINO_USB_CDC_ON_BOOT=0
+      - -DARDUINO_USB_CDC_ON_BOOT=1
+      - -DARDUINO_USB_MODE=0
+      - -DARDUINO_USB_MODE=1
+    build_flags:
+      - -DARDUINO_USB_CDC_ON_BOOT=1
+      - -DARDUINO_USB_MODE=1
+```
+
+See [example-nano-esp32.yaml](example-nano-esp32.yaml) for a complete working configuration.
+
+### Other ESP32 Boards
+
+For other ESP32 boards (e.g., `esp32dev`), these platformio options are not needed:
+
+```yaml
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+```
+
 ## Configuration Reference
 
 ### Key Parameters
