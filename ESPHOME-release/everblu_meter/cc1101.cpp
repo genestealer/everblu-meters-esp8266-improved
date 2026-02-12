@@ -651,9 +651,8 @@ uint8_t cc1101_check_packet_received(void)
   pktLen = 0;
   if (digitalRead(GDO0) == TRUE)
   {
-    // get RF info at beginning of the frame
-    l_lqi = halRfReadReg(LQI_ADDR);
-    l_freq_est = halRfReadReg(FREQEST_ADDR);
+    // Read RSSI immediately while signal is present (carrier active)
+    // RSSI register needs to be sampled during packet reception for accuracy
     l_Rssi_dbm = cc1100_rssi_convert2dbm(halRfReadReg(RSSI_ADDR));
 
     while (digitalRead(GDO0) == TRUE)
@@ -683,6 +682,11 @@ uint8_t cc1101_check_packet_received(void)
         break;
       }
     }
+    // Read LQI and FREQEST after packet completes (GDO0 goes low)
+    // These registers are latched at end-of-packet and contain final quality metrics
+    l_lqi = halRfReadReg(LQI_ADDR);
+    l_freq_est = halRfReadReg(FREQEST_ADDR);
+
     if (is_look_like_radian_frame(rxBuffer, pktLen))
     {
       echo_debug(debug_out, "[CC1101] Packet looks like RADIAN frame");
@@ -1536,11 +1540,11 @@ struct tmeter_data get_meter_data(void)
   // === Critical: Reset radio state before TX ===
   // If the radio is stuck in RXFIFO_OVERFLOW (0x11) or any non-IDLE state from
   // a previous cycle, STX will be ignored. Force IDLE and flush both FIFOs.
-  CC1101_CMD(SIDLE);  // Force radio to IDLE (required before flushing FIFOs)
-  delay(1);           // Brief settle time
-  CC1101_CMD(SFRX);   // Flush RX FIFO (clears RXFIFO_OVERFLOW state)
-  CC1101_CMD(SFTX);   // Flush TX FIFO (clears any stale data / TXFIFO_UNDERFLOW)
-  delay(1);           // Brief settle time after flush
+  CC1101_CMD(SIDLE); // Force radio to IDLE (required before flushing FIFOs)
+  delay(1);          // Brief settle time
+  CC1101_CMD(SFRX);  // Flush RX FIFO (clears RXFIFO_OVERFLOW state)
+  CC1101_CMD(SFTX);  // Flush TX FIFO (clears any stale data / TXFIFO_UNDERFLOW)
+  delay(1);          // Brief settle time after flush
   echo_debug(debug_out, "[CC1101] Pre-TX reset: IDLE + FIFO flush complete\n");
 
   halRfWriteReg(MDMCFG2, MDMCFG2_NO_PREAMBLE_SYNC);  // No preamble/sync for WUP
@@ -1611,7 +1615,7 @@ struct tmeter_data get_meter_data(void)
   echo_debug(1, "[METER] TX complete after %dms (MARCSTATE=0x%02X)\n", tmo * 10, marcstate & 0x1F);
   echo_debug(debug_out, "[CC1101] tmo=%i free_byte:0x%02X sts:0x%02X", tmo, CC1101_status_FIFO_FreeByte, CC1101_status_state);
   CC1101_CMD(SIDLE); // Ensure IDLE before flushing (required by CC1101 datasheet)
-  CC1101_CMD(SFTX); // flush the Tx_fifo content this clear the status state and put sate machin in IDLE
+  CC1101_CMD(SFTX);  // flush the Tx_fifo content this clear the status state and put sate machin in IDLE
   // end of transition restore default register
   halRfWriteReg(MDMCFG2, MDMCFG2_2FSK_16_16_SYNC); // Restore: 2-FSK, 16/16 sync bits
   halRfWriteReg(PKTCTRL0, PKTCTRL0_FIXED_LENGTH);  // Restore: fixed packet length
