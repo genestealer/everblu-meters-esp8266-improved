@@ -97,19 +97,6 @@ body:
       required: true
 
   - type: textarea
-    id: reproduce
-    attributes:
-      label: Steps to reproduce
-      description: Steps and any minimal configuration to reproduce the issue.
-      placeholder: |
-        1. ...
-        2. ...
-        3. ...
-      render: text
-    validations:
-      required: false
-
-  - type: textarea
     id: versions
     attributes:
       label: Versions / environment
@@ -134,8 +121,8 @@ body:
       description: Please answer these questions to help diagnose the problem.
       value: |-
         - How far is the CC1101 radio from the water/gas meter? (distance in meters)
-        - Have you tried **moving the radio closer to the meter** (e.g., within 2-3 meters) to test if distance/signal is the issue?
-        - Are there any **walls, metal obstacles, or other RF sources** between the radio and meter?
+        - Have you tried moving the radio closer to the meter (e.g., within 2-3 meters) to test if distance/signal is the issue?
+        - Are there any walls, metal obstacles, or other RF sources between the radio and meter?
         - What type of antenna does your CC1101 module have (wire, PCB trace, external)?
       render: text
     validations:
