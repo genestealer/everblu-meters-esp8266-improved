@@ -697,9 +697,8 @@ uint8_t cc1101_check_packet_received(void)
   pktLen = 0;
   if (digitalRead(GET_GDO0_PIN()) == TRUE)
   {
-    // get RF info at beginning of the frame
-    l_lqi = halRfReadReg(LQI_ADDR);
-    l_freq_est = halRfReadReg(FREQEST_ADDR);
+    // Read RSSI immediately while signal is present (carrier active)
+    // RSSI register needs to be sampled during packet reception for accuracy
     l_Rssi_dbm = cc1100_rssi_convert2dbm(halRfReadReg(RSSI_ADDR));
 
     while (digitalRead(GET_GDO0_PIN()) == TRUE)
@@ -729,6 +728,12 @@ uint8_t cc1101_check_packet_received(void)
         break;
       }
     }
+
+    // Read LQI and FREQEST after packet completes (GDO0 goes low)
+    // These registers are latched at end-of-packet and contain final quality metrics
+    l_lqi = halRfReadReg(LQI_ADDR);
+    l_freq_est = halRfReadReg(FREQEST_ADDR);
+
     if (is_look_like_radian_frame(rxBuffer, pktLen))
     {
       echo_debug(debug_out, "[CC1101] Packet looks like RADIAN frame");
@@ -837,6 +842,8 @@ static bool validate_radian_crc(const uint8_t *decoded_buffer, size_t size)
   {
     echo_debug(1, "[ERROR] RADIAN CRC mismatch (computed=0x%04X frame=0x%04X) - discarding frame\n",
                computed_crc, received_crc);
+    echo_debug(1, "[DEBUG] Frame bytes [0-31]: ");
+    show_in_hex_one_line(decoded_buffer, (size < 32) ? size : 32);
     return false;
   }
 
@@ -869,6 +876,10 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
   {
     echo_debug(1, "[ERROR] Parsed volume value is invalid (0x%08lX) - discarding frame\n",
                (unsigned long)data.volume);
+    echo_debug(1, "[DEBUG] Volume bytes [18-21]: %02X %02X %02X %02X\n",
+               decoded_buffer[18], decoded_buffer[19], decoded_buffer[20], decoded_buffer[21]);
+    echo_debug(1, "[DEBUG] First 32 bytes of frame: ");
+    show_in_hex_one_line(decoded_buffer, (size < 32) ? size : 32);
     memset(&data, 0, sizeof(data));
     return data;
   }
@@ -979,6 +990,10 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
         {
           echo_debug(1, "[ERROR] Historical volume decreased at index %d (%u -> %u) - marking history invalid\n",
                      i, data.history[i - 1], data.history[i]);
+          echo_debug(1, "[DEBUG] Historical bytes [%d-%d]: %02X %02X %02X %02X (index %d)\n",
+                     66 + (i * 4), 66 + (i * 4) + 3,
+                     decoded_buffer[66 + (i * 4)], decoded_buffer[66 + (i * 4) + 1],
+                     decoded_buffer[66 + (i * 4) + 2], decoded_buffer[66 + (i * 4) + 3], i);
           history_ok = false;
           break;
         }
@@ -1634,10 +1649,20 @@ struct tmeter_data get_meter_data(void)
     tmo++;
     marcstate = halRfReadReg(MARCSTATE_ADDR); // read out state of cc1100 to be sure in IDLE and TX is finished this update also CC1101_status_state
     // echo_debug(debug_out,"%ifree_byte:0x%02X sts:0x%02X\n",tmo,CC1101_status_FIFO_FreeByte,CC1101_status_state);
+
+    // Detect TXFIFO_UNDERFLOW (MARCSTATE 0x16) early and abort instead of
+    // spinning for the full 2020ms timeout. The FIFO underflowed mid-TX,
+    // so continuing to feed data is pointless.
+    if ((marcstate & 0x1F) == 0x16) // TXFIFO_UNDERFLOW
+    {
+      echo_debug(1, "[CC1101] TXFIFO_UNDERFLOW detected at tmo=%d, aborting TX loop\n", tmo);
+      break;
+    }
   }
   echo_debug(1, "[METER] TX complete after %dms (MARCSTATE=0x%02X)\n", tmo * 10, marcstate & 0x1F);
   echo_debug(debug_out, "[CC1101] tmo=%i free_byte:0x%02X sts:0x%02X", tmo, CC1101_status_FIFO_FreeByte, CC1101_status_state);
-  CC1101_CMD(SFTX); // flush the Tx_fifo content this clear the status state and put sate machin in IDLE
+  CC1101_CMD(SIDLE); // Ensure IDLE before flushing (required by CC1101 datasheet)
+  CC1101_CMD(SFTX);  // flush the Tx_fifo content this clear the status state and put sate machin in IDLE
   // end of transition restore default register
   halRfWriteReg(MDMCFG2, MDMCFG2_2FSK_16_16_SYNC); // Restore: 2-FSK, 16/16 sync bits
   halRfWriteReg(PKTCTRL0, PKTCTRL0_FIXED_LENGTH);  // Restore: fixed packet length
@@ -1668,13 +1693,35 @@ struct tmeter_data get_meter_data(void)
     }
 
     meter_data_size = decode_4bitpbit_serial(rxBuffer, rxBuffer_size, meter_data);
-    // show_in_hex(meter_data,meter_data_size);
     // If debug enabled, print the decoded (post-serial-decoding) meter data so we can inspect fields (timestamp etc.)
     echo_debug(1, "[METER] Decoded %d bytes from %d raw bytes\n", meter_data_size, rxBuffer_size);
+
+    // Always show hex dump when debug_cc1101 is enabled for field-level debugging
     if (debug_out)
     {
-      echo_debug(debug_out, "[CC1101] Decoded meter data size = %d\n", meter_data_size);
-      show_in_hex_one_line(meter_data, meter_data_size);
+      echo_debug(debug_out, "[CC1101] Full hex dump of decoded frame (%d bytes):\n", meter_data_size);
+      echo_debug(debug_out, "Offset  : Hex Data\n");
+      // Show in 16-byte rows with offset markers for easier analysis
+      for (int i = 0; i < meter_data_size; i += 16)
+      {
+        char hex_line[128];
+        int line_pos = 0;
+        int end_offset = (i + 15 < meter_data_size - 1) ? i + 15 : meter_data_size - 1;
+        line_pos += snprintf(hex_line + line_pos, sizeof(hex_line) - line_pos, "[%03d-%03d]: ", i, end_offset);
+        int max_j = (i + 16 < meter_data_size) ? i + 16 : meter_data_size;
+        for (int j = i; j < max_j; j++)
+        {
+          line_pos += snprintf(hex_line + line_pos, sizeof(hex_line) - line_pos, "%02X ", meter_data[j]);
+        }
+        echo_debug(debug_out, "%s\n", hex_line);
+      }
+      echo_debug(debug_out, "Note: Bytes [18-21]=volume, [31]=battery, [44-45]=wake/sleep, [66-117]=history\n");
+    }
+    else
+    {
+      // Even without debug_cc1101, show first 32 bytes for basic troubleshooting
+      echo_debug(1, "[METER] First 32 bytes (header + volume field): ");
+      show_in_hex_one_line(meter_data, (meter_data_size < 32) ? meter_data_size : 32);
     }
 
     echo_debug(1, "[METER] Validating CRC...\n");
