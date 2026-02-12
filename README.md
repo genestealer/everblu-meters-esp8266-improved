@@ -299,6 +299,7 @@ Below are the wiring diagrams for common ESP8266 boards and ESP32 DevKit.
 - **Voltage:** The CC1101 operates at **3.3V only**. Do not connect to 5V or you will damage the module.
 - **Hardware SPI:** This project uses the ESP8266/ESP32's hardware SPI interface for reliable, high-speed communication.
 - **GDO0 Pin:** Default is GPIO 5 for ESP8266, GPIO 4 for ESP32. You can change this in your `private.h` file if needed.
+- **Distance & Signal Quality:** The RADIAN protocol implementation does not have publicly available CRC checksums for the manufacturer's proprietary encoding, making readings somewhat vulnerable to RF interference. Weak signal (distance > 10+ meters) or electrical interference can cause read failures. **Keep the CC1101 radio within a few meters (~2-5m ideally) of your meter for reliable communication.** If you experience frequent "No ACK frame received" or "No data frame received" failures, try moving the radio closer to the meter to rule out signal strength issues before investigating hardware wiring.
 
 #### Wiring Table
 
