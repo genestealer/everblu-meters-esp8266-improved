@@ -37,7 +37,7 @@ ota:
 time:
   - platform: homeassistant
     id: homeassistant_time
-    timezone: America/New_York
+    timezone: Europe/London
 
 # EverBlu Meter Component
 external_components:

@@ -45,7 +45,7 @@ web_server:
 time:
   - platform: homeassistant
     id: ha_time
-    timezone: Europe/Paris
+    timezone: Europe/London
     on_time_sync:
       then:
         - logger.log: "Time synchronized with Home Assistant"
