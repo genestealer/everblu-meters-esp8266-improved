@@ -88,15 +88,6 @@ body:
           required: true
 
   - type: textarea
-    id: description
-    attributes:
-      label: Description
-      description: What happened, and what did you expect to happen?
-      placeholder: Clear and concise description of the issue.
-    validations:
-      required: true
-
-  - type: textarea
     id: versions
     attributes:
       label: Versions / environment
@@ -124,6 +115,7 @@ body:
         - Have you tried moving the radio closer to the meter (e.g., within 2-3 meters) to test if distance/signal is the issue?
         - Are there any walls, metal obstacles, or other RF sources between the radio and meter?
         - What type of antenna does your CC1101 module have (wire, PCB trace, external)?
+        - Have you tried running a frequency scan to find a better frequency? (See QUICK_REFERENCE.md or ESPHOME_INTEGRATION_GUIDE.md for how to trigger the scan button)
       render: text
     validations:
       required: false
@@ -140,6 +132,16 @@ body:
       render: yaml
     validations:
       required: false
+
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened, and what did you expect to happen?
+      placeholder: Clear and concise description of the issue.
+    validations:
+      required: true
 
   - type: textarea
     id: logs
