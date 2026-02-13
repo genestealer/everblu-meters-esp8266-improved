@@ -6,10 +6,16 @@
 #include <unity.h>
 #include <ctime>
 #include <cstring>
+#include "src/services/schedule_manager.h"
 
-// Forward declarations - these would link from the main build
-extern bool isReadingDay(struct tm *ptm, const char *schedule);
+// Wrapper to drive ScheduleManager using the legacy isReadingDay signature
+static ScheduleManager g_scheduleManager;
 
+bool isReadingDay(struct tm *ptm, const char *schedule)
+{
+    g_scheduleManager.setSchedule(schedule);
+    return g_scheduleManager.isReadingDay(ptm);
+}
 /**
  * Helper to create a tm structure for a specific day of week
  * @param dayOfWeek 0 = Sunday, 1 = Monday, ..., 6 = Saturday
