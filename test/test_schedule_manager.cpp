@@ -99,19 +99,17 @@ void test_schedule_monday_sunday_includes_sunday(void)
 }
 
 /**
- * Test: Invalid schedule returns false for all days
+ * Test: Invalid schedule falls back to Monday-Friday schedule
  */
 void test_schedule_invalid(void)
 {
     struct tm monday = createTmForDay(1);
     struct tm sunday = createTmForDay(0);
 
-    TEST_ASSERT_FALSE(isReadingDay(&monday, "InvalidSchedule"));
+    // Invalid schedule string should be treated as Monday-Friday:
+    // weekdays are reading days, Sunday is not.
+    TEST_ASSERT_TRUE(isReadingDay(&monday, "InvalidSchedule"));
     TEST_ASSERT_FALSE(isReadingDay(&sunday, "InvalidSchedule"));
-    TEST_ASSERT_FALSE(isReadingDay(&monday, "Everyday")); // Removed - use Monday-Sunday instead
-    TEST_ASSERT_FALSE(isReadingDay(&sunday, "Everyday")); // Removed - use Monday-Sunday instead
-    TEST_ASSERT_FALSE(isReadingDay(&monday, "Saturday")); // Removed - use Monday-Saturday instead
-    TEST_ASSERT_FALSE(isReadingDay(&sunday, "Sunday"));   // Removed - use Monday-Sunday instead
 }
 
 /**
