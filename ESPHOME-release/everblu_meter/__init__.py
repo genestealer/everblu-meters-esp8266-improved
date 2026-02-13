@@ -90,7 +90,6 @@ METER_TYPE_GAS = "gas"
 SCHEDULE_MONDAY_FRIDAY = "Monday-Friday"
 SCHEDULE_MONDAY_SATURDAY = "Monday-Saturday"
 SCHEDULE_MONDAY_SUNDAY = "Monday-Sunday"
-SCHEDULE_EVERYDAY = "Everyday"
 
 CONF_GDO0_PIN = "gdo0_pin"
 

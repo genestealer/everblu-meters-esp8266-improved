@@ -4,8 +4,22 @@
 
 echo "Running prepare-component-release.ps1..."
 
+# Detect an available PowerShell executable (pwsh, powershell, or powershell.exe)
+PS_CMD=""
+if command -v pwsh >/dev/null 2>&1; then
+    PS_CMD="pwsh"
+elif command -v powershell >/dev/null 2>&1; then
+    PS_CMD="powershell"
+elif command -v powershell.exe >/dev/null 2>&1; then
+    PS_CMD="powershell.exe"
+else
+    echo "Warning: No PowerShell executable (pwsh/powershell/powershell.exe) found."
+    echo "Skipping prepare-component-release.ps1; commit not blocked."
+    exit 0
+fi
+
 # Run the PowerShell script
-powershell.exe -ExecutionPolicy Bypass -File "./ESPHOME/prepare-component-release.ps1"
+"$PS_CMD" -ExecutionPolicy Bypass -File "./ESPHOME/prepare-component-release.ps1"
 
 # Check if the script succeeded
 if [ $? -ne 0 ]; then

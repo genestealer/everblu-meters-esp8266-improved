@@ -201,9 +201,8 @@ This checklist helps verify that the ESPHome integration works correctly across 
 
 ### Different Schedule Types
 - [ ] Monday-Friday schedule works
-- [ ] Saturday schedule works
-- [ ] Sunday schedule works
-- [ ] Everyday schedule works
+- [ ] Monday-Saturday schedule works
+- [ ] Monday-Sunday schedule works
 - [ ] Reading only happens on configured days
 
 ### Time Configuration
