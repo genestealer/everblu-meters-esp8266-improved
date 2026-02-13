@@ -1,0 +1,20 @@
+#!/bin/sh
+# Pre-commit hook to automatically run prepare-component-release.ps1
+# This ensures the ESPHome component is always up-to-date before committing
+
+echo "Running prepare-component-release.ps1..."
+
+# Run the PowerShell script
+powershell.exe -ExecutionPolicy Bypass -File "./ESPHOME/prepare-component-release.ps1"
+
+# Check if the script succeeded
+if [ $? -ne 0 ]; then
+    echo "Error: prepare-component-release.ps1 failed"
+    exit 1
+fi
+
+# Stage any changes made by the release script
+git add ESPHOME-release/ 2>/dev/null || true
+
+echo "Component release prepared successfully"
+exit 0
