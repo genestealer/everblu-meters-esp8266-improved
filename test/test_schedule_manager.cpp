@@ -181,3 +181,23 @@ void tearDown(void)
 {
     // No teardown needed
 }
+
+/**
+ * Unity/PlatformIO test runner entry point.
+ * Ensures that the tests in this file are actually executed.
+ */
+void setup(void)
+{
+    UNITY_BEGIN();
+
+    // Run schedule manager tests defined in this file
+    RUN_TEST(test_schedule_null);
+    RUN_TEST(test_all_schedules_all_days);
+
+    UNITY_END();
+}
+
+void loop(void)
+{
+    // Nothing to do here; tests are run once in setup()
+}
