@@ -16,6 +16,9 @@
 #endif
 #include "wifi_serial.h" // Optional WiFi serial mirroring
 #include <SPI.h>         // Include the SPI library for SPI communication
+#ifdef USE_ESPHOME
+#include "esphome/components/spi/spi.h" // ESPHome SPI device interface
+#endif
 #if defined(ESP32)
 #include <esp_task_wdt.h>
 #endif
@@ -203,9 +206,38 @@ static const uint8_t debug_out = (uint8_t)(DEBUG_CC1101);
 #define TEST2 0x2C   // Various test settings
 #define TEST1 0x2D   // Various test settings
 #define TEST0 0x2E   // Various test settings
+#ifdef USE_ESPHOME
+// ESPHome SPI integration - store SPIDevice instance and CS pin
+// The EverbluMeterComponent inherits from this SPIDevice specialization.
+using CC1101SpiDevice = esphome::spi::SPIDevice<esphome::spi::BIT_ORDER_MSB_FIRST,
+                                                esphome::spi::CLOCK_POLARITY_LOW,
+                                                esphome::spi::CLOCK_PHASE_LEADING,
+                                                esphome::spi::DATA_RATE_1MHZ>;
+static CC1101SpiDevice *_spi_device = nullptr;
+static int _spi_cs_pin = -1;
+static int _gdo0_pin = -1;
+
+void cc1101_set_spi_device(void *device, int cs_pin)
+{
+  // Store the SPIDevice pointer for ESPHome SPI transactions
+  _spi_device = static_cast<CC1101SpiDevice *>(device);
+  _spi_cs_pin = cs_pin;
+}
+
+void cc1101_set_gdo0_pin(int gdo0_pin)
+{
+  _gdo0_pin = gdo0_pin;
+}
+
+// Macro to get GDO0 pin - use variable in ESPHome mode, build flag otherwise
+#define GET_GDO0_PIN() (_gdo0_pin)
+#else
+// Non-ESPHome mode: GDO0 comes from build flag
+#define GET_GDO0_PIN() (GDO0)
+#endif
 
 // Change these define according to your ESP8266 board
-#ifdef ESP8266
+#if defined(ESP8266) && !defined(USE_ESPHOME)
 #define SPI_CSK PIN_SPI_SCK
 #define SPI_MISO PIN_SPI_MISO
 #define SPI_MOSI PIN_SPI_MOSI
@@ -213,7 +245,7 @@ static const uint8_t debug_out = (uint8_t)(DEBUG_CC1101);
 #endif
 
 // Change these define according to your ESP32 board
-#ifdef ESP32
+#if defined(ESP32) && !defined(USE_ESPHOME)
 #define SPI_CSK SCK
 #define SPI_MISO MISO
 #define SPI_MOSI MOSI
@@ -223,28 +255,41 @@ static const uint8_t debug_out = (uint8_t)(DEBUG_CC1101);
 int _spi_speed = 0;
 int wiringPiSPIDataRW(int channel, unsigned char *data, int len)
 {
+#ifdef USE_ESPHOME
+  // ESPHome mode: Use SPIDevice methods (enable/transfer_array/disable)
+  // The SPIDevice handles bus configuration, speed, and transaction management
+  if (!_spi_device)
+    return -1;
+
+  _spi_device->enable();
+  _spi_device->transfer_array(data, len);
+  _spi_device->disable();
+#else
+  // Arduino SPI
   if (!_spi_speed)
     return -1;
 
   SPI.beginTransaction(SPISettings(_spi_speed, MSBFIRST, SPI_MODE0));
-  digitalWrite(SPI_SS, 0);
-
-  // echo_debug(debug_out, "wiringPiSPIDataRW(0x%02X, %d)\n", (len > 0) ? data[0] : 'X' , len);
-
+  digitalWrite(SPI_SS, LOW);
   SPI.transfer(data, len);
-
-  digitalWrite(SPI_SS, 1);
+  digitalWrite(SPI_SS, HIGH);
   SPI.endTransaction();
+#endif
 
   return 0;
 }
 
 int wiringPiSPISetup(int channel, int speed)
 {
+#ifdef USE_ESPHOME
+  // ESPHome mode: SPI is already configured by SPIDevice
+  _spi_speed = speed; // Store for potential future use
+#else
+  // Arduino mode: Set up SPI manually
   _spi_speed = speed;
 
   pinMode(SPI_SS, OUTPUT);
-  digitalWrite(SPI_SS, 1);
+  digitalWrite(SPI_SS, HIGH);
 
 #ifdef ESP8266
   SPI.pins(SPI_CSK, SPI_MISO, SPI_MOSI, SPI_SS);
@@ -253,6 +298,7 @@ int wiringPiSPISetup(int channel, int speed)
 
 #ifdef ESP32
   SPI.begin(SPI_CSK, SPI_MISO, SPI_MOSI, SPI_SS);
+#endif
 #endif
 
   return 0;
@@ -512,7 +558,7 @@ void cc1101_configureRF_0(float freq)
 
 bool cc1101_init(float freq)
 {
-  pinMode(GDO0, INPUT_PULLUP);
+  pinMode(GET_GDO0_PIN(), INPUT_PULLUP);
 
   // Initialize SPI bus for CC1101 communication (500 kHz)
   if ((wiringPiSPISetup(0, 500000)) < 0)
@@ -649,14 +695,13 @@ uint8_t cc1101_check_packet_received(void)
   int8_t l_Rssi_dbm;
   uint8_t l_lqi, l_freq_est, pktLen;
   pktLen = 0;
-  if (digitalRead(GDO0) == TRUE)
+  if (digitalRead(GET_GDO0_PIN()) == TRUE)
   {
-    // get RF info at beginning of the frame
-    l_lqi = halRfReadReg(LQI_ADDR);
-    l_freq_est = halRfReadReg(FREQEST_ADDR);
+    // Read RSSI immediately while signal is present (carrier active)
+    // RSSI register needs to be sampled during packet reception for accuracy
     l_Rssi_dbm = cc1100_rssi_convert2dbm(halRfReadReg(RSSI_ADDR));
 
-    while (digitalRead(GDO0) == TRUE)
+    while (digitalRead(GET_GDO0_PIN()) == TRUE)
     {
       delay(2); // Reduced from 5ms to 2ms for faster FIFO reading (prevents overflow)
 
@@ -683,6 +728,12 @@ uint8_t cc1101_check_packet_received(void)
         break;
       }
     }
+
+    // Read LQI and FREQEST after packet completes (GDO0 goes low)
+    // These registers are latched at end-of-packet and contain final quality metrics
+    l_lqi = halRfReadReg(LQI_ADDR);
+    l_freq_est = halRfReadReg(FREQEST_ADDR);
+
     if (is_look_like_radian_frame(rxBuffer, pktLen))
     {
       echo_debug(debug_out, "[CC1101] Packet looks like RADIAN frame");
@@ -1277,7 +1328,7 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
   halRfWriteReg(PKTLEN, 1);                      // Just one byte of sync pattern
   cc1101_rec_mode();
 
-  while ((digitalRead(GDO0) == FALSE) && (l_tmo < rx_tmo_ms))
+  while ((digitalRead(GET_GDO0_PIN()) == FALSE) && (l_tmo < rx_tmo_ms))
   {
     delay(1);
     l_tmo++;
@@ -1366,7 +1417,7 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
   l_tmo = 0;
   l_total_byte = 0;
   l_byte_in_rx = 1;
-  while ((digitalRead(GDO0) == FALSE) && (l_tmo < rx_tmo_ms))
+  while ((digitalRead(GET_GDO0_PIN()) == FALSE) && (l_tmo < rx_tmo_ms))
   {
     delay(1);
     l_tmo++;
@@ -1532,6 +1583,17 @@ struct tmeter_data get_meter_data(void)
 
   echo_debug(1, "[METER] Transmitting wake-up + interrogation (Year=%d, Serial=%lu)...\n",
              METER_YEAR, (unsigned long)METER_SERIAL);
+
+  // === Critical: Reset radio state before TX ===
+  // If the radio is stuck in RXFIFO_OVERFLOW (0x11) or any non-IDLE state from
+  // a previous cycle, STX will be ignored. Force IDLE and flush both FIFOs.
+  CC1101_CMD(SIDLE); // Force radio to IDLE (required before flushing FIFOs)
+  delay(1);          // Brief settle time
+  CC1101_CMD(SFRX);  // Flush RX FIFO (clears RXFIFO_OVERFLOW state)
+  CC1101_CMD(SFTX);  // Flush TX FIFO (clears any stale data / TXFIFO_UNDERFLOW)
+  delay(1);          // Brief settle time after flush
+  echo_debug(debug_out, "[CC1101] Pre-TX reset: IDLE + FIFO flush complete\n");
+
   halRfWriteReg(MDMCFG2, MDMCFG2_NO_PREAMBLE_SYNC);  // No preamble/sync for WUP
   halRfWriteReg(PKTCTRL0, PKTCTRL0_INFINITE_LENGTH); // Infinite packet length
   SPIWriteBurstReg(TX_FIFO_ADDR, wupbuffer, 8);
@@ -1587,10 +1649,20 @@ struct tmeter_data get_meter_data(void)
     tmo++;
     marcstate = halRfReadReg(MARCSTATE_ADDR); // read out state of cc1100 to be sure in IDLE and TX is finished this update also CC1101_status_state
     // echo_debug(debug_out,"%ifree_byte:0x%02X sts:0x%02X\n",tmo,CC1101_status_FIFO_FreeByte,CC1101_status_state);
+
+    // Detect TXFIFO_UNDERFLOW (MARCSTATE 0x16) early and abort instead of
+    // spinning for the full 2020ms timeout. The FIFO underflowed mid-TX,
+    // so continuing to feed data is pointless.
+    if ((marcstate & 0x1F) == 0x16) // TXFIFO_UNDERFLOW
+    {
+      echo_debug(1, "[CC1101] TXFIFO_UNDERFLOW detected at tmo=%d, aborting TX loop\n", tmo);
+      break;
+    }
   }
   echo_debug(1, "[METER] TX complete after %dms (MARCSTATE=0x%02X)\n", tmo * 10, marcstate & 0x1F);
   echo_debug(debug_out, "[CC1101] tmo=%i free_byte:0x%02X sts:0x%02X", tmo, CC1101_status_FIFO_FreeByte, CC1101_status_state);
-  CC1101_CMD(SFTX); // flush the Tx_fifo content this clear the status state and put sate machin in IDLE
+  CC1101_CMD(SIDLE); // Ensure IDLE before flushing (required by CC1101 datasheet)
+  CC1101_CMD(SFTX);  // flush the Tx_fifo content this clear the status state and put sate machin in IDLE
   // end of transition restore default register
   halRfWriteReg(MDMCFG2, MDMCFG2_2FSK_16_16_SYNC); // Restore: 2-FSK, 16/16 sync bits
   halRfWriteReg(PKTCTRL0, PKTCTRL0_FIXED_LENGTH);  // Restore: fixed packet length

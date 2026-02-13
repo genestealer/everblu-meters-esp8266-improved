@@ -8,6 +8,10 @@
 #include "esphome/core/log.h"
 #endif
 
+#include "core/version.h"
+
+// Include CC1101 header for SPI device setup
+#include "cc1101.h"
 #ifdef USE_ESP8266
 #include <ESP8266WiFi.h>
 #elif defined(USE_ESP32)
@@ -46,6 +50,9 @@ namespace esphome
         void EverbluMeterComponent::setup()
         {
             ESP_LOGCONFIG(TAG, "Setting up EverBlu Meter...");
+
+            // Initialize ESPHome SPI device before any SPI transactions
+            this->spi_setup();
 
             // Reset initialization state on every setup (after reboot/OTA)
             meter_initialized_ = false;
@@ -101,6 +108,7 @@ namespace esphome
             data_publisher_->set_radio_state_sensor(radio_state_sensor_);
             data_publisher_->set_timestamp_sensor(timestamp_sensor_);
             data_publisher_->set_history_sensor(history_sensor_);
+            data_publisher_->set_version_sensor(version_sensor_);
             data_publisher_->set_meter_serial_sensor(meter_serial_sensor_);
             data_publisher_->set_meter_year_sensor(meter_year_sensor_);
             data_publisher_->set_reading_schedule_sensor(reading_schedule_sensor_);
@@ -130,6 +138,7 @@ namespace esphome
             texts += (radio_state_sensor_ != nullptr);
             texts += (timestamp_sensor_ != nullptr);
             texts += (history_sensor_ != nullptr);
+            texts += (version_sensor_ != nullptr);
             texts += (meter_serial_sensor_ != nullptr);
             texts += (meter_year_sensor_ != nullptr);
             texts += (reading_schedule_sensor_ != nullptr);
@@ -140,6 +149,25 @@ namespace esphome
             binaries += (radio_connected_sensor_ != nullptr);
 
             ESP_LOGD(TAG, "Linked sensors -> numeric: %d, text: %d, binary: %d", numeric, texts, binaries);
+
+            // Initialize CC1101 SPI device before creating meter reader
+            auto *spi_device = static_cast<spi::SPIDevice<spi::BIT_ORDER_MSB_FIRST,
+                                                          spi::CLOCK_POLARITY_LOW,
+                                                          spi::CLOCK_PHASE_LEADING,
+                                                          spi::DATA_RATE_1MHZ> *>(this);
+            cc1101_set_spi_device(static_cast<void *>(spi_device), -1);
+            ESP_LOGD(TAG, "CC1101 SPI device configured");
+
+            // Configure GDO0 pin for CC1101
+            if (gdo0_pin_ >= 0)
+            {
+                cc1101_set_gdo0_pin(gdo0_pin_);
+                ESP_LOGD(TAG, "CC1101 GDO0 pin configured: %d", gdo0_pin_);
+            }
+            else
+            {
+                ESP_LOGE(TAG, "GDO0 pin not configured for CC1101!");
+            }
 
             // Create meter reader with all adapters (but don't initialize yet)
             meter_reader_ = new MeterReader(config_provider_, time_provider_, data_publisher_);
@@ -172,14 +200,25 @@ namespace esphome
                     frequency_);
 
                 // Publish initial status states
-                ESP_LOGD(TAG, "Publishing: radio state=Idle");
-                data_publisher_->publishRadioState("Idle");
+                // Preserve radio state after init failure - don't overwrite "unavailable" with "Idle"
+                if (meter_reader_->isRadioConnected())
+                {
+                    ESP_LOGD(TAG, "Publishing: radio state=Idle");
+                    data_publisher_->publishRadioState("Idle");
+                }
+                else
+                {
+                    ESP_LOGD(TAG, "Skipping radio state publish - radio init failed, preserving 'unavailable' state");
+                }
 
                 ESP_LOGD(TAG, "Publishing: status=Ready");
                 data_publisher_->publishStatusMessage("Ready");
 
                 ESP_LOGD(TAG, "Publishing: error=None");
                 data_publisher_->publishError("None");
+
+                ESP_LOGD(TAG, "Publishing: firmware version=%s", EVERBLU_FW_VERSION);
+                data_publisher_->publishFirmwareVersion(EVERBLU_FW_VERSION);
 
                 ESP_LOGD(TAG, "Publishing: active_reading=false");
                 data_publisher_->publishActiveReading(false);
@@ -302,6 +341,7 @@ namespace esphome
             ESP_LOGCONFIG(TAG, "  Meter Year: %u", meter_year_);
             ESP_LOGCONFIG(TAG, "  Meter Serial: %u", meter_serial_);
             ESP_LOGCONFIG(TAG, "  Meter Type: %s", is_gas_ ? "Gas" : "Water");
+            ESP_LOGCONFIG(TAG, "  Everblu Meter Component Version: %s", EVERBLU_FW_VERSION);
             if (is_gas_)
             {
                 ESP_LOGCONFIG(TAG, "  Gas Volume Divisor: %d", gas_volume_divisor_);

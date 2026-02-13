@@ -99,6 +99,12 @@ public:
     bool isReadingInProgress() const { return m_readingInProgress; }
 
     /**
+     * @brief Check if CC1101 radio initialized successfully
+     * @return true if radio is connected and initialized
+     */
+    bool isRadioConnected() const { return m_radioConnected; }
+
+    /**
      * @brief Get last error message
      * @return Error message string
      */
@@ -154,6 +160,7 @@ private:
     bool m_readingInProgress;
     bool m_isScheduledRead;
     bool m_haConnected;
+    bool m_radioConnected; // Tracks CC1101 radio initialization success
 
     // Retry management
     int m_retryCount;

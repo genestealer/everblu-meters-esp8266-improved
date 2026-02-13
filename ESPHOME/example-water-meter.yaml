@@ -37,7 +37,7 @@ ota:
 time:
   - platform: homeassistant
     id: homeassistant_time
-    timezone: America/New_York
+    timezone: Europe/London
 
 # EverBlu Meter Component
 external_components:
@@ -158,6 +158,9 @@ everblu_meter:
   
   history_json:
     name: "Meter History (JSON)"
+
+  firmware_version:
+    name: "Firmware Version"
   
   # Binary sensors
   active_reading:

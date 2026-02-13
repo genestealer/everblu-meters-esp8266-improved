@@ -21,6 +21,7 @@
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/time/real_time_clock.h"
 #include "esphome/components/button/button.h"
+#include "esphome/components/spi/spi.h"
 
 #ifdef USE_API
 #include "esphome/components/api/api_server.h"
@@ -56,7 +57,7 @@ namespace esphome
             bool is_reset_frequency_{false};
         };
 
-        class EverbluMeterComponent : public PollingComponent
+        class EverbluMeterComponent : public PollingComponent, public spi::SPIDevice<spi::BIT_ORDER_MSB_FIRST, spi::CLOCK_POLARITY_LOW, spi::CLOCK_PHASE_LEADING, spi::DATA_RATE_1MHZ>
         {
         public:
             EverbluMeterComponent() = default;
@@ -95,6 +96,7 @@ namespace esphome
             void set_time_component(time::RealTimeClock *time) { time_component_ = time; }
             void set_initial_read_on_boot(bool v) { initial_read_on_boot_ = v; }
             void set_adaptive_threshold(int threshold) { adaptive_threshold_ = threshold; }
+            void set_gdo0_pin(int pin) { gdo0_pin_ = pin; }
 
             // Sensor setters
             void set_volume_sensor(sensor::Sensor *sensor) { volume_sensor_ = sensor; }
@@ -118,6 +120,7 @@ namespace esphome
             void set_radio_state_sensor(text_sensor::TextSensor *sensor) { radio_state_sensor_ = sensor; }
             void set_timestamp_sensor(text_sensor::TextSensor *sensor) { timestamp_sensor_ = sensor; }
             void set_history_sensor(text_sensor::TextSensor *sensor) { history_sensor_ = sensor; }
+            void set_version_sensor(text_sensor::TextSensor *sensor) { version_sensor_ = sensor; }
             void set_meter_serial_sensor(text_sensor::TextSensor *sensor) { meter_serial_sensor_ = sensor; }
             void set_meter_year_sensor(text_sensor::TextSensor *sensor) { meter_year_sensor_ = sensor; }
             void set_reading_schedule_sensor(text_sensor::TextSensor *sensor) { reading_schedule_sensor_ = sensor; }
@@ -152,6 +155,9 @@ namespace esphome
             // Internal state tracking
             void republish_initial_states();
 
+            // GDO0 pin (raw GPIO number for CC1101 Arduino driver)
+            int gdo0_pin_{-1};
+
             // ESPHome components
             time::RealTimeClock *time_component_{nullptr};
 
@@ -177,6 +183,7 @@ namespace esphome
             text_sensor::TextSensor *radio_state_sensor_{nullptr};
             text_sensor::TextSensor *timestamp_sensor_{nullptr};
             text_sensor::TextSensor *history_sensor_{nullptr};
+            text_sensor::TextSensor *version_sensor_{nullptr};
             text_sensor::TextSensor *meter_serial_sensor_{nullptr};
             text_sensor::TextSensor *meter_year_sensor_{nullptr};
             text_sensor::TextSensor *reading_schedule_sensor_{nullptr};
