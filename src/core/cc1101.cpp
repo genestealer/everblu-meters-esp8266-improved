@@ -1614,7 +1614,7 @@ struct tmeter_data get_meter_data(void)
     // echo_debug(debug_out,"%ifree_byte:0x%02X sts:0x%02X\n",tmo,CC1101_status_FIFO_FreeByte,CC1101_status_state);
 
     // Detect TXFIFO_UNDERFLOW (MARCSTATE 0x16) early and abort instead of
-    // spinning for the full 2020ms timeout. The FIFO underflowed mid-TX,
+    // spinning for the full 3000ms timeout. The FIFO underflowed mid-TX,
     // so continuing to feed data is pointless.
     if ((marcstate & 0x1F) == 0x16) // TXFIFO_UNDERFLOW
     {
