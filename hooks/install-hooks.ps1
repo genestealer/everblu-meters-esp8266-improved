@@ -2,19 +2,21 @@
 # Installs Git hooks from the hooks/ directory into .git/hooks/
 
 $ErrorActionPreference = "Stop"
+$isWindows = ($env:OS -eq 'Windows_NT')
 
 Write-Host "Installing Git hooks..." -ForegroundColor Cyan
 
 $hooks = Get-ChildItem -Path "hooks" -File | Where-Object { $_.Extension -eq "" }
+$gitHooksDir = Join-Path -Path ".git" -ChildPath "hooks"
 
 foreach ($hook in $hooks) {
     $source = $hook.FullName
-    $dest = ".git\hooks\$($hook.Name)"
+    $dest = Join-Path -Path $gitHooksDir -ChildPath $hook.Name
     
     Copy-Item $source $dest -Force
     
     # On Unix-like systems (Linux/macOS), set executable bit
-    if (-not $IsWindows) {
+    if (-not $isWindows) {
         try {
             & chmod +x -- $dest
             Write-Host "✓ Installed $($hook.Name) (executable)" -ForegroundColor Green
