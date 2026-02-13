@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 Releases are created manually by tagging commits with version tags matching `v*.*.*` (e.g., `v2.1.0`). Users should build from source and configure `private.h` with their own meter settings.
 
+## [v2.1.2] - 2026-02-13
+
+### Fixed
+
+- CC1101 LQI/FREQEST register reads on buffer overflow (only read when packet completes normally)
+- TX underflow error logging (distinct message vs successful completion)
+- Comment typo in SFTX flush operation
+
+
 ## [v2.1.1] - 2026-02-13
 
 ### Fixed
