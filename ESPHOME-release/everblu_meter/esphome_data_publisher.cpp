@@ -81,6 +81,12 @@ void ESPHomeDataPublisher::publishMeterReading(const tmeter_data &data, const ch
     {
         timestamp_sensor_->publish_state(timestamp);
     }
+
+    // Frequency estimate from CC1101
+    if (frequency_estimate_sensor_)
+    {
+        publishFrequencyEstimate(data.freqest);
+    }
 #endif
 }
 
@@ -284,6 +290,20 @@ void ESPHomeDataPublisher::publishTunedFrequency(float frequencyMHz)
         // Publish in MHz with high precision (6 decimal places = kHz resolution)
         ESP_LOGD(TAG_PUB, "Publishing tuned frequency: %.6f MHz", frequencyMHz);
         tuned_frequency_sensor_->publish_state(frequencyMHz);
+    }
+#endif
+}
+
+void ESPHomeDataPublisher::publishFrequencyEstimate(int8_t freqestValue)
+{
+#ifdef USE_ESPHOME
+    if (frequency_estimate_sensor_)
+    {
+        // Convert FREQEST raw value to kHz (approximately 1.59 kHz per LSB with 26 MHz crystal)
+        constexpr float FREQEST_TO_KHZ = 1.587; // ~1.59 kHz per LSB
+        float freqestKHz = (float)freqestValue * FREQEST_TO_KHZ;
+        ESP_LOGD(TAG_PUB, "Publishing frequency estimate: %d (%.3f kHz)", freqestValue, freqestKHz);
+        frequency_estimate_sensor_->publish_state(freqestKHz);
     }
 #endif
 }

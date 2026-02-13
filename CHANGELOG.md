@@ -39,7 +39,6 @@ Releases are created manually by tagging commits with version tags matching `v*.
 - `SCHEDULE_EVERYDAY` constant - use `SCHEDULE_MONDAY_SUNDAY` instead
 - References to legacy "Everyday", "Saturday", "Sunday" schedule options
 
-
 ## [v2.1.0] - 2026-01-19
 
 **🎉 ESPHome Integration is NOW FULLY WORKING! 🎉**

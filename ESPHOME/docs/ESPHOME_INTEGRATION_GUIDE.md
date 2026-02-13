@@ -173,7 +173,7 @@ everblu_meter:
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `reading_schedule` | string | `Monday-Friday` | When to read: `Monday-Friday`, `Saturday`, `Sunday`, or `Everyday` |
+| `reading_schedule` | string | `Monday-Friday` | When to read: `Monday-Friday`, `Monday-Saturday`, or `Monday-Sunday` |
 | `read_hour` | int | `10` | Hour to perform reading (0-23, in UTC) |
 | `read_minute` | int | `0` | Minute to perform reading (0-59) |
 | `timezone_offset` | int | `0` | **Minutes** offset from UTC (-720 to +720). Example: `660` for UTC+11, `-300` for UTC-5 |

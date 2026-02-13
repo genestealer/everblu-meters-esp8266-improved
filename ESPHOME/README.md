@@ -183,9 +183,8 @@ esphome run your-config.yaml
 ### Schedule Options
 
 - Monday-Friday - Weekdays (default)
-- Saturday - Saturdays only
-- Sunday - Sundays only
-- Everyday - All days
+- Monday-Saturday - Monday through Saturday
+- Monday-Sunday - All days
 
 ### Custom Schedule Example
 
@@ -417,6 +416,9 @@ EverbluMeterComponent (ESPHome)
 - **rssi** / **rssi_percentage** - Radio signal strength
 - **lqi** / **lqi_percentage** - Link quality indicator
 - **time_start** / **time_end** - Reading timing
+- **frequency_offset** - Current frequency offset (kHz)
+- **tuned_frequency** - Actual tuned frequency (MHz)
+- **frequency_estimate** - CC1101 frequency estimate from last reading (kHz) - helps monitor frequency drift
 - **total_attempts** / **successful_reads** / **failed_reads** - Statistics
 
 ### Text Sensors

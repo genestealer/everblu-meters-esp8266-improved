@@ -78,6 +78,7 @@ CONF_SUCCESSFUL_READS = "successful_reads"
 CONF_FAILED_READS = "failed_reads"
 CONF_FREQUENCY_OFFSET = "frequency_offset"
 CONF_TUNED_FREQUENCY = "tuned_frequency"
+CONF_FREQUENCY_ESTIMATE = "frequency_estimate"
 CONF_REQUEST_READING_BUTTON = "request_reading_button"
 CONF_FREQUENCY_SCAN_BUTTON = "frequency_scan_button"
 CONF_RESET_FREQUENCY_BUTTON = "reset_frequency_button"
@@ -86,11 +87,10 @@ CONF_RESET_FREQUENCY_BUTTON = "reset_frequency_button"
 METER_TYPE_WATER = "water"
 METER_TYPE_GAS = "gas"
 
-# Reading schedules
+# Reading schedules - must match C++ ScheduleManager::isReadingDay(...) string comparisons
 SCHEDULE_MONDAY_FRIDAY = "Monday-Friday"
-SCHEDULE_MONDAY_SATURDAY = "Saturday"
-SCHEDULE_MONDAY_SUNDAY = "Sunday"
-SCHEDULE_EVERYDAY = "Everyday"
+SCHEDULE_MONDAY_SATURDAY = "Monday-Saturday"
+SCHEDULE_MONDAY_SUNDAY = "Monday-Sunday"
 
 CONF_GDO0_PIN = "gdo0_pin"
 
@@ -193,6 +193,13 @@ CONFIG_SCHEMA = (
                 accuracy_decimals=6,
                 state_class=STATE_CLASS_MEASUREMENT,
                 icon="mdi:radio-tower",
+                entity_category="diagnostic",
+            ),
+            cv.Optional(CONF_FREQUENCY_ESTIMATE): sensor.sensor_schema(
+                unit_of_measurement="kHz",
+                accuracy_decimals=3,
+                state_class=STATE_CLASS_MEASUREMENT,
+                icon="mdi:sine-wave",
                 entity_category="diagnostic",
             ),
             # Text sensors
@@ -378,6 +385,10 @@ async def to_code(config):
     if CONF_TUNED_FREQUENCY in config:
         sens = await sensor.new_sensor(config[CONF_TUNED_FREQUENCY])
         cg.add(var.set_tuned_frequency_sensor(sens))
+    
+    if CONF_FREQUENCY_ESTIMATE in config:
+        sens = await sensor.new_sensor(config[CONF_FREQUENCY_ESTIMATE])
+        cg.add(var.set_frequency_estimate_sensor(sens))
 
     # Register text sensors
     if CONF_STATUS in config:
