@@ -2,5 +2,5 @@
 // Keep this in sync with the latest entry in CHANGELOG.md and Git tags.
 
 #ifndef EVERBLU_FW_VERSION
-#define EVERBLU_FW_VERSION "2.1.0"
+#define EVERBLU_FW_VERSION "2.1.1"
 #endif

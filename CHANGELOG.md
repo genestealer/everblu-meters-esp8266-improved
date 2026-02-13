@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file.
 
 Releases are created manually by tagging commits with version tags matching `v*.*.*` (e.g., `v2.1.0`). Users should build from source and configure `private.h` with their own meter settings.
 
+## [Unreleased]
+
+### Fixed
+
+- Schedule logic bug where "Monday-Sunday" schedule excluded Sunday
+- ESPHome component memory leak from raw `new` allocations without destructor
+- Schedule constant mismatch in ESPHome Python code (removed "Everyday", "Saturday", "Sunday")
+- Duplicate STRINGIFY macro definition with include guards
+- ESPHome namespace compliance for `setup_priority` constant
+
+### Added
+
+- Comprehensive unit tests for schedule manager covering all day combinations
+- Cross-platform Git hook installation with automatic executable bit setting
+- PowerShell executable detection in pre-commit hook with graceful fallback
+
+### Changed
+
+- Updated schedule documentation to use standardized names
+- Updated ESPHome testing checklist to reflect current schedule options
+
+### Removed
+
+- `SCHEDULE_EVERYDAY` constant - use `SCHEDULE_MONDAY_SUNDAY` instead
+- References to legacy "Everyday", "Saturday", "Sunday" schedule options
+
 ## [v2.1.0] - 2026-01-19
 
 **🎉 ESPHome Integration is NOW FULLY WORKING! 🎉**
