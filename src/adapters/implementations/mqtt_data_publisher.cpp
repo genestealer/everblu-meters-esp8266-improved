@@ -193,6 +193,16 @@ void MQTTDataPublisher::publishTunedFrequency(float frequencyMHz)
     publish("tuned_frequency", buffer, true);
 }
 
+void MQTTDataPublisher::publishFrequencyEstimate(int8_t freqestValue)
+{
+    char buffer[16];
+    // Convert FREQEST raw value to kHz (approximately 1.59 kHz per LSB with 26 MHz crystal)
+    constexpr float FREQEST_TO_KHZ = 1.587; // ~1.59 kHz per LSB
+    float freqestKHz = (float)freqestValue * FREQEST_TO_KHZ;
+    snprintf(buffer, sizeof(buffer), "%.3f", freqestKHz);
+    publish("frequency_estimate", buffer, true);
+}
+
 void MQTTDataPublisher::publishUptime(unsigned long uptimeSeconds, const char *uptimeISO)
 {
     char buffer[32];

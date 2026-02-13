@@ -113,6 +113,12 @@ public:
     virtual void publishTunedFrequency(float frequencyMHz) = 0;
 
     /**
+     * @brief Publish frequency estimate from CC1101
+     * @param freqestValue Raw FREQEST value from meter reading (-128 to +127)
+     */
+    virtual void publishFrequencyEstimate(int8_t freqestValue) = 0;
+
+    /**
      * @brief Publish uptime
      * @param uptimeSeconds System uptime in seconds
      * @param uptimeISO Uptime as ISO8601 duration string
