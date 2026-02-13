@@ -61,12 +61,21 @@ namespace esphome
         public:
             EverbluMeterComponent() = default;
 
+            // Destructor to clean up dynamically allocated adapters
+            ~EverbluMeterComponent()
+            {
+                delete config_provider_;
+                delete time_provider_;
+                delete data_publisher_;
+                delete meter_reader_;
+            }
+
             // Component lifecycle
             void setup() override;
             void loop() override;
             void update() override;
             void dump_config() override;
-            float get_setup_priority() const override { return setup_priority::DATA; }
+            float get_setup_priority() const override { return esphome::setup_priority::DATA; }
 
             // Configuration setters (called from Python code generation)
             void set_meter_year(uint8_t year) { meter_year_ = year; }

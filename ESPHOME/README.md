@@ -183,9 +183,8 @@ esphome run your-config.yaml
 ### Schedule Options
 
 - Monday-Friday - Weekdays (default)
-- Saturday - Saturdays only
-- Sunday - Sundays only
-- Everyday - All days
+- Monday-Saturday - Monday through Saturday
+- Monday-Sunday - All days
 
 ### Custom Schedule Example
 

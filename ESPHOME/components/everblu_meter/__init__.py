@@ -86,11 +86,10 @@ CONF_RESET_FREQUENCY_BUTTON = "reset_frequency_button"
 METER_TYPE_WATER = "water"
 METER_TYPE_GAS = "gas"
 
-# Reading schedules
+# Reading schedules - must match C++ ScheduleManager::isReadingDay(...) string comparisons
 SCHEDULE_MONDAY_FRIDAY = "Monday-Friday"
-SCHEDULE_MONDAY_SATURDAY = "Saturday"
-SCHEDULE_MONDAY_SUNDAY = "Sunday"
-SCHEDULE_EVERYDAY = "Everyday"
+SCHEDULE_MONDAY_SATURDAY = "Monday-Saturday"
+SCHEDULE_MONDAY_SUNDAY = "Monday-Sunday"
 
 CONF_GDO0_PIN = "gdo0_pin"
 
