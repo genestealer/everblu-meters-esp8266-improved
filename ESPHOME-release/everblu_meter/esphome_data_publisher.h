@@ -69,6 +69,7 @@ public:
     void set_failed_reads_sensor(esphome::sensor::Sensor *sensor) { failed_reads_sensor_ = sensor; }
     void set_frequency_offset_sensor(esphome::sensor::Sensor *sensor) { frequency_offset_sensor_ = sensor; }
     void set_tuned_frequency_sensor(esphome::sensor::Sensor *sensor) { tuned_frequency_sensor_ = sensor; }
+    void set_frequency_estimate_sensor(esphome::sensor::Sensor *sensor) { frequency_estimate_sensor_ = sensor; }
     void set_uptime_sensor(esphome::sensor::Sensor *sensor) { uptime_sensor_ = sensor; }
 
     // Text sensors
@@ -104,6 +105,7 @@ public:
                            unsigned long failedReads) override;
     void publishFrequencyOffset(float offsetMHz) override;
     void publishTunedFrequency(float frequencyMHz) override;
+    void publishFrequencyEstimate(int8_t freqestValue) override;
     void publishUptime(unsigned long uptimeSeconds, const char *uptimeISO) override;
     void publishFirmwareVersion(const char *version) override;
     void publishDiscovery() override;
@@ -128,8 +130,9 @@ private:
     esphome::sensor::Sensor *successful_reads_sensor_{nullptr};
     esphome::sensor::Sensor *failed_reads_sensor_{nullptr};
     esphome::sensor::Sensor *frequency_offset_sensor_{nullptr};
-    esphome::sensor::Sensor *uptime_sensor_{nullptr};
     esphome::sensor::Sensor *tuned_frequency_sensor_{nullptr};
+    esphome::sensor::Sensor *frequency_estimate_sensor_{nullptr};
+    esphome::sensor::Sensor *uptime_sensor_{nullptr};
 
     // Text sensors
     esphome::text_sensor::TextSensor *status_sensor_{nullptr};

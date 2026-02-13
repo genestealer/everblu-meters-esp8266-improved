@@ -122,6 +122,9 @@ everblu_meter:
 
   tuned_frequency:
     name: "Tuned Frequency (MHz)"
+  
+  frequency_estimate:
+    name: "Frequency Estimate"
 
   # Diagnostic text sensors
   meter_serial_sensor:

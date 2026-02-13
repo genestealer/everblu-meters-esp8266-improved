@@ -111,6 +111,7 @@ namespace esphome
             void set_failed_reads_sensor(sensor::Sensor *sensor) { failed_reads_sensor_ = sensor; }
             void set_frequency_offset_sensor(sensor::Sensor *sensor) { frequency_offset_sensor_ = sensor; }
             void set_tuned_frequency_sensor(sensor::Sensor *sensor) { tuned_frequency_sensor_ = sensor; }
+            void set_frequency_estimate_sensor(sensor::Sensor *sensor) { frequency_estimate_sensor_ = sensor; }
 
             void set_status_sensor(text_sensor::TextSensor *sensor) { status_sensor_ = sensor; }
             void set_error_sensor(text_sensor::TextSensor *sensor) { error_sensor_ = sensor; }
@@ -169,6 +170,7 @@ namespace esphome
             sensor::Sensor *failed_reads_sensor_{nullptr};
             sensor::Sensor *frequency_offset_sensor_{nullptr};
             sensor::Sensor *tuned_frequency_sensor_{nullptr};
+            sensor::Sensor *frequency_estimate_sensor_{nullptr};
 
             text_sensor::TextSensor *status_sensor_{nullptr};
             text_sensor::TextSensor *error_sensor_{nullptr};
