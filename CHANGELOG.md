@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 Releases are created manually by tagging commits with version tags matching `v*.*.*` (e.g., `v2.1.0`). Users should build from source and configure `private.h` with their own meter settings.
 
+## [v2.1.3] - 2026-03-12
+
+### Changed
+
+- Bumped firmware version to `2.1.3` for both standalone MQTT firmware and ESPHome release component.
+- Updated README release callout to reflect current `V2.1.3` release.
+
+### Fixed
+
+- Documented a reproducible recovery path for ESP32 PlatformIO builds failing with `ModuleNotFoundError: No module named 'intelhex'`.
+
 ## [v2.1.2] - 2026-02-13
 
 ### Fixed
