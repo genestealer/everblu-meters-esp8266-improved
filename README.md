@@ -801,10 +801,17 @@ Try the following in order:
 & "$env:USERPROFILE\.platformio\penv\Scripts\python.exe" -m pip install --disable-pip-version-check --no-warn-script-location intelhex
 ```
 
+- Re-run the ESP32 build explicitly through PlatformIO’s bundled executable:
+
+  ```powershell
+& "$env:USERPROFILE\.platformio\penv\Scripts\platformio.exe" run --environment esp32dev
+```
+
 Notes
 
 - Only ESP32 builds use this dependency; ESP8266 builds do not require `intelhex`.
 - Prefer the PlatformIO terminal over a global Python to avoid installing into the wrong environment.
+- If `pio` is not recognized in PowerShell, use the full executable path above instead of `pio run ...`.
 
 ### ESP32 compile errors about ESP8266 headers
 
