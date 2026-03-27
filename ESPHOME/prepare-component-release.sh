@@ -28,6 +28,7 @@ fi
 # Clear any existing release output to ensure a clean package
 if [ -d "$RELEASE_ROOT" ]; then
     echo "Clearing existing release directory..."
+    chmod -R u+w "$RELEASE_DIR"
     rm -rf "$RELEASE_ROOT"
 fi
 
@@ -103,6 +104,9 @@ Do NOT edit files in ESPHOME-release. Any changes will be overwritten the next t
 the prepare-component-release scripts run. Make edits in the source directories above
 and re-run the release script to regenerate.
 EOF
+
+# Prevent Python creating __pycache__ as potentially a different user
+touch $RELEASE_DIR/__pycache__
 
 chmod -R a-w "$RELEASE_DIR"
 
