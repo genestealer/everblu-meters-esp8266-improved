@@ -28,7 +28,7 @@ fi
 # Clear any existing release output to ensure a clean package
 if [ -d "$RELEASE_ROOT" ]; then
     echo "Clearing existing release directory..."
-    chmod -R u+w "$RELEASE_DIR"
+    chmod -R u+w "$RELEASE_ROOT"
     rm -rf "$RELEASE_ROOT"
 fi
 
