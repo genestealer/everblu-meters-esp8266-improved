@@ -106,7 +106,7 @@ and re-run the release script to regenerate.
 EOF
 
 # Prevent Python creating __pycache__ as potentially a different user
-touch $RELEASE_DIR/__pycache__
+touch "$RELEASE_DIR/__pycache__"
 
 chmod -R a-w "$RELEASE_DIR"
 
