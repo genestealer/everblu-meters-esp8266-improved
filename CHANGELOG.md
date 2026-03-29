@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 Releases are created manually by tagging commits with version tags matching `v*.*.*` (e.g., `v2.1.0`). Users should build from source and configure `private.h` with their own meter settings.
 
+## [v2.1.4] - 2026-03-29
+
+### Changed
+
+- Applied build updates and ESPHome `2026.3` compatibility updates (PR #68 by @davidc).
+
+### Fixed
+
+- Updated ESPHome API usage from `is_connected(true)` to `is_connected_with_state_subscription()` per ESPHome `2026.3.0` API changes.
+- Resolved ESPHome compatibility issue tracked in #65.
+
 ## [v2.1.3] - 2026-03-12
 
 ### Changed
