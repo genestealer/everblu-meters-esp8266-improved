@@ -4,6 +4,43 @@ All notable changes to this project will be documented in this file.
 
 Releases are created manually by tagging commits with version tags matching `v*.*.*` (e.g., `v2.1.0`). Users should build from source and configure `private.h` with their own meter settings.
 
+## [v2.2.0] - 2026-04-06
+
+### Breaking Changes
+
+- ESPHome component configuration schema changed.
+- Existing ESPHome YAML that relied on implicit CC1101 SPI wiring will no longer validate.
+- `everblu_meter` now requires explicit SPI integration fields:
+	- top-level `spi:` bus definition
+	- `spi_id` under `everblu_meter`
+	- `cs_pin` under `everblu_meter`
+
+### Migration Required
+
+- Add a top-level `spi:` block with your board-specific CLK/MOSI/MISO pins.
+- Add `spi_id` and `cs_pin` to `everblu_meter`.
+- Keep `gdo0_pin` configured under `everblu_meter`.
+
+### Changed
+
+- Bumped firmware/component version to `2.2.0` to reflect the large ESPHome SPI integration and migration impact.
+- Consolidated release notes for SPI schema migration, example updates, and ESPHome CC1101 integration hardening.
+
+## [v2.1.5] - 2026-04-06
+
+### Changed
+
+- Updated ESPHome example configurations to the new SPI schema (`spi:` bus + `spi_id` + `cs_pin`) across water, gas, advanced, and Nano ESP32 examples.
+- Added SPI migration guidance in ESPHome README with explicit before/after configuration snippets.
+- Clarified ESPHome CC1101 SPI transport behavior and comments to avoid implying the `500kHz` setup call controls ESPHome transfer speed.
+
+### Fixed
+
+- Prevented ESPHome boot state republish from overwriting CC1101 init failures with `status=Ready` and `error=None`.
+- Removed unused `cs_pin` storage from ESPHome CC1101 SPI bridge (`cc1101_set_spi_device` now takes only the SPI device pointer).
+- Removed unused `CONF_CS_PIN` import in ESPHome component schema module.
+- Corrected Nano ESP32 example to include required SPI fields and removed unsupported `consecutive_failures` sensor.
+
 ## [v2.1.4] - 2026-03-29
 
 ### Changed
