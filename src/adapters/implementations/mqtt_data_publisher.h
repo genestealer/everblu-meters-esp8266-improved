@@ -36,6 +36,7 @@ public:
                            unsigned long failedReads) override;
     void publishFrequencyOffset(float offsetMHz) override;
     void publishTunedFrequency(float frequencyMHz) override;
+    void publishFrequencyEstimate(int8_t freqestValue) override;
     void publishUptime(unsigned long uptimeSeconds, const char *uptimeISO) override;
     void publishFirmwareVersion(const char *version) override;
     void publishDiscovery() override;

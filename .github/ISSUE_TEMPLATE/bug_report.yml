@@ -40,8 +40,18 @@ body:
       options:
         - ESP8266
         - ESP32
+        - Other
     validations:
       required: true
+
+  - type: input
+    id: chip_family_other
+    attributes:
+      label: If "Other", enter chip family
+      placeholder: e.g. RP2040
+      description: Only fill this if you selected "Other" above.
+    validations:
+      required: false
 
   - type: dropdown
     id: board_model
@@ -78,28 +88,6 @@ body:
           required: true
 
   - type: textarea
-    id: description
-    attributes:
-      label: Description
-      description: What happened, and what did you expect to happen?
-      placeholder: Clear and concise description of the issue.
-    validations:
-      required: true
-
-  - type: textarea
-    id: reproduce
-    attributes:
-      label: Steps to reproduce
-      description: Steps and any minimal configuration to reproduce the issue.
-      placeholder: |
-        1. ...
-        2. ...
-        3. ...
-      render: text
-    validations:
-      required: false
-
-  - type: textarea
     id: versions
     attributes:
       label: Versions / environment
@@ -112,7 +100,22 @@ body:
     id: hardware
     attributes:
       label: Hardware details
-      description: Board model (ESP8266 variant), CC1101 module details, wiring, power, antenna, etc.
+      description: Board model (ESP8266 variant), CC1101 module details, wiring, power, antenna, distance from meter, etc.
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: diagnostic_questions
+    attributes:
+      label: Diagnostic questions (helps us narrow down the issue)
+      description: Please answer these questions to help diagnose the problem.
+      value: |-
+        - How far is the CC1101 radio from the water/gas meter? (distance in meters)
+        - Have you tried moving the radio closer to the meter (e.g., within 2-3 meters) to test if distance/signal is the issue?
+        - Are there any walls, metal obstacles, or other RF sources between the radio and meter?
+        - What type of antenna does your CC1101 module have (wire, PCB trace, external)?
+        - Have you tried running a frequency scan to find a better frequency? (See QUICK_REFERENCE.md or ESPHOME_INTEGRATION_GUIDE.md for how to trigger the scan button)
       render: text
     validations:
       required: false
@@ -122,9 +125,23 @@ body:
     attributes:
       label: Minimal configuration
       description: Provide a minimal YAML/CPP config that reproduces the problem (redact secrets).
+      placeholder: |
+        ```yaml
+        # Your ESPHome/config YAML here
+        ```
       render: yaml
     validations:
       required: false
+
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened, and what did you expect to happen?
+      placeholder: Clear and concise description of the issue.
+    validations:
+      required: true
 
   - type: textarea
     id: logs
@@ -134,7 +151,9 @@ body:
         Please paste DEBUG-level logs that capture the issue. Redact any sensitive information.
         See docs/LOGGING_SYSTEM.md for how to enable and collect detailed logs.
       placeholder: |
+        ```
         <paste logs here>
-      render: text
+        ```
+      render: shell
     validations:
       required: false

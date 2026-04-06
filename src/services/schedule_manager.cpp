@@ -68,7 +68,7 @@ bool ScheduleManager::isReadingDay(struct tm *ptm)
     }
     else if (strcmp(s_schedule, "Monday-Sunday") == 0)
     {
-        return dayOfWeek != 0; // All days except Sunday
+        return true; // All days including Sunday (dayOfWeek 0-6)
     }
 
     return false;

@@ -9,15 +9,21 @@
 #include "wifi_serial.h"
 #include "version.h"
 
-#if defined(ESP8266)
+#if __has_include(<ESP8266WiFi.h>)
 #include <ESP8266WiFi.h>
-#elif defined(ESP32)
+#define WIFI_SERIAL_HAS_WIFI 1
+#elif __has_include(<WiFi.h>)
 #include <WiFi.h>
+#define WIFI_SERIAL_HAS_WIFI 1
+#else
+#define WIFI_SERIAL_HAS_WIFI 0
 #endif
 
 // TCP server on configured port
+#if WIFI_SERIAL_HAS_WIFI
 static WiFiServer wifiSerialServer(WIFI_SERIAL_PORT);
 static WiFiClient wifiSerialClient;
+#endif
 static bool serverStarted = false;
 
 // Global combined stream instance
@@ -29,6 +35,7 @@ WifiSerialStream WiFiSerial(::Serial);
 
 void WifiSerialStream::beginServer()
 {
+#if WIFI_SERIAL_HAS_WIFI
     if (WiFi.status() != WL_CONNECTED || serverStarted)
     {
         return;
@@ -44,10 +51,18 @@ void WifiSerialStream::beginServer()
                 WiFi.localIP().toString().c_str(), WIFI_SERIAL_PORT);
     // NOTE: This server is unauthenticated and unencrypted. Any device on your local network
     // can connect and view serial output, which may include WiFi/MQTT credentials and internal state.
+#else
+    if (!serverStarted)
+    {
+        _usb.println("[WiFi Serial] WiFi headers unavailable in this build; TCP serial disabled");
+        serverStarted = true;
+    }
+#endif
 }
 
 void WifiSerialStream::loop()
 {
+#if WIFI_SERIAL_HAS_WIFI
     if (!serverStarted || WiFi.status() != WL_CONNECTED)
     {
         return;
@@ -91,6 +106,7 @@ void WifiSerialStream::loop()
         _usb.println("[WiFi Serial] Client disconnected");
         wifiSerialClient.stop();
     }
+#endif
 }
 
 size_t WifiSerialStream::write(uint8_t c)
@@ -98,10 +114,12 @@ size_t WifiSerialStream::write(uint8_t c)
     _usb.write(c);
     // NOTE: WiFi client write calls may block if the TCP buffer is full or connection is slow.
     // This could briefly block the main application loop.
+#if WIFI_SERIAL_HAS_WIFI
     if (wifiSerialClient && wifiSerialClient.connected())
     {
         wifiSerialClient.write(c);
     }
+#endif
     return 1;
 }
 
@@ -110,10 +128,12 @@ size_t WifiSerialStream::write(const uint8_t *buffer, size_t size)
     _usb.write(buffer, size);
     // NOTE: WiFi client write calls may block if the TCP buffer is full or connection is slow.
     // This could briefly block the main application loop.
+#if WIFI_SERIAL_HAS_WIFI
     if (wifiSerialClient && wifiSerialClient.connected())
     {
         wifiSerialClient.write(buffer, size);
     }
+#endif
     return size;
 }
 
@@ -141,10 +161,12 @@ size_t WifiSerialStream::printf(const char *format, ...)
 void WifiSerialStream::flush()
 {
     _usb.flush();
+#if WIFI_SERIAL_HAS_WIFI
     if (wifiSerialClient && wifiSerialClient.connected())
     {
         wifiSerialClient.flush();
     }
+#endif
 }
 
 int WifiSerialStream::available()

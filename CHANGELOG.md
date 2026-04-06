@@ -4,6 +4,63 @@ All notable changes to this project will be documented in this file.
 
 Releases are created manually by tagging commits with version tags matching `v*.*.*` (e.g., `v2.1.0`). Users should build from source and configure `private.h` with their own meter settings.
 
+## [v2.1.4] - 2026-03-29
+
+### Changed
+
+- Applied build updates and ESPHome `2026.3` compatibility updates (PR #68 by @davidc).
+
+### Fixed
+
+- Updated ESPHome API usage from `is_connected(true)` to `is_connected_with_state_subscription()` per ESPHome `2026.3.0` API changes.
+- Resolved ESPHome compatibility issue tracked in #65.
+
+## [v2.1.3] - 2026-03-12
+
+### Changed
+
+- Bumped firmware version to `2.1.3` for both standalone MQTT firmware and ESPHome release component.
+- Updated README release callout to reflect current `V2.1.3` release.
+
+### Fixed
+
+- Documented a reproducible recovery path for ESP32 PlatformIO builds failing with `ModuleNotFoundError: No module named 'intelhex'`.
+
+## [v2.1.2] - 2026-02-13
+
+### Fixed
+
+- CC1101 LQI/FREQEST register reads on buffer overflow (only read when packet completes normally)
+- TX underflow error logging (distinct message vs successful completion)
+- Comment typo in SFTX flush operation
+
+
+## [v2.1.1] - 2026-02-13
+
+### Fixed
+
+- Schedule logic bug where "Monday-Sunday" schedule excluded Sunday
+- ESPHome component memory leak from raw `new` allocations without destructor
+- Schedule constant mismatch in ESPHome Python code (removed "Everyday", "Saturday", "Sunday")
+- Duplicate STRINGIFY macro definition with include guards
+- ESPHome namespace compliance for `setup_priority` constant
+
+### Added
+
+- Comprehensive unit tests for schedule manager covering all day combinations
+- Cross-platform Git hook installation with automatic executable bit setting
+- PowerShell executable detection in pre-commit hook with graceful fallback
+
+### Changed
+
+- Updated schedule documentation to use standardized names
+- Updated ESPHome testing checklist to reflect current schedule options
+
+### Removed
+
+- `SCHEDULE_EVERYDAY` constant - use `SCHEDULE_MONDAY_SUNDAY` instead
+- References to legacy "Everyday", "Saturday", "Sunday" schedule options
+
 ## [v2.1.0] - 2026-01-19
 
 **🎉 ESPHome Integration is NOW FULLY WORKING! 🎉**

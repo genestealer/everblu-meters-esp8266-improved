@@ -29,7 +29,7 @@ This release adds complete ESPHome integration as an alternative to the standalo
 - `auto_scan` - Automatic frequency scanning
 
 **Scheduling**:
-- `schedule` - Reading schedule (Monday-Friday, Saturday, Sunday, Everyday)
+- `schedule` - Reading schedule (Monday-Friday, Monday-Saturday, Monday-Sunday)
 - `read_hour` / `read_minute` - Scheduled reading time
 - `timezone_offset` - Timezone configuration
 - `auto_align_time` / `auto_align_midpoint` - Time alignment features

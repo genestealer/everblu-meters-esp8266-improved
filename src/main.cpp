@@ -257,8 +257,11 @@ void adaptiveFrequencyTracking(int8_t freqest);
 // Secrets pulled from private.h file
 // Note: MQTT Client ID is made unique per device by appending the meter serial number
 // This prevents multiple devices from having the same client ID and causing MQTT connection conflicts
+// STRINGIFY/TOSTRING macros for compile-time string conversion
+#ifndef STRINGIFY
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
+#endif
 #define MQTT_CLIENT_ID_WITH_SERIAL SECRET_MQTT_CLIENT_ID "-" TOSTRING(METER_SERIAL)
 
 EspMQTTClient mqtt(
@@ -301,8 +304,7 @@ const char *readingSchedule = DEFAULT_READING_SCHEDULE;
 // Format: everblu/cyble/{METER_SERIAL} (or everblu/cyble if meter prefix is disabled)
 // NOTE: METER_SERIAL must be defined as a numeric value in private.h
 // Compile-time validation ensures METER_SERIAL is non-zero
-#define STRINGIFY(x) #x
-#define TOSTRING(x) STRINGIFY(x)
+// (STRINGIFY/TOSTRING macros already defined above)
 
 // Compile-time validation: Ensure METER_SERIAL is defined and non-zero
 // This static_assert will fail at compile time if METER_SERIAL is 0 or undefined

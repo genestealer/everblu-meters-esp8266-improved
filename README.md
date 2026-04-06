@@ -28,9 +28,9 @@ Integrated with Home Assistant via MQTT AutoDiscovery and ESPHome external compo
 
 ---
 
-### **ESPHome** - Release V2.1.0
+### **ESPHome** - Release V2.1.3
 ESPHome integration is now production-ready. For setup and usage, see the ESPHome docs at [ESPHOME/README.md](ESPHOME/README.md)
- - Versioned external component in `ESPHOME-release` with the same 2.1.0 code as the main firmware
+ - Versioned external component in `ESPHOME-release` with the same 2.1.3 code as the main firmware
  - Tested on ESP8266 and ESP32 with water and gas meters; supports the same sensors and calibration logic
  - YAML stays simple: drop in the component, set `meter_year`, `meter_serial`, `meter_type`, and go
  - Build with the Arduino framework (set `esp32.framework.type: arduino`; ESP-IDF is not supported for this component)
@@ -299,6 +299,7 @@ Below are the wiring diagrams for common ESP8266 boards and ESP32 DevKit.
 - **Voltage:** The CC1101 operates at **3.3V only**. Do not connect to 5V or you will damage the module.
 - **Hardware SPI:** This project uses the ESP8266/ESP32's hardware SPI interface for reliable, high-speed communication.
 - **GDO0 Pin:** Default is GPIO 5 for ESP8266, GPIO 4 for ESP32. You can change this in your `private.h` file if needed.
+- **Distance & Signal Quality:** The RADIAN protocol implementation does not have publicly available CRC checksums for the manufacturer's proprietary encoding, making readings somewhat vulnerable to RF interference. Weak signal (distance > 10+ meters) or electrical interference can cause read failures. **Keep the CC1101 radio within a few meters (~2-5m ideally) of your meter for reliable communication.** If you experience frequent "No ACK frame received" or "No data frame received" failures, try moving the radio closer to the meter to rule out signal strength issues before investigating hardware wiring.
 
 #### Wiring Table
 
@@ -756,6 +757,29 @@ See `ADAPTIVE_FREQUENCY_FEATURES.md` for deeper technical notes.
 
 ## Troubleshooting
 
+### 🔴 Corrupted or Invalid Volume Readings
+
+**Symptoms:**
+- Volume reads as 0, very small values, or negative numbers
+- Historical data shows impossible decreases
+- Battery showing as 0 months
+- CRC passes but data is clearly wrong
+
+**Solution:**
+Enable hex dump debugging to see the raw 200-byte decoded frame:
+
+**ESPHome:** Add `debug_cc1101: true` to your YAML config  
+**MQTT:** Set `#define DEBUG_CC1101 1` in `include/private.h`
+
+This outputs detailed byte-by-byte data to help identify:
+- Wrong byte offsets for your specific meter variant
+- Regional/manufacturing date differences in data layout
+- Corrupted fields causing parsing errors
+
+**📖 Complete guide:** [docs/TROUBLESHOOTING_CORRUPTED_READINGS.md](docs/TROUBLESHOOTING_CORRUPTED_READINGS.md)
+
+---
+
 ### ESP32 build: ModuleNotFoundError: No module named 'intelhex'
 
 This is a PlatformIO tooling dependency used by `esptool.py` to build ESP32 bootloader/partition images.
@@ -777,10 +801,17 @@ Try the following in order:
 & "$env:USERPROFILE\.platformio\penv\Scripts\python.exe" -m pip install --disable-pip-version-check --no-warn-script-location intelhex
 ```
 
+- Re-run the ESP32 build explicitly through PlatformIO’s bundled executable:
+
+  ```powershell
+& "$env:USERPROFILE\.platformio\penv\Scripts\platformio.exe" run --environment esp32dev
+```
+
 Notes
 
 - Only ESP32 builds use this dependency; ESP8266 builds do not require `intelhex`.
 - Prefer the PlatformIO terminal over a global Python to avoid installing into the wrong environment.
+- If `pio` is not recognized in PowerShell, use the full executable path above instead of `pio run ...`.
 
 ### ESP32 compile errors about ESP8266 headers
 

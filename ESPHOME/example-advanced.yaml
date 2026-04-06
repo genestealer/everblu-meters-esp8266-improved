@@ -70,15 +70,16 @@ everblu_meter:
   meter_type: water
   
   # Radio configuration - custom frequency
-  frequency: 433.85       # Fine-tuned frequency
+  frequency: 433.82       # Fine-tuned frequency
   auto_scan: false        # Disable auto-scan for faster readings
   debug_cc1101: true      # Enable detailed CC1101 radio debug logs
   
   # Advanced scheduling - weekend only
   reading_schedule: Saturday      # Read only on Saturdays
-  read_hour: 6           # Early morning reading
+  read_hour: 6           # Early morning reading (in UTC)
   read_minute: 30
-  timezone_offset: 1     # CET/CEST
+  timezone_offset: 60    # CET (UTC+1) - offset in MINUTES
+                         # NOTE: Static offset, update when DST changes (CEST = 120)
   
   # Timing features
   auto_align_time: true
@@ -155,6 +156,9 @@ everblu_meter:
 
   tuned_frequency:
     name: "Tuned Frequency (MHz)"
+  
+  frequency_estimate:
+    name: "Frequency Estimate"
 
   meter_serial_sensor:
     name: "Meter Serial"

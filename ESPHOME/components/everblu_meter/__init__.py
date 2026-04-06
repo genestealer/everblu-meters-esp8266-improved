@@ -7,10 +7,12 @@ using the RADIAN protocol over 433 MHz with a CC1101 transceiver.
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
+from esphome import pins
 from esphome.components import sensor, text_sensor, binary_sensor, button, time as time_, spi
 from esphome.const import (
     CONF_ID,
     CONF_FREQUENCY,
+    CONF_NUMBER,
     CONF_TIME_ID,
     CONF_CS_PIN,
     DEVICE_CLASS_ENERGY,
@@ -80,6 +82,7 @@ CONF_SUCCESSFUL_READS = "successful_reads"
 CONF_FAILED_READS = "failed_reads"
 CONF_FREQUENCY_OFFSET = "frequency_offset"
 CONF_TUNED_FREQUENCY = "tuned_frequency"
+CONF_FREQUENCY_ESTIMATE = "frequency_estimate"
 CONF_REQUEST_READING_BUTTON = "request_reading_button"
 CONF_FREQUENCY_SCAN_BUTTON = "frequency_scan_button"
 CONF_RESET_FREQUENCY_BUTTON = "reset_frequency_button"
@@ -88,13 +91,16 @@ CONF_RESET_FREQUENCY_BUTTON = "reset_frequency_button"
 METER_TYPE_WATER = "water"
 METER_TYPE_GAS = "gas"
 
-# Reading schedules
+# Reading schedules - must match C++ ScheduleManager::isReadingDay(...) string comparisons
 SCHEDULE_MONDAY_FRIDAY = "Monday-Friday"
-SCHEDULE_MONDAY_SATURDAY = "Saturday"
-SCHEDULE_MONDAY_SUNDAY = "Sunday"
-SCHEDULE_EVERYDAY = "Everyday"
+SCHEDULE_MONDAY_SATURDAY = "Monday-Saturday"
+SCHEDULE_MONDAY_SUNDAY = "Monday-Sunday"
 
 CONF_GDO0_PIN = "gdo0_pin"
+
+def validate_gdo0_pin(value):
+    return pins.internal_gpio_input_pin_schema(value)
+
 
 CONFIG_SCHEMA = (
     cv.Schema(
@@ -103,7 +109,7 @@ CONFIG_SCHEMA = (
             cv.GenerateID(spi.CONF_SPI_ID): cv.use_id(spi.SPIComponent),
             cv.Required(CONF_METER_YEAR): cv.int_range(min=0, max=99),
             cv.Required(CONF_METER_SERIAL): cv.uint32_t,
-            cv.Required(CONF_GDO0_PIN): cv.int_range(min=0, max=50),
+            cv.Required(CONF_GDO0_PIN): validate_gdo0_pin,
             cv.Required(CONF_TIME_ID): cv.use_id(time_.RealTimeClock),
             cv.Optional(CONF_METER_TYPE, default=METER_TYPE_WATER): cv.enum(
                 {METER_TYPE_WATER: False, METER_TYPE_GAS: True}
@@ -198,6 +204,13 @@ CONFIG_SCHEMA = (
                 icon="mdi:radio-tower",
                 entity_category="diagnostic",
             ),
+            cv.Optional(CONF_FREQUENCY_ESTIMATE): sensor.sensor_schema(
+                unit_of_measurement="kHz",
+                accuracy_decimals=3,
+                state_class=STATE_CLASS_MEASUREMENT,
+                icon="mdi:sine-wave",
+                entity_category="diagnostic",
+            ),
             # Text sensors
             cv.Optional(CONF_STATUS): text_sensor.text_sensor_schema(
                 icon="mdi:information",
@@ -273,7 +286,7 @@ async def to_code(config):
     await spi.register_spi_device(var, config)
 
     # CS pin is managed by SPIDevice; only pass GDO0 for CC1101 interrupts
-    cg.add(var.set_gdo0_pin(config[CONF_GDO0_PIN]))
+    cg.add(var.set_gdo0_pin(config[CONF_GDO0_PIN][CONF_NUMBER]))
 
     # No custom include paths needed when using flat release layout
 
@@ -389,6 +402,10 @@ async def to_code(config):
     if CONF_TUNED_FREQUENCY in config:
         sens = await sensor.new_sensor(config[CONF_TUNED_FREQUENCY])
         cg.add(var.set_tuned_frequency_sensor(sens))
+    
+    if CONF_FREQUENCY_ESTIMATE in config:
+        sens = await sensor.new_sensor(config[CONF_FREQUENCY_ESTIMATE])
+        cg.add(var.set_frequency_estimate_sensor(sens))
 
     # Register text sensors
     if CONF_STATUS in config:
