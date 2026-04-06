@@ -154,7 +154,7 @@ namespace esphome
                                                           spi::CLOCK_POLARITY_LOW,
                                                           spi::CLOCK_PHASE_LEADING,
                                                           spi::DATA_RATE_1MHZ> *>(this);
-            cc1101_set_spi_device(static_cast<void *>(spi_device), -1);
+            cc1101_set_spi_device(static_cast<void *>(spi_device));
             ESP_LOGD(TAG, "CC1101 SPI device configured");
 
             // Configure GDO0 pin for CC1101
@@ -210,11 +210,18 @@ namespace esphome
                     ESP_LOGD(TAG, "Skipping radio state publish - radio init failed, preserving 'unavailable' state");
                 }
 
-                ESP_LOGD(TAG, "Publishing: status=Ready");
-                data_publisher_->publishStatusMessage("Ready");
+                if (meter_reader_->isRadioConnected())
+                {
+                    ESP_LOGD(TAG, "Publishing: status=Ready");
+                    data_publisher_->publishStatusMessage("Ready");
 
-                ESP_LOGD(TAG, "Publishing: error=None");
-                data_publisher_->publishError("None");
+                    ESP_LOGD(TAG, "Publishing: error=None");
+                    data_publisher_->publishError("None");
+                }
+                else
+                {
+                    ESP_LOGD(TAG, "Skipping Ready/None publish - preserving radio init error state");
+                }
 
                 ESP_LOGD(TAG, "Publishing: firmware version=%s", EVERBLU_FW_VERSION);
                 data_publisher_->publishFirmwareVersion(EVERBLU_FW_VERSION);

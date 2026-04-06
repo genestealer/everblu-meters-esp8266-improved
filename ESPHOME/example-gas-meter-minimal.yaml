@@ -29,6 +29,13 @@ time:
   - platform: homeassistant
     id: ha_time
 
+# SPI bus shared with the CC1101 radio
+spi:
+  id: main_bus
+  clk_pin: GPIO14
+  mosi_pin: GPIO13
+  miso_pin: GPIO12
+
 # EverBlu Meter Component
 external_components:
   - source:
@@ -40,10 +47,12 @@ external_components:
     refresh: 1d
 everblu_meter:
   id: my_gas_meter
+  spi_id: main_bus
   
   # REQUIRED: Meter identification
   meter_year: 22
   meter_serial: 87654321
+  cs_pin: GPIO15
   gdo0_pin: 4
   
   # REQUIRED: Meter type

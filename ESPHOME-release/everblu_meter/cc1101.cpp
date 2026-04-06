@@ -207,21 +207,19 @@ static const uint8_t debug_out = (uint8_t)(DEBUG_CC1101);
 #define TEST1 0x2D   // Various test settings
 #define TEST0 0x2E   // Various test settings
 #ifdef USE_ESPHOME
-// ESPHome SPI integration - store SPIDevice instance and CS pin
+// ESPHome SPI integration - store the SPIDevice instance used for transactions.
 // The EverbluMeterComponent inherits from this SPIDevice specialization.
 using CC1101SpiDevice = esphome::spi::SPIDevice<esphome::spi::BIT_ORDER_MSB_FIRST,
                                                 esphome::spi::CLOCK_POLARITY_LOW,
                                                 esphome::spi::CLOCK_PHASE_LEADING,
                                                 esphome::spi::DATA_RATE_1MHZ>;
 static CC1101SpiDevice *_spi_device = nullptr;
-static int _spi_cs_pin = -1;
 static int _gdo0_pin = -1;
 
-void cc1101_set_spi_device(void *device, int cs_pin)
+void cc1101_set_spi_device(void *device)
 {
-  // Store the SPIDevice pointer for ESPHome SPI transactions
+  // CS is managed by ESPHome SPIDevice enable()/disable().
   _spi_device = static_cast<CC1101SpiDevice *>(device);
-  _spi_cs_pin = cs_pin;
 }
 
 void cc1101_set_gdo0_pin(int gdo0_pin)
@@ -282,8 +280,10 @@ int wiringPiSPIDataRW(int channel, unsigned char *data, int len)
 int wiringPiSPISetup(int channel, int speed)
 {
 #ifdef USE_ESPHOME
-  // ESPHome mode: SPI is already configured by SPIDevice
-  _spi_speed = speed; // Store for potential future use
+  // ESPHome mode: SPI is already configured by SPIDevice.
+  // The requested speed is retained only for diagnostics; transfers use the
+  // rate defined by the SPIDevice template in the ESPHome component.
+  _spi_speed = speed;
 #else
   // Arduino mode: Set up SPI manually
   _spi_speed = speed;
@@ -560,7 +560,9 @@ bool cc1101_init(float freq)
 {
   pinMode(GET_GDO0_PIN(), INPUT_PULLUP);
 
-  // Initialize SPI bus for CC1101 communication (500 kHz)
+  // Initialize SPI transport for CC1101 communication.
+  // Standalone builds configure Arduino SPI here at 500 kHz.
+  // ESPHome builds ignore the requested speed and use the SPIDevice rate.
   if ((wiringPiSPISetup(0, 500000)) < 0)
   {
     LOG_E("everblu_meter", "Failed to initialize SPI bus - check CC1101 wiring and connections");

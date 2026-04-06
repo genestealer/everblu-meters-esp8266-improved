@@ -88,6 +88,38 @@ This will output detailed hex dumps of the decoded frame, helping identify:
 
 ## Quick Start
 
+## Breaking Change: SPI Configuration Required
+
+This component now uses ESPHome's native `spi:` bus integration. Existing YAML that relied on implicit CC1101 SPI pins must be updated.
+
+Previous configuration:
+
+```yaml
+everblu_meter:
+  meter_year: 21
+  meter_serial: 12345678
+  gdo0_pin: 4
+  time_id: ha_time
+```
+
+Current configuration:
+
+```yaml
+spi:
+  id: main_bus
+  clk_pin: GPIO14
+  mosi_pin: GPIO13
+  miso_pin: GPIO12
+
+everblu_meter:
+  spi_id: main_bus
+  cs_pin: GPIO15
+  meter_year: 21
+  meter_serial: 12345678
+  gdo0_pin: 4
+  time_id: ha_time
+```
+
 ### 1. Use as External Component
 
 The component is ready to use directly from the `ESPHOME-release` folder. Add to your ESPHome YAML configuration:
@@ -124,7 +156,15 @@ time:
   - platform: homeassistant
     id: ha_time
 
+spi:
+  id: main_bus
+  clk_pin: GPIO14
+  mosi_pin: GPIO13
+  miso_pin: GPIO12
+
 everblu_meter:
+  spi_id: main_bus
+  cs_pin: GPIO15
   meter_year: 21
   meter_serial: 12345678
   meter_type: water
@@ -204,8 +244,10 @@ esp32:
 |-----------|------|---------|----------|-------------|
 | `meter_year` | int | - | Yes | Meter year (0-99) |
 | `meter_serial` | int | - | Yes | Serial number |
-| `meter_type` | enum | - | Yes | `water` or `gas` |
-| `gdo0_pin` | int | - | Yes | CC1101 GDO0 GPIO |
+| `spi_id` | id | - | Yes | SPI bus ID from the top-level `spi:` block |
+| `cs_pin` | pin | - | Yes | CC1101 chip select pin |
+| `meter_type` | enum | water | No | `water` or `gas` |
+| `gdo0_pin` | pin | - | Yes | CC1101 GDO0 GPIO |
 | `time_id` | id | - | Yes | Time component ID |
 | `frequency` | float | 433.82 | No | RF frequency (MHz) |
 | `auto_scan` | bool | true | No | Auto frequency scan |
@@ -227,6 +269,8 @@ esp32:
 
 ```yaml
 everblu_meter:
+  spi_id: main_bus
+  cs_pin: GPIO15
   meter_year: 21
   meter_serial: 12345678
   gdo0_pin: 4

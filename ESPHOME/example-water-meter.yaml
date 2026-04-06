@@ -39,6 +39,13 @@ time:
     id: homeassistant_time
     timezone: Europe/London
 
+# SPI bus shared with the CC1101 radio
+spi:
+  id: main_bus
+  clk_pin: GPIO14
+  mosi_pin: GPIO13
+  miso_pin: GPIO12
+
 # EverBlu Meter Component
 external_components:
   - source:
@@ -51,10 +58,12 @@ external_components:
 
 everblu_meter:
   id: my_water_meter
+  spi_id: main_bus
   
   # Meter identification (REQUIRED)
   meter_year: 21          # Last 2 digits of year (e.g., 21 for 2021)
   meter_serial: 12345678  # Your meter's serial number
+  cs_pin: GPIO15          # CC1101 CS / NSS (D8 on D1 mini)
   gdo0_pin: 4             # GPIO connected to CC1101 GDO0 (D2 on D1 mini)
   
   # Optional: set meter_type to 'gas' for gas meters (defaults to water)

@@ -52,23 +52,32 @@ time:
     id: homeassistant_time
     timezone: Europe/London
 
+# SPI bus for the CC1101 radio on Arduino Nano ESP32
+spi:
+  id: main_bus
+  clk_pin: GPIO48
+  mosi_pin: GPIO38
+  miso_pin: GPIO47
+
 # EverBlu Meter Component
 external_components:
   - source:
       type: git
-      url: https://github.com/psykokwak-com/everblu-meters-esp8266-improved
-      ref: feature/esphome-spi-integration
+      url: https://github.com/genestealer/everblu-meters-esp8266-improved
+      ref: main
       path: ESPHOME-release
     components: [ everblu_meter ]
     refresh: 1d
 
 everblu_meter:
   id: my_water_meter
+  spi_id: main_bus
   
   # Meter identification (REQUIRED)
   meter_year: 21          # Last 2 digits of year (e.g., 21 for 2021)
   meter_serial: 12345678  # Your meter's serial number
-  gdo0_pin: 4             # GPIO connected to CC1101 GDO0
+  cs_pin: GPIO21          # Nano ESP32 D10 -> CC1101 CS / NSS
+  gdo0_pin: GPIO5         # Nano ESP32 D2 -> CC1101 GDO0
   
   # Optional: set meter_type to 'gas' for gas meters (defaults to water)
   
@@ -119,9 +128,6 @@ everblu_meter:
   
   failed_reads:
     name: "Failed Reads"
-  
-  consecutive_failures:
-    name: "Consecutive Failures"
   
   # Last frequency offset used
   frequency_offset:

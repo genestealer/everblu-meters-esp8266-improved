@@ -50,6 +50,13 @@ time:
       then:
         - logger.log: "Time synchronized with Home Assistant"
 
+# SPI bus shared with the CC1101 radio
+spi:
+  id: main_bus
+  clk_pin: GPIO18
+  mosi_pin: GPIO23
+  miso_pin: GPIO19
+
 # EverBlu Meter Component
 external_components:
   - source:
@@ -62,10 +69,12 @@ external_components:
 
 everblu_meter:
   id: my_meter
+  spi_id: main_bus
   
   # Meter configuration
   meter_year: 23
   meter_serial: 12345678
+  cs_pin: GPIO5
   gdo0_pin: 4
   meter_type: water
   
