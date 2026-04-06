@@ -284,6 +284,8 @@ int wiringPiSPISetup(int channel, int speed)
   // The requested speed is retained only for diagnostics; transfers use the
   // rate defined by the SPIDevice template in the ESPHome component.
   _spi_speed = speed;
+  if (!_spi_device)
+    return -1;
 #else
   // Arduino mode: Set up SPI manually
   _spi_speed = speed;

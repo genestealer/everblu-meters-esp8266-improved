@@ -110,7 +110,7 @@ void MeterReader::begin()
         {
             m_publisher->publishRadioState("unavailable");
             m_publisher->publishStatusMessage("Error");
-            m_publisher->publishError("CC1101 radio not responding (PARTNUM: 0x00, VERSION: 0x00) - check SPI wiring");
+            m_publisher->publishError("CC1101 radio not responding - check SPI wiring");
         }
     }
 #else

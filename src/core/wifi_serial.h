@@ -28,10 +28,10 @@ public:
     explicit WifiSerialStream(Stream &usb) : _usb(usb) {}
 
     // Basic Serial-compatible API
-    // Note: Stream base class doesn't have begin() or setDebugOutput()
-    // These are provided as no-ops for compatibility
-    void begin(unsigned long baud) { /* Stream doesn't have begin, ignored */ }
-    void setDebugOutput(bool enable) { /* Stream doesn't have setDebugOutput, ignored */ }
+    // Forward to the real global Serial so remapped Serial.begin() still
+    // initializes the underlying USB/UART serial device.
+    void begin(unsigned long baud) { ::Serial.begin(baud); }
+    void setDebugOutput(bool enable) { ::Serial.setDebugOutput(enable); }
     void flush();
     int available();
     int read();
