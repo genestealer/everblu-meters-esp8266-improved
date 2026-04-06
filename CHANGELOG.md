@@ -11,9 +11,9 @@ Releases are created manually by tagging commits with version tags matching `v*.
 - ESPHome component configuration schema changed.
 - Existing ESPHome YAML that relied on implicit CC1101 SPI wiring will no longer validate.
 - `everblu_meter` now requires explicit SPI integration fields:
-	- top-level `spi:` bus definition
-	- `spi_id` under `everblu_meter`
-	- `cs_pin` under `everblu_meter`
+  - top-level `spi:` bus definition
+  - `spi_id` under `everblu_meter`
+  - `cs_pin` under `everblu_meter`
 
 ### Migration Required
 

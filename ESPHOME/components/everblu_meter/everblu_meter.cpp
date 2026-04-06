@@ -12,11 +12,6 @@
 
 // Include CC1101 header for SPI device setup
 #include "cc1101.h"
-#ifdef USE_ESP8266
-#include <ESP8266WiFi.h>
-#elif defined(USE_ESP32)
-#include <WiFi.h>
-#endif
 namespace esphome
 {
     namespace everblu_meter

@@ -203,7 +203,7 @@ esphome run your-config.yaml
 
 ### Arduino Nano ESP32 (ESP32S3)
 
-If using an **Arduino Nano ESP32** board, you must add the following `platformio_options` to your ESPHome configuration to avoid USB CDC compilation errors:
+If using an **Arduino Nano ESP32** board, you may still need the following `platformio_options` depending on your ESPHome/PlatformIO toolchain configuration. These flags address board USB mode selection at build time; they are separate from the `Stream&` compatibility fix in `WifiSerialStream`.
 
 ```yaml
 esp32:
@@ -211,7 +211,7 @@ esp32:
   framework:
     type: arduino
   
-  # REQUIRED for Arduino Nano ESP32 to compile successfully
+  # May be required on some Arduino Nano ESP32 toolchain setups
   platformio_options:
     build_unflags:
       - -DARDUINO_USB_CDC_ON_BOOT=0

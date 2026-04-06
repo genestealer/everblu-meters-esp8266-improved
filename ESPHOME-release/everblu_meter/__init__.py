@@ -105,7 +105,6 @@ CONFIG_SCHEMA = (
     cv.Schema(
         {
             cv.GenerateID(): cv.declare_id(EverbluMeterComponent),
-            cv.GenerateID(spi.CONF_SPI_ID): cv.use_id(spi.SPIComponent),
             cv.Required(CONF_METER_YEAR): cv.int_range(min=0, max=99),
             cv.Required(CONF_METER_SERIAL): cv.uint32_t,
             cv.Required(CONF_GDO0_PIN): validate_gdo0_pin,
