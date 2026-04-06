@@ -25,11 +25,6 @@ Releases are created manually by tagging commits with version tags matching `v*.
 
 - Bumped firmware/component version to `2.2.0` to reflect the large ESPHome SPI integration and migration impact.
 - Consolidated release notes for SPI schema migration, example updates, and ESPHome CC1101 integration hardening.
-
-## [v2.1.5] - 2026-04-06
-
-### Changed
-
 - Updated ESPHome example configurations to the new SPI schema (`spi:` bus + `spi_id` + `cs_pin`) across water, gas, advanced, and Nano ESP32 examples.
 - Added SPI migration guidance in ESPHome README with explicit before/after configuration snippets.
 - Clarified ESPHome CC1101 SPI transport behavior and comments to avoid implying the `500kHz` setup call controls ESPHome transfer speed.

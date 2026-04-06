@@ -424,9 +424,17 @@ void MeterReader::resetFrequencyOffset()
 
     // Reinitialize radio with base frequency
     float baseFrequency = FrequencyManager::getBaseFrequency();
-    cc1101_init(baseFrequency);
+    bool radio_ok = cc1101_init(baseFrequency);
+    m_radioConnected = radio_ok;
 
-    LOG_I("everblu_meter", "Radio reinitialized with base frequency: %.6f MHz", baseFrequency);
+    if (radio_ok)
+    {
+        LOG_I("everblu_meter", "Radio reinitialized with base frequency: %.6f MHz", baseFrequency);
+    }
+    else
+    {
+        LOG_E("everblu_meter", "Radio reinit failed at base frequency: %.6f MHz", baseFrequency);
+    }
 
     // Publish the reset values
     if (m_publisher)
