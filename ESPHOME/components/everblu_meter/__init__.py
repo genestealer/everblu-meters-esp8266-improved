@@ -7,7 +7,8 @@ using the RADIAN protocol over 433 MHz with a CC1101 transceiver.
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import sensor, text_sensor, binary_sensor, button, time as time_
+from esphome import pins
+from esphome.components import sensor, text_sensor, binary_sensor, button, time as time_, spi
 from esphome.const import (
     CONF_ID,
     CONF_FREQUENCY,
@@ -23,8 +24,8 @@ from esphome.const import (
     UNIT_DECIBEL_MILLIWATT,
 )
 
-DEPENDENCIES = ["time"]
-CODEOWNERS = ["@your-github-username"]
+DEPENDENCIES = ["time", "spi"]
+CODEOWNERS = ["@genestealer"]
 AUTO_LOAD = ["sensor", "text_sensor", "binary_sensor", "button"]
 
 # Tell ESPHome to include all source files in src/ subdirectories
@@ -67,6 +68,7 @@ CONF_ERROR = "error"
 CONF_RADIO_STATE = "radio_state"
 CONF_TIMESTAMP = "timestamp"
 CONF_HISTORY_JSON = "history_json"
+CONF_FIRMWARE_VERSION = "firmware_version"
 CONF_METER_SERIAL_SENSOR = "meter_serial_sensor"
 CONF_METER_YEAR_SENSOR = "meter_year_sensor"
 CONF_READING_SCHEDULE_SENSOR = "reading_schedule_sensor"
@@ -94,13 +96,14 @@ SCHEDULE_MONDAY_SUNDAY = "Monday-Sunday"
 
 CONF_GDO0_PIN = "gdo0_pin"
 
+
 CONFIG_SCHEMA = (
     cv.Schema(
         {
             cv.GenerateID(): cv.declare_id(EverbluMeterComponent),
             cv.Required(CONF_METER_YEAR): cv.int_range(min=0, max=99),
             cv.Required(CONF_METER_SERIAL): cv.uint32_t,
-            cv.Required(CONF_GDO0_PIN): cv.int_range(min=0, max=39),
+            cv.Required(CONF_GDO0_PIN): pins.internal_gpio_input_pin_schema,
             cv.Required(CONF_TIME_ID): cv.use_id(time_.RealTimeClock),
             cv.Optional(CONF_METER_TYPE, default=METER_TYPE_WATER): cv.enum(
                 {METER_TYPE_WATER: False, METER_TYPE_GAS: True}
@@ -221,6 +224,10 @@ CONFIG_SCHEMA = (
             cv.Optional(CONF_HISTORY_JSON): text_sensor.text_sensor_schema(
                 icon="mdi:history",
             ),
+            cv.Optional(CONF_FIRMWARE_VERSION): text_sensor.text_sensor_schema(
+                icon="mdi:tag",
+                entity_category="diagnostic",
+            ),
             cv.Optional(CONF_METER_SERIAL_SENSOR): text_sensor.text_sensor_schema(
                 icon="mdi:barcode",
                 entity_category="diagnostic",
@@ -260,6 +267,7 @@ CONFIG_SCHEMA = (
         }
     )
     .extend(cv.polling_component_schema("24h"))
+    .extend(spi.spi_device_schema(cs_pin_required=True))
 )
 
 
@@ -267,8 +275,13 @@ async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
 
-    # Add SPI library for CC1101
-    cg.add_library("SPI", None)
+    # Register SPI device (replaces manual set_spi_parent setup)
+    # This properly integrates with ESPHome's SPI architecture and CS pin management
+    await spi.register_spi_device(var, config)
+
+    # CS pin is managed by SPIDevice; pass the InternalGPIOPin for CC1101 interrupts.
+    gdo0 = await cg.gpio_pin_expression(config[CONF_GDO0_PIN])
+    cg.add(var.set_gdo0_pin(gdo0))
 
     # No custom include paths needed when using flat release layout
 
@@ -280,7 +293,6 @@ async def to_code(config):
     # Use explicit -D flags to ensure visibility in all translation units
     cg.add_build_flag(f"-DMETER_YEAR={config[CONF_METER_YEAR]}")
     cg.add_build_flag(f"-DMETER_SERIAL={config[CONF_METER_SERIAL]}")
-    cg.add_build_flag(f"-DGDO0={config[CONF_GDO0_PIN]}")
     
     # Note: ESPHome automatically compiles all .cpp files in component directory
     # No need to explicitly list source files - just ensure main.cpp is excluded from release
@@ -410,6 +422,10 @@ async def to_code(config):
     if CONF_HISTORY_JSON in config:
         sens = await text_sensor.new_text_sensor(config[CONF_HISTORY_JSON])
         cg.add(var.set_history_sensor(sens))
+
+    if CONF_FIRMWARE_VERSION in config:
+        sens = await text_sensor.new_text_sensor(config[CONF_FIRMWARE_VERSION])
+        cg.add(var.set_version_sensor(sens))
 
     if CONF_METER_SERIAL_SENSOR in config:
         sens = await text_sensor.new_text_sensor(config[CONF_METER_SERIAL_SENSOR])

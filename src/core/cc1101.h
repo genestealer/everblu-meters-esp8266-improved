@@ -12,6 +12,26 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#ifdef USE_ESPHOME
+/**
+ * @brief Configure CC1101 to use ESPHome SPI device
+ *
+ * Must be called before cc1101_init() when compiling with ESPHome.
+ * Provides the SPI device used for CC1101 communication.
+ *
+ * @param device Pointer to ESPHome SPIDevice instance (as void* for generic handling)
+ */
+void cc1101_set_spi_device(void *device);
+
+/**
+ * @brief Set GDO0 pin for ESPHome mode
+ *
+ * Must be called before cc1101_init() when compiling with ESPHome.
+ *
+ * @param gdo0_pin GPIO pin number for GDO0 interrupt signal
+ */
+void cc1101_set_gdo0_pin(int gdo0_pin);
+#endif
 
 /**
  * @struct tmeter_data

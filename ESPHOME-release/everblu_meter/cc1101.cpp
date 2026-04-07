@@ -15,7 +15,12 @@
 #endif
 #endif
 #include "wifi_serial.h" // Optional WiFi serial mirroring
-#include <SPI.h>         // Include the SPI library for SPI communication
+#if !defined(USE_ESPHOME)
+#include <SPI.h> // Include the SPI library for SPI communication (not needed for ESPHome)
+#endif
+#ifdef USE_ESPHOME
+#include "esphome/components/spi/spi.h" // ESPHome SPI device interface
+#endif
 #if defined(ESP32)
 #include <esp_task_wdt.h>
 #endif
@@ -203,9 +208,36 @@ static const uint8_t debug_out = (uint8_t)(DEBUG_CC1101);
 #define TEST2 0x2C   // Various test settings
 #define TEST1 0x2D   // Various test settings
 #define TEST0 0x2E   // Various test settings
+#ifdef USE_ESPHOME
+// ESPHome SPI integration - store the SPIDevice instance used for transactions.
+// The EverbluMeterComponent inherits from this SPIDevice specialization.
+using CC1101SpiDevice = esphome::spi::SPIDevice<esphome::spi::BIT_ORDER_MSB_FIRST,
+                                                esphome::spi::CLOCK_POLARITY_LOW,
+                                                esphome::spi::CLOCK_PHASE_LEADING,
+                                                esphome::spi::DATA_RATE_1MHZ>;
+static CC1101SpiDevice *_spi_device = nullptr;
+static int _gdo0_pin = -1;
+
+void cc1101_set_spi_device(void *device)
+{
+  // CS is managed by ESPHome SPIDevice enable()/disable().
+  _spi_device = static_cast<CC1101SpiDevice *>(device);
+}
+
+void cc1101_set_gdo0_pin(int gdo0_pin)
+{
+  _gdo0_pin = gdo0_pin;
+}
+
+// Macro to get GDO0 pin - use variable in ESPHome mode, build flag otherwise
+#define GET_GDO0_PIN() (_gdo0_pin)
+#else
+// Non-ESPHome mode: GDO0 comes from build flag
+#define GET_GDO0_PIN() (GDO0)
+#endif
 
 // Change these define according to your ESP8266 board
-#ifdef ESP8266
+#if defined(ESP8266) && !defined(USE_ESPHOME)
 #define SPI_CSK PIN_SPI_SCK
 #define SPI_MISO PIN_SPI_MISO
 #define SPI_MOSI PIN_SPI_MOSI
@@ -213,7 +245,7 @@ static const uint8_t debug_out = (uint8_t)(DEBUG_CC1101);
 #endif
 
 // Change these define according to your ESP32 board
-#ifdef ESP32
+#if defined(ESP32) && !defined(USE_ESPHOME)
 #define SPI_CSK SCK
 #define SPI_MISO MISO
 #define SPI_MOSI MOSI
@@ -223,28 +255,45 @@ static const uint8_t debug_out = (uint8_t)(DEBUG_CC1101);
 int _spi_speed = 0;
 int wiringPiSPIDataRW(int channel, unsigned char *data, int len)
 {
+#ifdef USE_ESPHOME
+  // ESPHome mode: Use SPIDevice methods (enable/transfer_array/disable)
+  // The SPIDevice handles bus configuration, speed, and transaction management
+  if (!_spi_device)
+    return -1;
+
+  _spi_device->enable();
+  _spi_device->transfer_array(data, len);
+  _spi_device->disable();
+#else
+  // Arduino SPI
   if (!_spi_speed)
     return -1;
 
   SPI.beginTransaction(SPISettings(_spi_speed, MSBFIRST, SPI_MODE0));
-  digitalWrite(SPI_SS, 0);
-
-  // echo_debug(debug_out, "wiringPiSPIDataRW(0x%02X, %d)\n", (len > 0) ? data[0] : 'X' , len);
-
+  digitalWrite(SPI_SS, LOW);
   SPI.transfer(data, len);
-
-  digitalWrite(SPI_SS, 1);
+  digitalWrite(SPI_SS, HIGH);
   SPI.endTransaction();
+#endif
 
   return 0;
 }
 
 int wiringPiSPISetup(int channel, int speed)
 {
+#ifdef USE_ESPHOME
+  // ESPHome mode: SPI is already configured by SPIDevice.
+  // The requested speed is retained only for diagnostics; transfers use the
+  // rate defined by the SPIDevice template in the ESPHome component.
+  _spi_speed = speed;
+  if (!_spi_device)
+    return -1;
+#else
+  // Arduino mode: Set up SPI manually
   _spi_speed = speed;
 
   pinMode(SPI_SS, OUTPUT);
-  digitalWrite(SPI_SS, 1);
+  digitalWrite(SPI_SS, HIGH);
 
 #ifdef ESP8266
   SPI.pins(SPI_CSK, SPI_MISO, SPI_MOSI, SPI_SS);
@@ -253,6 +302,7 @@ int wiringPiSPISetup(int channel, int speed)
 
 #ifdef ESP32
   SPI.begin(SPI_CSK, SPI_MISO, SPI_MOSI, SPI_SS);
+#endif
 #endif
 
   return 0;
@@ -512,9 +562,19 @@ void cc1101_configureRF_0(float freq)
 
 bool cc1101_init(float freq)
 {
-  pinMode(GDO0, INPUT_PULLUP);
+#ifdef USE_ESPHOME
+  if (GET_GDO0_PIN() < 0)
+  {
+    LOG_E("everblu_meter", "GDO0 pin is not configured; call cc1101_set_gdo0_pin() before cc1101_init()");
+    return false;
+  }
+#endif
 
-  // Initialize SPI bus for CC1101 communication (500 kHz)
+  pinMode(GET_GDO0_PIN(), INPUT_PULLUP);
+
+  // Initialize SPI transport for CC1101 communication.
+  // Standalone builds configure Arduino SPI here at 500 kHz.
+  // ESPHome builds ignore the requested speed and use the SPIDevice rate.
   if ((wiringPiSPISetup(0, 500000)) < 0)
   {
     LOG_E("everblu_meter", "Failed to initialize SPI bus - check CC1101 wiring and connections");
@@ -649,14 +709,14 @@ uint8_t cc1101_check_packet_received(void)
   int8_t l_Rssi_dbm;
   uint8_t l_lqi, l_freq_est, pktLen;
   pktLen = 0;
-  if (digitalRead(GDO0) == TRUE)
+  if (digitalRead(GET_GDO0_PIN()) == TRUE)
   {
     // Read RSSI immediately while signal is present (carrier active)
     // RSSI register needs to be sampled during packet reception for accuracy
     l_Rssi_dbm = cc1100_rssi_convert2dbm(halRfReadReg(RSSI_ADDR));
 
     bool buffer_overflow = false;
-    while (digitalRead(GDO0) == TRUE)
+    while (digitalRead(GET_GDO0_PIN()) == TRUE)
     {
       delay(2); // Reduced from 5ms to 2ms for faster FIFO reading (prevents overflow)
 
@@ -684,6 +744,7 @@ uint8_t cc1101_check_packet_received(void)
         break;
       }
     }
+
     // Read LQI and FREQEST only if packet completed normally (GDO0 went low)
     // If we exited via buffer overflow, GDO0 may still be high and these registers
     // are not yet latched, so reading them would give incorrect values.
@@ -1291,7 +1352,7 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
   halRfWriteReg(PKTLEN, 1);                      // Just one byte of sync pattern
   cc1101_rec_mode();
 
-  while ((digitalRead(GDO0) == FALSE) && (l_tmo < rx_tmo_ms))
+  while ((digitalRead(GET_GDO0_PIN()) == FALSE) && (l_tmo < rx_tmo_ms))
   {
     delay(1);
     l_tmo++;
@@ -1380,7 +1441,7 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
   l_tmo = 0;
   l_total_byte = 0;
   l_byte_in_rx = 1;
-  while ((digitalRead(GDO0) == FALSE) && (l_tmo < rx_tmo_ms))
+  while ((digitalRead(GET_GDO0_PIN()) == FALSE) && (l_tmo < rx_tmo_ms))
   {
     delay(1);
     l_tmo++;
@@ -1559,8 +1620,20 @@ struct tmeter_data get_meter_data(void)
 
   halRfWriteReg(MDMCFG2, MDMCFG2_NO_PREAMBLE_SYNC);  // No preamble/sync for WUP
   halRfWriteReg(PKTCTRL0, PKTCTRL0_INFINITE_LENGTH); // Infinite packet length
-  SPIWriteBurstReg(TX_FIFO_ADDR, wupbuffer, 8);
-  wup2send--;
+
+  // Pre-fill FIFO to near capacity before starting TX.
+  // A fuller FIFO provides much larger buffer (~186ms vs ~27ms) against
+  // yield()/delay() latency in ESPHome where background tasks (WiFi, API
+  // server, OTA, logger, mDNS) steal CPU time during each yield() call.
+  // CC1101 TX FIFO is 64 bytes; fill up to 56 bytes (7 x 8-byte WUP buffers).
+  {
+    int prefill = (wup2send > 7) ? 7 : wup2send;
+    for (int i = 0; i < prefill; i++)
+    {
+      SPIWriteBurstReg(TX_FIFO_ADDR, wupbuffer, 8);
+      wup2send--;
+    }
+  }
   CC1101_CMD(STX);                          // sends the data store into transmit buffer over the air
   delay(10);                                // to give time for calibration
   marcstate = halRfReadReg(MARCSTATE_ADDR); // to  update 	CC1101_status_state
@@ -1599,7 +1672,29 @@ struct tmeter_data get_meter_data(void)
     }
     else
     {
-      delay(130); // 130ms time to free 39bytes FIFO space
+      // Wait for enough FIFO space for the 39-byte interrogation frame.
+      // Poll TXBYTES register instead of fixed delay(130) to prevent
+      // TXFIFO_UNDERFLOW when FIFO level is low. This commonly occurs in
+      // ESPHome builds where yield()/delay() service heavy background tasks
+      // (WiFi, API server, OTA, logger, mDNS, web_server) causing the FIFO
+      // feeding loop to fall behind the 2.4 kbps TX drain rate.
+      // See: https://github.com/genestealer/everblu-meters-esp8266-improved/issues/58
+      {
+        uint8_t wait_count = 0;
+        while (wait_count < 100) // Safety limit ~500ms
+        {
+          uint8_t txbytes_reg = halRfReadReg(TXBYTES_ADDR);
+          if (txbytes_reg & 0x80)
+            break; // TXFIFO_UNDERFLOW already occurred
+          uint8_t num_txbytes = txbytes_reg & 0x7F;
+          if (num_txbytes <= 25)
+            break; // 64 - 25 = 39 free bytes available
+          delay(5);
+          wait_count++;
+          if (wait_count % 10 == 0)
+            FEED_WDT();
+        }
+      }
       SPIWriteBurstReg(TX_FIFO_ADDR, txbuffer, 39);
       if (debug_out && 0)
       {
@@ -1614,7 +1709,7 @@ struct tmeter_data get_meter_data(void)
     // echo_debug(debug_out,"%ifree_byte:0x%02X sts:0x%02X\n",tmo,CC1101_status_FIFO_FreeByte,CC1101_status_state);
 
     // Detect TXFIFO_UNDERFLOW (MARCSTATE 0x16) early and abort instead of
-    // spinning for the full 3000ms timeout. The FIFO underflowed mid-TX,
+    // spinning for the full TX timeout. The FIFO underflowed mid-TX,
     // so continuing to feed data is pointless.
     if ((marcstate & 0x1F) == 0x16) // TXFIFO_UNDERFLOW
     {
@@ -1622,6 +1717,7 @@ struct tmeter_data get_meter_data(void)
       break;
     }
   }
+
   // Check if TX was aborted due to underflow
   bool tx_aborted = ((marcstate & 0x1F) == 0x16);
   if (tx_aborted)
