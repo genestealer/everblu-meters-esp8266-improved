@@ -1681,15 +1681,18 @@ struct tmeter_data get_meter_data(void)
       // See: https://github.com/genestealer/everblu-meters-esp8266-improved/issues/58
       {
         uint8_t wait_count = 0;
-        while (wait_count < 100)  // Safety limit ~500ms
+        while (wait_count < 100) // Safety limit ~500ms
         {
           uint8_t txbytes_reg = halRfReadReg(TXBYTES_ADDR);
-          if (txbytes_reg & 0x80) break;  // TXFIFO_UNDERFLOW already occurred
+          if (txbytes_reg & 0x80)
+            break; // TXFIFO_UNDERFLOW already occurred
           uint8_t num_txbytes = txbytes_reg & 0x7F;
-          if (num_txbytes <= 25) break;  // 64 - 25 = 39 free bytes available
+          if (num_txbytes <= 25)
+            break; // 64 - 25 = 39 free bytes available
           delay(5);
           wait_count++;
-          if (wait_count % 10 == 0) FEED_WDT();
+          if (wait_count % 10 == 0)
+            FEED_WDT();
         }
       }
       SPIWriteBurstReg(TX_FIFO_ADDR, txbuffer, 39);
