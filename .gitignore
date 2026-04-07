@@ -62,5 +62,6 @@ include/private.h
 include/secrets.h
 __pycache__/
 *.pyc
+**/.esphome/
 
 

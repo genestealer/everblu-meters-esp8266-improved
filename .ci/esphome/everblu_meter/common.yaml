@@ -1,0 +1,33 @@
+# Shared configuration included by each platform-specific test file via:
+#   <<: !include common.yaml
+#
+# Paths in external_components are resolved relative to the config file
+# that includes this file (test.*.yaml), not relative to this file itself.
+
+spi:
+  clk_pin: ${spi_clk_pin}
+  miso_pin: ${spi_miso_pin}
+  mosi_pin: ${spi_mosi_pin}
+
+time:
+  - platform: sntp
+    id: ci_time
+
+external_components:
+  - source:
+      type: local
+      path: ../../../ESPHOME-release
+    components: [ everblu_meter ]
+
+everblu_meter:
+  meter_year: 22
+  meter_serial: 87654321
+  meter_type: ${meter_type}
+  gdo0_pin: ${gdo0_pin}
+  time_id: ci_time
+
+  volume:
+    name: "CI Volume"
+
+  status:
+    name: "CI Status"

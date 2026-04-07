@@ -17,26 +17,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - id: esp8266-local-gas
-            platform: esp8266
-            source_mode: local
-            meter_type: gas
-          - id: esp8266-local-water
-            platform: esp8266
-            source_mode: local
-            meter_type: water
-          - id: esp32-local-gas
-            platform: esp32
-            source_mode: local
-            meter_type: gas
-          - id: esp32-local-water
-            platform: esp32
-            source_mode: local
-            meter_type: water
-          - id: esp8266-git-smoke
-            platform: esp8266
-            source_mode: git
-            meter_type: water
+          # Xtensa / Arduino - water meter
+          - id: esp8266-ard
+            config: .ci/esphome/everblu_meter/test.esp8266-ard.yaml
+          # Xtensa / Arduino - gas meter (verifies gas meter codegen path)
+          - id: esp32-ard
+            config: .ci/esphome/everblu_meter/test.esp32-ard.yaml
+          # RISC-V / Arduino - different architecture family
+          - id: esp32-c3-ard
+            config: .ci/esphome/everblu_meter/test.esp32-c3-ard.yaml
+          # Git external_components smoke test - validates real-world install path
+          - id: esp8266-git
+            config: .ci/esphome/everblu_meter/test.esp8266-git.yaml
 
     name: ${{ matrix.id }}
 
@@ -60,9 +52,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.platformio
-          key: ${{ runner.os }}-pio-esphome-${{ matrix.platform }}-${{ hashFiles('.github/workflows/esphome-external-component.yml') }}
+          key: ${{ runner.os }}-pio-esphome-${{ matrix.id }}-${{ hashFiles('.github/workflows/esphome-external-component.yml') }}
           restore-keys: |
-            ${{ runner.os }}-pio-esphome-${{ matrix.platform }}-
+            ${{ runner.os }}-pio-esphome-${{ matrix.id }}-
             ${{ runner.os }}-pio-esphome-
 
       - name: Install ESPHome
@@ -70,87 +62,19 @@ jobs:
           python -m pip install --upgrade pip
           pip install "esphome>=2025.0"
 
-      - name: Generate test configuration
-        run: |
-          mkdir -p .ci/esphome
-
-          if [ "${{ matrix.source_mode }}" = "local" ]; then
-            EXTERNAL_COMPONENT_BLOCK='external_components:\n  - source:\n      type: local\n      path: ../../ESPHOME-release\n    components: [ everblu_meter ]'
-          else
-            EXTERNAL_COMPONENT_BLOCK='external_components:\n  - source:\n      type: git\n      url: https://github.com/${{ github.repository }}\n      ref: main\n      path: ESPHOME-release\n    components: [ everblu_meter ]\n    refresh: 0s'
-          fi
-
-          if [ "${{ matrix.platform }}" = "esp8266" ]; then
-            PLATFORM_BLOCK='esp8266:\n  board: d1_mini\n  framework:\n    version: recommended'
-            SPI_BLOCK='spi:\n  clk_pin: GPIO14\n  miso_pin: GPIO12\n  mosi_pin: GPIO13'
-            GDO0_PIN='4'
-          else
-            PLATFORM_BLOCK='esp32:\n  board: esp32dev\n  framework:\n    type: arduino'
-            SPI_BLOCK='spi:\n  clk_pin: GPIO18\n  miso_pin: GPIO19\n  mosi_pin: GPIO23'
-            GDO0_PIN='4'
-          fi
-
-          {
-            echo "esphome:"
-            echo "  name: ci-${{ matrix.id }}"
-            echo "  min_version: 2024.6.0"
-            echo ""
-            printf "%b\n" "$PLATFORM_BLOCK"
-            echo ""
-            echo "logger:"
-            echo ""
-            echo "api:"
-            echo ""
-            echo "ota:"
-            echo "  - platform: esphome"
-            echo ""
-            echo "wifi:"
-            echo "  ssid: CI-WIFI"
-            echo "  password: CI-PASSWORD"
-            echo ""
-            echo "time:"
-            echo "  - platform: sntp"
-            echo "    id: ci_time"
-            echo ""
-            printf "%b\n" "$SPI_BLOCK"
-            echo ""
-            printf "%b\n" "$EXTERNAL_COMPONENT_BLOCK"
-            echo ""
-            echo "everblu_meter:"
-            echo "  meter_year: 22"
-            echo "  meter_serial: 87654321"
-            echo "  meter_type: ${{ matrix.meter_type }}"
-            echo "  gdo0_pin: ${GDO0_PIN}"
-            echo "  time_id: ci_time"
-            echo ""
-            echo "  volume:"
-            echo "    name: CI Volume"
-            echo ""
-            echo "  status:"
-            echo "    name: CI Status"
-          } > .ci/esphome/${{ matrix.id }}.yaml
-
-          echo "Generated .ci/esphome/${{ matrix.id }}.yaml"
-          cat .ci/esphome/${{ matrix.id }}.yaml
-
       - name: Validate configuration
-        run: |
-          esphome config .ci/esphome/${{ matrix.id }}.yaml
+        run: esphome config ${{ matrix.config }}
 
-      - name: Compile configuration
-        run: |
-          esphome compile .ci/esphome/${{ matrix.id }}.yaml
+      - name: Compile
+        run: esphome compile ${{ matrix.config }}
 
-      - name: Integration summary
+      - name: Summary
         if: always()
         run: |
           {
-            echo "## ESPHome Integration Test"
+            echo "## ESPHome Integration Test: ${{ matrix.id }}"
             echo ""
-            echo "- Case: ${{ matrix.id }}"
-            echo "- Platform: ${{ matrix.platform }}"
-            echo "- Source mode: ${{ matrix.source_mode }}"
-            echo "- Meter type: ${{ matrix.meter_type }}"
+            echo "Config: \`${{ matrix.config }}\`"
             echo ""
-            echo "Validated with: esphome config + esphome compile"
+            echo "Validated with: \`esphome config\` + \`esphome compile\`"
           } >> "$GITHUB_STEP_SUMMARY"

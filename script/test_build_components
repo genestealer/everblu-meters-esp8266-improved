@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Run ESPHome compile tests for a component, mirroring official ESPHome CI.
+#
+# Usage:
+#   script/test_build_components                    # tests everblu_meter
+#   script/test_build_components everblu_meter      # explicit component name
+#
+# Prerequisites:
+#   pip install esphome
+#
+# The ESPHOME environment variable overrides the esphome binary location:
+#   ESPHOME=/path/to/esphome script/test_build_components
+
+set -e
+
+COMPONENT="${1:-everblu_meter}"
+ESPHOME_CMD="${ESPHOME:-esphome}"
+TEST_DIR=".ci/esphome/${COMPONENT}"
+
+if [ ! -d "$TEST_DIR" ]; then
+  echo "Error: test directory '$TEST_DIR' not found"
+  exit 1
+fi
+
+echo "Testing component: ${COMPONENT}"
+echo "Using: $(${ESPHOME_CMD} version)"
+echo ""
+
+PASS=0
+FAIL=0
+
+for f in "${TEST_DIR}/test."*.yaml; do
+  [ -f "$f" ] || continue
+  echo "==> ${f}"
+  if "${ESPHOME_CMD}" compile "${f}"; then
+    echo "PASS: ${f}"
+    PASS=$((PASS + 1))
+  else
+    echo "FAIL: ${f}"
+    FAIL=$((FAIL + 1))
+  fi
+  echo ""
+done
+
+echo "Results: ${PASS} passed, ${FAIL} failed"
+[ $FAIL -eq 0 ]
