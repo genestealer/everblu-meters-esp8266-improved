@@ -28,9 +28,11 @@ echo ""
 
 PASS=0
 FAIL=0
+FOUND=0
 
 for f in "${TEST_DIR}/test."*.yaml; do
   [ -f "$f" ] || continue
+  FOUND=$((FOUND + 1))
   echo "==> ${f}"
   if "${ESPHOME_CMD}" compile "${f}"; then
     echo "PASS: ${f}"
@@ -41,6 +43,11 @@ for f in "${TEST_DIR}/test."*.yaml; do
   fi
   echo ""
 done
+
+if [ $FOUND -eq 0 ]; then
+  echo "Error: no test files found in '${TEST_DIR}'"
+  exit 1
+fi
 
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ $FAIL -eq 0 ]

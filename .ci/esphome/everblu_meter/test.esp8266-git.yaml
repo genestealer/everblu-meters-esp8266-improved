@@ -1,6 +1,8 @@
 # Git external_components smoke test.
 # Validates the component is consumable via the public GitHub URL (end-user path).
-# Always targets 'main' branch - tests real-world install, not current branch changes.
+# Targets 'main' branch intentionally - this test is skipped on pull requests
+# (see workflow: if condition) and only runs on push to main/master/develop.
+# Running it on PRs would compile whatever is on main, not the proposed changes.
 
 esphome:
   name: ci-esp8266-git

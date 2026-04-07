@@ -36,6 +36,9 @@ jobs:
             config: .ci/esphome/everblu_meter/test.esp8266-git.yaml
 
     name: ${{ matrix.id }}
+    # Skip the git smoke test on pull requests: it compiles ref: main, not the
+    # proposed branch, so it cannot catch regressions introduced by the PR.
+    if: matrix.id != 'esp8266-git' || github.event_name != 'pull_request'
 
     steps:
       - uses: actions/checkout@v4
