@@ -1,5 +1,5 @@
 # EverBlu Water Meter - Arduino Nano ESP32 Configuration
-# This example is specifically configured for Arduino Nano ESP32 (Arduino Nano Every with ESP32S3)
+# This example is specifically configured for Arduino Nano ESP32 (ESP32-S3)
 # Note: The platformio_options below are REQUIRED for this board to compile successfully
 
 esphome:
