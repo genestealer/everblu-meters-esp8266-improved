@@ -23,7 +23,8 @@ if [ ! -d "$TEST_DIR" ]; then
 fi
 
 echo "Testing component: ${COMPONENT}"
-echo "Using: $(${ESPHOME_CMD} version)"
+ESPHOME_VERSION="$("${ESPHOME_CMD}" version)"
+echo "Using: ${ESPHOME_VERSION}"
 echo ""
 
 PASS=0
