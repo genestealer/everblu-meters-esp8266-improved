@@ -247,7 +247,7 @@ esp32:
 | `spi_id` | id | - | Yes | SPI bus ID from the top-level `spi:` block |
 | `cs_pin` | pin | - | Yes | CC1101 chip select pin |
 | `meter_type` | enum | water | No | `water` or `gas` |
-| `gdo0_pin` | pin | - | Yes | CC1101 GDO0 GPIO |
+| `gdo0_pin` | int | - | Yes | CC1101 GDO0 raw GPIO number |
 | `time_id` | id | - | Yes | Time component ID |
 | `frequency` | float | 433.82 | No | RF frequency (MHz) |
 | `auto_scan` | bool | true | No | Auto frequency scan |

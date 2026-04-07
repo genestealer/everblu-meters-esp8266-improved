@@ -560,6 +560,14 @@ void cc1101_configureRF_0(float freq)
 
 bool cc1101_init(float freq)
 {
+#ifdef USE_ESPHOME
+  if (GET_GDO0_PIN() < 0)
+  {
+    LOG_E("everblu_meter", "GDO0 pin is not configured; call cc1101_set_gdo0_pin() before cc1101_init()");
+    return false;
+  }
+#endif
+
   pinMode(GET_GDO0_PIN(), INPUT_PULLUP);
 
   // Initialize SPI transport for CC1101 communication.
