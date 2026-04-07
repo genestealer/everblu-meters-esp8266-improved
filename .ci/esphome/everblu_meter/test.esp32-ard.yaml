@@ -1,0 +1,29 @@
+substitutions:
+  spi_clk_pin: GPIO18
+  spi_miso_pin: GPIO19
+  spi_mosi_pin: GPIO23
+  cs_pin: GPIO15
+  gdo0_pin: GPIO4
+  meter_type: gas
+
+esphome:
+  name: ci-esp32-ard
+  min_version: 2024.6.0
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+logger:
+
+api:
+
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: CI-WIFI
+  password: CI-PASSWORD
+
+<<: !include common.yaml

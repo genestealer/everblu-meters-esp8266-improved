@@ -1,0 +1,29 @@
+substitutions:
+  spi_clk_pin: GPIO6
+  spi_miso_pin: GPIO5
+  spi_mosi_pin: GPIO7
+  cs_pin: GPIO10
+  gdo0_pin: GPIO4
+  meter_type: water
+
+esphome:
+  name: ci-esp32-c3-ard
+  min_version: 2024.6.0
+
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: arduino
+
+logger:
+
+api:
+
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: CI-WIFI
+  password: CI-PASSWORD
+
+<<: !include common.yaml

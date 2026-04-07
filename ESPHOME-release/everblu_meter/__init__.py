@@ -7,6 +7,7 @@ using the RADIAN protocol over 433 MHz with a CC1101 transceiver.
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
+from esphome import pins
 from esphome.components import sensor, text_sensor, binary_sensor, button, time as time_, spi
 from esphome.const import (
     CONF_ID,
@@ -102,7 +103,7 @@ CONFIG_SCHEMA = (
             cv.GenerateID(): cv.declare_id(EverbluMeterComponent),
             cv.Required(CONF_METER_YEAR): cv.int_range(min=0, max=99),
             cv.Required(CONF_METER_SERIAL): cv.uint32_t,
-            cv.Required(CONF_GDO0_PIN): cv.int_range(min=0, max=50),
+            cv.Required(CONF_GDO0_PIN): pins.internal_gpio_input_pin_schema,
             cv.Required(CONF_TIME_ID): cv.use_id(time_.RealTimeClock),
             cv.Optional(CONF_METER_TYPE, default=METER_TYPE_WATER): cv.enum(
                 {METER_TYPE_WATER: False, METER_TYPE_GAS: True}
@@ -278,8 +279,9 @@ async def to_code(config):
     # This properly integrates with ESPHome's SPI architecture and CS pin management
     await spi.register_spi_device(var, config)
 
-    # CS pin is managed by SPIDevice; pass raw GDO0 GPIO number for CC1101 interrupts.
-    cg.add(var.set_gdo0_pin(config[CONF_GDO0_PIN]))
+    # CS pin is managed by SPIDevice; pass the InternalGPIOPin for CC1101 interrupts.
+    gdo0 = await cg.gpio_pin_expression(config[CONF_GDO0_PIN])
+    cg.add(var.set_gdo0_pin(gdo0))
 
     # No custom include paths needed when using flat release layout
 

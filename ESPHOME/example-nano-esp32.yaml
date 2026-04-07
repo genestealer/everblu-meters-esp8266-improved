@@ -6,6 +6,7 @@ esphome:
   name: everblu-nano-esp32
 
 esp32:
+  # WARNING: Arduino framework is required; ESP-IDF builds fail because everblu_meter depends on Arduino headers
   # Arduino Nano ESP32 uses ESP32S3 chip
   board: arduino_nano_esp32
   framework:

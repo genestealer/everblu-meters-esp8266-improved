@@ -16,6 +16,7 @@
 // esphome/* includes when working within ESPHome.
 
 #include "esphome/core/component.h"
+#include "esphome/core/gpio.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/binary_sensor/binary_sensor.h"
@@ -96,7 +97,7 @@ namespace esphome
             void set_time_component(time::RealTimeClock *time) { time_component_ = time; }
             void set_initial_read_on_boot(bool v) { initial_read_on_boot_ = v; }
             void set_adaptive_threshold(int threshold) { adaptive_threshold_ = threshold; }
-            void set_gdo0_pin(int pin) { gdo0_pin_ = pin; }
+            void set_gdo0_pin(InternalGPIOPin *pin) { gdo0_pin_ = pin; }
 
             // Sensor setters
             void set_volume_sensor(sensor::Sensor *sensor) { volume_sensor_ = sensor; }
@@ -156,7 +157,7 @@ namespace esphome
             void republish_initial_states();
 
             // GDO0 pin (raw GPIO number for CC1101 Arduino driver)
-            int gdo0_pin_{-1};
+            InternalGPIOPin *gdo0_pin_{nullptr};
 
             // ESPHome components
             time::RealTimeClock *time_component_{nullptr};

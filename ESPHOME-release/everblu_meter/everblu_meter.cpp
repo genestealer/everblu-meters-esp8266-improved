@@ -153,10 +153,10 @@ namespace esphome
             ESP_LOGD(TAG, "CC1101 SPI device configured");
 
             // Configure GDO0 pin for CC1101
-            if (gdo0_pin_ >= 0)
+            if (gdo0_pin_ != nullptr)
             {
-                cc1101_set_gdo0_pin(gdo0_pin_);
-                ESP_LOGD(TAG, "CC1101 GDO0 pin configured: %d", gdo0_pin_);
+                cc1101_set_gdo0_pin(gdo0_pin_->get_pin());
+                ESP_LOGD(TAG, "CC1101 GDO0 pin configured: %d", gdo0_pin_->get_pin());
             }
             else
             {
