@@ -1,0 +1,88 @@
+name: ESPHome External Component Integration
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  integration-test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # CI scope rationale:
+          # - Cover architecture families with water on Xtensa (ESP8266) and RISC-V (ESP32-C3)
+          # - Cover the gas-specific code path once (ESP32)
+          # - Keep one git-source smoke test for real external_components install flow
+          # This keeps runtime reasonable while still exercising the main compatibility paths.
+          # Xtensa / Arduino - water meter
+          - id: esp8266-ard
+            config: .ci/esphome/everblu_meter/test.esp8266-ard.yaml
+          # Xtensa / Arduino - gas meter (verifies gas meter codegen path)
+          - id: esp32-ard
+            config: .ci/esphome/everblu_meter/test.esp32-ard.yaml
+          # RISC-V / Arduino - different architecture family
+          - id: esp32-c3-ard
+            config: .ci/esphome/everblu_meter/test.esp32-c3-ard.yaml
+          # Git external_components smoke test - validates real-world install path
+          - id: esp8266-git
+            config: .ci/esphome/everblu_meter/test.esp8266-git.yaml
+
+    name: ${{ matrix.id }}
+    # Skip the git smoke test on pull requests: it compiles ref: main, not the
+    # proposed branch, so it cannot catch regressions introduced by the PR.
+    if: matrix.id != 'esp8266-git' || github.event_name != 'pull_request'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-esphome-${{ hashFiles('.github/workflows/esphome-external-component.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-esphome-
+
+      - name: Cache PlatformIO packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: ${{ runner.os }}-pio-esphome-${{ matrix.id }}-${{ hashFiles('.github/workflows/esphome-external-component.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-esphome-${{ matrix.id }}-
+            ${{ runner.os }}-pio-esphome-
+
+      - name: Install ESPHome
+        run: |
+          python -m pip install --upgrade pip
+          pip install "esphome>=2025.0"
+
+      - name: Validate configuration
+        run: esphome config ${{ matrix.config }}
+
+      - name: Compile
+        run: esphome compile ${{ matrix.config }}
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## ESPHome Integration Test: ${{ matrix.id }}"
+            echo ""
+            echo "Config: \`${{ matrix.config }}\`"
+            echo ""
+            echo "Validated with: \`esphome config\` + \`esphome compile\`"
+          } >> "$GITHUB_STEP_SUMMARY"
