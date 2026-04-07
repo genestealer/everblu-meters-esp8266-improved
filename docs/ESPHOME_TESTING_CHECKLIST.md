@@ -71,6 +71,18 @@ This checklist helps verify that the ESPHome integration works correctly across 
 - [ ] Config with all sensors - compiles
 - [ ] Config with no sensors - compiles (should warn?)
 
+### CI Matrix Strategy (GitHub Actions)
+- [x] Water meter tested on Xtensa (ESP8266) and RISC-V (ESP32-C3)
+- [x] Gas meter tested at least once to validate gas-specific code path
+- [x] Git source external_components smoke test included
+- [x] Matrix balances coverage and CI runtime
+
+Notes:
+- Water-on-two-architectures validates cross-architecture compatibility.
+- Gas-on-one-board validates meter_type-specific generation and compile path.
+- Git smoke test validates the real user install flow (external_components from git).
+- Expand to full water+gas on every board if stricter coverage is preferred over CI time.
+
 ## Upload and Boot Tests
 
 ### First Boot

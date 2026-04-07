@@ -17,6 +17,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # CI scope rationale:
+          # - Cover architecture families with water on Xtensa (ESP8266) and RISC-V (ESP32-C3)
+          # - Cover the gas-specific code path once (ESP32)
+          # - Keep one git-source smoke test for real external_components install flow
+          # This keeps runtime reasonable while still exercising the main compatibility paths.
           # Xtensa / Arduino - water meter
           - id: esp8266-ard
             config: .ci/esphome/everblu_meter/test.esp8266-ard.yaml
