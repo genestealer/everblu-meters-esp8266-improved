@@ -1620,8 +1620,20 @@ struct tmeter_data get_meter_data(void)
 
   halRfWriteReg(MDMCFG2, MDMCFG2_NO_PREAMBLE_SYNC);  // No preamble/sync for WUP
   halRfWriteReg(PKTCTRL0, PKTCTRL0_INFINITE_LENGTH); // Infinite packet length
-  SPIWriteBurstReg(TX_FIFO_ADDR, wupbuffer, 8);
-  wup2send--;
+
+  // Pre-fill FIFO to near capacity before starting TX.
+  // A fuller FIFO provides much larger buffer (~186ms vs ~27ms) against
+  // yield()/delay() latency in ESPHome where background tasks (WiFi, API
+  // server, OTA, logger, mDNS) steal CPU time during each yield() call.
+  // CC1101 TX FIFO is 64 bytes; fill up to 56 bytes (7 x 8-byte WUP buffers).
+  {
+    int prefill = (wup2send > 7) ? 7 : wup2send;
+    for (int i = 0; i < prefill; i++)
+    {
+      SPIWriteBurstReg(TX_FIFO_ADDR, wupbuffer, 8);
+      wup2send--;
+    }
+  }
   CC1101_CMD(STX);                          // sends the data store into transmit buffer over the air
   delay(10);                                // to give time for calibration
   marcstate = halRfReadReg(MARCSTATE_ADDR); // to  update 	CC1101_status_state
@@ -1660,7 +1672,26 @@ struct tmeter_data get_meter_data(void)
     }
     else
     {
-      delay(130); // 130ms time to free 39bytes FIFO space
+      // Wait for enough FIFO space for the 39-byte interrogation frame.
+      // Poll TXBYTES register instead of fixed delay(130) to prevent
+      // TXFIFO_UNDERFLOW when FIFO level is low. This commonly occurs in
+      // ESPHome builds where yield()/delay() service heavy background tasks
+      // (WiFi, API server, OTA, logger, mDNS, web_server) causing the FIFO
+      // feeding loop to fall behind the 2.4 kbps TX drain rate.
+      // See: https://github.com/genestealer/everblu-meters-esp8266-improved/issues/58
+      {
+        uint8_t wait_count = 0;
+        while (wait_count < 100)  // Safety limit ~500ms
+        {
+          uint8_t txbytes_reg = halRfReadReg(TXBYTES_ADDR);
+          if (txbytes_reg & 0x80) break;  // TXFIFO_UNDERFLOW already occurred
+          uint8_t num_txbytes = txbytes_reg & 0x7F;
+          if (num_txbytes <= 25) break;  // 64 - 25 = 39 free bytes available
+          delay(5);
+          wait_count++;
+          if (wait_count % 10 == 0) FEED_WDT();
+        }
+      }
       SPIWriteBurstReg(TX_FIFO_ADDR, txbuffer, 39);
       if (debug_out && 0)
       {
