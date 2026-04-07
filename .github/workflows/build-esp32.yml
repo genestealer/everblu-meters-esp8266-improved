@@ -18,6 +18,8 @@ jobs:
         environment:
           - name: esp32dev
             board: ESP32 DevKit
+          - name: esp32-c3-ard
+            board: ESP32-C3 DevKitM-1 (Arduino)
 
     name: Build ${{ matrix.environment.board }}
 
