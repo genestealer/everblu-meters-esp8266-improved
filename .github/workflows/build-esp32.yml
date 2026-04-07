@@ -2,7 +2,7 @@ name: ESP32 Build
 
 on:
   push:
-    branches: [main, master, develop, automatic-calibration]
+    branches: [main, master, develop]
   pull_request:
     branches: [main, master, develop]
   workflow_dispatch:
