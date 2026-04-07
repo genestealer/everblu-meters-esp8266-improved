@@ -2,7 +2,7 @@ name: ESPHome External Component Integration
 
 on:
   push:
-    branches: [main, master, develop]
+    branches: [main, master, develop, feature/**]
   pull_request:
     branches: [main, master, develop]
   workflow_dispatch:
