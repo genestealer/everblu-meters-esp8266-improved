@@ -4,11 +4,11 @@
 esphome:
   name: everblu-gas-meter
 
-esp8266:
-  # WARNING: Arduino framework is required; ESP-IDF is not supported for everblu_meter
-  board: d1_mini
+esp32:
+  # WARNING: Arduino framework is required; ESP-IDF builds fail because everblu_meter depends on Arduino headers
+  board: esp32dev
   framework:
-    version: recommended  # Arduino core (explicit)
+    type: arduino
 
 # WiFi configuration
 wifi:
@@ -29,6 +29,13 @@ time:
   - platform: homeassistant
     id: ha_time
 
+# SPI bus shared with the CC1101 radio
+spi:
+  id: main_bus
+  clk_pin: GPIO14
+  mosi_pin: GPIO13
+  miso_pin: GPIO12
+
 # EverBlu Meter Component
 external_components:
   - source:
@@ -40,16 +47,17 @@ external_components:
     refresh: 1d
 everblu_meter:
   id: my_gas_meter
+  spi_id: main_bus
   
   # REQUIRED: Meter identification
   meter_year: 22
   meter_serial: 87654321
+  cs_pin: GPIO15
   gdo0_pin: 4
   
   # REQUIRED: Meter type
   meter_type: gas
   gas_volume_divisor: 100  # Gas meters use divisor (100 or 1000)
-  debug_cc1101: true       # Enable detailed CC1101 radio debug logs
   
   # Optional: Link to time component
   time_id: ha_time
@@ -140,6 +148,9 @@ everblu_meter:
 
   history_json:
     name: "Meter History (JSON)"
+
+  firmware_version:
+    name: "Firmware Version"
 
   active_reading:
     name: "Reading Active"

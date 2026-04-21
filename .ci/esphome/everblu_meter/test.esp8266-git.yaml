@@ -29,6 +29,7 @@ time:
     id: ci_time
 
 spi:
+  id: ci_spi
   clk_pin: GPIO14
   miso_pin: GPIO12
   mosi_pin: GPIO13
@@ -43,6 +44,8 @@ external_components:
     refresh: 0s
 
 everblu_meter:
+  spi_id: ci_spi
+  cs_pin: GPIO15
   meter_year: 22
   meter_serial: 87654321
   meter_type: water

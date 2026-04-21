@@ -88,6 +88,38 @@ This will output detailed hex dumps of the decoded frame, helping identify:
 
 ## Quick Start
 
+## Breaking Change: SPI Configuration Required
+
+This component now uses ESPHome's native `spi:` bus integration. Existing YAML that relied on implicit CC1101 SPI pins must be updated.
+
+Previous configuration:
+
+```yaml
+everblu_meter:
+  meter_year: 21
+  meter_serial: 12345678
+  gdo0_pin: 4
+  time_id: ha_time
+```
+
+Current configuration:
+
+```yaml
+spi:
+  id: main_bus
+  clk_pin: GPIO14
+  mosi_pin: GPIO13
+  miso_pin: GPIO12
+
+everblu_meter:
+  spi_id: main_bus
+  cs_pin: GPIO15
+  meter_year: 21
+  meter_serial: 12345678
+  gdo0_pin: 4
+  time_id: ha_time
+```
+
 ### 1. Use as External Component
 
 The component is ready to use directly from the `ESPHOME-release` folder. Add to your ESPHome YAML configuration:
@@ -124,7 +156,15 @@ time:
   - platform: homeassistant
     id: ha_time
 
+spi:
+  id: main_bus
+  clk_pin: GPIO14
+  mosi_pin: GPIO13
+  miso_pin: GPIO12
+
 everblu_meter:
+  spi_id: main_bus
+  cs_pin: GPIO15
   meter_year: 21
   meter_serial: 12345678
   meter_type: water
@@ -159,6 +199,43 @@ external_components:
 esphome run your-config.yaml
 ```
 
+## Board-Specific Configuration
+
+### Arduino Nano ESP32 (ESP32S3)
+
+If using an **Arduino Nano ESP32** board, you may still need the following `platformio_options` depending on your ESPHome/PlatformIO toolchain configuration. These flags address board USB mode selection at build time; they are separate from the `Stream&` compatibility fix in `WifiSerialStream`.
+
+```yaml
+esp32:
+  board: arduino_nano_esp32
+  framework:
+    type: arduino
+  
+  # May be required on some Arduino Nano ESP32 toolchain setups
+  platformio_options:
+    build_unflags:
+      - -DARDUINO_USB_CDC_ON_BOOT=0
+      - -DARDUINO_USB_CDC_ON_BOOT=1
+      - -DARDUINO_USB_MODE=0
+      - -DARDUINO_USB_MODE=1
+    build_flags:
+      - -DARDUINO_USB_CDC_ON_BOOT=1
+      - -DARDUINO_USB_MODE=1
+```
+
+See [example-nano-esp32.yaml](example-nano-esp32.yaml) for a complete working configuration.
+
+### Other ESP32 Boards
+
+For other ESP32 boards (e.g., `esp32dev`), these platformio options are not needed:
+
+```yaml
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+```
+
 ## Configuration Reference
 
 ### Key Parameters
@@ -167,8 +244,10 @@ esphome run your-config.yaml
 |-----------|------|---------|----------|-------------|
 | `meter_year` | int | - | Yes | Meter year (0-99) |
 | `meter_serial` | int | - | Yes | Serial number |
-| `meter_type` | enum | - | Yes | `water` or `gas` |
-| `gdo0_pin` | int | - | Yes | CC1101 GDO0 GPIO |
+| `spi_id` | id | - | Yes | SPI bus ID from the top-level `spi:` block |
+| `cs_pin` | pin | - | Yes | CC1101 chip select pin |
+| `meter_type` | enum | water | No | `water` or `gas` |
+| `gdo0_pin` | pin | - | Yes | CC1101 GDO0 pin (e.g. `GPIO4`, `D2`, `4`) |
 | `time_id` | id | - | Yes | Time component ID |
 | `frequency` | float | 433.82 | No | RF frequency (MHz) |
 | `auto_scan` | bool | true | No | Auto frequency scan |
@@ -190,6 +269,8 @@ esphome run your-config.yaml
 
 ```yaml
 everblu_meter:
+  spi_id: main_bus
+  cs_pin: GPIO15
   meter_year: 21
   meter_serial: 12345678
   gdo0_pin: 4
@@ -426,9 +507,21 @@ EverbluMeterComponent (ESPHome)
 - **error** - Last error message
 - **radio_state** - Radio state (Init/Scanning/Receiving/Idle)
 - **timestamp** - Last successful reading time
+- **history_json** - Meter history JSON payload
+- **firmware_version** - Firmware version string
+- **meter_serial_sensor** - Meter serial number
+- **meter_year_sensor** - Meter year
+- **reading_schedule_sensor** - Active reading schedule
+- **reading_time_utc_sensor** - Configured reading time (UTC)
 
 ### Binary Sensors
 - **active_reading** - Whether a reading is currently in progress
+- **radio_connected** - CC1101 radio connectivity status
+
+### Control Buttons
+- **request_reading_button** - Trigger a manual reading
+- **frequency_scan_button** - Trigger a frequency scan
+- **reset_frequency_button** - Reset the frequency offset
 
 ## Common Configuration Patterns
 
@@ -513,15 +606,15 @@ everblu_meter:
 
 For detailed troubleshooting, see the [Integration Guide](docs/ESPHOME_INTEGRATION_GUIDE.md#troubleshooting).
 
-## \ud83d\dcd3 License
+## License
 
 MIT License - See [LICENSE.md](../LICENSE.md)
 
-## \ud83d\de4f Credits
+## Credits
 
 Based on the EverBlu Meters ESP8266 project with architectural improvements for reusability and ESPHome integration.
 
-## \ud83d\udd17 Links
+## Links
 
 - **Main Project**: [Main README](../README.md)
 - **GitHub Repository**: https://github.com/yourusername/everblu-meters-esp8266-improved
@@ -531,8 +624,8 @@ Based on the EverBlu Meters ESP8266 project with architectural improvements for 
 ---
 
 **Need Help?**
-- \ud83d\udcd6 Start with the [Integration Guide](docs/ESPHOME_INTEGRATION_GUIDE.md)
-- \ud83c\udfe0 See [Home Assistant Integration](docs/ESPHOME_HOME_ASSISTANT_INTEGRATION.md) for accessing meter data in Home Assistant
-- \ud83d\dd0d See the Configuration Reference above for parameters and quick fixes
-- \ud83d\udc1b See [Troubleshooting](docs/ESPHOME_INTEGRATION_GUIDE.md#troubleshooting) for common issues
-- \ud83d\dc68\u200d\ud83d\udcbb Developers: See [Developer Guide](docs/DEVELOPER_GUIDE.md) for architecture details
+- Start with the [Integration Guide](docs/ESPHOME_INTEGRATION_GUIDE.md)
+- See [Home Assistant Integration](docs/ESPHOME_HOME_ASSISTANT_INTEGRATION.md) for accessing meter data in Home Assistant
+- See the Configuration Reference above for parameters and quick fixes
+- See [Troubleshooting](docs/ESPHOME_INTEGRATION_GUIDE.md#troubleshooting) for common issues
+- Developers: See [Developer Guide](docs/DEVELOPER_GUIDE.md) for architecture details

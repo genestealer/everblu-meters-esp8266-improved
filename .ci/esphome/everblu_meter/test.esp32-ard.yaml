@@ -2,7 +2,8 @@ substitutions:
   spi_clk_pin: GPIO18
   spi_miso_pin: GPIO19
   spi_mosi_pin: GPIO23
-  gdo0_pin: "4"
+  cs_pin: GPIO15
+  gdo0_pin: GPIO4
   meter_type: gas
 
 esphome:

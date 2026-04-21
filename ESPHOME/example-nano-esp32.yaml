@@ -1,0 +1,135 @@
+# EverBlu Water Meter - Arduino Nano ESP32 Configuration
+# This example is specifically configured for Arduino Nano ESP32 (ESP32-S3)
+# Note: The platformio_options below are REQUIRED for this board to compile successfully
+
+esphome:
+  name: everblu-nano-esp32
+
+esp32:
+  # WARNING: Arduino framework is required; ESP-IDF builds fail because everblu_meter depends on Arduino headers
+  # Arduino Nano ESP32 uses ESP32S3 chip
+  board: arduino_nano_esp32
+  framework:
+    type: arduino
+
+  # CRITICAL: These platformio options are required for Nano ESP32
+  # to resolve USBSerial compilation errors
+  platformio_options:
+    build_unflags:
+      - -DARDUINO_USB_CDC_ON_BOOT=0
+      - -DARDUINO_USB_CDC_ON_BOOT=1
+      - -DARDUINO_USB_MODE=0
+      - -DARDUINO_USB_MODE=1
+    build_flags:
+      - -DARDUINO_USB_CDC_ON_BOOT=1
+      - -DARDUINO_USB_MODE=1
+
+# WiFi configuration
+wifi:
+  ssid: "YourWiFiSSID"
+  password: "YourWiFiPassword"
+  
+  # Enable fallback hotspot
+  ap:
+    ssid: "EverBlu Fallback"
+    password: "ConfigMe123"
+
+# Enable logging
+logger:
+  level: DEBUG
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "your-32-byte-base64-encoded-key-here"
+
+# Enable OTA updates
+ota:
+  password: "YourOTAPassword"
+
+# Time component (required for scheduled readings)
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+    timezone: Europe/London
+
+# SPI bus for the CC1101 radio on Arduino Nano ESP32
+spi:
+  id: main_bus
+  clk_pin: GPIO48
+  mosi_pin: GPIO38
+  miso_pin: GPIO47
+
+# EverBlu Meter Component
+external_components:
+  - source:
+      type: git
+      url: https://github.com/genestealer/everblu-meters-esp8266-improved
+      ref: main
+      path: ESPHOME-release
+    components: [ everblu_meter ]
+    refresh: 1d
+
+everblu_meter:
+  id: my_water_meter
+  spi_id: main_bus
+  
+  # Meter identification (REQUIRED)
+  meter_year: 21          # Last 2 digits of year (e.g., 21 for 2021)
+  meter_serial: 12345678  # Your meter's serial number
+  cs_pin: GPIO21          # Nano ESP32 D10 -> CC1101 CS / NSS
+  gdo0_pin: GPIO5         # Nano ESP32 D2 -> CC1101 GDO0
+  
+  # Optional: set meter_type to 'gas' for gas meters (defaults to water)
+  
+  # Link to time component
+  time_id: homeassistant_time
+  
+  # Control buttons
+  request_reading_button:
+    name: "Read Meter Now"
+  frequency_scan_button:
+    name: "Scan Frequency"
+  reset_frequency_button:
+    name: "Reset Frequency Offset"
+  
+  # Volume sensors
+  volume:
+    name: "Water Volume"
+  
+  counter:
+    name: "Read Counter"
+  
+  # Battery sensor
+  battery:
+    name: "Meter Battery"
+  
+  # Radio quality sensors
+  rssi:
+    name: "Meter RSSI"
+  
+  rssi_percentage:
+    name: "RSSI Percentage"
+  
+  lqi:
+    name: "LQI"
+  
+  lqi_percentage:
+    name: "LQI Percentage"
+
+  firmware_version:
+    name: "Firmware Version"
+  
+  # Statistics sensors
+  total_attempts:
+    name: "Total Read Attempts"
+  
+  successful_reads:
+    name: "Successful Reads"
+  
+  failed_reads:
+    name: "Failed Reads"
+  
+  # Last frequency offset used
+  frequency_offset:
+    name: "Frequency Offset"
