@@ -351,7 +351,7 @@ void MeterReader::handleFailedRead()
         // Schedule retry after delay
         m_retryCount++;
         m_nextRetryTime = millis() + RETRY_DELAY_MS;
-        m_lastErrorMessage = "Retrying after failure";
+        m_lastErrorMessage = "No meter response (asleep/out of range/wrong Year/Serial) - retrying";
 
         m_publisher->publishStatusMessage("Retry scheduled");
         m_publisher->publishError(m_lastErrorMessage);
@@ -368,7 +368,7 @@ void MeterReader::handleFailedRead()
         // Max retries reached
         m_failedReads++;
         m_lastFailedAttempt = millis();
-        m_lastErrorMessage = "Max retries reached - cooling down";
+        m_lastErrorMessage = "No meter response after max retries - check distance and meter Year/Serial";
 
         m_publisher->publishError(m_lastErrorMessage);
         m_publisher->publishStatusMessage("Failed after max retries");

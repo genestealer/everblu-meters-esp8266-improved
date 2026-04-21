@@ -1365,7 +1365,7 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
   }
   else
   {
-    echo_debug(debug_out, "[ERROR] Timeout waiting for GDO0 (sync detection)\n");
+    echo_debug(debug_out, "[RX] No sync detected before timeout (meter may be asleep/out of range/wrong config)\n");
     return 0;
   }
   while ((l_byte_in_rx == 0) && (l_tmo < rx_tmo_ms))
@@ -1387,7 +1387,7 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
   }
   else
   {
-    echo_debug(debug_out, "[ERROR] Timeout waiting for sync pattern bytes\n");
+    echo_debug(debug_out, "[RX] Sync detected but no payload bytes before timeout\n");
     return 0;
   }
 
@@ -1722,7 +1722,8 @@ struct tmeter_data get_meter_data(void)
   bool tx_aborted = ((marcstate & 0x1F) == 0x16);
   if (tx_aborted)
   {
-    echo_debug(1, "[ERROR] TX ABORTED due to TXFIFO_UNDERFLOW after %dms (MARCSTATE=0x%02X)\n", tmo * 10, marcstate & 0x1F);
+    echo_debug(1, "[METER] No response during wake-up/interrogation (TXFIFO_UNDERFLOW after %dms, MARCSTATE=0x%02X)\n", tmo * 10, marcstate & 0x1F);
+    echo_debug(1, "[METER] This is expected when meter is asleep, out of range, or Year/Serial is incorrect\n");
   }
   else
   {
@@ -1741,7 +1742,7 @@ struct tmeter_data get_meter_data(void)
   if (!receive_radian_frame(0x12, 150, rxBuffer, sizeof(rxBuffer)))
   {
     echo_debug(1, "[METER] No ACK frame received (meter may be asleep/out of range)\n");
-    echo_debug(debug_out, "[ERROR] Timeout waiting for meter acknowledgement frame\n");
+    echo_debug(debug_out, "[METER] Meter acknowledgement frame timeout\n");
   }
   else
   {
@@ -1806,8 +1807,8 @@ struct tmeter_data get_meter_data(void)
   }
   else
   {
-    echo_debug(1, "[METER] ERROR: No data frame received (timeout)\n");
-    echo_debug(debug_out, "[ERROR] Timeout waiting for meter data frame\n");
+    echo_debug(1, "[METER] No data frame received (timeout)\n");
+    echo_debug(debug_out, "[METER] Meter data frame timeout\n");
   }
   sdata.rssi = halRfReadReg(RSSI_ADDR);                              // Read RSSI value from CC1101
   sdata.rssi_dbm = cc1100_rssi_convert2dbm(halRfReadReg(RSSI_ADDR)); // Read RSSI value from CC1101 and convert to dBm
