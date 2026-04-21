@@ -58,7 +58,6 @@ everblu_meter:
   # REQUIRED: Meter type
   meter_type: gas
   gas_volume_divisor: 100  # Gas meters use divisor (100 or 1000)
-  debug_cc1101: true       # Enable detailed CC1101 radio debug logs
   
   # Optional: Link to time component
   time_id: ha_time
