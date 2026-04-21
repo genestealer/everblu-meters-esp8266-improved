@@ -63,8 +63,8 @@ everblu_meter:
   # Meter identification (REQUIRED)
   meter_year: 21          # Last 2 digits of year (e.g., 21 for 2021)
   meter_serial: 12345678  # Your meter's serial number
-  cs_pin: GPIO15          # CC1101 CS / NSS (D8 on D1 mini)
-  gdo0_pin: 4             # GPIO connected to CC1101 GDO0 (D2 on D1 mini)
+  cs_pin: GPIO15          # CC1101 CS / NSS on ESP32 GPIO15
+  gdo0_pin: 4             # GPIO connected to CC1101 GDO0 on ESP32 GPIO4
   
   # Optional: set meter_type to 'gas' for gas meters (defaults to water)
   
