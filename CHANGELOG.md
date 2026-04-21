@@ -4,7 +4,9 @@ All notable changes to this project will be documented in this file.
 
 Releases are created manually by tagging commits with version tags matching `v*.*.*` (e.g., `v2.1.0`). Users should build from source and configure `private.h` with their own meter settings.
 
-## [v2.2.0] - 2026-04-06
+## [v2.2.0] - 2026-04-21
+
+> **⚠️ BREAKING CHANGE** — This release contains a breaking ESPHome configuration schema change due to the explicit SPI integration. Existing `everblu_meter` YAML configurations **will not validate** without migration. See [Migration Required](#migration-required) below.
 
 ### Breaking Changes
 
@@ -31,6 +33,8 @@ Releases are created manually by tagging commits with version tags matching `v*.
 
 ### Fixed
 
+- Reduced misleading `[ERROR] TX ABORTED due to TXFIFO_UNDERFLOW` and related `[ERROR]` log messages that appeared whenever a meter did not respond during polling. These are expected conditions (meter asleep, out of range, or wrong Year/Serial configured) and are no longer logged at error level. They now appear with `[METER]`/`[RX]` prefixes and include context explaining likely causes.
+- Updated ESPHome `error_sensor` text (visible in Home Assistant) to display actionable messages such as `"No meter response (asleep/out of range/wrong Year/Serial) - retrying"` and `"No meter response after max retries - check distance and meter Year/Serial"` instead of generic failure strings.
 - Prevented ESPHome boot state republish from overwriting CC1101 init failures with `status=Ready` and `error=None`.
 - Removed unused `cs_pin` storage from ESPHome CC1101 SPI bridge (`cc1101_set_spi_device` now takes only the SPI device pointer).
 - Removed unused `CONF_CS_PIN` import in ESPHome component schema module.
