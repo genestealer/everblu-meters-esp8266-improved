@@ -4,11 +4,10 @@
 esphome:
   name: everblu-water-meter
 
-esp32:
-  # WARNING: Arduino framework is required; ESP-IDF builds fail because everblu_meter depends on Arduino headers
-  board: esp32dev
+esp8266:
+  board: huzzah
   framework:
-    type: arduino
+    version: recommended  # Arduino core (explicit)
 
 # WiFi configuration
 wifi:
@@ -63,8 +62,8 @@ everblu_meter:
   # Meter identification (REQUIRED)
   meter_year: 21          # Last 2 digits of year (e.g., 21 for 2021)
   meter_serial: 12345678  # Your meter's serial number
-  cs_pin: GPIO15          # CC1101 CS / NSS on ESP32 GPIO15
-  gdo0_pin: 4             # GPIO connected to CC1101 GDO0 on ESP32 GPIO4
+  cs_pin: GPIO15          # CC1101 CS / NSS on ESP8266 Huzzah GPIO15
+  gdo0_pin: GPIO5         # GPIO connected to CC1101 GDO0 on ESP8266 Huzzah GPIO5 (D1)
   
   # Optional: set meter_type to 'gas' for gas meters (defaults to water)
   
