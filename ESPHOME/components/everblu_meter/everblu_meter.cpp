@@ -335,7 +335,12 @@ namespace esphome
             }
             else
             {
-                ESP_LOGE(TAG, "GDO0 pin not configured for CC1101!");
+                // Log error only once to avoid flooding the log
+                if (!gdo0_error_logged_)
+                {
+                    ESP_LOGE(TAG, "GDO0 pin not configured for CC1101!");
+                    gdo0_error_logged_ = true;
+                }
             }
         }
 

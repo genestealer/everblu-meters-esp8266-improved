@@ -1821,8 +1821,10 @@ struct tmeter_data get_meter_data(void)
 {
 #if defined(USE_ESPHOME)
   // ESPHome multi-instance flows should use get_meter_data_for_meter().
-  // Keep this wrapper for backward compatibility and direct tests.
-  return get_meter_data_for_meter(0, 0);
+  // Fail fast to avoid a blocking radio transaction with an invalid identity.
+  echo_debug(1, "[METER] get_meter_data() is unsupported in USE_ESPHOME; use get_meter_data_for_meter()\n");
+  struct tmeter_data sdata = {};
+  return sdata;
 #else
   return get_meter_data_for_meter(METER_YEAR, METER_SERIAL);
 #endif

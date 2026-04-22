@@ -520,6 +520,7 @@ bool MeterReader::isReadingDayForConfiguredSchedule(const struct tm *ptm) const
         return true;
     }
 
-    // Default to safe weekdays behaviour for unknown schedule strings.
-    return dayOfWeek >= 1 && dayOfWeek <= 5;
+    // Unknown schedule: log warning and skip read to avoid misconfiguration
+    LOG_W("everblu_meter", "Unknown reading_schedule '%s'; skipping scheduled read.", schedule);
+    return false;
 }
