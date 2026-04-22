@@ -117,6 +117,14 @@ public:
     void setHAConnected(bool connected);
 
 private:
+    static MeterReader *s_active_reader;
+
+    static bool radioInitCallback(float freq);
+    static tmeter_data meterReadCallback();
+
+    void activateCallbackContext();
+    bool isReadingDayForConfiguredSchedule(const struct tm *ptm) const;
+
     /**
      * @brief Perform actual meter reading operation
      *

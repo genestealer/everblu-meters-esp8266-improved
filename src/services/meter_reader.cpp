@@ -4,7 +4,6 @@
  */
 
 #include "meter_reader.h"
-#include "schedule_manager.h"
 #include "meter_history.h"
 
 // Conditional includes based on build environment
@@ -54,13 +53,44 @@ MeterReader::MeterReader(IConfigProvider *config, ITimeProvider *timeProvider, I
 {
 }
 
+MeterReader *MeterReader::s_active_reader = nullptr;
+
+bool MeterReader::radioInitCallback(float freq)
+{
+    if (!s_active_reader)
+    {
+        return false;
+    }
+    return cc1101_init(freq);
+}
+
+tmeter_data MeterReader::meterReadCallback()
+{
+    tmeter_data data{};
+    if (!s_active_reader)
+    {
+        return data;
+    }
+
+    return get_meter_data_for_meter(
+        s_active_reader->m_config->getMeterYear(),
+        s_active_reader->m_config->getMeterSerial());
+}
+
+void MeterReader::activateCallbackContext()
+{
+    s_active_reader = this;
+}
+
 void MeterReader::begin()
 {
     LOG_I("everblu_meter", "Initializing...");
 
+    activateCallbackContext();
+
     // Register FrequencyManager callbacks
-    FrequencyManager::setRadioInitCallback(cc1101_init);
-    FrequencyManager::setMeterReadCallback(get_meter_data);
+    FrequencyManager::setRadioInitCallback(MeterReader::radioInitCallback);
+    FrequencyManager::setMeterReadCallback(MeterReader::meterReadCallback);
 
     // Initialize FrequencyManager with configured frequency
     float frequency = m_config->getFrequency();
@@ -227,7 +257,7 @@ bool MeterReader::shouldPerformScheduledRead()
     struct tm *ptm = gmtime(&localTime);
 
     // Check if today is a valid reading day
-    bool isDayMatch = ScheduleManager::isReadingDay(ptm);
+    bool isDayMatch = isReadingDayForConfiguredSchedule(ptm);
     bool isTimeMatch = (ptm->tm_hour == m_readHourLocal && ptm->tm_min == m_readMinuteLocal);
     bool isSecondMatch = (ptm->tm_sec == 0);
 
@@ -259,6 +289,8 @@ void MeterReader::triggerReading(bool isScheduled)
 
 void MeterReader::performReading()
 {
+    activateCallbackContext();
+
     if (!m_publisher->isReady())
     {
         LOG_W("everblu_meter", "Publisher not ready, aborting read");
@@ -282,7 +314,7 @@ void MeterReader::performReading()
           currentFreq, currentOffset * 1000.0);
 
     // Perform actual meter read
-    struct tmeter_data meter_data = get_meter_data();
+    struct tmeter_data meter_data = meterReadCallback();
 
     // Validate data
     if (meter_data.reads_counter == 0 || meter_data.volume == 0)
@@ -393,6 +425,8 @@ void MeterReader::resetRetryState()
 
 void MeterReader::performFrequencyScan(bool wideRange)
 {
+    activateCallbackContext();
+
     LOG_I("everblu_meter", "Starting %s frequency scan...", wideRange ? "wide" : "narrow");
 
     if (wideRange)
@@ -417,6 +451,8 @@ void MeterReader::performFrequencyScan(bool wideRange)
 
 void MeterReader::resetFrequencyOffset()
 {
+    activateCallbackContext();
+
     LOG_I("everblu_meter", "Resetting frequency offset to 0");
 
     // Reset offset to 0 and save
@@ -424,7 +460,7 @@ void MeterReader::resetFrequencyOffset()
 
     // Reinitialize radio with base frequency
     float baseFrequency = FrequencyManager::getBaseFrequency();
-    bool radio_ok = cc1101_init(baseFrequency);
+    bool radio_ok = radioInitCallback(baseFrequency);
     m_radioConnected = radio_ok;
 
     if (radio_ok)
@@ -455,4 +491,35 @@ void MeterReader::getStatistics(unsigned long &totalAttempts, unsigned long &suc
 void MeterReader::setHAConnected(bool connected)
 {
     m_haConnected = connected;
+}
+
+bool MeterReader::isReadingDayForConfiguredSchedule(const struct tm *ptm) const
+{
+    if (ptm == nullptr)
+    {
+        return false;
+    }
+
+    const char *schedule = m_config->getReadingSchedule();
+    if (schedule == nullptr)
+    {
+        schedule = "Monday-Friday";
+    }
+
+    const int dayOfWeek = ptm->tm_wday; // 0=Sunday, 1=Monday, ... 6=Saturday
+    if (strcmp(schedule, "Monday-Friday") == 0)
+    {
+        return dayOfWeek >= 1 && dayOfWeek <= 5;
+    }
+    if (strcmp(schedule, "Monday-Saturday") == 0)
+    {
+        return dayOfWeek >= 1 && dayOfWeek <= 6;
+    }
+    if (strcmp(schedule, "Monday-Sunday") == 0)
+    {
+        return true;
+    }
+
+    // Default to safe weekdays behaviour for unknown schedule strings.
+    return dayOfWeek >= 1 && dayOfWeek <= 5;
 }

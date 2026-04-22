@@ -1,0 +1,224 @@
+substitutions:
+  device_name: everblu-meter
+  friendly_name: EverBlu Meter
+
+  cc1101_cs: "GPIO15"
+  cc1101_gdo0: "GPIO5"
+  tz_offset_min: "0"
+  meter_1_prefix: "Meter 1"
+  meter_2_prefix: "Meter 2"
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+
+esp8266:
+  board: huzzah
+  framework:
+    version: recommended
+
+logger:
+  level: DEBUG
+  logs:
+    everblu_meter: DEBUG
+    sensor: WARN
+
+api:
+  encryption:
+    key: "CHANGE_ME"
+
+ota:
+  - platform: esphome
+    password: "CHANGE_ME"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+external_components:
+  - source:
+      type: git
+      url: https://github.com/genestealer/everblu-meters-esp8266-improved
+      ref: main
+      path: ESPHOME-release
+    components: [everblu_meter]
+    refresh: 1d
+
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+
+spi:
+  - id: main_bus
+    clk_pin: GPIO14
+    mosi_pin: GPIO13
+    miso_pin: GPIO12
+
+everblu_meter:
+  - id: cold_water_meter
+    meter_year: 20
+    meter_serial: 257750
+    meter_type: water
+    debug_cc1101: true
+    spi_id: main_bus
+    cs_pin:
+      number: ${cc1101_cs}
+      allow_other_uses: true
+    gdo0_pin:
+      number: ${cc1101_gdo0}
+      allow_other_uses: true
+    time_id: homeassistant_time
+    timezone_offset: ${tz_offset_min}
+    read_hour: 11
+    read_minute: 30
+
+    request_reading_button:
+      name: "${meter_1_prefix} Read Meter Now"
+    frequency_scan_button:
+      name: "${meter_1_prefix} Scan Frequency"
+    reset_frequency_button:
+      name: "${meter_1_prefix} Reset Frequency Offset"
+
+    volume:
+      name: "${meter_1_prefix} Water Volume"
+    counter:
+      name: "${meter_1_prefix} Read Counter"
+    battery:
+      name: "${meter_1_prefix} Meter Battery"
+    rssi:
+      name: "${meter_1_prefix} Meter RSSI"
+    rssi_percentage:
+      name: "${meter_1_prefix} RSSI Percentage"
+    lqi:
+      name: "${meter_1_prefix} LQI"
+    lqi_percentage:
+      name: "${meter_1_prefix} LQI Percentage"
+
+    total_attempts:
+      name: "${meter_1_prefix} Total Read Attempts"
+    successful_reads:
+      name: "${meter_1_prefix} Successful Reads"
+    failed_reads:
+      name: "${meter_1_prefix} Failed Reads"
+    frequency_offset:
+      name: "${meter_1_prefix} Frequency Offset"
+    tuned_frequency:
+      name: "${meter_1_prefix} Tuned Frequency (MHz)"
+    frequency_estimate:
+      name: "${meter_1_prefix} Frequency Estimate"
+
+    meter_serial_sensor:
+      name: "${meter_1_prefix} Meter Serial"
+    meter_year_sensor:
+      name: "${meter_1_prefix} Meter Year"
+    reading_schedule_sensor:
+      name: "${meter_1_prefix} Reading Schedule"
+    reading_time_utc_sensor:
+      name: "${meter_1_prefix} Reading Time (UTC)"
+
+    time_start:
+      name: "${meter_1_prefix} Reading Start Time"
+    time_end:
+      name: "${meter_1_prefix} Reading End Time"
+
+    status:
+      name: "${meter_1_prefix} Meter Status"
+    error:
+      name: "${meter_1_prefix} Last Error"
+    radio_state:
+      name: "${meter_1_prefix} CC1101 State"
+    timestamp:
+      name: "${meter_1_prefix} Last Reading Time"
+    history_json:
+      name: "${meter_1_prefix} Meter History (JSON)"
+    firmware_version:
+      name: "${meter_1_prefix} Firmware Version"
+
+    active_reading:
+      name: "${meter_1_prefix} Reading Active"
+    radio_connected:
+      name: "${meter_1_prefix} CC1101 Connected"
+
+  - id: hot_water_meter
+    meter_year: 20
+    meter_serial: 259301
+    meter_type: water
+    debug_cc1101: true
+    spi_id: main_bus
+    cs_pin:
+      number: ${cc1101_cs}
+      allow_other_uses: true
+    gdo0_pin:
+      number: ${cc1101_gdo0}
+      allow_other_uses: true
+    time_id: homeassistant_time
+    timezone_offset: ${tz_offset_min}
+    read_hour: 11
+    read_minute: 40
+
+    request_reading_button:
+      name: "${meter_2_prefix} Read Meter Now"
+    frequency_scan_button:
+      name: "${meter_2_prefix} Scan Frequency"
+    reset_frequency_button:
+      name: "${meter_2_prefix} Reset Frequency Offset"
+
+    volume:
+      name: "${meter_2_prefix} Water Volume"
+    counter:
+      name: "${meter_2_prefix} Read Counter"
+    battery:
+      name: "${meter_2_prefix} Meter Battery"
+    rssi:
+      name: "${meter_2_prefix} Meter RSSI"
+    rssi_percentage:
+      name: "${meter_2_prefix} RSSI Percentage"
+    lqi:
+      name: "${meter_2_prefix} LQI"
+    lqi_percentage:
+      name: "${meter_2_prefix} LQI Percentage"
+
+    total_attempts:
+      name: "${meter_2_prefix} Total Read Attempts"
+    successful_reads:
+      name: "${meter_2_prefix} Successful Reads"
+    failed_reads:
+      name: "${meter_2_prefix} Failed Reads"
+    frequency_offset:
+      name: "${meter_2_prefix} Frequency Offset"
+    tuned_frequency:
+      name: "${meter_2_prefix} Tuned Frequency (MHz)"
+    frequency_estimate:
+      name: "${meter_2_prefix} Frequency Estimate"
+
+    meter_serial_sensor:
+      name: "${meter_2_prefix} Meter Serial"
+    meter_year_sensor:
+      name: "${meter_2_prefix} Meter Year"
+    reading_schedule_sensor:
+      name: "${meter_2_prefix} Reading Schedule"
+    reading_time_utc_sensor:
+      name: "${meter_2_prefix} Reading Time (UTC)"
+
+    time_start:
+      name: "${meter_2_prefix} Reading Start Time"
+    time_end:
+      name: "${meter_2_prefix} Reading End Time"
+
+    status:
+      name: "${meter_2_prefix} Meter Status"
+    error:
+      name: "${meter_2_prefix} Last Error"
+    radio_state:
+      name: "${meter_2_prefix} CC1101 State"
+    timestamp:
+      name: "${meter_2_prefix} Last Reading Time"
+    history_json:
+      name: "${meter_2_prefix} Meter History (JSON)"
+    firmware_version:
+      name: "${meter_2_prefix} Firmware Version"
+
+    active_reading:
+      name: "${meter_2_prefix} Reading Active"
+    radio_connected:
+      name: "${meter_2_prefix} CC1101 Connected"

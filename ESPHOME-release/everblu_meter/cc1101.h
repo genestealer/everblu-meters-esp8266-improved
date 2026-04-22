@@ -105,4 +105,16 @@ void cc1101_rec_mode(void);
  */
 struct tmeter_data get_meter_data(void);
 
+/**
+ * @brief Read data from a specific meter identity
+ *
+ * Same as get_meter_data(), but uses explicit meter identification instead of
+ * compile-time defines. This is required for ESPHome multi-instance support.
+ *
+ * @param meter_year Last two digits of meter production year
+ * @param meter_serial Meter serial number
+ * @return tmeter_data structure containing all extracted meter data
+ */
+struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_serial);
+
 #endif // __CC1101_H__

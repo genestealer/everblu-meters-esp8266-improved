@@ -144,24 +144,8 @@ namespace esphome
 
             ESP_LOGD(TAG, "Linked sensors -> numeric: %d, text: %d, binary: %d", numeric, texts, binaries);
 
-            // Initialize CC1101 SPI device before creating meter reader
-            auto *spi_device = static_cast<spi::SPIDevice<spi::BIT_ORDER_MSB_FIRST,
-                                                          spi::CLOCK_POLARITY_LOW,
-                                                          spi::CLOCK_PHASE_LEADING,
-                                                          spi::DATA_RATE_1MHZ> *>(this);
-            cc1101_set_spi_device(static_cast<void *>(spi_device));
-            ESP_LOGD(TAG, "CC1101 SPI device configured");
-
-            // Configure GDO0 pin for CC1101
-            if (gdo0_pin_ != nullptr)
-            {
-                cc1101_set_gdo0_pin(gdo0_pin_->get_pin());
-                ESP_LOGD(TAG, "CC1101 GDO0 pin configured: %d", gdo0_pin_->get_pin());
-            }
-            else
-            {
-                ESP_LOGE(TAG, "GDO0 pin not configured for CC1101!");
-            }
+            // Initialize CC1101 context before creating meter reader
+            apply_radio_context();
 
             // Create meter reader with all adapters (but don't initialize yet)
             meter_reader_ = new MeterReader(config_provider_, time_provider_, data_publisher_);
@@ -237,6 +221,9 @@ namespace esphome
             // Let the meter reader handle its periodic tasks
             if (meter_reader_ != nullptr)
             {
+                // Ensure this instance's SPI and GDO0 settings are active before any radio operations.
+                apply_radio_context();
+
 #ifdef USE_API
                 // Initialize meter reader when Home Assistant connects (ensures safe boot sequence)
                 // This is better than WiFi-only check because API connection is more stable
@@ -249,6 +236,7 @@ namespace esphome
                     if (!meter_initialized_ && is_ha_connected)
                     {
                         ESP_LOGI(TAG, "Home Assistant connected, initializing meter reader...");
+                        apply_radio_context();
                         meter_reader_->begin();
 
                         // Set adaptive frequency tracking threshold
@@ -302,6 +290,7 @@ namespace esphome
             }
 
             ESP_LOGI(TAG, "Manual read requested via button");
+            apply_radio_context();
             meter_reader_->triggerReading(false);
         }
 
@@ -314,6 +303,7 @@ namespace esphome
             }
 
             ESP_LOGI(TAG, "Frequency scan requested via button");
+            apply_radio_context();
             meter_reader_->performFrequencyScan(false);
         }
 
@@ -326,8 +316,27 @@ namespace esphome
             }
 
             ESP_LOGI(TAG, "Reset frequency offset requested via button");
+            apply_radio_context();
             meter_reader_->resetFrequencyOffset();
             ESP_LOGI(TAG, "Frequency offset reset to 0.000 kHz");
+        }
+
+        void EverbluMeterComponent::apply_radio_context()
+        {
+            auto *spi_device = static_cast<spi::SPIDevice<spi::BIT_ORDER_MSB_FIRST,
+                                                          spi::CLOCK_POLARITY_LOW,
+                                                          spi::CLOCK_PHASE_LEADING,
+                                                          spi::DATA_RATE_1MHZ> *>(this);
+            cc1101_set_spi_device(static_cast<void *>(spi_device));
+
+            if (gdo0_pin_ != nullptr)
+            {
+                cc1101_set_gdo0_pin(gdo0_pin_->get_pin());
+            }
+            else
+            {
+                ESP_LOGE(TAG, "GDO0 pin not configured for CC1101!");
+            }
         }
 
         void EverbluMeterComponent::update()

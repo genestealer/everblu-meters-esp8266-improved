@@ -29,7 +29,7 @@ CODEOWNERS = ["@genestealer"]
 AUTO_LOAD = ["sensor", "text_sensor", "binary_sensor", "button"]
 
 # Tell ESPHome to include all source files in src/ subdirectories
-MULTI_CONF = False
+MULTI_CONF = True
 
 everblu_meter_ns = cg.esphome_ns.namespace("everblu_meter")
 EverbluMeterComponent = everblu_meter_ns.class_("EverbluMeterComponent", cg.PollingComponent)
@@ -289,11 +289,6 @@ async def to_code(config):
     # Use build flags instead of defines to ensure propagation to ALL .cpp files
     cg.add_build_flag("-DUSE_ESPHOME")
     cg.add_build_flag("-DWIFI_SERIAL_NO_REMAP")  # Don't remap Serial in ESPHome builds
-    # Provide compile-time values expected by core code as numeric preprocessor defines
-    # Use explicit -D flags to ensure visibility in all translation units
-    cg.add_build_flag(f"-DMETER_YEAR={config[CONF_METER_YEAR]}")
-    cg.add_build_flag(f"-DMETER_SERIAL={config[CONF_METER_SERIAL]}")
-    
     # Note: ESPHome automatically compiles all .cpp files in component directory
     # No need to explicitly list source files - just ensure main.cpp is excluded from release
     

@@ -1584,7 +1584,7 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
    but for read-only operation, this is not required.
 */
 
-struct tmeter_data get_meter_data(void)
+struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_serial)
 {
   // Avoid leading newline so ESPHome log doesn't emit an empty line first
   echo_debug(1, "[METER] Starting meter read sequence...\n");
@@ -1603,10 +1603,10 @@ struct tmeter_data get_meter_data(void)
   memset(meter_data, 0, sizeof(meter_data)); // Clear static buffer
 
   uint8_t txbuffer[100];
-  Make_Radian_Master_req(txbuffer, METER_YEAR, METER_SERIAL);
+  Make_Radian_Master_req(txbuffer, meter_year, meter_serial);
 
   echo_debug(1, "[METER] Transmitting wake-up + interrogation (Year=%d, Serial=%lu)...\n",
-             METER_YEAR, (unsigned long)METER_SERIAL);
+             meter_year, (unsigned long)meter_serial);
 
   // === Critical: Reset radio state before TX ===
   // If the radio is stuck in RXFIFO_OVERFLOW (0x11) or any non-IDLE state from
@@ -1815,4 +1815,15 @@ struct tmeter_data get_meter_data(void)
   sdata.lqi = halRfReadReg(LQI_ADDR);                                // Read LQI value from CC1101
   sdata.freqest = (int8_t)halRfReadReg(FREQEST_ADDR);                // Read frequency offset estimate for adaptive tracking
   return sdata;
+}
+
+struct tmeter_data get_meter_data(void)
+{
+#if defined(USE_ESPHOME)
+  // ESPHome multi-instance flows should use get_meter_data_for_meter().
+  // Keep this wrapper for backward compatibility and direct tests.
+  return get_meter_data_for_meter(0, 0);
+#else
+  return get_meter_data_for_meter(METER_YEAR, METER_SERIAL);
+#endif
 }

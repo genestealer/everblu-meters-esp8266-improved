@@ -155,6 +155,7 @@ namespace esphome
 
             // Internal state tracking
             void republish_initial_states();
+            void apply_radio_context();
 
             // GDO0 pin (raw GPIO number for CC1101 Arduino driver)
             InternalGPIOPin *gdo0_pin_{nullptr};
