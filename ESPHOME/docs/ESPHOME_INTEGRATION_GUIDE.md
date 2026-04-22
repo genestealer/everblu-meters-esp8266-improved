@@ -530,14 +530,19 @@ sensor:
 
 ### Multiple Meters
 
-You SHOULD be able to configure multiple meters on one ESP (I have not been able to test this):
+Multiple meters are supported by defining a YAML list under `everblu_meter`:
 
 ```yaml
 everblu_meter:
   - id: water_meter
     meter_year: 21
     meter_serial: 12345678
-    gdo0_pin: 4
+    cs_pin:
+      number: GPIO15
+      allow_other_uses: true
+    gdo0_pin:
+      number: GPIO4
+      allow_other_uses: true
     meter_type: water
     volume:
       name: "Water Volume"
@@ -545,13 +550,25 @@ everblu_meter:
   - id: gas_meter
     meter_year: 22
     meter_serial: 87654321
-    gdo0_pin: 4
+    cs_pin:
+      number: GPIO15
+      allow_other_uses: true
+    gdo0_pin:
+      number: GPIO4
+      allow_other_uses: true
     meter_type: gas
     volume:
       name: "Gas Volume"
 ```
 
 **Note**: Reading multiple meters requires careful scheduling to avoid conflicts.
+
+Use unique `id` and entity `name` values per meter block. If both meters share one CC1101 module,
+they should use the same SPI, CS, and GDO0 wiring settings.
+
+**Shared pin note**: When multiple `everblu_meter` instances share the same CC1101 radio,
+ESPHome requires shared pins to be declared with `allow_other_uses: true`. Apply this to both
+`cs_pin` and `gdo0_pin` in every meter block that uses the shared radio.
 
 ## Developer Notes
 
