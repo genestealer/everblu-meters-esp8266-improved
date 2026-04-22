@@ -97,12 +97,53 @@ SCHEDULE_MONDAY_SUNDAY = "Monday-Sunday"
 CONF_GDO0_PIN = "gdo0_pin"
 
 
+def validate_meter_year(value):
+    """Validate and normalize 2-digit meter year values."""
+    if isinstance(value, str):
+        year_str = value.strip()
+        if not year_str:
+            raise cv.Invalid("meter_year cannot be empty")
+        if not year_str.isdigit():
+            raise cv.Invalid("meter_year must contain only digits")
+        if len(year_str) > 2:
+            raise cv.Invalid("meter_year must be 1 or 2 digits")
+        year = int(year_str)
+    else:
+        year = cv.int_(value)
+    if year < 0 or year > 99:
+        raise cv.Invalid("meter_year must be between 0 and 99")
+    return year
+
+
+def validate_meter_serial(value):
+    """Accept serials with leading zeros and normalize to integer form."""
+    if isinstance(value, str):
+        serial_str = value.strip()
+        if not serial_str:
+            raise cv.Invalid("meter_serial cannot be empty")
+        if not serial_str.isdigit():
+            raise cv.Invalid("meter_serial must contain only digits")
+        if len(serial_str) > 8:
+            raise cv.Invalid("meter_serial must be at most 8 digits")
+        serial_str = serial_str.lstrip("0")
+        if not serial_str:
+            raise cv.Invalid("meter_serial cannot be zero")
+        value = serial_str
+
+    serial = cv.uint32_t(value)
+    if serial <= 0:
+        raise cv.Invalid("meter_serial must be greater than zero")
+    if serial > 99999999:
+        raise cv.Invalid("meter_serial must be at most 8 digits")
+    return serial
+
+
 CONFIG_SCHEMA = (
     cv.Schema(
         {
             cv.GenerateID(): cv.declare_id(EverbluMeterComponent),
-            cv.Required(CONF_METER_YEAR): cv.int_range(min=0, max=99),
-            cv.Required(CONF_METER_SERIAL): cv.uint32_t,
+            cv.Required(CONF_METER_YEAR): validate_meter_year,
+            cv.Required(CONF_METER_SERIAL): validate_meter_serial,
             cv.Required(CONF_GDO0_PIN): pins.internal_gpio_input_pin_schema,
             cv.Required(CONF_TIME_ID): cv.use_id(time_.RealTimeClock),
             cv.Optional(CONF_METER_TYPE, default=METER_TYPE_WATER): cv.enum(
