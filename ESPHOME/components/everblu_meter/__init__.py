@@ -123,6 +123,8 @@ def validate_meter_serial(value):
             raise cv.Invalid("meter_serial cannot be empty")
         if not serial_str.isdigit():
             raise cv.Invalid("meter_serial must contain only digits")
+        if len(serial_str) > 8:
+            raise cv.Invalid("meter_serial must be at most 8 digits")
         serial_str = serial_str.lstrip("0")
         if not serial_str:
             raise cv.Invalid("meter_serial cannot be zero")
