@@ -519,6 +519,50 @@ bool MeterReader::isReadingDayForConfiguredSchedule(const struct tm *ptm) const
     {
         return true;
     }
+    switch(dayOfWeek) {
+        case 0:
+            return strcmp(schedule, "Sunday") == 0;
+        case 1:
+            return strcmp(schedule, "Monday") == 0;
+        case 2:
+            return strcmp(schedule, "Tuesday") == 0;
+        case 3:
+            return strcmp(schedule, "Wednesday") == 0;
+        case 4:
+            return strcmp(schedule, "Thursday") == 0;
+        case 5:
+            return strcmp(schedule, "Friday") == 0;
+        case 6:
+            return strcmp(schedule, "Saturday") == 0;
+    }
+    // if (strcmp(schedule, "Sunday") == 0)
+    // {
+    //     return dayOfWeek == 1;
+    // }
+    // if (strcmp(schedule, "Monday") == 0)
+    // {
+    //     return dayOfWeek == 1;
+    // }
+    // if (strcmp(schedule, "Tuesday") == 0)
+    // {
+    //     return dayOfWeek == 1;
+    // }
+    // if (strcmp(schedule, "Wednesday") == 0)
+    // {
+    //     return dayOfWeek == 1;
+    // }
+    // if (strcmp(schedule, "Thursday") == 0)
+    // {
+    //     return dayOfWeek == 1;
+    // }
+    // if (strcmp(schedule, "Friday") == 0)
+    // {
+    //     return dayOfWeek == 1;
+    // }
+    // if (strcmp(schedule, "Saturday") == 0)
+    // {
+    //     return dayOfWeek == 1;
+    // }
 
     // Unknown schedule: log warning and skip read to avoid misconfiguration
     LOG_W("everblu_meter", "Unknown reading_schedule '%s'; skipping scheduled read.", schedule);
