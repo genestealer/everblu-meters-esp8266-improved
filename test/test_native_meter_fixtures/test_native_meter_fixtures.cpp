@@ -10,7 +10,7 @@
 #include <string>
 #include <vector>
 
-#include "src/core/radian_parser.h"
+#include "core/radian_parser.h"
 
 struct Fixture
 {
