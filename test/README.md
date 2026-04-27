@@ -30,6 +30,23 @@ pio test -e huzzah
 
 # Run with verbose output
 pio test -v
+
+# Run native fixture replay tests (no hardware required)
+pio test -e native -v
+```
+
+### Native Fixture Replay (GitHub CI compatible)
+
+The `test_native_meter_fixtures` suite replays captured decoded meter frames from:
+
+- `test/fixtures/meter_frames/fixtures.lst`
+
+This suite runs on host (PlatformIO `native` environment), so it is suitable for GitHub Actions.
+
+To generate fixture entries from firmware logs, use:
+
+```bash
+python script/extract-meter-fixture.py --input meter-capture.log --append --name-prefix capture
 ```
 
 ### Test Framework
