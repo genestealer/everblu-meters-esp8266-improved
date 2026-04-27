@@ -15,8 +15,8 @@ Enable CC1101 debug logs in your local firmware config.
 **ESPHome** — add to your device YAML:
 
 ```yaml
-components:
-  everblu_meter:
+everblu_meter:
+  - id: water_meter
     debug_cc1101: true
 ```
 

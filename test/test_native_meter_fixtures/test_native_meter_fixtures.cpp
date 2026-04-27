@@ -3,10 +3,13 @@
 #include <cctype>
 #include <cstdint>
 #include <cstdlib>
+#include <cerrno>
 #include <fstream>
 #include <sstream>
 #include <string>
 #include <vector>
+
+#include "radian_parser.h"
 
 struct Fixture {
     std::string name;
@@ -19,108 +22,6 @@ struct Fixture {
     bool expected_history_available;
     bool expected_crc_valid;
 };
-
-static uint16_t crc_kermit(const uint8_t *input_ptr, size_t num_bytes) {
-    uint16_t crc = 0x0000;
-    for (size_t i = 0; i < num_bytes; i++) {
-        crc ^= input_ptr[i];
-        for (int j = 0; j < 8; j++) {
-            if (crc & 0x0001) {
-                crc = (crc >> 1) ^ 0x8408;
-            } else {
-                crc >>= 1;
-            }
-        }
-    }
-
-    uint16_t low_byte = (crc & 0xff00) >> 8;
-    uint16_t high_byte = (crc & 0x00ff) << 8;
-    return static_cast<uint16_t>(low_byte | high_byte);
-}
-
-static bool validate_radian_crc(const std::vector<uint8_t> &decoded) {
-    const size_t size = decoded.size();
-    if (size < 4) {
-        return false;
-    }
-
-    const uint8_t length_field = decoded[0];
-    size_t expected_len = length_field ? length_field : size;
-
-    if (expected_len > size) {
-        const size_t missing = expected_len - size;
-        if (missing == 2) {
-            return true;
-        }
-        return true;
-    }
-
-    if (expected_len < 4) {
-        return false;
-    }
-
-    const size_t crc_offset = expected_len - 2;
-    if (crc_offset + 1 >= size) {
-        return true;
-    }
-
-    const uint16_t received_crc = (static_cast<uint16_t>(decoded[crc_offset]) << 8) |
-                                  static_cast<uint16_t>(decoded[crc_offset + 1]);
-
-    if (expected_len <= 3) {
-        return false;
-    }
-
-    const uint16_t computed_crc = crc_kermit(decoded.data() + 1, expected_len - 3);
-    return computed_crc == received_crc;
-}
-
-struct ParsedData {
-    uint32_t volume;
-    uint32_t battery_left;
-    uint32_t reads_counter;
-    uint32_t time_start;
-    uint32_t time_end;
-    bool history_available;
-};
-
-static ParsedData parse_meter_report(const std::vector<uint8_t> &decoded) {
-    ParsedData out{};
-
-    if (decoded.size() < 30) {
-        return out;
-    }
-
-    out.volume = static_cast<uint32_t>(decoded[18]) |
-                 (static_cast<uint32_t>(decoded[19]) << 8) |
-                 (static_cast<uint32_t>(decoded[20]) << 16) |
-                 (static_cast<uint32_t>(decoded[21]) << 24);
-
-    if (out.volume == 0 || out.volume == 0xFFFFFFFFUL) {
-        out = {};
-        return out;
-    }
-
-    if (decoded.size() >= 49) {
-        out.reads_counter = decoded[48];
-        out.battery_left = decoded[31];
-        out.time_start = decoded[44];
-        out.time_end = decoded[45];
-
-        if (out.time_start > 23 || out.time_end > 23) {
-            out = {};
-            return out;
-        }
-
-        if (out.battery_left == 0xFF || out.reads_counter == 0xFF) {
-            out = {};
-            return out;
-        }
-    }
-
-    out.history_available = decoded.size() >= 118;
-    return out;
-}
 
 static std::string trim(const std::string &s) {
     size_t start = 0;
@@ -146,23 +47,40 @@ static std::vector<std::string> split(const std::string &s, char delim) {
     return out;
 }
 
-static std::vector<uint8_t> parse_hex_bytes(const std::string &hex_string) {
-    std::vector<uint8_t> out;
+static bool parse_hex_bytes(const std::string &hex_string, std::vector<uint8_t> &out) {
+    out.clear();
     std::stringstream ss(hex_string);
     std::string tok;
 
     while (ss >> tok) {
         if (tok.size() != 2) {
-            continue;
+            return false;
         }
         char *end = nullptr;
         long value = std::strtol(tok.c_str(), &end, 16);
-        if (end && *end == '\0' && value >= 0 && value <= 255) {
-            out.push_back(static_cast<uint8_t>(value));
+        if (!(end && *end == '\0' && value >= 0 && value <= 255)) {
+            return false;
         }
+        out.push_back(static_cast<uint8_t>(value));
     }
 
-    return out;
+    return !out.empty();
+}
+
+static bool parse_u32_field(const std::string &input, uint32_t &out) {
+    const std::string cleaned = trim(input);
+    if (cleaned.empty()) {
+        return false;
+    }
+
+    errno = 0;
+    char *end = nullptr;
+    unsigned long value = std::strtoul(cleaned.c_str(), &end, 10);
+    if (errno != 0 || end == nullptr || *end != '\0') {
+        return false;
+    }
+    out = static_cast<uint32_t>(value);
+    return true;
 }
 
 static std::ifstream open_fixture_list() {
@@ -183,40 +101,64 @@ static std::ifstream open_fixture_list() {
     return std::ifstream();
 }
 
-static std::vector<Fixture> load_fixtures() {
+struct FixtureLoadResult {
     std::vector<Fixture> fixtures;
+    bool fixture_file_found;
+    size_t data_line_count;
+    size_t parse_error_count;
+};
+
+static FixtureLoadResult load_fixtures() {
+    FixtureLoadResult result{};
     std::ifstream in = open_fixture_list();
     if (!in.good()) {
-        return fixtures;
+        result.fixture_file_found = false;
+        return result;
     }
+    result.fixture_file_found = true;
 
     std::string line;
+    size_t line_number = 0;
     while (std::getline(in, line)) {
+        line_number++;
         line = trim(line);
         if (line.empty() || line[0] == '#') {
             continue;
         }
+        result.data_line_count++;
 
         std::vector<std::string> parts = split(line, '|');
         if (parts.size() != 9) {
+            result.parse_error_count++;
             continue;
         }
 
         Fixture fx;
         fx.name = trim(parts[0]);
-        fx.decoded = parse_hex_bytes(parts[1]);
-        fx.expected_volume = static_cast<uint32_t>(std::strtoul(trim(parts[2]).c_str(), nullptr, 10));
-        fx.expected_battery = static_cast<uint32_t>(std::strtoul(trim(parts[3]).c_str(), nullptr, 10));
-        fx.expected_counter = static_cast<uint32_t>(std::strtoul(trim(parts[4]).c_str(), nullptr, 10));
-        fx.expected_time_start = static_cast<uint32_t>(std::strtoul(trim(parts[5]).c_str(), nullptr, 10));
-        fx.expected_time_end = static_cast<uint32_t>(std::strtoul(trim(parts[6]).c_str(), nullptr, 10));
-        fx.expected_history_available = std::strtoul(trim(parts[7]).c_str(), nullptr, 10) != 0;
-        fx.expected_crc_valid = std::strtoul(trim(parts[8]).c_str(), nullptr, 10) != 0;
+        uint32_t history_u32 = 0;
+        uint32_t crc_u32 = 0;
+        bool ok = true;
+        ok = ok && parse_hex_bytes(parts[1], fx.decoded);
+        ok = ok && parse_u32_field(parts[2], fx.expected_volume);
+        ok = ok && parse_u32_field(parts[3], fx.expected_battery);
+        ok = ok && parse_u32_field(parts[4], fx.expected_counter);
+        ok = ok && parse_u32_field(parts[5], fx.expected_time_start);
+        ok = ok && parse_u32_field(parts[6], fx.expected_time_end);
+        ok = ok && parse_u32_field(parts[7], history_u32);
+        ok = ok && parse_u32_field(parts[8], crc_u32);
 
-        fixtures.push_back(fx);
+        if (!ok) {
+            (void)line_number;
+            result.parse_error_count++;
+            continue;
+        }
+
+        fx.expected_history_available = history_u32 != 0;
+        fx.expected_crc_valid = crc_u32 != 0;
+        result.fixtures.push_back(fx);
     }
 
-    return fixtures;
+    return result;
 }
 
 void setUp(void) {}
@@ -224,9 +166,16 @@ void setUp(void) {}
 void tearDown(void) {}
 
 void test_replay_meter_fixtures(void) {
-    std::vector<Fixture> fixtures = load_fixtures();
+    FixtureLoadResult loaded = load_fixtures();
 
-    if (fixtures.empty()) {
+    TEST_ASSERT_EQUAL_UINT32_MESSAGE(
+        0,
+        static_cast<uint32_t>(loaded.parse_error_count),
+        "Malformed fixture line(s) found in fixtures.lst");
+
+    std::vector<Fixture> fixtures = loaded.fixtures;
+
+    if (!loaded.fixture_file_found || fixtures.empty()) {
         TEST_PASS_MESSAGE("No meter fixtures present yet. Capture frames and append fixtures.lst.");
         return;
     }
@@ -234,7 +183,7 @@ void test_replay_meter_fixtures(void) {
     for (const Fixture &fx : fixtures) {
         TEST_ASSERT_TRUE_MESSAGE(!fx.decoded.empty(), fx.name.c_str());
 
-        bool crc_ok = validate_radian_crc(fx.decoded);
+        bool crc_ok = radian_validate_crc(fx.decoded.data(), fx.decoded.size());
         TEST_ASSERT_EQUAL_INT_MESSAGE(
             fx.expected_crc_valid ? 1 : 0,
             crc_ok ? 1 : 0,
@@ -244,7 +193,9 @@ void test_replay_meter_fixtures(void) {
             continue;
         }
 
-        ParsedData parsed = parse_meter_report(fx.decoded);
+        struct radian_primary_data parsed;
+        bool parsed_ok = radian_parse_primary_data(fx.decoded.data(), fx.decoded.size(), &parsed);
+        TEST_ASSERT_TRUE_MESSAGE(parsed_ok, fx.name.c_str());
 
         TEST_ASSERT_EQUAL_UINT32_MESSAGE(fx.expected_volume, parsed.volume, fx.name.c_str());
         TEST_ASSERT_EQUAL_UINT32_MESSAGE(fx.expected_battery, parsed.battery_left, fx.name.c_str());

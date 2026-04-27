@@ -37,7 +37,9 @@ HEX_BYTE_RE = re.compile(r"\b[0-9A-Fa-f]{2}\b")
 _ESPHOME_PREFIX_RE = re.compile(r"^(?:\[[^\]]*\]\s*)+:\s*")
 
 def _strip_esphome_prefix(line: str) -> str:
-    """Remove any leading [bracket][groups]: prefix (ESPHome or similar) if present."""
+    """Remove an ESPHome-style log prefix while preserving raw MQTT dump lines."""
+    if HEX_LINE_RE.match(line):
+        return line
     m = _ESPHOME_PREFIX_RE.match(line)
     return line[m.end():] if m else line
 
