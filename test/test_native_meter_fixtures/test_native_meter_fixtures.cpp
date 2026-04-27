@@ -11,7 +11,8 @@
 
 #include "radian_parser.h"
 
-struct Fixture {
+struct Fixture
+{
     std::string name;
     std::vector<uint8_t> decoded;
     uint32_t expected_volume;
@@ -23,42 +24,51 @@ struct Fixture {
     bool expected_crc_valid;
 };
 
-static std::string trim(const std::string &s) {
+static std::string trim(const std::string &s)
+{
     size_t start = 0;
-    while (start < s.size() && std::isspace(static_cast<unsigned char>(s[start]))) {
+    while (start < s.size() && std::isspace(static_cast<unsigned char>(s[start])))
+    {
         start++;
     }
 
     size_t end = s.size();
-    while (end > start && std::isspace(static_cast<unsigned char>(s[end - 1]))) {
+    while (end > start && std::isspace(static_cast<unsigned char>(s[end - 1])))
+    {
         end--;
     }
 
     return s.substr(start, end - start);
 }
 
-static std::vector<std::string> split(const std::string &s, char delim) {
+static std::vector<std::string> split(const std::string &s, char delim)
+{
     std::vector<std::string> out;
     std::stringstream ss(s);
     std::string part;
-    while (std::getline(ss, part, delim)) {
+    while (std::getline(ss, part, delim))
+    {
         out.push_back(part);
     }
     return out;
 }
 
-static bool parse_hex_bytes(const std::string &hex_string, std::vector<uint8_t> &out) {
+static bool parse_hex_bytes(const std::string &hex_string, std::vector<uint8_t> &out)
+{
     out.clear();
     std::stringstream ss(hex_string);
     std::string tok;
 
-    while (ss >> tok) {
-        if (tok.size() != 2) {
+    while (ss >> tok)
+    {
+        if (tok.size() != 2)
+        {
             return false;
         }
         char *end = nullptr;
         long value = std::strtol(tok.c_str(), &end, 16);
-        if (!(end && *end == '\0' && value >= 0 && value <= 255)) {
+        if (!(end && *end == '\0' && value >= 0 && value <= 255))
+        {
             return false;
         }
         out.push_back(static_cast<uint8_t>(value));
@@ -67,23 +77,27 @@ static bool parse_hex_bytes(const std::string &hex_string, std::vector<uint8_t> 
     return !out.empty();
 }
 
-static bool parse_u32_field(const std::string &input, uint32_t &out) {
+static bool parse_u32_field(const std::string &input, uint32_t &out)
+{
     const std::string cleaned = trim(input);
-    if (cleaned.empty()) {
+    if (cleaned.empty())
+    {
         return false;
     }
 
     errno = 0;
     char *end = nullptr;
     unsigned long value = std::strtoul(cleaned.c_str(), &end, 10);
-    if (errno != 0 || end == nullptr || *end != '\0') {
+    if (errno != 0 || end == nullptr || *end != '\0')
+    {
         return false;
     }
     out = static_cast<uint32_t>(value);
     return true;
 }
 
-static std::ifstream open_fixture_list() {
+static std::ifstream open_fixture_list()
+{
     const char *candidates[] = {
         "test/fixtures/meter_frames/fixtures.lst",
         "../test/fixtures/meter_frames/fixtures.lst",
@@ -91,9 +105,11 @@ static std::ifstream open_fixture_list() {
         "../../../test/fixtures/meter_frames/fixtures.lst",
     };
 
-    for (const char *path : candidates) {
+    for (const char *path : candidates)
+    {
         std::ifstream file(path);
-        if (file.good()) {
+        if (file.good())
+        {
             return file;
         }
     }
@@ -101,17 +117,20 @@ static std::ifstream open_fixture_list() {
     return std::ifstream();
 }
 
-struct FixtureLoadResult {
+struct FixtureLoadResult
+{
     std::vector<Fixture> fixtures;
     bool fixture_file_found;
     size_t data_line_count;
     size_t parse_error_count;
 };
 
-static FixtureLoadResult load_fixtures() {
+static FixtureLoadResult load_fixtures()
+{
     FixtureLoadResult result{};
     std::ifstream in = open_fixture_list();
-    if (!in.good()) {
+    if (!in.good())
+    {
         result.fixture_file_found = false;
         return result;
     }
@@ -119,16 +138,19 @@ static FixtureLoadResult load_fixtures() {
 
     std::string line;
     size_t line_number = 0;
-    while (std::getline(in, line)) {
+    while (std::getline(in, line))
+    {
         line_number++;
         line = trim(line);
-        if (line.empty() || line[0] == '#') {
+        if (line.empty() || line[0] == '#')
+        {
             continue;
         }
         result.data_line_count++;
 
         std::vector<std::string> parts = split(line, '|');
-        if (parts.size() != 9) {
+        if (parts.size() != 9)
+        {
             result.parse_error_count++;
             continue;
         }
@@ -147,7 +169,8 @@ static FixtureLoadResult load_fixtures() {
         ok = ok && parse_u32_field(parts[7], history_u32);
         ok = ok && parse_u32_field(parts[8], crc_u32);
 
-        if (!ok) {
+        if (!ok)
+        {
             (void)line_number;
             result.parse_error_count++;
             continue;
@@ -165,7 +188,8 @@ void setUp(void) {}
 
 void tearDown(void) {}
 
-void test_replay_meter_fixtures(void) {
+void test_replay_meter_fixtures(void)
+{
     FixtureLoadResult loaded = load_fixtures();
 
     TEST_ASSERT_EQUAL_UINT32_MESSAGE(
@@ -175,12 +199,14 @@ void test_replay_meter_fixtures(void) {
 
     std::vector<Fixture> fixtures = loaded.fixtures;
 
-    if (!loaded.fixture_file_found || fixtures.empty()) {
+    if (!loaded.fixture_file_found || fixtures.empty())
+    {
         TEST_PASS_MESSAGE("No meter fixtures present yet. Capture frames and append fixtures.lst.");
         return;
     }
 
-    for (const Fixture &fx : fixtures) {
+    for (const Fixture &fx : fixtures)
+    {
         TEST_ASSERT_TRUE_MESSAGE(!fx.decoded.empty(), fx.name.c_str());
 
         bool crc_ok = radian_validate_crc(fx.decoded.data(), fx.decoded.size());
@@ -189,7 +215,8 @@ void test_replay_meter_fixtures(void) {
             crc_ok ? 1 : 0,
             fx.name.c_str());
 
-        if (!crc_ok) {
+        if (!crc_ok)
+        {
             continue;
         }
 
@@ -209,7 +236,8 @@ void test_replay_meter_fixtures(void) {
     }
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
     (void)argc;
     (void)argv;
 

@@ -1,8 +1,8 @@
 /*  CC1101 radio interface for Itron EverBlu Cyble Enhanced water meters */
 /*  Implements RADIAN protocol communication over 433 MHz RF */
 
-#include "utils.h"   // Utility functions
-#include "cc1101.h"  // CC1101 interface
+#include "utils.h"  // Utility functions
+#include "cc1101.h" // CC1101 interface
 #include "radian_parser.h"
 #include "logging.h" // Cross-platform logging
 #include <Arduino.h> // Arduino core

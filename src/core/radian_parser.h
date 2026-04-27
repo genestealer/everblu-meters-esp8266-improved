@@ -7,12 +7,12 @@
 
 struct radian_primary_data
 {
-  uint32_t volume;
-  uint8_t reads_counter;
-  uint8_t battery_left;
-  uint8_t time_start;
-  uint8_t time_end;
-  bool history_available;
+    uint32_t volume;
+    uint8_t reads_counter;
+    uint8_t battery_left;
+    uint8_t time_start;
+    uint8_t time_end;
+    bool history_available;
 };
 
 uint16_t radian_crc_kermit(const uint8_t *input_ptr, size_t num_bytes);
