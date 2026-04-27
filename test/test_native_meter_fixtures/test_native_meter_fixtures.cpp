@@ -5,11 +5,12 @@
 #include <cstdlib>
 #include <cerrno>
 #include <fstream>
+#include <limits>
 #include <sstream>
 #include <string>
 #include <vector>
 
-#include "core/radian_parser.h"
+#include "src/core/radian_parser.h"
 
 struct Fixture
 {
@@ -88,7 +89,8 @@ static bool parse_u32_field(const std::string &input, uint32_t &out)
     errno = 0;
     char *end = nullptr;
     unsigned long value = std::strtoul(cleaned.c_str(), &end, 10);
-    if (errno != 0 || end == nullptr || *end != '\0')
+    if (errno != 0 || end == nullptr || *end != '\0' ||
+        value > static_cast<unsigned long>(std::numeric_limits<uint32_t>::max()))
     {
         return false;
     }

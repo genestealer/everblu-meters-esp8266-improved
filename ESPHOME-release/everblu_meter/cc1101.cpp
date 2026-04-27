@@ -826,14 +826,11 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
   struct radian_primary_data primary;
   if (!radian_parse_primary_data(decoded_buffer, size, &primary))
   {
+    if (size < 30)
+    {
+      echo_debug(1, "[ERROR] Buffer too small for meter data (size=%d, need>=30)\n", size);
+    }
     echo_debug(1, "[ERROR] Invalid primary meter fields - discarding frame\n");
-    return data;
-  }
-
-  // Bounds check: ensure buffer is large enough for basic data
-  if (size < 30)
-  {
-    echo_debug(1, "[ERROR] Buffer too small for meter data (size=%d, need>=30)\n", size);
     return data;
   }
 

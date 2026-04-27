@@ -53,11 +53,6 @@ bool radian_validate_crc(const uint8_t *decoded_buffer, size_t size)
         return true;
     }
 
-    if (expected_len <= 3)
-    {
-        return false;
-    }
-
     const uint16_t received_crc = ((uint16_t)decoded_buffer[crc_offset] << 8) |
                                   (uint16_t)decoded_buffer[crc_offset + 1];
     const uint16_t computed_crc = radian_crc_kermit(&decoded_buffer[1], expected_len - 3);
