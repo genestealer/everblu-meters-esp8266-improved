@@ -71,16 +71,6 @@ void print_time(void);
 // Note: init_crc_tab() is now static inline in utils.cpp
 
 /**
- * @brief Calculate Kermit CRC-16 checksum
- *
- * Calculates CRC-16/KERMIT checksum used in RADIAN protocol for
- * data integrity verification.
- *
- * @param input_ptr Pointer to input data buffer
- * @param num_bytes Number of bytes to include in CRC calculation
- * @return 16-bit CRC checksum value
- */
-/**
  * @brief Encode buffer using RADIAN 1:3 encoding scheme
  *
  * Encodes input buffer using proprietary 1:3 encoding required by
