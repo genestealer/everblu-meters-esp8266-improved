@@ -9,6 +9,7 @@
  */
 
 #include <Arduino.h>
+#include "crc_kermit.h"
 #include "cc1101.h"		 // For tmeter_data struct
 #include "wifi_serial.h" // Mirror Serial to WiFi
 #include "logging.h"	 // Cross-platform logging
@@ -225,53 +226,6 @@ void print_time(void)
 	strftime(buffer, 80, "%d/%m/%Y %X", timeinfo);
 	LOG_D("everblu_meter", "%s", buffer);
 }
-
-/*----------------------------------------------------------------------------*/
-#define CRC_START_KERMIT 0x0000
-#define CRC_POLY_KERMIT 0x8408
-static uint8_t crc_tab_init = 0;
-static uint16_t crc_tab[256];
-/*----------------------------------------------------------------------------*/
-/* https://www.libcrc.org/
- * static void init_crc_tab( void );
- *
- * For optimal performance, the  CRC Kermit routine uses a lookup table with
- * values that can be used directly in the XOR arithmetic in the algorithm.
- * This lookup table is calculated by the init_crc_tab() routine, the first
- * time the CRC function is called.
- */
-
-static void init_crc_tab(void)
-{
-
-	uint16_t i;
-	uint16_t j;
-	uint16_t crc;
-	uint16_t c;
-
-	for (i = 0; i < 256; i++)
-	{
-
-		crc = 0;
-		c = i;
-
-		for (j = 0; j < 8; j++)
-		{
-
-			if ((crc ^ c) & 0x0001)
-				crc = (crc >> 1) ^ CRC_POLY_KERMIT;
-			else
-				crc = crc >> 1;
-
-			c = c >> 1;
-		}
-
-		crc_tab[i] = crc;
-	}
-
-	crc_tab_init = 1;
-
-} /* init_crc_tab */
 
 /*----------------------------------------------------------------------------*/
 /**
