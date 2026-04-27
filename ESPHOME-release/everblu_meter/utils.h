@@ -9,6 +9,7 @@
  */
 
 #include <Arduino.h>
+#include "crc_kermit.h"
 
 /**
  * @brief Display buffer contents in hexadecimal format (multi-line)
@@ -79,8 +80,6 @@ void print_time(void);
  * @param num_bytes Number of bytes to include in CRC calculation
  * @return 16-bit CRC checksum value
  */
-uint16_t crc_kermit(const unsigned char *input_ptr, size_t num_bytes);
-
 /**
  * @brief Encode buffer using RADIAN 1:3 encoding scheme
  *

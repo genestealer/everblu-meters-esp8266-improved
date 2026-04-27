@@ -1,29 +1,11 @@
 #include "radian_parser.h"
+#include "crc_kermit.h"
 
 #include <string.h>
 
 uint16_t radian_crc_kermit(const uint8_t *input_ptr, size_t num_bytes)
 {
-    uint16_t crc = 0x0000;
-    for (size_t i = 0; i < num_bytes; i++)
-    {
-        crc ^= input_ptr[i];
-        for (int j = 0; j < 8; j++)
-        {
-            if (crc & 0x0001)
-            {
-                crc = (crc >> 1) ^ 0x8408;
-            }
-            else
-            {
-                crc >>= 1;
-            }
-        }
-    }
-
-    uint16_t low_byte = (crc & 0xFF00) >> 8;
-    uint16_t high_byte = (crc & 0x00FF) << 8;
-    return (uint16_t)(low_byte | high_byte);
+    return crc_kermit(input_ptr, num_bytes);
 }
 
 bool radian_validate_crc(const uint8_t *decoded_buffer, size_t size)

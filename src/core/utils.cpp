@@ -273,49 +273,6 @@ static void init_crc_tab(void)
 
 } /* init_crc_tab */
 
-/* https://www.libcrc.org/
- * uint16_t crc_kermit( const unsigned char *input_str, size_t num_bytes );
- *
- * The function crc_kermit() calculates the 16 bits Kermit CRC in one pass for
- * a byte string of which the beginning has been passed to the function. The
- * number of bytes to check is also a parameter.
- */
-
-uint16_t crc_kermit(const unsigned char *input_ptr, size_t num_bytes)
-{
-
-	uint16_t crc;
-	uint16_t tmp;
-	uint16_t short_c;
-	uint16_t low_byte;
-	uint16_t high_byte;
-	const unsigned char *ptr;
-	size_t a;
-
-	if (!crc_tab_init)
-		init_crc_tab();
-
-	crc = CRC_START_KERMIT;
-	ptr = input_ptr;
-
-	for (a = 0; a < num_bytes; a++)
-	{
-
-		short_c = 0x00ff & (uint16_t)*ptr;
-		tmp = crc ^ short_c;
-		crc = (crc >> 8) ^ crc_tab[tmp & 0xff];
-
-		ptr++;
-	}
-
-	low_byte = (crc & 0xff00) >> 8;
-	high_byte = (crc & 0x00ff) << 8;
-	crc = low_byte | high_byte;
-
-	return crc;
-
-} /* crc_kermit */
-
 /*----------------------------------------------------------------------------*/
 /**
  * Reverses the bit order of the input data and adds a start bit before and a stop bit
