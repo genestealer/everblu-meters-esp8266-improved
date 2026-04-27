@@ -57,7 +57,7 @@ spi:
 everblu_meter:
   - id: cold_water_meter
     meter_year: 20
-    meter_serial: 257750
+    meter_serial: 257701
     meter_type: water
     debug_cc1101: true
     spi_id: main_bus
@@ -141,7 +141,7 @@ everblu_meter:
 
   - id: hot_water_meter
     meter_year: 20
-    meter_serial: 259301
+    meter_serial: 257702
     meter_type: water
     debug_cc1101: true
     spi_id: main_bus
