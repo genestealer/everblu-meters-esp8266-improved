@@ -14,7 +14,7 @@ ESPHome logger format (with component prefix):
   [I][everblu_meter:124]: [000-015]: 7C 44 2D ...
   [D][everblu_meter:125]: [016-031]: ...
 
-Collect ESPHome logs with: esphome logs your-device.yaml > capture.log
+Collect ESPHome logs with: esphome logs your-device.yaml > logs_water_meter_logs.txt
 Collect MQTT logs with:    pio device monitor --baud 115200 | Tee-Object capture.log
 """
 
@@ -176,7 +176,11 @@ def to_fixture_line(frame: ParsedFrame) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Extract meter fixtures from firmware logs")
-    parser.add_argument("--input", required=True, help="Path to firmware log file")
+    parser.add_argument(
+        "--input",
+        required=True,
+        help="Path to firmware log file (.log or .txt)",
+    )
     parser.add_argument(
         "--output",
         default="test/fixtures/meter_frames/fixtures.lst",
@@ -197,6 +201,14 @@ def main() -> int:
     input_path = pathlib.Path(args.input)
     if not input_path.exists():
         raise SystemExit(f"Input log file not found: {input_path}")
+
+    # Accept both serial capture files and ESPHome web-exported text logs.
+    allowed_suffixes = {".log", ".txt"}
+    suffix = input_path.suffix.lower()
+    if suffix and suffix not in allowed_suffixes:
+        raise SystemExit(
+            f"Unsupported input extension '{suffix}'. Use a .log or .txt file."
+        )
 
     log_text = input_path.read_text(encoding="utf-8", errors="ignore")
     frames = collect_frames(log_text, args.name_prefix)
