@@ -1,0 +1,3 @@
+# fixture_name|decoded_hex|volume|battery|counter|time_start|time_end|history_available|crc_valid
+# Add captured fixtures with script/extract-meter-fixture.py
+home_001|7C 11 00 45 20 0A 50 14 00 45 14 03 EE D6 00 01 08 00 45 BB 0B 00 40 06 1B 04 1A 01 09 3B 31 5F 31 33 33 32 39 30 41 4C 30 32 00 00 06 12 04 01 D7 01 00 00 00 00 00 00 80 80 80 80 80 80 80 80 80 80 80 80 80 84 CB 9D 09 00 36 C4 09 00 F5 F5 09 00 31 2F 0A 00 B6 70 0A 00 F5 B1 0A 00 10 E0 0A 00 8D 02 0B 00 04 1F 0B 00 BD 3E 0B 00 FF 5D 0B 00 9A 79 0B 00 07 97|768837|95|215|6|18|1|1

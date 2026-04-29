@@ -9,6 +9,7 @@
  */
 
 #include <Arduino.h>
+#include "crc_kermit.h"
 
 /**
  * @brief Display buffer contents in hexadecimal format (multi-line)
@@ -68,18 +69,6 @@ void print_time(void);
  * and is automatically called when needed. No need to call explicitly.
  */
 // Note: init_crc_tab() is now static inline in utils.cpp
-
-/**
- * @brief Calculate Kermit CRC-16 checksum
- *
- * Calculates CRC-16/KERMIT checksum used in RADIAN protocol for
- * data integrity verification.
- *
- * @param input_ptr Pointer to input data buffer
- * @param num_bytes Number of bytes to include in CRC calculation
- * @return 16-bit CRC checksum value
- */
-uint16_t crc_kermit(const unsigned char *input_ptr, size_t num_bytes);
 
 /**
  * @brief Encode buffer using RADIAN 1:3 encoding scheme
