@@ -142,8 +142,7 @@ time:
     id: ha_time
 
 everblu_meter:
-  meter_year: 21              # Last 2 digits of manufacture year
-  meter_serial: 12345678      # Your meter's serial number
+  meter_code: "211234567000" # Code under barcode without dashes; suffix optional (9–12 digits)
   gdo0_pin: 4                 # GPIO connected to CC1101 GDO0 (D2 on D1 mini)
   meter_type: water           # 'water' or 'gas'
   time_id: ha_time
@@ -156,8 +155,7 @@ everblu_meter:
 
 | Parameter | Type | Description | Example |
 |-----------|------|-------------|---------|
-| `meter_year` | int | Last 2 digits of meter manufacture year (00-99) | `21` |
-| `meter_serial` | int | Meter serial number | `12345678` |
+| `meter_code` | string | Code under barcode without dashes; 3-digit suffix optional (`YYSSSSSSS` or `YYSSSSSSSNNN`, 9–12 digits) | `211234567000` or `211234567` |
 | `meter_type` | string | Type of meter: `water` or `gas` | `water` |
 
 ### Optional Parameters
@@ -231,13 +229,16 @@ timezone_offset: -420  # US Pacific PDT (UTC-7) - Summer
 
 ### Finding Your Meter Information
 
-#### Meter Year and Serial Number
+#### Meter Code
 
-Look for a label on your meter that shows:
-- **Year**: Usually 2 digits (e.g., "21" for 2021)
-- **Serial Number**: 8-digit number
+Look for the full code printed under the barcode on your meter label.
 
-Example label: `21-12345678` means year=21, serial=12345678
+Example label format: `YY-SSSSSSS-NNN`
+- Configure `meter_code` as the same digits without dashes — the 3-digit suffix is **optional**
+- Accepted: `YYSSSSSSS` (9 digits, no suffix) or `YYSSSSSSSNNN` (12 digits, with suffix)
+- First 2 digits (`YY`) are parsed as year
+- Middle digits (`SSSSSSS`) are parsed as serial
+- Last 3 digits (`NNN`), if present, are the label suffix and are ignored by the radio protocol
 
 #### Frequency
 
@@ -310,8 +311,7 @@ Simple configuration with essential sensors:
 
 ```yaml
 everblu_meter:
-  meter_year: 21
-  meter_serial: 12345678
+  meter_code: "211234567000"
   gdo0_pin: 4
   meter_type: water
   time_id: ha_time
@@ -333,8 +333,7 @@ Minimal configuration for gas meter:
 
 ```yaml
 everblu_meter:
-  meter_year: 22
-  meter_serial: 87654321
+  meter_code: "228765432000"
   meter_type: gas
   gas_volume_divisor: 100
   time_id: ha_time
@@ -354,8 +353,7 @@ Full monitoring with all sensors and custom scheduling:
 
 ```yaml
 everblu_meter:
-  meter_year: 23
-  meter_serial: 12345678
+  meter_code: "231234567000"
   gdo0_pin: 4
   meter_type: water
   
@@ -535,8 +533,7 @@ Multiple meters are supported by defining a YAML list under `everblu_meter`:
 ```yaml
 everblu_meter:
   - id: water_meter
-    meter_year: 21
-    meter_serial: 12345678
+    meter_code: "211234567000"
     cs_pin:
       number: GPIO15
       allow_other_uses: true
@@ -548,8 +545,7 @@ everblu_meter:
       name: "Water Volume"
   
   - id: gas_meter
-    meter_year: 22
-    meter_serial: 87654321
+    meter_code: "228765432000"
     cs_pin:
       number: GPIO15
       allow_other_uses: true

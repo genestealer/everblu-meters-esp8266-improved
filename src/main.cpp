@@ -262,7 +262,7 @@ void adaptiveFrequencyTracking(int8_t freqest);
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
 #endif
-#define MQTT_CLIENT_ID_WITH_SERIAL SECRET_MQTT_CLIENT_ID "-" TOSTRING(METER_SERIAL)
+#define MQTT_CLIENT_ID_WITH_SERIAL SECRET_MQTT_CLIENT_ID "-" METER_CODE
 
 EspMQTTClient mqtt(
     SECRET_WIFI_SSID,           // Your Wifi SSID
@@ -302,17 +302,9 @@ const char *readingSchedule = DEFAULT_READING_SCHEDULE;
 // Helper variables for generating serial-prefixed MQTT topics and entity IDs
 // These must be initialized before EspMQTTClient is constructed (for LWT topic)
 // Format: everblu/cyble/{METER_SERIAL} (or everblu/cyble if meter prefix is disabled)
-// NOTE: METER_SERIAL must be defined as a numeric value in private.h
-// Compile-time validation ensures METER_SERIAL is non-zero
-// (STRINGIFY/TOSTRING macros already defined above)
-
-// Compile-time validation: Ensure METER_SERIAL is defined and non-zero
-// This static_assert will fail at compile time if METER_SERIAL is 0 or undefined
-#if !defined(METER_SERIAL)
-#error "METER_SERIAL must be defined in private.h"
-#endif
-#if METER_SERIAL == 0
-#error "METER_SERIAL cannot be zero - please set a valid meter serial number in private.h"
+// Compile-time check: Ensure METER_CODE is defined
+#if !defined(METER_CODE)
+#error "METER_CODE must be defined in private.h"
 #endif
 
 // Define meter prefix option if not defined in private.h (default to enabled)
@@ -326,19 +318,46 @@ const char *readingSchedule = DEFAULT_READING_SCHEDULE;
 #endif
 
 // Buffer size calculations for MQTT topics:
-// - meterSerialStr: METER_SERIAL as string (max 10 digits for ULONG_MAX) + null = 16 bytes (safe)
-// - mqttBaseTopic: "everblu/cyble/" (15) + optional METER_SERIAL (10) + null (1) = 26 bytes minimum
-//   Buffer size: 64 bytes provides 2.4x safety margin for future extensions
-// - mqttLwtTopic: mqttBaseTopic (25-35) + "/status" (7) + null (1) = 33-43 bytes minimum
-//   Buffer size: 80 bytes provides adequate safety margin
-char meterSerialStr[16] = TOSTRING(METER_SERIAL); // String representation of METER_SERIAL
+// - meterSerialStr: serial as decimal string (max 8 digits) + null = 16 bytes
+// - mqttBaseTopic: "everblu/cyble/" (15) + serial (8) + null (1) = 64 bytes
+// - mqttLwtTopic: mqttBaseTopic + "/status" (7) + null (1) = 80 bytes
+// Parsed at runtime from METER_CODE by parseMeterCode() called at the start of setup()
+static uint8_t g_meterYear = 0;
+static uint32_t g_meterSerial = 0;
+char meterSerialStr[16] = {}; // filled by parseMeterCode()
 #if ENABLE_METER_PREFIX_IN_ENTITY_IDS
-char mqttBaseTopic[64] = "everblu/cyble/" TOSTRING(METER_SERIAL);          // Base MQTT topic with meter serial
-char mqttLwtTopic[80] = "everblu/cyble/" TOSTRING(METER_SERIAL) "/status"; // LWT status topic with serial number
+char mqttBaseTopic[64] = {}; // filled by parseMeterCode()
+char mqttLwtTopic[80] = {};  // filled by parseMeterCode()
 #else
 char mqttBaseTopic[64] = "everblu/cyble";       // Base MQTT topic without meter serial
 char mqttLwtTopic[80] = "everblu/cyble/status"; // LWT status topic without serial number
 #endif
+
+/**
+ * Parse METER_CODE ("YYSSSSSSNNN") into g_meterYear, g_meterSerial, and
+ * the MQTT topic buffers.  Called once at the very start of setup().
+ */
+static void parseMeterCode()
+{
+  const char *code = METER_CODE;
+  size_t len = strlen(code);
+  if (len < 6)
+  {
+    Serial.println("[ERROR] METER_CODE is too short - expected YYSSSSSSNNN (min 6 digits, no dashes)");
+    return;
+  }
+  // First 2 digits = year
+  g_meterYear = (uint8_t)((code[0] - '0') * 10 + (code[1] - '0'));
+  // Middle digits = serial (positions 2 .. len-4, last 3 are suffix)
+  g_meterSerial = 0;
+  for (size_t i = 2; i < len - 3; i++)
+    g_meterSerial = g_meterSerial * 10 + (uint32_t)(code[i] - '0');
+  snprintf(meterSerialStr, sizeof(meterSerialStr), "%lu", (unsigned long)g_meterSerial);
+#if ENABLE_METER_PREFIX_IN_ENTITY_IDS
+  snprintf(mqttBaseTopic, sizeof(mqttBaseTopic), "everblu/cyble/%lu", (unsigned long)g_meterSerial);
+  snprintf(mqttLwtTopic, sizeof(mqttLwtTopic), "everblu/cyble/%lu/status", (unsigned long)g_meterSerial);
+#endif
+}
 
 // Standard buffer size for constructing MQTT topic strings
 // Calculation: mqttBaseTopic (max 63) + longest suffix "/wifi_signal_percentage" (24) + null (1) = 88 bytes
@@ -930,7 +949,7 @@ void onScheduled()
 String getMeterPrefix()
 {
 #if ENABLE_METER_PREFIX_IN_ENTITY_IDS
-  return String(METER_SERIAL) + "_";
+  return String(g_meterSerial) + "_";
 #else
   return "";
 #endif
@@ -945,8 +964,8 @@ String buildDeviceJson()
   json.reserve(300);
 
 #if ENABLE_METER_PREFIX_IN_ENTITY_IDS
-  json = "\"ids\": [\"" + String(METER_SERIAL) + "\"],\n";
-  json += "    \"name\": \"EverBlu Meter " + String(METER_SERIAL) + "\",\n";
+  json = "\"ids\": [\"" + String(g_meterSerial) + "\"],\n";
+  json += "    \"name\": \"EverBlu Meter " + String(g_meterSerial) + "\",\n";
 #else
   // When meter prefix is disabled, use a fixed device ID for single-meter setup
   json = "\"ids\": [\"everblu_meter_device\"],\n";
@@ -1074,12 +1093,12 @@ void publishMeterSettings()
   char valueBuffer[16];
   char topicBuffer[MQTT_TOPIC_BUFFER_SIZE];
 
-  snprintf(valueBuffer, sizeof(valueBuffer), "%d", METER_YEAR);
+  snprintf(valueBuffer, sizeof(valueBuffer), "%d", g_meterYear);
   snprintf(topicBuffer, sizeof(topicBuffer), "%s/everblu_meter_year", mqttBaseTopic);
   mqtt.publish(topicBuffer, valueBuffer, true);
   delay(5);
 
-  snprintf(valueBuffer, sizeof(valueBuffer), "%u", METER_SERIAL);
+  snprintf(valueBuffer, sizeof(valueBuffer), "%lu", (unsigned long)g_meterSerial);
   snprintf(topicBuffer, sizeof(topicBuffer), "%s/everblu_meter_serial", mqttBaseTopic);
   mqtt.publish(topicBuffer, valueBuffer, true);
   delay(5);
@@ -1112,7 +1131,7 @@ static void publishDiscoveryMessage(const char *domain, const char *entity, cons
   char configTopic[256];
   char entityId[128];
 #if ENABLE_METER_PREFIX_IN_ENTITY_IDS
-  snprintf(entityId, sizeof(entityId), "%lu_%s", (unsigned long)METER_SERIAL, entity);
+  snprintf(entityId, sizeof(entityId), "%lu_%s", (unsigned long)g_meterSerial, entity);
 #else
   snprintf(entityId, sizeof(entityId), "%s", entity);
 #endif
@@ -1857,8 +1876,7 @@ void adaptiveFrequencyTracking(int8_t freqest)
  *
  * Performs startup validation of configuration parameters to fail fast
  * on invalid settings. Checks:
- * - METER_YEAR (must be 0-99)
- * - METER_SERIAL (must be non-zero)
+ * - METER_CODE (must parse to non-zero serial within 24-bit protocol limit)
  * - FREQUENCY (must be 300-500 MHz if defined)
  * - READING_HOUR/MINUTE (must be valid time)
  * - Reading schedule string format
@@ -1873,63 +1891,30 @@ bool validateConfiguration()
 
   Serial.println("\n=== Configuration Validation ===");
 
-  // Validate METER_YEAR (should be 0-99 for years 2000-2099)
-  // Common mistake: entering 4-digit year (e.g., 2023 instead of 23)
-  if (METER_YEAR > 99)
+  // Validate METER_CODE parse results
+  if (strchr(METER_CODE, '-') != nullptr || strchr(METER_CODE, ' ') != nullptr)
   {
-    if (METER_YEAR >= 2000 && METER_YEAR <= 2099)
-    {
-      Serial.printf("[ERROR] METER_YEAR=%d appears to be a 4-digit year\n", METER_YEAR);
-      Serial.printf("       Use 2-digit year format: %d (not %d)\n", METER_YEAR - 2000, METER_YEAR);
-      Serial.println("       Example: Serial '23-1875247-234' → use 23");
-    }
-    else
-    {
-      Serial.printf("[ERROR] Invalid METER_YEAR=%d (expected 0-99)\n", METER_YEAR);
-    }
+    Serial.println("[ERROR] METER_CODE contains dashes or spaces.");
+    Serial.println("       Remove all dashes: '16-0039185-107' -> '160039185107'");
     valid = false;
   }
-  else if (METER_YEAR < 10)
+  else if (g_meterSerial == 0)
   {
-    Serial.printf("⚠ METER_YEAR: %d (20%02d) - unusually old meter\n", METER_YEAR, METER_YEAR);
-    Serial.printf("  If your serial starts with %02d, this is correct.\n", METER_YEAR);
-    Serial.println("  Otherwise, check for missing leading zero in private.h");
+    Serial.println("[ERROR] Parsed serial is zero - check METER_CODE in private.h");
+    Serial.println("       Format: \"YYSSSSSSNNN\" (2-digit year + serial + 3-digit suffix)");
+    valid = false;
+  }
+  else if (g_meterSerial > 16777215UL) // 0xFFFFFF - 3-byte protocol limit
+  {
+    Serial.printf("[ERROR] Parsed serial %lu exceeds protocol max 16777215 (0xFFFFFF)\n",
+                  (unsigned long)g_meterSerial);
+    Serial.println("       Verify the code from your meter label is correct.");
+    valid = false;
   }
   else
   {
-    Serial.printf("✓ METER_YEAR: %d (20%02d)\n", METER_YEAR, METER_YEAR);
-  }
-
-  // Validate METER_SERIAL (should not be 0, and should be reasonable length)
-  // Serial format on meter: XX-YYYYYYY-ZZZ (use only middle part YYYYYYY)
-  // Note: If middle part starts with 0, omit leading zeros (e.g., 0123456 → 123456)
-  if (METER_SERIAL == 0)
-  {
-    Serial.println("[ERROR] METER_SERIAL not configured (value is 0)");
-    Serial.println("       Use the middle part of your meter's serial number");
-    Serial.println("       Example: Serial '23-1875247-234' → use 1875247");
-    valid = false;
-  }
-  else if (METER_SERIAL > 99999999UL) // 8 digits max (most serials are 6-7 digits)
-  {
-    Serial.printf("[ERROR] METER_SERIAL=%lu seems too long (>8 digits)\n", (unsigned long)METER_SERIAL);
-    Serial.println("       Use only the middle part of the serial (ignore last part)");
-    Serial.println("       Example: Serial '23-1875247-234' → use 1875247 (not 1875247234)");
-    valid = false;
-  }
-  else if (METER_SERIAL < 10UL) // Very suspiciously short (< 2 digits)
-  {
-    Serial.printf("[WARNING] METER_SERIAL=%lu is very short (<2 digits)\n", (unsigned long)METER_SERIAL);
-    Serial.println("         Double-check you entered the complete middle part");
-    Serial.printf("⚠ METER_SERIAL: %lu\n", (unsigned long)METER_SERIAL);
-  }
-  else if (METER_SERIAL < 1000UL) // Possibly correct if serial had leading zeros
-  {
-    Serial.printf("✓ METER_SERIAL: %lu (if your serial started with zeros, this is correct)\n", (unsigned long)METER_SERIAL);
-  }
-  else
-  {
-    Serial.printf("✓ METER_SERIAL: %lu\n", (unsigned long)METER_SERIAL);
+    Serial.printf("✓ METER_CODE: %s (year=%d, serial=%lu)\n",
+                  METER_CODE, g_meterYear, (unsigned long)g_meterSerial);
   }
 
 // Validate FREQUENCY if defined (should be 300-500 MHz for 433 MHz band)
@@ -1996,6 +1981,10 @@ void setup()
   // Give Serial a moment to initialize
   delay(100);
 
+  // Parse METER_CODE into g_meterYear, g_meterSerial, and topic buffers
+  // Must happen before any code uses these values
+  parseMeterCode();
+
 // On platforms with native USB Serial (e.g. some ESP32 cores) wait briefly for host to open the port
 #if defined(ESP32)
   unsigned long __serial_wait_start = millis();
@@ -2008,7 +1997,7 @@ void setup()
   Serial.println("Water/Gas usage data for Home Assistant");
   Serial.println("https://github.com/genestealer/everblu-meters-esp8266-improved");
   Serial.printf("[STATUS] Firmware version: %s\n", EVERBLU_FW_VERSION);
-  Serial.printf("[STATUS] Target meter: 20%02d-%07lu\n\n", METER_YEAR, (unsigned long)METER_SERIAL);
+  Serial.printf("[STATUS] Target meter: 20%02d-%07lu\n\n", g_meterYear, (unsigned long)g_meterSerial);
 
   // Initialize meter type configuration
   initMeterTypeConfig();

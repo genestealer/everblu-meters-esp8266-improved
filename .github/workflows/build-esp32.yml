@@ -65,9 +65,8 @@ jobs:
 
       - name: Inject dummy values for CI build
         run: |
-          sed -i 's/#define METER_YEAR xx/#define METER_YEAR 99/g' include/private.h
-          sed -i 's/#define METER_SERIAL xxxxxxx/#define METER_SERIAL 9999999/g' include/private.h
-          echo "Injected dummy METER_YEAR=99 and METER_SERIAL=9999999 for CI build"
+          sed -i 's/#define METER_CODE "xxxxxxxxxxxx"/#define METER_CODE "99999999000"/g' include/private.h
+          echo "Injected dummy METER_CODE=99999999000 for CI build"
 
       - name: Build PlatformIO Project (${{ matrix.environment.board }})
         run: |

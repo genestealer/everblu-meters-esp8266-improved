@@ -56,8 +56,7 @@ spi:
 
 everblu_meter:
   - id: cold_water_meter
-    meter_year: 20
-    meter_serial: 257701
+    meter_code: "200257750000"  # year=20, serial=257750 (12-digit form, suffix 000 ignored)
     meter_type: water
     debug_cc1101: true
     spi_id: main_bus
@@ -140,8 +139,7 @@ everblu_meter:
       name: "${meter_1_prefix} CC1101 Connected"
 
   - id: hot_water_meter
-    meter_year: 20
-    meter_serial: 257702
+    meter_code: "200257751000"  # year=20, serial=257751 (12-digit form, suffix 000 ignored)
     meter_type: water
     debug_cc1101: true
     spi_id: main_bus

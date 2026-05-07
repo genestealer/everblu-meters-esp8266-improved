@@ -28,9 +28,22 @@ public:
         DefineConfigProvider() = default;
         ~DefineConfigProvider() override = default;
 
-        // Meter identification
-        uint8_t getMeterYear() const override { return METER_YEAR; }
-        uint32_t getMeterSerial() const override { return METER_SERIAL; }
+        // Meter identification — parsed at call time from the METER_CODE string.
+        // METER_CODE format: "YYSSSSSSNNN"  (2-digit year + serial + 3-digit suffix)
+        uint8_t getMeterYear() const override
+        {
+                const char *c = METER_CODE;
+                return (uint8_t)((c[0] - '0') * 10 + (c[1] - '0'));
+        }
+        uint32_t getMeterSerial() const override
+        {
+                const char *c = METER_CODE;
+                size_t len = strlen(c);
+                uint32_t s = 0;
+                for (size_t i = 2; i < len - 3; i++)
+                        s = s * 10 + (uint32_t)(c[i] - '0');
+                return s;
+        }
         bool isMeterGas() const override
         {
 #ifdef METER_IS_GAS

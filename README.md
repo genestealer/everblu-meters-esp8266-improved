@@ -32,7 +32,7 @@ Integrated with Home Assistant via MQTT AutoDiscovery and ESPHome external compo
 ESPHome integration is now production-ready. For setup and usage, see the ESPHome docs at [ESPHOME/README.md](ESPHOME/README.md)
  - Versioned external component in `ESPHOME-release` with the same 2.2.1 code as the main firmware
  - Tested on ESP8266 and ESP32 with water and gas meters; supports the same sensors and calibration logic
- - YAML stays simple: drop in the component, set `meter_year`, `meter_serial`, `meter_type`, and go
+ - YAML stays simple: drop in the component, set `meter_code` and `meter_type`, and go
  - Build with the Arduino framework (set `esp32.framework.type: arduino`; ESP-IDF is not supported for this component)
  - Migration tip: if you move from MQTT firmware, keep the same meter serial values so your topics/entities stay aligned
 
@@ -178,7 +178,7 @@ See the Hardware section below for full wiring tables and pictures.
   - Wi‑Fi SSID/password
   - MQTT broker/port (+ credentials, if used)
   - `ENABLE_HA_DISCOVERY` - set to `0` to disable Home Assistant discovery topic publishing (`homeassistant/...`) and keep raw MQTT topics only
-  - `METER_YEAR` and `METER_SERIAL` (from the meter label)
+  - `METER_CODE` (full under-barcode code without dashes)
   - `METER_TYPE` - set to `"water"` (default) or `"gas"` depending on your meter type
   - `MAX_RETRIES` - maximum reading retry attempts before cooldown (optional, default is 10)
   - `ADAPTIVE_THRESHOLD` - how many successful reads before adjusting frequency (optional, default is 1 = adjust after each read)
@@ -249,7 +249,7 @@ The gap of ~11 m³ is consistent with the assumption that the EverBlu module was
    - Click "Upload and Monitor"
 6. Wait for the build and upload to complete.
 7. On first boot, wait up to ~2 minutes while the automatic wide frequency scan runs (serial monitor will show progress).
-8. Once the scan finishes, you should see meter data in the serial monitor and MQTT topics `everblu/cyble/{METER_SERIAL}/...` on your broker/Home Assistant.
+8. Once the scan finishes, you should see meter data in the serial monitor and MQTT topics `everblu/cyble/{PARSED_SERIAL}/...` on your broker/Home Assistant.
 
 #### Over-The-Air (OTA) Updates
 
@@ -270,7 +270,7 @@ Once your device is running and connected to Wi-Fi, you can update it wirelessly
 4. Click **PlatformIO: Upload and Monitor** as before.
 5. The firmware will be uploaded over your Wi-Fi network.
 
-> **Note**: You can find your device's IP address in the serial monitor output at startup, or check your router's DHCP client list, or look at the `everblu/cyble/{METER_SERIAL}/wifi_ip` MQTT topic in Home Assistant.
+> **Note**: You can find your device's IP address in the serial monitor output at startup, or check your router's DHCP client list, or look at the `everblu/cyble/{PARSED_SERIAL}/wifi_ip` MQTT topic in Home Assistant.
 
 ---
 
@@ -456,7 +456,7 @@ The following MQTT topics are used to integrate the device with Home Assistant v
 
 When running multiple ESP devices on the same MQTT broker, the firmware automatically appends the meter serial number to the MQTT Client ID to ensure uniqueness. This prevents connection conflicts and proper Home Assistant availability tracking.
 
-**Example:** With `SECRET_MQTT_CLIENT_ID = "EverblueCyble"` and `METER_SERIAL = 123456`, the final Client ID becomes `"EverblueCyble-123456"`.
+**Example:** With `SECRET_MQTT_CLIENT_ID = "EverblueCyble"` and `METER_CODE = "231234567234"`, the parsed serial is `1234567` and the final Client ID becomes `"EverblueCyble-1234567"`.
 
 ---
 
@@ -520,7 +520,7 @@ Both MQTT and ESPHome modes expose a **history sensor** containing 12 months of 
 - Verify meter readings against utility bills
 
 **Accessing the data:**
-- **MQTT**: Available in topic `everblu/cyble/{METER_SERIAL}/history`
+- **MQTT**: Available in topic `everblu/cyble/{PARSED_SERIAL}/history`
 - **ESPHome**: Available as text sensor `sensor.{device}_history`
 
 **Tip:** Parse this JSON in Home Assistant using a template sensor to extract individual months or calculate averages.
@@ -541,22 +541,23 @@ This will install all required dependencies and may require restarting VS Code.
   - Update the following details in `private.h`:
 - Wi-Fi and MQTT credentials.
 If your MQTT setup does not require a username and password, comment out those lines using `//`.
-    - **Meter Serial Number** - Find the serial on your meter label (ignore the manufacturing date):
-      - Format: `XX-YYYYYYY-ZZZ` (e.g., "23-1875247-234")
-      - Use **first part** for `METER_YEAR` (e.g., 23)
-      - Use **middle part** for `METER_SERIAL` (e.g., 1875247)
-      - **Ignore the last part** (e.g., ignore -234)
-      - **If middle part starts with 0**, omit leading zeros (e.g., "23-0123456-234" → use 123456)
+    - **Meter Code** - Copy the code under the barcode (ignore the manufacturing date):
+      - Label format: `YY-SSSSSSS-NNN` (example: `23-1875247-234`)
+      - Set `METER_CODE` to the same digits **without dashes** — the 3-digit suffix is optional (9–12 digits accepted)
+      - Year is parsed from the first 2 digits (`YY`)
+      - Serial is parsed from the middle section (`SSSSSSS`) and used in topics/entity prefixes
+      - Last 3 digits (`NNN`), if present, are ignored by the radio protocol
 
       Example:
       ```cpp
-      // Serial on meter: 23-1875247-234
-      #define METER_YEAR 23       // First part
-      #define METER_SERIAL 1875247 // Middle part only
+      // Label text: 23-1875247-234  (with suffix, 12 digits)
+      #define METER_CODE "231875247234"
 
-      // Serial with leading zeros: 23-0123456-234
-      #define METER_YEAR 23       // First part
-      #define METER_SERIAL 123456  // Omit leading zeros
+      // Same meter, without suffix (9 digits — also valid)
+      #define METER_CODE "231875247"
+
+      // Label with leading zeros in serial: 23-0123456-234
+      #define METER_CODE "230123456234"
       ```
      ![Cyble Meter Label](docs/images/meter_label.jpg)
 - **Wi-Fi PHY Mode**: To enable 802.11g Wi-Fi PHY mode, set `ENABLE_WIFI_PHY_MODE_11G` to `1` in the `private.h` file.

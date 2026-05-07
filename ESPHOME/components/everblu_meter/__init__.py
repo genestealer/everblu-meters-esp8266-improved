@@ -36,8 +36,7 @@ EverbluMeterComponent = everblu_meter_ns.class_("EverbluMeterComponent", cg.Poll
 EverbluMeterTriggerButton = everblu_meter_ns.class_("EverbluMeterTriggerButton", button.Button)
 
 # Configuration keys
-CONF_METER_YEAR = "meter_year"
-CONF_METER_SERIAL = "meter_serial"
+CONF_METER_CODE = "meter_code"
 CONF_METER_TYPE = "meter_type"
 CONF_GAS_VOLUME_DIVISOR = "gas_volume_divisor"
 CONF_AUTO_SCAN = "auto_scan"
@@ -97,53 +96,67 @@ SCHEDULE_MONDAY_SUNDAY = "Monday-Sunday"
 CONF_GDO0_PIN = "gdo0_pin"
 
 
-def validate_meter_year(value):
-    """Validate and normalize meter year values from 0 to 99 (string input may be 1 or 2 digits)."""
-    if isinstance(value, str):
-        year_str = value.strip()
-        if not year_str:
-            raise cv.Invalid("meter_year cannot be empty")
-        if not year_str.isdigit():
-            raise cv.Invalid("meter_year must contain only digits")
-        if len(year_str) > 2:
-            raise cv.Invalid("meter_year must be 1 or 2 digits")
-        year = int(year_str)
+def validate_meter_code(value):
+    """Parse the full meter code from the label, without dashes.
+
+    The code printed under the barcode has the format: YY-SSSSSSS-NNN
+    Enter the value without dashes. The 3-digit suffix is optional.
+      - First 2 digits : year (passed to the radio protocol as meter_year)
+      - Last 3 digits  : suffix / check digits (optional — ignored if present)
+      - Middle digits  : serial number (leading zeros preserved for matching)
+
+    Examples:
+      label '16-0039185-107' -> meter_code: '160039185107'  (with suffix)
+      label '16-0039185-107' -> meter_code: '160039185'     (without suffix)
+    """
+    if not isinstance(value, str):
+        value = str(value)
+    code = value.strip()
+    if "-" in code or " " in code:
+        raise cv.Invalid(
+            "meter_code must not contain dashes or spaces. "
+            "Enter the code exactly as it appears under the barcode but without dashes. "
+            "Example: '160039185107' from label '16-0039185-107'"
+        )
+    if not code.isdigit():
+        raise cv.Invalid("meter_code must contain only digits")
+    if len(code) < 5:
+        raise cv.Invalid(
+            f"meter_code '{code}' is too short ({len(code)} digits). "
+            "Expected at least 5 digits: 2-digit year + at least 3 serial digits. "
+            "Example (with optional 3-digit suffix): label '16-0039185-107' -> meter_code: '160039185107'. "
+            "Example (without suffix): label '20-0257301' -> meter_code: '200257301'."
+        )
+    year = int(code[:2])
+    # The last 3 digits are an optional label suffix (ignored by the radio protocol).
+    # If the code is 12+ digits we strip them; shorter codes are entered without the suffix.
+    if len(code) >= 12:
+        serial_str = code[2:-3]
     else:
-        year = cv.int_(value)
-    if year < 0 or year > 99:
-        raise cv.Invalid("meter_year must be between 0 and 99")
-    return year
-
-
-def validate_meter_serial(value):
-    """Accept serials with leading zeros and normalize to integer form."""
-    if isinstance(value, str):
-        serial_str = value.strip()
-        if not serial_str:
-            raise cv.Invalid("meter_serial cannot be empty")
-        if not serial_str.isdigit():
-            raise cv.Invalid("meter_serial must contain only digits")
-        if len(serial_str) > 8:
-            raise cv.Invalid("meter_serial must be at most 8 digits")
-        serial_str = serial_str.lstrip("0")
-        if not serial_str:
-            raise cv.Invalid("meter_serial cannot be zero")
-        value = serial_str
-
-    serial = cv.uint32_t(value)
-    if serial <= 0:
-        raise cv.Invalid("meter_serial must be greater than zero")
-    if serial > 99999999:
-        raise cv.Invalid("meter_serial must be at most 8 digits")
-    return serial
+        serial_str = code[2:]
+    if not serial_str:
+        raise cv.Invalid(
+            "meter_code serial section is empty. "
+            "Ensure the code has at least 1 digit between the 2-digit year and the 3-digit suffix."
+        )
+    serial_digits = serial_str.lstrip("0")
+    if not serial_digits:
+        raise cv.Invalid("meter_code serial section cannot be all zeros")
+    serial = int(serial_digits)
+    # The radio protocol packs the serial into 3 bytes (24-bit unsigned), max 0xFFFFFF = 16777215
+    if serial > 16777215:
+        raise cv.Invalid(
+            f"Parsed serial {serial} exceeds the protocol maximum of 16777215 (3 bytes / 0xFFFFFF). "
+            "Verify the code from your meter label is correct."
+        )
+    return {"raw": code, "year": year, "serial": serial}
 
 
 CONFIG_SCHEMA = (
     cv.Schema(
         {
             cv.GenerateID(): cv.declare_id(EverbluMeterComponent),
-            cv.Required(CONF_METER_YEAR): validate_meter_year,
-            cv.Required(CONF_METER_SERIAL): validate_meter_serial,
+            cv.Required(CONF_METER_CODE): validate_meter_code,
             cv.Required(CONF_GDO0_PIN): pins.internal_gpio_input_pin_schema,
             cv.Required(CONF_TIME_ID): cv.use_id(time_.RealTimeClock),
             cv.Optional(CONF_METER_TYPE, default=METER_TYPE_WATER): cv.enum(
@@ -334,8 +347,10 @@ async def to_code(config):
     # No need to explicitly list source files - just ensure main.cpp is excluded from release
     
     # Set basic configuration
-    cg.add(var.set_meter_year(config[CONF_METER_YEAR]))
-    cg.add(var.set_meter_serial(config[CONF_METER_SERIAL]))
+    meter_code = config[CONF_METER_CODE]
+    cg.add(var.set_meter_code(meter_code["raw"]))
+    cg.add(var.set_meter_year(meter_code["year"]))
+    cg.add(var.set_meter_serial(meter_code["serial"]))
     cg.add(var.set_meter_type(config[CONF_METER_TYPE]))
     cg.add(var.set_gas_volume_divisor(config[CONF_GAS_VOLUME_DIVISOR]))
     cg.add(var.set_frequency(config[CONF_FREQUENCY]))

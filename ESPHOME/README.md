@@ -96,8 +96,7 @@ Previous configuration:
 
 ```yaml
 everblu_meter:
-  meter_year: 21
-  meter_serial: 12345678
+  meter_code: "211234567000"
   gdo0_pin: 4
   time_id: ha_time
 ```
@@ -114,8 +113,7 @@ spi:
 everblu_meter:
   spi_id: main_bus
   cs_pin: GPIO15
-  meter_year: 21
-  meter_serial: 12345678
+  meter_code: "211234567000"
   gdo0_pin: 4
   time_id: ha_time
 ```
@@ -165,8 +163,7 @@ spi:
 everblu_meter:
   spi_id: main_bus
   cs_pin: GPIO15
-  meter_year: 21
-  meter_serial: 12345678
+  meter_code: "211234567000"
   meter_type: water
   gdo0_pin: 4
   time_id: ha_time
@@ -242,8 +239,7 @@ esp32:
 
 | Parameter | Type | Default | Required | Description |
 |-----------|------|---------|----------|-------------|
-| `meter_year` | int | - | Yes | Meter year (0-99) |
-| `meter_serial` | int | - | Yes | Serial number |
+| `meter_code` | string | - | Yes | Full meter code without dashes: `YYSSSSSSSNNN` |
 | `spi_id` | id | - | Yes | SPI bus ID from the top-level `spi:` block |
 | `cs_pin` | pin | - | Yes | CC1101 chip select pin |
 | `meter_type` | enum | water | No | `water` or `gas` |
@@ -271,8 +267,7 @@ esp32:
 everblu_meter:
   spi_id: main_bus
   cs_pin: GPIO15
-  meter_year: 21
-  meter_serial: 12345678
+  meter_code: "211234567000"
   gdo0_pin: 4
   meter_type: water
   time_id: ha_time
@@ -509,8 +504,8 @@ EverbluMeterComponent (ESPHome)
 - **timestamp** - Last successful reading time
 - **history_json** - Meter history JSON payload
 - **firmware_version** - Firmware version string
-- **meter_serial_sensor** - Meter serial number
-- **meter_year_sensor** - Meter year
+- **meter_serial_sensor** - Parsed serial section from `meter_code`
+- **meter_year_sensor** - Parsed year (`YY`) from `meter_code`
 - **reading_schedule_sensor** - Active reading schedule
 - **reading_time_utc_sensor** - Configured reading time (UTC)
 
@@ -528,8 +523,7 @@ EverbluMeterComponent (ESPHome)
 ### Water Meter - Basic
 ```yaml
 everblu_meter:
-  meter_year: 21
-  meter_serial: 12345678
+  meter_code: "211234567000"
   meter_type: water
   gdo0_pin: 4
   time_id: ha_time
@@ -541,8 +535,7 @@ everblu_meter:
 ### Gas Meter - Basic
 ```yaml
 everblu_meter:
-  meter_year: 22
-  meter_serial: 87654321
+  meter_code: "228765432000"
   meter_type: gas
   gdo0_pin: 4
   time_id: ha_time
@@ -555,8 +548,7 @@ everblu_meter:
 ### With Full Monitoring
 ```yaml
 everblu_meter:
-  meter_year: 21
-  meter_serial: 12345678
+  meter_code: "211234567000"
   meter_type: water
   gdo0_pin: 4
   time_id: ha_time
