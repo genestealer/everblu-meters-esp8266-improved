@@ -1454,10 +1454,9 @@ void onConnectionEstablished()
     Serial.println("Frequency scan command received via MQTT");
     performFrequencyScan(); });
 
-  Serial.println("[MQTT] Send MQTT config for HA.");
-
   // Publish Home Assistant discovery only when enabled in compile-time config.
 #if ENABLE_HA_DISCOVERY
+  Serial.println("[MQTT] Send Home Assistant discovery config.");
   publishHADiscovery();
 #else
   Serial.println("[MQTT] Home Assistant discovery disabled by ENABLE_HA_DISCOVERY=0");

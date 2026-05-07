@@ -247,6 +247,8 @@ Discovery publishing is enabled by default. To disable `homeassistant/...` topic
 #define ENABLE_HA_DISCOVERY 0
 ```
 
+If discovery was enabled before, retained `homeassistant/...` config topics may still exist on the broker until they are cleared, so Home Assistant entities may remain visible after switching this to `0`.
+
 The stored offset is automatically applied:
 ```
 Effective Frequency = FREQUENCY + stored_offset

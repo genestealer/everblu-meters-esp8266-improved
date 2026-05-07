@@ -691,6 +691,7 @@ Default behavior (if not defined) is enabled:
 ```
 
 With discovery disabled, telemetry and command topics under `everblu/cyble/...` continue to work normally.
+If discovery was enabled previously, retained `homeassistant/...` config topics may remain on the broker until you clear them (or switch to a different discovery prefix), so existing Home Assistant entities may not disappear immediately.
 
 ---
 
