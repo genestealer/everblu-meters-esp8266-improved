@@ -240,6 +240,13 @@ The base frequency is defined in `private.h`:
 #define FREQUENCY 433.82  // Base frequency in MHz
 ```
 
+### Home Assistant Discovery (MQTT)
+Discovery publishing is enabled by default. To disable `homeassistant/...` topic publishing and keep only raw MQTT topics:
+
+```cpp
+#define ENABLE_HA_DISCOVERY 0
+```
+
 The stored offset is automatically applied:
 ```
 Effective Frequency = FREQUENCY + stored_offset

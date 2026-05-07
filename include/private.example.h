@@ -35,6 +35,15 @@
 // 0 = disable (default)
 #define ENABLE_MQTT_DEBUGGING 0
 
+// Home Assistant MQTT discovery publishing
+// Controls whether the firmware publishes Home Assistant discovery topics
+// under homeassistant/... at startup.
+//
+// 1 (default): Publish discovery topics for automatic Home Assistant entity creation
+// 0:           Disable discovery publishing (raw MQTT topics only)
+//
+#define ENABLE_HA_DISCOVERY 1
+
 // Meter number prefix in entity IDs
 // Controls whether the meter serial number is included as a prefix in MQTT entity IDs
 // and Home Assistant entity names. This is useful for distinguishing entities when
