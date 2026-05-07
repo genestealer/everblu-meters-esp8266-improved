@@ -320,6 +320,11 @@ const char *readingSchedule = DEFAULT_READING_SCHEDULE;
 #define ENABLE_METER_PREFIX_IN_ENTITY_IDS 1
 #endif
 
+// Define Home Assistant MQTT discovery option if not defined in private.h (default to enabled)
+#ifndef ENABLE_HA_DISCOVERY
+#define ENABLE_HA_DISCOVERY 1
+#endif
+
 // Buffer size calculations for MQTT topics:
 // - meterSerialStr: METER_SERIAL as string (max 10 digits for ULONG_MAX) + null = 16 bytes (safe)
 // - mqttBaseTopic: "everblu/cyble/" (15) + optional METER_SERIAL (10) + null (1) = 26 bytes minimum
@@ -1449,10 +1454,13 @@ void onConnectionEstablished()
     Serial.println("Frequency scan command received via MQTT");
     performFrequencyScan(); });
 
-  Serial.println("[MQTT] Send MQTT config for HA.");
-
-  // Publish all Home Assistant discovery messages with serial-specific entity IDs
+  // Publish Home Assistant discovery only when enabled in compile-time config.
+#if ENABLE_HA_DISCOVERY
+  Serial.println("[MQTT] Send Home Assistant discovery config.");
   publishHADiscovery();
+#else
+  Serial.println("[MQTT] Home Assistant discovery disabled by ENABLE_HA_DISCOVERY=0");
+#endif
 
   // Set initial state for active reading
   char topicBuffer[MQTT_TOPIC_BUFFER_SIZE];
