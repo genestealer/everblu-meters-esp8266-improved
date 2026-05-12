@@ -96,8 +96,8 @@ the prepare-component-release scripts run. Make edits in the source directories 
 and re-run the release script to regenerate.
 "@
 
-Set-Content -Path "$RELEASE_ROOT\README_DO_NOT_EDIT.md" -Value $warningText -NoNewline
-Set-Content -Path "$RELEASE_DIR\DO_NOT_EDIT.md" -Value $warningText -NoNewline
+Set-Content -Path "$RELEASE_ROOT\README_DO_NOT_EDIT.md" -Value $warningText
+Set-Content -Path "$RELEASE_DIR\DO_NOT_EDIT.md" -Value $warningText
 
 attrib +R "$RELEASE_DIR\*" /S /D
 
