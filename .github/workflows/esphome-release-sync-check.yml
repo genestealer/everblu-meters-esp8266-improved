@@ -1,4 +1,4 @@
-name: ESPHOME Release Sync Check
+name: ESPHOME Sync Check
 
 on:
   pull_request:
@@ -29,12 +29,21 @@ jobs:
         run: |
           set -euo pipefail
 
-          if ! git diff --quiet -- ESPHOME-release; then
+          # Exclude the purely-informational marker files: they differ only in
+          # line-endings between Windows (PS1) and Linux (bash) generation and
+          # have no effect on ESPHome's ability to use the component.
+          if ! git diff --quiet \
+              -- ESPHOME-release \
+              ':(exclude)ESPHOME-release/README_DO_NOT_EDIT.md' \
+              ':(exclude)ESPHOME-release/everblu_meter/DO_NOT_EDIT.md'; then
             echo "Generated release output is not in sync with committed ESPHOME-release files."
             echo "Run ESPHOME/prepare-component-release.ps1 (Windows) or ESPHOME/prepare-component-release.sh (Linux/macOS), then commit ESPHOME-release updates."
             echo ""
             echo "Changed files:"
-            git diff --name-only -- ESPHOME-release
+            git diff --name-only \
+              -- ESPHOME-release \
+              ':(exclude)ESPHOME-release/README_DO_NOT_EDIT.md' \
+              ':(exclude)ESPHOME-release/everblu_meter/DO_NOT_EDIT.md'
             exit 1
           fi
 
