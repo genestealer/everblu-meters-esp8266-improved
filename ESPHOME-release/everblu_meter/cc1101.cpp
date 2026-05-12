@@ -1,8 +1,9 @@
 /*  CC1101 radio interface for Itron EverBlu Cyble Enhanced water meters */
 /*  Implements RADIAN protocol communication over 433 MHz RF */
 
-#include "utils.h"   // Utility functions
-#include "cc1101.h"  // CC1101 interface
+#include "utils.h"  // Utility functions
+#include "cc1101.h" // CC1101 interface
+#include "radian_parser.h"
 #include "logging.h" // Cross-platform logging
 #include <Arduino.h> // Arduino core
 #if !defined(USE_ESPHOME)
@@ -805,73 +806,16 @@ static bool validate_radian_crc(const uint8_t *decoded_buffer, size_t size)
     return false;
   }
 
-  const uint8_t length_field = decoded_buffer[0];
-  size_t expected_len = length_field ? length_field : size;
-
-  if (expected_len > size)
+  const bool crc_ok = radian_validate_crc(decoded_buffer, size);
+  if (!crc_ok)
   {
-    const size_t missing = expected_len - size;
-    // Many EverBlu meters advertise 0x7C (124) bytes but actually deliver 122 bytes,
-    // meaning the CRC bytes are not present in the decoded payload. Log the situation
-    // but keep the frame so we don't regress existing setups.
-    echo_debug(debug_out,
-               "[WARN] RADIAN frame missing %u byte(s) from advertised length (expected=%u got=%u)\n",
-               (unsigned)missing, (unsigned)expected_len, (unsigned)size);
-    if (missing == 2)
-    {
-      echo_debug(debug_out, "[WARN] CRC bytes absent in payload - skipping CRC validation\n");
-      return true;
-    }
-    // For any other mismatch we can't meaningfully validate, so accept the frame but warn.
-    echo_debug(debug_out, "[WARN] Length mismatch prevents CRC validation - accepting frame\n");
-    return true;
-  }
-
-  if (expected_len < 4)
-  {
-    echo_debug(1, "[ERROR] Invalid RADIAN length byte (%u)\n", length_field);
-    return false;
-  }
-
-  if (expected_len < size)
-  {
-    echo_debug(debug_out,
-               "[WARN] Decoder produced %u bytes but length byte indicates %u - extra tail ignored for CRC\n",
-               (unsigned)size, (unsigned)expected_len);
-  }
-
-  const size_t crc_offset = expected_len - 2;
-  if (crc_offset + 1 >= size)
-  {
-    echo_debug(debug_out, "[WARN] Not enough data to read CRC bytes - accepting frame\n");
-    return true;
-  }
-
-  const uint16_t received_crc = ((uint16_t)decoded_buffer[crc_offset] << 8) |
-                                (uint16_t)decoded_buffer[crc_offset + 1];
-
-  // RADIAN/wM-Bus frames place the length byte ahead of the CRC-protected
-  // fields. The CRC covers C + addresses + payload, i.e. everything after the
-  // length byte up to (but not including) the CRC itself. Excluding the length
-  // byte fixes the persistent mismatches observed in the field.
-  if (expected_len <= 3)
-  {
-    echo_debug(1, "[ERROR] RADIAN frame too short for CRC validation (len=%u)\n", (unsigned)expected_len);
-    return false;
-  }
-
-  const uint16_t computed_crc = crc_kermit(&decoded_buffer[1], expected_len - 3);
-
-  if (computed_crc != received_crc)
-  {
-    echo_debug(1, "[ERROR] RADIAN CRC mismatch (computed=0x%04X frame=0x%04X) - discarding frame\n",
-               computed_crc, received_crc);
+    echo_debug(1, "[ERROR] RADIAN CRC validation failed - discarding frame\n");
     echo_debug(1, "[DEBUG] Frame bytes [0-31]: ");
     show_in_hex_one_line(decoded_buffer, (size < 32) ? size : 32);
     return false;
   }
 
-  return true;
+  return crc_ok;
 }
 
 struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
@@ -879,67 +823,31 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
   struct tmeter_data data;
   memset(&data, 0, sizeof(data)); // Initialize all fields to zero
 
-  // Bounds check: ensure buffer is large enough for basic data
-  if (size < 30)
+  struct radian_primary_data primary;
+  if (!radian_parse_primary_data(decoded_buffer, size, &primary))
   {
-    echo_debug(1, "[ERROR] Buffer too small for meter data (size=%d, need>=30)\n", size);
+    if (size < 30)
+    {
+      echo_debug(1, "[ERROR] Buffer too small for meter data (size=%d, need>=30)\n", size);
+    }
+    echo_debug(1, "[ERROR] Invalid primary meter fields - discarding frame\n");
     return data;
   }
 
   // Extract volume using proper uint32_t handling to prevent overflow
   // Byte order is LSB first: [18]=LSB, [19], [20], [21]=MSB
-  data.volume = ((uint32_t)decoded_buffer[18]) |
-                ((uint32_t)decoded_buffer[19] << 8) |
-                ((uint32_t)decoded_buffer[20] << 16) |
-                ((uint32_t)decoded_buffer[21] << 24);
-
-  // Basic plausibility checks for primary fields. These are deliberately
-  // conservative so we only reject clearly bogus frames while keeping the
-  // behaviour compatible with good data.
-  if (data.volume == 0 || data.volume == 0xFFFFFFFFUL)
-  {
-    echo_debug(1, "[ERROR] Parsed volume value is invalid (0x%08lX) - discarding frame\n",
-               (unsigned long)data.volume);
-    echo_debug(1, "[DEBUG] Volume bytes [18-21]: %02X %02X %02X %02X\n",
-               decoded_buffer[18], decoded_buffer[19], decoded_buffer[20], decoded_buffer[21]);
-    echo_debug(1, "[DEBUG] First 32 bytes of frame: ");
-    show_in_hex_one_line(decoded_buffer, (size < 32) ? size : 32);
-    memset(&data, 0, sizeof(data));
-    return data;
-  }
+  data.volume = (int)primary.volume;
+  data.reads_counter = primary.reads_counter;
+  data.battery_left = primary.battery_left;
+  data.time_start = primary.time_start;
+  data.time_end = primary.time_end;
+  data.history_available = primary.history_available;
 
   // Extract extended data if buffer is large enough
   if (size >= 49)
   { // Need at least 49 bytes to safely access decoded_buffer[48]
     // echo_debug(1,"Num %u %u Mois %uh-%uh ",decoded_buffer[48], decoded_buffer[31],decoded_buffer[44],decoded_buffer[45]);
-    data.reads_counter = decoded_buffer[48];
-    data.battery_left = decoded_buffer[31];
-    data.time_start = decoded_buffer[44];
-    data.time_end = decoded_buffer[45];
-
-    // Sanity checks on extended fields: time window must be within 0-23,
-    // and battery_left should not be 0xFF (usually reserved / invalid).
-    if (data.time_start > 23 || data.time_end > 23)
-    {
-      echo_debug(1, "[ERROR] Invalid wake window %u-%u (expected 0-23) - discarding frame\n",
-                 data.time_start, data.time_end);
-      memset(&data, 0, sizeof(data));
-      return data;
-    }
-
-    if (data.battery_left == 0xFF)
-    {
-      echo_debug(1, "[ERROR] Invalid battery_left value 0xFF - discarding frame\n");
-      memset(&data, 0, sizeof(data));
-      return data;
-    }
-
-    if (data.reads_counter == 0xFF)
-    {
-      echo_debug(1, "[ERROR] Invalid reads_counter value 0xFF (255) - discarding frame\n");
-      memset(&data, 0, sizeof(data));
-      return data;
-    }
+    // Values already validated by radian_parse_primary_data.
   }
   else
   {

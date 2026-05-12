@@ -98,7 +98,7 @@ CONF_GDO0_PIN = "gdo0_pin"
 
 
 def validate_meter_year(value):
-    """Validate and normalize 2-digit meter year values."""
+    """Validate and normalize meter year values from 0 to 99 (string input may be 1 or 2 digits)."""
     if isinstance(value, str):
         year_str = value.strip()
         if not year_str:

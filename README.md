@@ -28,9 +28,9 @@ Integrated with Home Assistant via MQTT AutoDiscovery and ESPHome external compo
 
 ---
 
-### **ESPHome** - Release V2.1.3
+### **ESPHome** - Release V2.2.1
 ESPHome integration is now production-ready. For setup and usage, see the ESPHome docs at [ESPHOME/README.md](ESPHOME/README.md)
- - Versioned external component in `ESPHOME-release` with the same 2.1.3 code as the main firmware
+ - Versioned external component in `ESPHOME-release` with the same 2.2.1 code as the main firmware
  - Tested on ESP8266 and ESP32 with water and gas meters; supports the same sensors and calibration logic
  - YAML stays simple: drop in the component, set `meter_year`, `meter_serial`, `meter_type`, and go
  - Build with the Arduino framework (set `esp32.framework.type: arduino`; ESP-IDF is not supported for this component)
@@ -177,6 +177,7 @@ See the Hardware section below for full wiring tables and pictures.
 - `include/private.h` (copy from `include/private.example.h`):
   - Wi‑Fi SSID/password
   - MQTT broker/port (+ credentials, if used)
+  - `ENABLE_HA_DISCOVERY` - set to `0` to disable Home Assistant discovery topic publishing (`homeassistant/...`) and keep raw MQTT topics only
   - `METER_YEAR` and `METER_SERIAL` (from the meter label)
   - `METER_TYPE` - set to `"water"` (default) or `"gas"` depending on your meter type
   - `MAX_RETRIES` - maximum reading retry attempts before cooldown (optional, default is 10)
@@ -670,6 +671,27 @@ In serial logs at startup you’ll see:
 - The UTC time pulled from the time server
 - The configured offset (minutes)
 - The local (UTC+offset) time
+
+---
+
+### Home Assistant Discovery Toggle (MQTT mode)
+
+By default, the standalone MQTT firmware publishes Home Assistant discovery topics under `homeassistant/...` so entities are created automatically.
+
+If you only want raw MQTT topics and do not use Home Assistant discovery, set this in `include/private.h`:
+
+```cpp
+#define ENABLE_HA_DISCOVERY 0
+```
+
+Default behavior (if not defined) is enabled:
+
+```cpp
+#define ENABLE_HA_DISCOVERY 1
+```
+
+With discovery disabled, telemetry and command topics under `everblu/cyble/...` continue to work normally.
+If discovery was enabled previously, retained `homeassistant/...` config topics may remain on the broker until you clear them (or switch to a different discovery prefix), so existing Home Assistant entities may not disappear immediately.
 
 ---
 

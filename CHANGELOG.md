@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 Releases are created manually by tagging commits with version tags matching `v*.*.*` (e.g., `v2.1.0`). Users should build from source and configure `private.h` with their own meter settings.
 
+## [v2.2.1] - 2026-05-07
+
+### Added
+
+- Added compile-time MQTT option `ENABLE_HA_DISCOVERY` (default `1`) to allow disabling Home Assistant discovery topic publishing (`homeassistant/...`) while keeping raw MQTT telemetry and command topics active (Issue #77).
+
+### Changed
+
+- Updated `include/private.example.h` and README configuration guidance with the new Home Assistant discovery toggle.
+- Bumped firmware/component version to `2.2.1`.
+
 ## [v2.2.0] - 2026-04-21
 
 > **⚠️ BREAKING CHANGE** — This release contains a breaking ESPHome configuration schema change due to the explicit SPI integration. Existing `everblu_meter` YAML configurations **will not validate** without migration. See [Migration Required](#migration-required) below.
