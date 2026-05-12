@@ -519,24 +519,6 @@ bool MeterReader::isReadingDayForConfiguredSchedule(const struct tm *ptm) const
     {
         return true;
     }
-    // check for single day reading schedule
-    switch(dayOfWeek) 
-    {
-        case 0:
-            return strcasecmp(schedule, "sunday") == 0;
-        case 1:
-            return strcasecmp(schedule, "monday") == 0;
-        case 2:
-            return strcasecmp(schedule, "tuesday") == 0;
-        case 3:
-            return strcasecmp(schedule, "wednesday") == 0;
-        case 4:
-            return strcasecmp(schedule, "thursday") == 0;
-        case 5:
-            return strcasecmp(schedule, "friday") == 0;
-        case 6:
-            return strcasecmp(schedule, "saturday") == 0;
-    }
 
     // Unknown schedule: log warning and skip read to avoid misconfiguration
     LOG_W("everblu_meter", "Unknown reading_schedule '%s'; skipping scheduled read.", schedule);
