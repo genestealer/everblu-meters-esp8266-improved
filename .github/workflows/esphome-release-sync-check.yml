@@ -29,10 +29,17 @@ jobs:
         run: |
           set -euo pipefail
 
-          # --ignore-cr-at-eol treats CRLF and LF as identical, so Windows-generated
-          # ESPHOME-release files (committed with CRLF) pass the check when CI
-          # regenerates them with LF. All meaningful content differences still fail.
-          CHANGED=$(git diff --ignore-cr-at-eol --name-only -- ESPHOME-release)
+          # Restore the informational marker files to their committed state before
+          # diffing. They are not ESPHome component files; they exist only to warn
+          # humans not to edit ESPHOME-release manually. The bash script regenerates
+          # them with LF while Windows PowerShell commits them with CRLF, causing a
+          # spurious diff that has nothing to do with component correctness.
+          git checkout -- \
+            ESPHOME-release/README_DO_NOT_EDIT.md \
+            "ESPHOME-release/everblu_meter/DO_NOT_EDIT.md" \
+            2>/dev/null || true
+
+          CHANGED=$(git diff --name-only -- ESPHOME-release)
 
           if [ -n "$CHANGED" ]; then
             echo "Generated release output is not in sync with committed ESPHOME-release files."
