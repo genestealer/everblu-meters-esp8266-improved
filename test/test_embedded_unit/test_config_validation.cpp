@@ -73,6 +73,13 @@ void test_valid_reading_schedules(void)
     TEST_ASSERT_TRUE(isValidReadingSchedule("Monday-Friday"));
     TEST_ASSERT_TRUE(isValidReadingSchedule("Monday-Saturday"));
     TEST_ASSERT_TRUE(isValidReadingSchedule("Monday-Sunday"));
+    TEST_ASSERT_TRUE(isValidReadingSchedule("Monday"));
+    TEST_ASSERT_TRUE(isValidReadingSchedule("Tuesday"));
+    TEST_ASSERT_TRUE(isValidReadingSchedule("Wednesday"));
+    TEST_ASSERT_TRUE(isValidReadingSchedule("Thursday"));
+    TEST_ASSERT_TRUE(isValidReadingSchedule("Friday"));
+    TEST_ASSERT_TRUE(isValidReadingSchedule("Saturday"));
+    TEST_ASSERT_TRUE(isValidReadingSchedule("Sunday"));
 }
 
 /**
