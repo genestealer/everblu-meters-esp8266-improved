@@ -1,0 +1,41 @@
+name: ESPHOME Release Sync Check
+
+on:
+  pull_request:
+    branches: [main, master, develop]
+    paths:
+      - src/**
+      - ESPHOME/components/everblu_meter/**
+      - ESPHOME/prepare-component-release.ps1
+      - ESPHOME/prepare-component-release.sh
+      - ESPHOME-release/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-generated-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate ESPHOME release output
+        run: bash ./ESPHOME/prepare-component-release.sh
+
+      - name: Verify generated files are committed
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if ! git diff --quiet -- ESPHOME-release; then
+            echo "Generated release output is not in sync with committed ESPHOME-release files."
+            echo "Run ESPHOME/prepare-component-release.ps1 (Windows) or ESPHOME/prepare-component-release.sh (Linux/macOS), then commit ESPHOME-release updates."
+            echo ""
+            echo "Changed files:"
+            git diff --name-only -- ESPHOME-release
+            exit 1
+          fi
+
+          echo "ESPHOME-release is up to date with generated output."
