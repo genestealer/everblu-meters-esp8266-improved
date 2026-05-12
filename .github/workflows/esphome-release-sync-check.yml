@@ -29,21 +29,17 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Exclude the purely-informational marker files: they differ only in
-          # line-endings between Windows (PS1) and Linux (bash) generation and
-          # have no effect on ESPHome's ability to use the component.
-          if ! git diff --quiet \
-              -- ESPHOME-release \
-              ':(exclude)ESPHOME-release/README_DO_NOT_EDIT.md' \
-              ':(exclude)ESPHOME-release/everblu_meter/DO_NOT_EDIT.md'; then
+          # --ignore-cr-at-eol treats CRLF and LF as identical, so Windows-generated
+          # ESPHOME-release files (committed with CRLF) pass the check when CI
+          # regenerates them with LF. All meaningful content differences still fail.
+          CHANGED=$(git diff --ignore-cr-at-eol --name-only -- ESPHOME-release)
+
+          if [ -n "$CHANGED" ]; then
             echo "Generated release output is not in sync with committed ESPHOME-release files."
             echo "Run ESPHOME/prepare-component-release.ps1 (Windows) or ESPHOME/prepare-component-release.sh (Linux/macOS), then commit ESPHOME-release updates."
             echo ""
             echo "Changed files:"
-            git diff --name-only \
-              -- ESPHOME-release \
-              ':(exclude)ESPHOME-release/README_DO_NOT_EDIT.md' \
-              ':(exclude)ESPHOME-release/everblu_meter/DO_NOT_EDIT.md'
+            echo "$CHANGED"
             exit 1
           fi
 
