@@ -17,22 +17,36 @@
 
 bool isValidReadingSchedule(const char *schedule)
 {
-    // Reject null or empty schedules
-    if (schedule == nullptr || schedule[0] == '\0')
-    {
-        return false;
-    }
+	// Reject null or empty schedules
+	if (schedule == nullptr || schedule[0] == '\0')
+	{
+		return false;
+	}
 
-    // Allowed values based on tests
-    if (strcmp(schedule, "Monday-Friday") == 0)
-        return true;
-    if (strcmp(schedule, "Monday-Saturday") == 0)
-        return true;
-    if (strcmp(schedule, "Monday-Sunday") == 0)
-        return true;
+	// Allowed values based on unit tests
+	if (strcasecmp(schedule, "monday-friday") == 0)
+		return true;
+	if (strcasecmp(schedule, "monday-saturday") == 0)
+		return true;
+	if (strcasecmp(schedule, "monday-sunday") == 0)
+		return true;
+	if (strcasecmp(schedule, "monday") == 0)
+		return true;
+	if (strcasecmp(schedule, "tuesday") == 0)
+		return true;
+	if (strcasecmp(schedule, "wednesday") == 0)
+		return true;
+	if (strcasecmp(schedule, "thursday") == 0)
+		return true;
+	if (strcasecmp(schedule, "friday") == 0)
+		return true;
+	if (strcasecmp(schedule, "saturday") == 0)
+		return true;
+	if (strcasecmp(schedule, "sunday") == 0)
+		return true;
 
-    // Everything else is invalid
-    return false;
+	// Everything else is considered invalid for now
+	return false;
 }
 
 bool validateConfiguration()
