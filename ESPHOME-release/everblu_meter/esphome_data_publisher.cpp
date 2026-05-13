@@ -4,7 +4,7 @@
  */
 
 #include "esphome_data_publisher.h"
-#include "meter_history.h"
+#include "../../services/meter_history.h"
 
 #ifdef USE_ESPHOME
 #include "esphome/components/sensor/sensor.h"

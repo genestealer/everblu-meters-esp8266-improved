@@ -30,10 +30,10 @@
 
 // Include core meter reading components
 // These are in src/ subdirectory within the component
-#include "meter_reader.h"
-#include "esphome_config_provider.h"
-#include "esphome_time_provider.h"
-#include "esphome_data_publisher.h"
+#include "services/meter_reader.h"
+#include "adapters/implementations/esphome_config_provider.h"
+#include "adapters/implementations/esphome_time_provider.h"
+#include "adapters/implementations/esphome_data_publisher.h"
 
 namespace esphome
 {

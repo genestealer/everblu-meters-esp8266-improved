@@ -9,7 +9,7 @@
 #ifdef USE_ESPHOME
 #include "logging.h"
 #else
-#include "logging.h"
+#include "../../core/logging.h"
 #endif
 
 #include <Arduino.h>

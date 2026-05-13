@@ -4,7 +4,7 @@
  */
 
 #include "storage_abstraction.h"
-#include "logging.h"
+#include "../core/logging.h"
 
 // Fallback to ESPHome preferences
 #if defined(USE_ESPHOME) || (__has_include("esphome/core/preferences.h"))

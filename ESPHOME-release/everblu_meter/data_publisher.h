@@ -14,7 +14,7 @@
 #ifndef DATA_PUBLISHER_H
 #define DATA_PUBLISHER_H
 
-#include "cc1101.h"
+#include "../core/cc1101.h"
 #include <stdint.h>
 
 /**
