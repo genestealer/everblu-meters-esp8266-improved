@@ -6,71 +6,7 @@
 #include <unity.h>
 #include <Arduino.h>
 #include <string.h>
-
-static bool parseMeterCodePartsForTest(const char *code, uint8_t *out_year, uint32_t *out_serial)
-{
-    if (code == nullptr)
-    {
-        return false;
-    }
-
-    const size_t len = strlen(code);
-    if (len < 5)
-    {
-        return false;
-    }
-
-    if (code[0] < '0' || code[0] > '9' || code[1] < '0' || code[1] > '9' || code[2] != '-')
-    {
-        return false;
-    }
-
-    const uint8_t year = (uint8_t)((code[0] - '0') * 10 + (code[1] - '0'));
-    uint32_t serial = 0;
-    size_t serial_digits = 0;
-    size_t i = 3;
-    while (i < len && code[i] >= '0' && code[i] <= '9')
-    {
-        serial = serial * 10 + (uint32_t)(code[i] - '0');
-        serial_digits++;
-        i++;
-    }
-
-    if (serial_digits == 0 || serial_digits > 8)
-    {
-        return false;
-    }
-
-    if (i < len)
-    {
-        if (code[i] != '-' || (i + 4) != len)
-        {
-            return false;
-        }
-        for (size_t j = i + 1; j < len; j++)
-        {
-            if (code[j] < '0' || code[j] > '9')
-            {
-                return false;
-            }
-        }
-    }
-
-    if (serial == 0 || serial > 0xFFFFFFUL)
-    {
-        return false;
-    }
-
-    if (out_year != nullptr)
-    {
-        *out_year = year;
-    }
-    if (out_serial != nullptr)
-    {
-        *out_serial = serial;
-    }
-    return true;
-}
+#include "core/meter_code_parser.h"
 
 // Mock configuration values for testing
 #define TEST_METER_YEAR 2020
@@ -173,7 +109,7 @@ void test_meter_code_parse_valid_dashed_with_suffix(void)
 {
     uint8_t year = 0;
     uint32_t serial = 0;
-    TEST_ASSERT_TRUE(parseMeterCodePartsForTest("20-0257301-999", &year, &serial));
+    TEST_ASSERT_TRUE(everblu::core::parseMeterCode("20-0257301-999", &year, &serial));
     TEST_ASSERT_EQUAL_UINT8(20, year);
     TEST_ASSERT_EQUAL_UINT32(257301UL, serial);
 }
@@ -182,30 +118,30 @@ void test_meter_code_parse_valid_dashed_without_suffix(void)
 {
     uint8_t year = 0;
     uint32_t serial = 0;
-    TEST_ASSERT_TRUE(parseMeterCodePartsForTest("20-0257301", &year, &serial));
+    TEST_ASSERT_TRUE(everblu::core::parseMeterCode("20-0257301", &year, &serial));
     TEST_ASSERT_EQUAL_UINT8(20, year);
     TEST_ASSERT_EQUAL_UINT32(257301UL, serial);
 }
 
 void test_meter_code_parse_rejects_non_digit(void)
 {
-    TEST_ASSERT_FALSE(parseMeterCodePartsForTest("20-02573A1-999", nullptr, nullptr));
+    TEST_ASSERT_FALSE(everblu::core::parseMeterCode("20-02573A1-999", nullptr, nullptr));
 }
 
 void test_meter_code_parse_rejects_missing_dash_format(void)
 {
-    TEST_ASSERT_FALSE(parseMeterCodePartsForTest("200257301999", nullptr, nullptr));
+    TEST_ASSERT_FALSE(everblu::core::parseMeterCode("200257301999", nullptr, nullptr));
 }
 
 void test_meter_code_parse_rejects_zero_serial(void)
 {
-    TEST_ASSERT_FALSE(parseMeterCodePartsForTest("20-0000000-000", nullptr, nullptr));
+    TEST_ASSERT_FALSE(everblu::core::parseMeterCode("20-0000000-000", nullptr, nullptr));
 }
 
 void test_meter_code_parse_rejects_serial_over_24bit(void)
 {
     // 16777216 is one above 0xFFFFFF.
-    TEST_ASSERT_FALSE(parseMeterCodePartsForTest("20-16777216-000", nullptr, nullptr));
+    TEST_ASSERT_FALSE(everblu::core::parseMeterCode("20-16777216-000", nullptr, nullptr));
 }
 
 void setup()

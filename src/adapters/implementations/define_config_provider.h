@@ -14,7 +14,10 @@
 // Only build real provider when private.h exists (standalone mode)
 #if !defined(USE_ESPHOME) && (__has_include("private.h") || __has_include("../../private.h"))
 #include "private.h"
-#include <cstring>
+#include "../../core/meter_code_parser.h"
+#if defined(ARDUINO)
+#include <Arduino.h>
+#endif
 
 #if !defined(METER_CODE)
 #error "METER_CODE must be defined in private.h"
@@ -37,23 +40,13 @@ public:
         // METER_CODE format: "YY-SSSSSSS" or "YY-SSSSSSS-NNN".
         uint8_t getMeterYear() const override
         {
-                uint8_t year = 0;
-                uint32_t serial = 0;
-                if (!parseMeterCode(METER_CODE, year, serial))
-                {
-                        return 0;
-                }
-                return year;
+                ensureMeterCodeParsed();
+                return meterCodeValid_ ? parsedYear_ : 0;
         }
         uint32_t getMeterSerial() const override
         {
-                uint8_t year = 0;
-                uint32_t serial = 0;
-                if (!parseMeterCode(METER_CODE, year, serial))
-                {
-                        return 0;
-                }
-                return serial;
+                ensureMeterCodeParsed();
+                return meterCodeValid_ ? parsedSerial_ : 0;
         }
         bool isMeterGas() const override
         {
@@ -172,57 +165,37 @@ public:
         const char *getNtpServer() const override { return SECRET_NTP_SERVER; }
 
 private:
-        static bool parseMeterCode(const char *code, uint8_t &year, uint32_t &serial)
+        void ensureMeterCodeParsed() const
         {
-                if (code == nullptr)
+                if (meterCodeParsed_)
                 {
-                        return false;
+                        return;
                 }
 
-                size_t len = strlen(code);
-                if (len < 5)
-                {
-                        return false;
-                }
+                meterCodeParsed_ = true;
+                meterCodeValid_ = everblu::core::parseMeterCode(METER_CODE, &parsedYear_, &parsedSerial_);
 
-                if (code[0] < '0' || code[0] > '9' || code[1] < '0' || code[1] > '9' || code[2] != '-')
+                if (!meterCodeValid_)
                 {
-                        return false;
-                }
-
-                year = (uint8_t)((code[0] - '0') * 10 + (code[1] - '0'));
-                serial = 0;
-                size_t serial_digits = 0;
-                size_t i = 3;
-                while (i < len && code[i] >= '0' && code[i] <= '9')
-                {
-                        serial = serial * 10 + (uint32_t)(code[i] - '0');
-                        serial_digits++;
-                        i++;
-                }
-
-                if (serial_digits == 0 || serial_digits > 8)
-                {
-                        return false;
-                }
-
-                if (i < len)
-                {
-                        if (code[i] != '-' || (i + 4) != len)
+#if defined(ARDUINO)
+                        if (!meterCodeErrorLogged_)
                         {
-                                return false;
+                                Serial.println("[ERROR] Invalid METER_CODE in private.h; DefineConfigProvider meter identity unavailable");
+                                meterCodeErrorLogged_ = true;
                         }
-                        for (size_t j = i + 1; j < len; j++)
-                        {
-                                if (code[j] < '0' || code[j] > '9')
-                                {
-                                        return false;
-                                }
-                        }
+#endif
+                        parsedYear_ = 0;
+                        parsedSerial_ = 0;
                 }
-
-                return serial > 0 && serial <= 0xFFFFFFUL;
         }
+
+        mutable bool meterCodeParsed_{false};
+        mutable bool meterCodeValid_{false};
+#if defined(ARDUINO)
+        mutable bool meterCodeErrorLogged_{false};
+#endif
+        mutable uint8_t parsedYear_{0};
+        mutable uint32_t parsedSerial_{0};
 };
 
 #else

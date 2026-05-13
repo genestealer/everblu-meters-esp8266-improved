@@ -26,6 +26,7 @@
 #include "core/version.h"              // Firmware version definition
 #include "core/wifi_serial.h"          // WiFi serial monitor
 #include "core/cc1101.h"               // CC1101 RF transceiver and meter data
+#include "core/meter_code_parser.h"    // Shared METER_CODE parser
 #include "core/utils.h"                // Utility functions
 #include "services/schedule_manager.h" // Schedule management
 #if defined(ESP8266)
@@ -257,78 +258,13 @@ void adaptiveFrequencyTracking(int8_t freqest);
 // Secrets pulled from private.h file
 // Note: MQTT Client ID is made unique per device by appending the meter serial number
 // This prevents multiple devices from having the same client ID and causing MQTT connection conflicts
-static bool parseMeterCodeParts(const char *code, uint8_t *out_year, uint32_t *out_serial)
-{
-  if (code == nullptr)
-  {
-    return false;
-  }
-
-  const size_t len = strlen(code);
-  if (len < 5)
-  {
-    return false;
-  }
-
-  if (code[0] < '0' || code[0] > '9' || code[1] < '0' || code[1] > '9' || code[2] != '-')
-  {
-    return false;
-  }
-
-  const uint8_t year = (uint8_t)((code[0] - '0') * 10 + (code[1] - '0'));
-  size_t i = 3;
-  uint32_t serial = 0;
-  size_t serial_digits = 0;
-  while (i < len && code[i] >= '0' && code[i] <= '9')
-  {
-    serial = serial * 10 + (uint32_t)(code[i] - '0');
-    serial_digits++;
-    i++;
-  }
-
-  if (serial_digits == 0 || serial_digits > 8)
-  {
-    return false;
-  }
-
-  if (i < len)
-  {
-    // Optional suffix must be exactly 3 digits after '-'.
-    if (code[i] != '-' || (i + 4) != len)
-    {
-      return false;
-    }
-    for (size_t j = i + 1; j < len; j++)
-    {
-      if (code[j] < '0' || code[j] > '9')
-      {
-        return false;
-      }
-    }
-  }
-
-  if (serial == 0 || serial > 0xFFFFFFUL)
-  {
-    return false;
-  }
-
-  if (out_year != nullptr)
-  {
-    *out_year = year;
-  }
-  if (out_serial != nullptr)
-  {
-    *out_serial = serial;
-  }
-  return true;
-}
 
 static const char *buildMqttClientIdWithSerial()
 {
   static char client_id[64] = {};
   uint8_t year = 0;
   uint32_t serial = 0;
-  if (parseMeterCodeParts(METER_CODE, &year, &serial))
+  if (everblu::core::parseMeterCode(METER_CODE, &year, &serial))
   {
     snprintf(client_id, sizeof(client_id), "%s-%lu", SECRET_MQTT_CLIENT_ID, (unsigned long)serial);
   }
@@ -354,8 +290,7 @@ EspMQTTClient mqtt(
 
 // Base MQTT topic prefix for all EverBlu Cyble entities
 // Centralising this avoids repeating "everblu/cyble/" all over the code.
-// mqttBaseTopic is initialized at global scope using compile-time string
-// concatenation with METER_SERIAL (via TOSTRING) and is only printed in setup().
+// mqttBaseTopic is populated during setup() after parsing METER_CODE.
 
 const char jsonTemplate[] = "{ "
                             "\"liters\": %d, "
@@ -416,7 +351,7 @@ char mqttLwtTopic[80] = "everblu/cyble/status"; // LWT status topic without seri
  */
 static void parseMeterCode()
 {
-  if (!parseMeterCodeParts(METER_CODE, &g_meterYear, &g_meterSerial))
+  if (!everblu::core::parseMeterCode(METER_CODE, &g_meterYear, &g_meterSerial))
   {
     Serial.println("[ERROR] Invalid METER_CODE - expected YY-serial or YY-serial-NNN (with dashes)");
     return;
@@ -1964,7 +1899,7 @@ bool validateConfiguration()
   Serial.println("\n=== Configuration Validation ===");
 
   // Validate METER_CODE parse results
-  if (!parseMeterCodeParts(METER_CODE, &parsed_year, &parsed_serial))
+  if (!everblu::core::parseMeterCode(METER_CODE, &parsed_year, &parsed_serial))
   {
     Serial.println("[ERROR] Invalid METER_CODE in private.h");
     Serial.println("       Expected dashed format: \"YY-SSSSSSS\" or \"YY-SSSSSSS-NNN\"");

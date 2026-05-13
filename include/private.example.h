@@ -100,7 +100,7 @@
 //
 // Label format:  YY - SSSSSSS - NNN
 //                ^^   ^^^^^^^   ^^^ <- 3-digit suffix (optional, ignored if present)
-//                |    serial section (leading zeros are preserved)
+//                |    serial section (leading zeros are allowed in input, but normalized after parsing)
 //                2-digit year
 //
 // Examples:
