@@ -120,10 +120,10 @@ def validate_meter_code(value):
         )
     if not code.isdigit():
         raise cv.Invalid("meter_code must contain only digits")
-    if len(code) < 5:
+    if len(code) < 9 or len(code) > 12:
         raise cv.Invalid(
-            f"meter_code '{code}' is too short ({len(code)} digits). "
-            "Expected at least 5 digits: 2-digit year + at least 3 serial digits. "
+            f"meter_code '{code}' has invalid length ({len(code)} digits). "
+            "Expected 9 to 12 digits: YY + serial (and optional 3-digit suffix). "
             "Example (with optional 3-digit suffix): label '16-0039185-107' -> meter_code: '160039185107'. "
             "Example (without suffix): label '20-0257301' -> meter_code: '200257301'."
         )

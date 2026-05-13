@@ -67,7 +67,7 @@ jobs:
           if [ ! -f include/private.h ]; then
             cp include/private.example.h include/private.h
           fi
-          sed -i 's/#define METER_CODE "xxxxxxxxxxxx"/#define METER_CODE "99999999000"/g' include/private.h
+          sed -i 's/#define METER_CODE "xxxxxxxxxxxx"/#define METER_CODE "991234567000"/g' include/private.h
 
       - name: Build and capture memory usage
         id: build

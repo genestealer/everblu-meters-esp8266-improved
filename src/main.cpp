@@ -257,12 +257,74 @@ void adaptiveFrequencyTracking(int8_t freqest);
 // Secrets pulled from private.h file
 // Note: MQTT Client ID is made unique per device by appending the meter serial number
 // This prevents multiple devices from having the same client ID and causing MQTT connection conflicts
-// STRINGIFY/TOSTRING macros for compile-time string conversion
-#ifndef STRINGIFY
-#define STRINGIFY(x) #x
-#define TOSTRING(x) STRINGIFY(x)
-#endif
-#define MQTT_CLIENT_ID_WITH_SERIAL SECRET_MQTT_CLIENT_ID "-" METER_CODE
+static bool parseMeterCodeParts(const char *code, uint8_t *out_year, uint32_t *out_serial)
+{
+  if (code == nullptr)
+  {
+    return false;
+  }
+
+  const size_t len = strlen(code);
+  if (len < 9 || len > 12)
+  {
+    return false;
+  }
+
+  for (size_t i = 0; i < len; i++)
+  {
+    if (code[i] < '0' || code[i] > '9')
+    {
+      return false;
+    }
+  }
+
+  const uint8_t year = (uint8_t)((code[0] - '0') * 10 + (code[1] - '0'));
+  const size_t serial_end = (len == 12) ? (len - 3) : len;
+  if (serial_end <= 2)
+  {
+    return false;
+  }
+
+  uint32_t serial = 0;
+  for (size_t i = 2; i < serial_end; i++)
+  {
+    serial = serial * 10 + (uint32_t)(code[i] - '0');
+  }
+
+  if (serial == 0 || serial > 0xFFFFFFUL)
+  {
+    return false;
+  }
+
+  if (out_year != nullptr)
+  {
+    *out_year = year;
+  }
+  if (out_serial != nullptr)
+  {
+    *out_serial = serial;
+  }
+  return true;
+}
+
+static const char *buildMqttClientIdWithSerial()
+{
+  static char client_id[64] = {};
+  uint8_t year = 0;
+  uint32_t serial = 0;
+  if (parseMeterCodeParts(METER_CODE, &year, &serial))
+  {
+    snprintf(client_id, sizeof(client_id), "%s-%lu", SECRET_MQTT_CLIENT_ID, (unsigned long)serial);
+  }
+  else
+  {
+    // Keep startup resilient so validation can print a clear error afterward.
+    snprintf(client_id, sizeof(client_id), "%s-%s", SECRET_MQTT_CLIENT_ID, METER_CODE);
+  }
+  return client_id;
+}
+
+const char *MQTT_CLIENT_ID_WITH_SERIAL = buildMqttClientIdWithSerial();
 
 EspMQTTClient mqtt(
     SECRET_WIFI_SSID,           // Your Wifi SSID
@@ -339,19 +401,12 @@ char mqttLwtTopic[80] = "everblu/cyble/status"; // LWT status topic without seri
  */
 static void parseMeterCode()
 {
-  const char *code = METER_CODE;
-  size_t len = strlen(code);
-  if (len < 6)
+  if (!parseMeterCodeParts(METER_CODE, &g_meterYear, &g_meterSerial))
   {
-    Serial.println("[ERROR] METER_CODE is too short - expected YYSSSSSSNNN (min 6 digits, no dashes)");
+    Serial.println("[ERROR] Invalid METER_CODE - expected 9..12 digits: YY + serial + optional 3-digit suffix");
     return;
   }
-  // First 2 digits = year
-  g_meterYear = (uint8_t)((code[0] - '0') * 10 + (code[1] - '0'));
-  // Middle digits = serial (positions 2 .. len-4, last 3 are suffix)
-  g_meterSerial = 0;
-  for (size_t i = 2; i < len - 3; i++)
-    g_meterSerial = g_meterSerial * 10 + (uint32_t)(code[i] - '0');
+
   snprintf(meterSerialStr, sizeof(meterSerialStr), "%lu", (unsigned long)g_meterSerial);
 #if ENABLE_METER_PREFIX_IN_ENTITY_IDS
   snprintf(mqttBaseTopic, sizeof(mqttBaseTopic), "everblu/cyble/%lu", (unsigned long)g_meterSerial);
@@ -1888,31 +1943,24 @@ void adaptiveFrequencyTracking(int8_t freqest)
 bool validateConfiguration()
 {
   bool valid = true;
+  uint8_t parsed_year = 0;
+  uint32_t parsed_serial = 0;
 
   Serial.println("\n=== Configuration Validation ===");
 
   // Validate METER_CODE parse results
-  if (strchr(METER_CODE, '-') != nullptr || strchr(METER_CODE, ' ') != nullptr)
+  if (!parseMeterCodeParts(METER_CODE, &parsed_year, &parsed_serial))
   {
-    Serial.println("[ERROR] METER_CODE contains dashes or spaces.");
-    Serial.println("       Remove all dashes: '16-0039185-107' -> '160039185107'");
-    valid = false;
-  }
-  else if (g_meterSerial == 0)
-  {
-    Serial.println("[ERROR] Parsed serial is zero - check METER_CODE in private.h");
-    Serial.println("       Format: \"YYSSSSSSNNN\" (2-digit year + serial + 3-digit suffix)");
-    valid = false;
-  }
-  else if (g_meterSerial > 16777215UL) // 0xFFFFFF - 3-byte protocol limit
-  {
-    Serial.printf("[ERROR] Parsed serial %lu exceeds protocol max 16777215 (0xFFFFFF)\n",
-                  (unsigned long)g_meterSerial);
-    Serial.println("       Verify the code from your meter label is correct.");
+    Serial.println("[ERROR] Invalid METER_CODE in private.h");
+    Serial.println("       Expected 9..12 digits without dashes/spaces");
+    Serial.println("       Format: \"YYSSSSSSS\" or \"YYSSSSSSSNNN\" (suffix optional)");
+    Serial.println("       Example: label '16-0039185-107' -> '160039185' or '160039185107'");
     valid = false;
   }
   else
   {
+    g_meterYear = parsed_year;
+    g_meterSerial = parsed_serial;
     Serial.printf("✓ METER_CODE: %s (year=%d, serial=%lu)\n",
                   METER_CODE, g_meterYear, (unsigned long)g_meterSerial);
   }

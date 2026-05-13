@@ -14,6 +14,7 @@
 // Only build real provider when private.h exists (standalone mode)
 #if !defined(USE_ESPHOME) && (__has_include("private.h") || __has_include("../../private.h"))
 #include "private.h"
+#include <cstring>
 
 /**
  * @class DefineConfigProvider
@@ -29,20 +30,26 @@ public:
         ~DefineConfigProvider() override = default;
 
         // Meter identification — parsed at call time from the METER_CODE string.
-        // METER_CODE format: "YYSSSSSSNNN"  (2-digit year + serial + 3-digit suffix)
+        // METER_CODE format: "YYSSSSSSS" or "YYSSSSSSSNNN".
         uint8_t getMeterYear() const override
         {
-                const char *c = METER_CODE;
-                return (uint8_t)((c[0] - '0') * 10 + (c[1] - '0'));
+                uint8_t year = 0;
+                uint32_t serial = 0;
+                if (!parseMeterCode(METER_CODE, year, serial))
+                {
+                        return 0;
+                }
+                return year;
         }
         uint32_t getMeterSerial() const override
         {
-                const char *c = METER_CODE;
-                size_t len = strlen(c);
-                uint32_t s = 0;
-                for (size_t i = 2; i < len - 3; i++)
-                        s = s * 10 + (uint32_t)(c[i] - '0');
-                return s;
+                uint8_t year = 0;
+                uint32_t serial = 0;
+                if (!parseMeterCode(METER_CODE, year, serial))
+                {
+                        return 0;
+                }
+                return serial;
         }
         bool isMeterGas() const override
         {
@@ -159,6 +166,44 @@ public:
         const char *getMqttPassword() const override { return SECRET_MQTT_PASSWORD; }
         const char *getMqttClientId() const override { return SECRET_MQTT_CLIENT_ID; }
         const char *getNtpServer() const override { return SECRET_NTP_SERVER; }
+
+private:
+        static bool parseMeterCode(const char *code, uint8_t &year, uint32_t &serial)
+        {
+                if (code == nullptr)
+                {
+                        return false;
+                }
+
+                size_t len = strlen(code);
+                if (len < 9 || len > 12)
+                {
+                        return false;
+                }
+
+                for (size_t i = 0; i < len; i++)
+                {
+                        if (code[i] < '0' || code[i] > '9')
+                        {
+                                return false;
+                        }
+                }
+
+                year = (uint8_t)((code[0] - '0') * 10 + (code[1] - '0'));
+                size_t serial_end = (len == 12) ? (len - 3) : len;
+                if (serial_end <= 2)
+                {
+                        return false;
+                }
+
+                serial = 0;
+                for (size_t i = 2; i < serial_end; i++)
+                {
+                        serial = serial * 10 + (uint32_t)(code[i] - '0');
+                }
+
+                return serial > 0 && serial <= 0xFFFFFFUL;
+        }
 };
 
 #else

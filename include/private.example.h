@@ -112,7 +112,7 @@
 //   - Leaving dashes in (you will get a clear error at compile/startup)
 //   - Using the 4-digit date printed below the barcode instead of the code
 //
-#define METER_CODE "xxxxxxxxx"
+#define METER_CODE "xxxxxxxxxxxx"
 
 // Meter type configuration
 // "water" = water meter (default) - readings in liters (L), device class water
