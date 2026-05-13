@@ -97,43 +97,46 @@ CONF_GDO0_PIN = "gdo0_pin"
 
 
 def validate_meter_code(value):
-    """Parse the full meter code from the label, without dashes.
+    """Parse the full meter code from the label, with dashes.
 
     The code printed under the barcode has the format: YY-SSSSSSS-NNN
-    Enter the value without dashes. The 3-digit suffix is optional.
+    Enter the value with dashes. The 3-digit suffix is optional.
       - First 2 digits : year (passed to the radio protocol as meter_year)
       - Last 3 digits  : suffix / check digits (optional — ignored if present)
-      - Middle digits  : serial number (leading zeros preserved for matching)
+      - Middle digits  : serial number (leading zeros accepted; parsed as integer)
 
     Examples:
-      label '16-0039185-107' -> meter_code: '160039185107'  (with suffix)
-      label '16-0039185-107' -> meter_code: '160039185'     (without suffix)
+      label '16-0039185-107' -> meter_code: '16-0039185-107'  (with suffix)
+      label '16-0039185-107' -> meter_code: '16-0039185'      (without suffix)
     """
     if not isinstance(value, str):
         value = str(value)
     code = value.strip()
-    if "-" in code or " " in code:
+    if " " in code:
+        raise cv.Invalid("meter_code must not contain spaces")
+    if len(code) < 5:
         raise cv.Invalid(
-            "meter_code must not contain dashes or spaces. "
-            "Enter the code exactly as it appears under the barcode but without dashes. "
-            "Example: '160039185107' from label '16-0039185-107'"
+            f"meter_code '{code}' is too short ({len(code)} characters). "
+            "Expected dashed format: YY-serial or YY-serial-NNN. "
+            "Example: '16-0039185-107'"
         )
-    if not code.isdigit():
-        raise cv.Invalid("meter_code must contain only digits")
-    if len(code) < 9 or len(code) > 12:
+    parts = code.split("-")
+    if len(parts) not in (2, 3):
         raise cv.Invalid(
-            f"meter_code '{code}' has invalid length ({len(code)} digits). "
-            "Expected 9 to 12 digits: YY + serial (and optional 3-digit suffix). "
-            "Example (with optional 3-digit suffix): label '16-0039185-107' -> meter_code: '160039185107'. "
-            "Example (without suffix): label '20-0257301' -> meter_code: '200257301'."
+            "meter_code must use dashed format: YY-serial or YY-serial-NNN. "
+            "Example: '19-00000101-800'"
         )
-    year = int(code[:2])
-    # The last 3 digits are an optional label suffix (ignored by the radio protocol).
-    # If the code is 12+ digits we strip them; shorter codes are entered without the suffix.
-    if len(code) >= 12:
-        serial_str = code[2:-3]
-    else:
-        serial_str = code[2:]
+    year_str = parts[0]
+    serial_str = parts[1]
+    suffix_str = parts[2] if len(parts) == 3 else ""
+    if len(year_str) != 2 or not year_str.isdigit():
+        raise cv.Invalid("meter_code year section must be exactly 2 digits (YY)")
+    if not serial_str.isdigit() or len(serial_str) == 0 or len(serial_str) > 8:
+        raise cv.Invalid("meter_code serial section must be 1 to 8 digits")
+    if suffix_str and (len(suffix_str) != 3 or not suffix_str.isdigit()):
+        raise cv.Invalid("meter_code suffix section must be exactly 3 digits when provided")
+
+    year = int(year_str)
     if not serial_str:
         raise cv.Invalid(
             "meter_code serial section is empty. "

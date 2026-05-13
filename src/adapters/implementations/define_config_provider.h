@@ -16,6 +16,10 @@
 #include "private.h"
 #include <cstring>
 
+#if !defined(METER_CODE)
+#error "METER_CODE must be defined in private.h"
+#endif
+
 /**
  * @class DefineConfigProvider
  * @brief Configuration provider using #defines from private.h
@@ -30,7 +34,7 @@ public:
         ~DefineConfigProvider() override = default;
 
         // Meter identification — parsed at call time from the METER_CODE string.
-        // METER_CODE format: "YYSSSSSSS" or "YYSSSSSSSNNN".
+        // METER_CODE format: "YY-SSSSSSS" or "YY-SSSSSSS-NNN".
         uint8_t getMeterYear() const override
         {
                 uint8_t year = 0;
@@ -176,30 +180,45 @@ private:
                 }
 
                 size_t len = strlen(code);
-                if (len < 9 || len > 12)
+                if (len < 5)
                 {
                         return false;
                 }
 
-                for (size_t i = 0; i < len; i++)
+                if (code[0] < '0' || code[0] > '9' || code[1] < '0' || code[1] > '9' || code[2] != '-')
                 {
-                        if (code[i] < '0' || code[i] > '9')
-                        {
-                                return false;
-                        }
+                        return false;
                 }
 
                 year = (uint8_t)((code[0] - '0') * 10 + (code[1] - '0'));
-                size_t serial_end = (len == 12) ? (len - 3) : len;
-                if (serial_end <= 2)
+                serial = 0;
+                size_t serial_digits = 0;
+                size_t i = 3;
+                while (i < len && code[i] >= '0' && code[i] <= '9')
+                {
+                        serial = serial * 10 + (uint32_t)(code[i] - '0');
+                        serial_digits++;
+                        i++;
+                }
+
+                if (serial_digits == 0 || serial_digits > 8)
                 {
                         return false;
                 }
 
-                serial = 0;
-                for (size_t i = 2; i < serial_end; i++)
+                if (i < len)
                 {
-                        serial = serial * 10 + (uint32_t)(code[i] - '0');
+                        if (code[i] != '-' || (i + 4) != len)
+                        {
+                                return false;
+                        }
+                        for (size_t j = i + 1; j < len; j++)
+                        {
+                                if (code[j] < '0' || code[j] > '9')
+                                {
+                                        return false;
+                                }
+                        }
                 }
 
                 return serial > 0 && serial <= 0xFFFFFFUL;

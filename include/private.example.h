@@ -95,8 +95,8 @@
 // ============================================================================
 //
 // Copy the code printed UNDER THE BARCODE on your meter label.
-// Remove the dashes and enter the result as a quoted string.
-// The 3-digit suffix is optional — 9 to 12 digits are accepted.
+// Keep the dashes and enter the result as a quoted string.
+// The 3-digit suffix is optional.
 //
 // Label format:  YY - SSSSSSS - NNN
 //                ^^   ^^^^^^^   ^^^ <- 3-digit suffix (optional, ignored if present)
@@ -105,14 +105,14 @@
 //
 // Examples:
 //   Label text:  16-0039185-107
-//   With suffix:    METER_CODE  "160039185107"   (12 digits)
-//   Without suffix: METER_CODE  "160039185"      (9 digits, same result)
+//   With suffix:    METER_CODE  "16-0039185-107"
+//   Without suffix: METER_CODE  "16-0039185"
 //
 // Common mistakes:
-//   - Leaving dashes in (you will get a clear error at compile/startup)
+//   - Removing dashes
 //   - Using the 4-digit date printed below the barcode instead of the code
 //
-#define METER_CODE "xxxxxxxxxxxx"
+#define METER_CODE "xx-xxxxxxx-xxx"
 
 // Meter type configuration
 // "water" = water meter (default) - readings in liters (L), device class water

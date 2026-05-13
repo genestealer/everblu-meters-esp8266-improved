@@ -131,7 +131,7 @@ jobs:
             "192.168.xxx.xxx:SECRET_MQTT_SERVER"
             "xxxxxxxxx:SECRET_MQTT_USERNAME"
             "xxxxxxxxxxxxxxx:SECRET_MQTT_PASSWORD"
-            "xxxxxxxxxxxx:METER_CODE"
+            "xx-xxxxxxx-xxx:METER_CODE"
           )
 
           for placeholder in "${PLACEHOLDERS[@]}"; do

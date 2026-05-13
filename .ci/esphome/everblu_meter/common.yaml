@@ -23,7 +23,7 @@ external_components:
 everblu_meter:
   spi_id: ci_spi
   cs_pin: ${cs_pin}
-  meter_code: "228765432100"
+  meter_code: "22-8765432-100"
   meter_type: ${meter_type}
   gdo0_pin: ${gdo0_pin}
   time_id: ci_time

@@ -353,7 +353,7 @@ namespace esphome
         void EverbluMeterComponent::dump_config()
         {
             ESP_LOGCONFIG(TAG, "EverBlu Meter:");
-            ESP_LOGCONFIG(TAG, "  Meter Code: %s (year=%u, serial=%u)", meter_code_.c_str(), meter_year_, meter_serial_);
+            ESP_LOGCONFIG(TAG, "  Meter Code: %s (year=%u, serial=%lu)", meter_code_.c_str(), meter_year_, (unsigned long)meter_serial_);
             ESP_LOGCONFIG(TAG, "  Meter Type: %s", is_gas_ ? "Gas" : "Water");
             ESP_LOGCONFIG(TAG, "  Everblu Meter Component Version: %s", EVERBLU_FW_VERSION);
             if (is_gas_)

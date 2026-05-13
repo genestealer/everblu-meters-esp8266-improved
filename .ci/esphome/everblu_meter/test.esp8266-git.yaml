@@ -46,7 +46,7 @@ external_components:
 everblu_meter:
   spi_id: ci_spi
   cs_pin: GPIO15
-  meter_code: "228765432100"
+  meter_code: "22-8765432-100"
   meter_type: water
   gdo0_pin: 4
   time_id: ci_time

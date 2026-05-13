@@ -265,30 +265,46 @@ static bool parseMeterCodeParts(const char *code, uint8_t *out_year, uint32_t *o
   }
 
   const size_t len = strlen(code);
-  if (len < 9 || len > 12)
+  if (len < 5)
   {
     return false;
   }
 
-  for (size_t i = 0; i < len; i++)
+  if (code[0] < '0' || code[0] > '9' || code[1] < '0' || code[1] > '9' || code[2] != '-')
   {
-    if (code[i] < '0' || code[i] > '9')
-    {
-      return false;
-    }
+    return false;
   }
 
   const uint8_t year = (uint8_t)((code[0] - '0') * 10 + (code[1] - '0'));
-  const size_t serial_end = (len == 12) ? (len - 3) : len;
-  if (serial_end <= 2)
+  size_t i = 3;
+  uint32_t serial = 0;
+  size_t serial_digits = 0;
+  while (i < len && code[i] >= '0' && code[i] <= '9')
+  {
+    serial = serial * 10 + (uint32_t)(code[i] - '0');
+    serial_digits++;
+    i++;
+  }
+
+  if (serial_digits == 0 || serial_digits > 8)
   {
     return false;
   }
 
-  uint32_t serial = 0;
-  for (size_t i = 2; i < serial_end; i++)
+  if (i < len)
   {
-    serial = serial * 10 + (uint32_t)(code[i] - '0');
+    // Optional suffix must be exactly 3 digits after '-'.
+    if (code[i] != '-' || (i + 4) != len)
+    {
+      return false;
+    }
+    for (size_t j = i + 1; j < len; j++)
+    {
+      if (code[j] < '0' || code[j] > '9')
+      {
+        return false;
+      }
+    }
   }
 
   if (serial == 0 || serial > 0xFFFFFFUL)
@@ -361,9 +377,9 @@ const unsigned long RETRY_COOLDOWN = 3600000; // 1 hour cooldown in milliseconds
 // Global variable to store the reading schedule (default from private.h)
 const char *readingSchedule = DEFAULT_READING_SCHEDULE;
 
-// Helper variables for generating serial-prefixed MQTT topics and entity IDs
-// These must be initialized before EspMQTTClient is constructed (for LWT topic)
-// Format: everblu/cyble/{METER_SERIAL} (or everblu/cyble if meter prefix is disabled)
+// Helper variables for generating serial-prefixed MQTT topics and entity IDs.
+// They are filled by parseMeterCode() in setup() before last-will configuration.
+// Format: everblu/cyble/{serial} (or everblu/cyble if meter prefix is disabled)
 // Compile-time check: Ensure METER_CODE is defined
 #if !defined(METER_CODE)
 #error "METER_CODE must be defined in private.h"
@@ -379,10 +395,8 @@ const char *readingSchedule = DEFAULT_READING_SCHEDULE;
 #define ENABLE_HA_DISCOVERY 1
 #endif
 
-// Buffer size calculations for MQTT topics:
-// - meterSerialStr: serial as decimal string (max 8 digits) + null = 16 bytes
-// - mqttBaseTopic: "everblu/cyble/" (15) + serial (8) + null (1) = 64 bytes
-// - mqttLwtTopic: mqttBaseTopic + "/status" (7) + null (1) = 80 bytes
+// Buffer sizes for MQTT topics are intentionally conservative for future-proofing.
+// Current worst-case payloads are significantly smaller than these buffers.
 // Parsed at runtime from METER_CODE by parseMeterCode() called at the start of setup()
 static uint8_t g_meterYear = 0;
 static uint32_t g_meterSerial = 0;
@@ -396,14 +410,15 @@ char mqttLwtTopic[80] = "everblu/cyble/status"; // LWT status topic without seri
 #endif
 
 /**
- * Parse METER_CODE ("YYSSSSSSNNN") into g_meterYear, g_meterSerial, and
+ * Parse METER_CODE ("YY-SSSSSSS" or "YY-SSSSSSS-NNN") into g_meterYear,
+ * g_meterSerial, and
  * the MQTT topic buffers.  Called once at the very start of setup().
  */
 static void parseMeterCode()
 {
   if (!parseMeterCodeParts(METER_CODE, &g_meterYear, &g_meterSerial))
   {
-    Serial.println("[ERROR] Invalid METER_CODE - expected 9..12 digits: YY + serial + optional 3-digit suffix");
+    Serial.println("[ERROR] Invalid METER_CODE - expected YY-serial or YY-serial-NNN (with dashes)");
     return;
   }
 
@@ -1952,9 +1967,8 @@ bool validateConfiguration()
   if (!parseMeterCodeParts(METER_CODE, &parsed_year, &parsed_serial))
   {
     Serial.println("[ERROR] Invalid METER_CODE in private.h");
-    Serial.println("       Expected 9..12 digits without dashes/spaces");
-    Serial.println("       Format: \"YYSSSSSSS\" or \"YYSSSSSSSNNN\" (suffix optional)");
-    Serial.println("       Example: label '16-0039185-107' -> '160039185' or '160039185107'");
+    Serial.println("       Expected dashed format: \"YY-SSSSSSS\" or \"YY-SSSSSSS-NNN\"");
+    Serial.println("       Example: label '16-0039185-107' -> '16-0039185-107'");
     valid = false;
   }
   else

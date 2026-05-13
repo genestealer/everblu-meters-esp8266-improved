@@ -1742,29 +1742,53 @@ struct tmeter_data get_meter_data(void)
 #else
   const char *meter_code = METER_CODE;
   size_t len = strlen(meter_code);
-  if (len < 9 || len > 12)
+  if (len < 5)
   {
-    echo_debug(1, "[METER] Invalid METER_CODE: expected 9..12 digits\n");
+    echo_debug(1, "[METER] Invalid METER_CODE: expected YY-serial or YY-serial-NNN\n");
     return sdata;
   }
 
-  for (size_t i = 0; i < len; i++)
+  if (meter_code[0] < '0' || meter_code[0] > '9' ||
+      meter_code[1] < '0' || meter_code[1] > '9' ||
+      meter_code[2] != '-')
   {
-    if (meter_code[i] < '0' || meter_code[i] > '9')
-    {
-      echo_debug(1, "[METER] Invalid METER_CODE: contains non-digit characters\n");
-      return sdata;
-    }
+    echo_debug(1, "[METER] Invalid METER_CODE: expected YY- prefix\n");
+    return sdata;
   }
 
-  // Expected format: YY + serial digits + optional NNN suffix.
+  // Expected format: YY-serial or YY-serial-NNN.
   uint8_t meter_year = (uint8_t)((meter_code[0] - '0') * 10 + (meter_code[1] - '0'));
-  size_t serial_end = (len == 12) ? (len - 3) : len;
-
   uint32_t meter_serial = 0;
-  for (size_t i = 2; i < serial_end; i++)
+  size_t serial_digits = 0;
+  size_t i = 3;
+  while (i < len && meter_code[i] >= '0' && meter_code[i] <= '9')
   {
     meter_serial = meter_serial * 10 + (uint32_t)(meter_code[i] - '0');
+    serial_digits++;
+    i++;
+  }
+
+  if (serial_digits == 0 || serial_digits > 8)
+  {
+    echo_debug(1, "[METER] Invalid METER_CODE: serial must be 1..8 digits\n");
+    return sdata;
+  }
+
+  if (i < len)
+  {
+    if (meter_code[i] != '-' || (i + 4) != len)
+    {
+      echo_debug(1, "[METER] Invalid METER_CODE: invalid suffix section\n");
+      return sdata;
+    }
+    for (size_t j = i + 1; j < len; j++)
+    {
+      if (meter_code[j] < '0' || meter_code[j] > '9')
+      {
+        echo_debug(1, "[METER] Invalid METER_CODE: suffix must be numeric\n");
+        return sdata;
+      }
+    }
   }
 
   if (meter_serial == 0 || meter_serial > 0xFFFFFFUL)
