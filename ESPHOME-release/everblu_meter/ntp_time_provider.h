@@ -9,7 +9,7 @@
 #ifndef NTP_TIME_PROVIDER_H
 #define NTP_TIME_PROVIDER_H
 
-#include "../time_provider.h"
+#include "time_provider.h"
 
 /**
  * @class NTPTimeProvider

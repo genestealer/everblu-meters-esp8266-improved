@@ -12,9 +12,9 @@
 #include "wifi_serial.h"
 #include "logging.h"
 #else
-#include "../core/utils.h"
-#include "../core/wifi_serial.h"
-#include "../core/logging.h"
+#include "utils.h"
+#include "wifi_serial.h"
+#include "logging.h"
 #endif
 
 #include <Arduino.h>

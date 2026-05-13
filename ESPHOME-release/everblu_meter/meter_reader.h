@@ -20,10 +20,10 @@
 #ifndef METER_READER_H
 #define METER_READER_H
 
-#include "../adapters/config_provider.h"
-#include "../adapters/time_provider.h"
-#include "../adapters/data_publisher.h"
-#include "../core/cc1101.h"
+#include "config_provider.h"
+#include "time_provider.h"
+#include "data_publisher.h"
+#include "cc1101.h"
 #include "frequency_manager.h"
 
 /**

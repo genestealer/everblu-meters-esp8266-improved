@@ -4,7 +4,7 @@
  */
 
 #include "frequency_manager.h"
-#include "../core/logging.h"
+#include "logging.h"
 #include "storage_abstraction.h"
 #if defined(ESP32)
 #include <esp_task_wdt.h>

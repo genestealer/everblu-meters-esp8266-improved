@@ -9,7 +9,7 @@
 #ifndef ESPHOME_CONFIG_PROVIDER_H
 #define ESPHOME_CONFIG_PROVIDER_H
 
-#include "../config_provider.h"
+#include "config_provider.h"
 
 /**
  * @class ESPHomeConfigProvider

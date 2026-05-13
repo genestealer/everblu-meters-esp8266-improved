@@ -4,7 +4,7 @@
  */
 
 #include "meter_history.h"
-#include "../core/logging.h"
+#include "logging.h"
 #include <cstring>
 
 HistoryStats MeterHistory::calculateStats(const uint32_t history[13], uint32_t currentVolume)

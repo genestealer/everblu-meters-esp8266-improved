@@ -9,7 +9,7 @@
 #ifndef ESPHOME_TIME_PROVIDER_H
 #define ESPHOME_TIME_PROVIDER_H
 
-#include "../time_provider.h"
+#include "time_provider.h"
 
 #if defined(USE_ESPHOME) || __has_include("esphome/components/time/real_time_clock.h")
 namespace esphome

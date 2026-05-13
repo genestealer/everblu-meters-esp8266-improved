@@ -4,7 +4,7 @@
  */
 
 #include "schedule_manager.h"
-#include "../core/logging.h"
+#include "logging.h"
 
 // Static member initialization
 const char *ScheduleManager::s_schedule = "Monday-Friday";

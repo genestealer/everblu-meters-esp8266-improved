@@ -9,7 +9,7 @@
 #ifndef ESPHOME_DATA_PUBLISHER_H
 #define ESPHOME_DATA_PUBLISHER_H
 
-#include "../data_publisher.h"
+#include "data_publisher.h"
 
 // Forward declarations for ESPHome components
 // These will be available when compiled in ESPHome environment

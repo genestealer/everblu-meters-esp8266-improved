@@ -8,7 +8,7 @@
 #include "esphome/core/log.h"
 #endif
 
-#include "core/version.h"
+#include "version.h"
 
 // Include CC1101 header for SPI device setup
 #include "cc1101.h"
