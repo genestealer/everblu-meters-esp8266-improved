@@ -1,0 +1,53 @@
+name: ESPHOME Sync Check
+
+on:
+  pull_request:
+    branches: [main, master, develop]
+    paths:
+      - src/**
+      - ESPHOME/components/everblu_meter/**
+      - ESPHOME/prepare-component-release.ps1
+      - ESPHOME/prepare-component-release.sh
+      - ESPHOME-release/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-generated-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate ESPHOME release output
+        run: bash ./ESPHOME/prepare-component-release.sh
+
+      - name: Verify generated files are committed
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Restore the informational marker files to their committed state before
+          # diffing. They are not ESPHome component files; they exist only to warn
+          # humans not to edit ESPHOME-release manually. The bash script regenerates
+          # them with LF while Windows PowerShell commits them with CRLF, causing a
+          # spurious diff that has nothing to do with component correctness.
+          git checkout -- \
+            ESPHOME-release/README_DO_NOT_EDIT.md \
+            "ESPHOME-release/everblu_meter/DO_NOT_EDIT.md" \
+            2>/dev/null || true
+
+          CHANGED=$(git diff --name-only -- ESPHOME-release)
+
+          if [ -n "$CHANGED" ]; then
+            echo "Generated release output is not in sync with committed ESPHOME-release files."
+            echo "Run ESPHOME/prepare-component-release.ps1 (Windows) or ESPHOME/prepare-component-release.sh (Linux/macOS), then commit ESPHOME-release updates."
+            echo ""
+            echo "Changed files:"
+            echo "$CHANGED"
+            exit 1
+          fi
+
+          echo "ESPHOME-release is up to date with generated output."

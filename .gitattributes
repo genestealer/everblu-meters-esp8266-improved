@@ -1,0 +1,12 @@
+# Default: normalize all text files on commit
+* text=auto
+
+# Force LF for all files under ESPHOME-release so Windows-generated content
+# and Linux CI-regenerated content stay byte-for-byte identical.
+ESPHOME-release/**  text eol=lf
+
+# Shell scripts must always be LF (required for execution on Linux/macOS)
+*.sh  text eol=lf
+
+# PowerShell scripts can be CRLF on Windows
+*.ps1  text eol=crlf
