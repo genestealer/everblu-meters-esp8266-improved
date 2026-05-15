@@ -6,6 +6,7 @@
 #include <unity.h>
 #include <Arduino.h>
 #include <string.h>
+#include "core/meter_code_parser.h"
 
 // Mock configuration values for testing
 #define TEST_METER_YEAR 2020
@@ -104,6 +105,51 @@ void test_frequency_validation(void)
     TEST_ASSERT_TRUE(TEST_FREQUENCY <= 500.0);
 }
 
+void test_meter_code_parse_valid_dashed_with_suffix(void)
+{
+    uint8_t year = 0;
+    uint32_t serial = 0;
+    TEST_ASSERT_TRUE(everblu::core::parseMeterCode("20-0257301-999", &year, &serial));
+    TEST_ASSERT_EQUAL_UINT8(20, year);
+    TEST_ASSERT_EQUAL_UINT32(257301UL, serial);
+}
+
+void test_meter_code_parse_valid_dashed_without_suffix(void)
+{
+    uint8_t year = 0;
+    uint32_t serial = 0;
+    TEST_ASSERT_TRUE(everblu::core::parseMeterCode("20-0257301", &year, &serial));
+    TEST_ASSERT_EQUAL_UINT8(20, year);
+    TEST_ASSERT_EQUAL_UINT32(257301UL, serial);
+}
+
+void test_meter_code_parse_rejects_non_digit(void)
+{
+    TEST_ASSERT_FALSE(everblu::core::parseMeterCode("20-02573A1-999", nullptr, nullptr));
+}
+
+void test_meter_code_parse_rejects_missing_dash_format(void)
+{
+    TEST_ASSERT_FALSE(everblu::core::parseMeterCode("200257301999", nullptr, nullptr));
+}
+
+void test_meter_code_parse_rejects_zero_serial(void)
+{
+    TEST_ASSERT_FALSE(everblu::core::parseMeterCode("20-0000000-000", nullptr, nullptr));
+}
+
+void test_meter_code_parse_rejects_serial_over_24bit(void)
+{
+    // 8 digits is too long - must be exactly 7
+    TEST_ASSERT_FALSE(everblu::core::parseMeterCode("20-16777216-000", nullptr, nullptr));
+}
+
+void test_meter_code_parse_rejects_short_serial(void)
+{
+    // Fewer than 7 digits is invalid
+    TEST_ASSERT_FALSE(everblu::core::parseMeterCode("20-257750-000", nullptr, nullptr));
+}
+
 void setup()
 {
     delay(2000); // Wait for serial monitor
@@ -115,6 +161,13 @@ void setup()
     RUN_TEST(test_meter_year_validation);
     RUN_TEST(test_meter_serial_validation);
     RUN_TEST(test_frequency_validation);
+    RUN_TEST(test_meter_code_parse_valid_dashed_with_suffix);
+    RUN_TEST(test_meter_code_parse_valid_dashed_without_suffix);
+    RUN_TEST(test_meter_code_parse_rejects_non_digit);
+    RUN_TEST(test_meter_code_parse_rejects_missing_dash_format);
+    RUN_TEST(test_meter_code_parse_rejects_zero_serial);
+    RUN_TEST(test_meter_code_parse_rejects_serial_over_24bit);
+    RUN_TEST(test_meter_code_parse_rejects_short_serial);
 
     UNITY_END();
 }

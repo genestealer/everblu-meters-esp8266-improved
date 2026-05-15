@@ -96,8 +96,7 @@ Previous configuration:
 
 ```yaml
 everblu_meter:
-  meter_year: 21
-  meter_serial: 12345678
+  meter_code: "21-1234567-000"
   gdo0_pin: 4
   time_id: ha_time
 ```
@@ -114,8 +113,7 @@ spi:
 everblu_meter:
   spi_id: main_bus
   cs_pin: GPIO15
-  meter_year: 21
-  meter_serial: 12345678
+  meter_code: "21-1234567-000"
   gdo0_pin: 4
   time_id: ha_time
 ```
@@ -165,8 +163,7 @@ spi:
 everblu_meter:
   spi_id: main_bus
   cs_pin: GPIO15
-  meter_year: 21
-  meter_serial: 12345678
+  meter_code: "21-1234567-000"
   meter_type: water
   gdo0_pin: 4
   time_id: ha_time
@@ -240,24 +237,23 @@ esp32:
 
 ### Key Parameters
 
-| Parameter | Type | Default | Required | Description |
-|-----------|------|---------|----------|-------------|
-| `meter_year` | int | - | Yes | Meter year (0-99) |
-| `meter_serial` | int | - | Yes | Serial number |
-| `spi_id` | id | - | Yes | SPI bus ID from the top-level `spi:` block |
-| `cs_pin` | pin | - | Yes | CC1101 chip select pin |
-| `meter_type` | enum | water | No | `water` or `gas` |
-| `gdo0_pin` | pin | - | Yes | CC1101 GDO0 pin (e.g. `GPIO4`, `D2`, `4`) |
-| `time_id` | id | - | Yes | Time component ID |
-| `frequency` | float | 433.82 | No | RF frequency (MHz) |
-| `auto_scan` | bool | true | No | Auto frequency scan |
-| `schedule` | enum | Monday-Friday | No | Reading schedule |
-| `read_hour` | int | 10 | No | Read hour (0-23) |
-| `read_minute` | int | 0 | No | Read minute (0-59) |
-| `max_retries` | int | 10 | No | Max read attempts |
-| `retry_cooldown` | duration | 1h | No | Cooldown time |
-| `gas_volume_divisor` | int | 100 | No | Gas divisor (100/1000) |
-| `debug_cc1101` | bool | false | No | Enable hex dump for debugging |
+| Parameter            | Type     | Default       | Required | Description                                                           |
+| -------------------- | -------- | ------------- | -------- | --------------------------------------------------------------------- |
+| `meter_code`         | string   | -             | Yes      | Dashed meter code: `YY-SSSSSSS` or `YY-SSSSSSS-NNN` (suffix optional) |
+| `spi_id`             | id       | -             | Yes      | SPI bus ID from the top-level `spi:` block                            |
+| `cs_pin`             | pin      | -             | Yes      | CC1101 chip select pin                                                |
+| `meter_type`         | enum     | water         | No       | `water` or `gas`                                                      |
+| `gdo0_pin`           | pin      | -             | Yes      | CC1101 GDO0 pin (e.g. `GPIO4`, `D2`, `4`)                             |
+| `time_id`            | id       | -             | Yes      | Time component ID                                                     |
+| `frequency`          | float    | 433.82        | No       | RF frequency (MHz)                                                    |
+| `auto_scan`          | bool     | true          | No       | Auto frequency scan                                                   |
+| `schedule`           | enum     | Monday-Friday | No       | Reading schedule                                                      |
+| `read_hour`          | int      | 10            | No       | Read hour (0-23)                                                      |
+| `read_minute`        | int      | 0             | No       | Read minute (0-59)                                                    |
+| `max_retries`        | int      | 10            | No       | Max read attempts                                                     |
+| `retry_cooldown`     | duration | 1h            | No       | Cooldown time                                                         |
+| `gas_volume_divisor` | int      | 100           | No       | Gas divisor (100/1000)                                                |
+| `debug_cc1101`       | bool     | false         | No       | Enable hex dump for debugging                                         |
 
 ### Schedule Options
 
@@ -271,8 +267,7 @@ esp32:
 everblu_meter:
   spi_id: main_bus
   cs_pin: GPIO15
-  meter_year: 21
-  meter_serial: 12345678
+  meter_code: "21-1234567-000"
   gdo0_pin: 4
   meter_type: water
   time_id: ha_time
@@ -335,7 +330,7 @@ Three complete example configurations are provided:
 ### Wiring (ESP8266 D1 Mini)
 
 | CC1101 Pin | D1 Mini | GPIO |
-|------------|---------|------|
+| ---------- | ------- | ---- |
 | VCC        | 3.3V    | -    |
 | GND        | GND     | -    |
 | SCK        | D5      | 14   |
@@ -348,7 +343,7 @@ Three complete example configurations are provided:
 ### Wiring (ESP32)
 
 | CC1101 | ESP32 |
-|--------|-------|
+| ------ | ----- |
 | VCC    | 3.3V  |
 | GND    | GND   |
 | SCK    | 18    |
@@ -364,14 +359,14 @@ Important: The CC1101 requires 3.3V power. Do not connect to 5V!
 
 ### vs. Standalone MQTT Mode
 
-| Feature | ESPHome Mode | MQTT Mode |
-|---------|--------------|-----------|
-| Configuration | YAML | C++ defines |
-| Integration | ESPHome API | MQTT Broker |
-| Discovery | Automatic | Manual |
-| Updates | OTA | OTA |
-| Logging | ESPHome logs | Serial/WiFi |
-| Complexity | Low | Medium |
+| Feature       | ESPHome Mode | MQTT Mode   |
+| ------------- | ------------ | ----------- |
+| Configuration | YAML         | C++ defines |
+| Integration   | ESPHome API  | MQTT Broker |
+| Discovery     | Automatic    | Manual      |
+| Updates       | OTA          | OTA         |
+| Logging       | ESPHome logs | Serial/WiFi |
+| Complexity    | Low          | Medium      |
 
 ### ESPHome Mode Advantages
 
@@ -509,8 +504,8 @@ EverbluMeterComponent (ESPHome)
 - **timestamp** - Last successful reading time
 - **history_json** - Meter history JSON payload
 - **firmware_version** - Firmware version string
-- **meter_serial_sensor** - Meter serial number
-- **meter_year_sensor** - Meter year
+- **meter_serial_sensor** - Parsed serial section from `meter_code`
+- **meter_year_sensor** - Parsed year (`YY`) from `meter_code`
 - **reading_schedule_sensor** - Active reading schedule
 - **reading_time_utc_sensor** - Configured reading time (UTC)
 
@@ -528,8 +523,7 @@ EverbluMeterComponent (ESPHome)
 ### Water Meter - Basic
 ```yaml
 everblu_meter:
-  meter_year: 21
-  meter_serial: 12345678
+  meter_code: "21-1234567-000"
   meter_type: water
   gdo0_pin: 4
   time_id: ha_time
@@ -541,8 +535,7 @@ everblu_meter:
 ### Gas Meter - Basic
 ```yaml
 everblu_meter:
-  meter_year: 22
-  meter_serial: 87654321
+  meter_code: "22-8765432-000"
   meter_type: gas
   gdo0_pin: 4
   time_id: ha_time
@@ -555,8 +548,7 @@ everblu_meter:
 ### With Full Monitoring
 ```yaml
 everblu_meter:
-  meter_year: 21
-  meter_serial: 12345678
+  meter_code: "21-1234567-000"
   meter_type: water
   gdo0_pin: 4
   time_id: ha_time

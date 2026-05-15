@@ -9,6 +9,8 @@
 
 #pragma once
 
+#include <string>
+
 // Editor note: VS Code/IntelliSense may display include errors such as
 // "cannot open source file \"esphome/core/component.h\"". These headers are
 // provided by the ESPHome/PlatformIO build environment, and paths are resolved
@@ -82,6 +84,7 @@ namespace esphome
             // Configuration setters (called from Python code generation)
             void set_meter_year(uint8_t year) { meter_year_ = year; }
             void set_meter_serial(uint32_t serial) { meter_serial_ = serial; }
+            void set_meter_code(const std::string &code) { meter_code_ = code; }
             void set_meter_type(bool is_gas) { is_gas_ = is_gas; }
             void set_gas_volume_divisor(int divisor) { gas_volume_divisor_ = divisor; }
             void set_frequency(float freq) { frequency_ = freq; }
@@ -137,6 +140,7 @@ namespace esphome
 
         protected:
             // Configuration
+            std::string meter_code_{};
             uint8_t meter_year_{0};
             uint32_t meter_serial_{0};
             bool is_gas_{false};
@@ -156,7 +160,7 @@ namespace esphome
             // Internal state tracking
             void republish_initial_states();
             void apply_radio_context();
-            bool gdo0_error_logged_{false};  // One-shot flag to prevent log flooding
+            bool gdo0_error_logged_{false}; // One-shot flag to prevent log flooding
 
             // GDO0 pin (raw GPIO number for CC1101 Arduino driver)
             InternalGPIOPin *gdo0_pin_{nullptr};

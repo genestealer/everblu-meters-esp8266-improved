@@ -19,8 +19,9 @@
 #define SECRET_MQTT_SERVER "192.168.xxx.xxx"  // Broker IP or hostname
 #define SECRET_MQTT_CLIENT_ID "everbluMeters" // Client identifier (meter serial is appended automatically)
 
-// IMPORTANT: Multiple devices running this firmware will append their meter serial number
-// to the client ID to ensure uniqueness. For example, if METER_SERIAL is 123456:
+// IMPORTANT: Multiple devices running this firmware will append their parsed meter serial number
+// (derived from METER_CODE) to the client ID to ensure uniqueness. For example, if METER_CODE
+// parses to serial 123456:
 //   Final MQTT Client ID: "everbluMeters-123456"
 // This prevents MQTT connection conflicts and ensures proper Home Assistant availability tracking
 // when multiple meters are connected to the same broker.
@@ -93,23 +94,25 @@
 // METER IDENTIFICATION
 // ============================================================================
 //
-// Serial format: XX-YYYYYYY-ZZZ
-//   - Use the 2-digit year (XX)
-//   - Use the middle section only (YYYYYYY)
-//   - Ignore the suffix (-ZZZ)
+// Copy the code printed UNDER THE BARCODE on your meter label.
+// Keep the dashes and enter the result as a quoted string.
+// The 3-digit suffix is optional.
 //
-// Example:
-//   Serial: 20-02777550-234
-//     METER_YEAR   = 20
-//     METER_SERIAL = 2777550
+// Label format:  YY - SSSSSSS - NNN
+//                ^^   ^^^^^^^   ^^^ <- 3-digit suffix (optional, ignored if present)
+//                |    serial section (leading zeros are allowed in input, but normalized after parsing)
+//                2-digit year
+//
+// Examples:
+//   Label text:  16-0039185-107
+//   With suffix:    METER_CODE  "16-0039185-107"
+//   Without suffix: METER_CODE  "16-0039185"
 //
 // Common mistakes:
-//   - Using a 4-digit year
-//   - Including the suffix
-//   - Keeping leading zeros in the serial
+//   - Removing dashes
+//   - Using the 4-digit date printed below the barcode instead of the code
 //
-#define METER_YEAR xx
-#define METER_SERIAL xxxxxxx
+#define METER_CODE "xx-xxxxxxx-xxx"
 
 // Meter type configuration
 // "water" = water meter (default) - readings in liters (L), device class water

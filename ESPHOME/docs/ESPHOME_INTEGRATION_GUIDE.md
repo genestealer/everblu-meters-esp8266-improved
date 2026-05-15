@@ -40,16 +40,16 @@ The ESPHome integration allows you to read EverBlu Cyble Enhanced water and gas 
 
 Connect the CC1101 to your ESP board:
 
-| CC1101 Pin | ESP8266 (D1 Mini) | ESP32        |
-|------------|-------------------|--------------|
-| GND        | GND               | GND          |
-| VCC        | 3.3V              | 3.3V         |
-| SCK        | D5 (GPIO14)       | GPIO18       |
-| MISO       | D6 (GPIO12)       | GPIO19       |
-| MOSI       | D7 (GPIO13)       | GPIO23       |
-| CSN        | D8 (GPIO15)       | GPIO5        |
-| GDO0       | D1 (GPIO5)        | GPIO4        |
-| GDO2       | D2 (GPIO4)        | GPIO2        |
+| CC1101 Pin | ESP8266 (D1 Mini) | ESP32  |
+| ---------- | ----------------- | ------ |
+| GND        | GND               | GND    |
+| VCC        | 3.3V              | 3.3V   |
+| SCK        | D5 (GPIO14)       | GPIO18 |
+| MISO       | D6 (GPIO12)       | GPIO19 |
+| MOSI       | D7 (GPIO13)       | GPIO23 |
+| CSN        | D8 (GPIO15)       | GPIO5  |
+| GDO0       | D1 (GPIO5)        | GPIO4  |
+| GDO2       | D2 (GPIO4)        | GPIO2  |
 
 ⚠️ **Important**: The CC1101 requires 3.3V power. Do not connect to 5V!
 
@@ -142,8 +142,7 @@ time:
     id: ha_time
 
 everblu_meter:
-  meter_year: 21              # Last 2 digits of manufacture year
-  meter_serial: 12345678      # Your meter's serial number
+  meter_code: "21-1234567-000" # Code under barcode with dashes; suffix optional
   gdo0_pin: 4                 # GPIO connected to CC1101 GDO0 (D2 on D1 mini)
   meter_type: water           # 'water' or 'gas'
   time_id: ha_time
@@ -154,29 +153,28 @@ everblu_meter:
 
 ### Required Parameters
 
-| Parameter | Type | Description | Example |
-|-----------|------|-------------|---------|
-| `meter_year` | int | Last 2 digits of meter manufacture year (00-99) | `21` |
-| `meter_serial` | int | Meter serial number | `12345678` |
-| `meter_type` | string | Type of meter: `water` or `gas` | `water` |
+| Parameter    | Type   | Description                                                                                | Example                          |
+| ------------ | ------ | ------------------------------------------------------------------------------------------ | -------------------------------- |
+| `meter_code` | string | Code under barcode with dashes; 3-digit suffix optional (`YY-SSSSSSS` or `YY-SSSSSSS-NNN`) | `21-1234567-000` or `21-1234567` |
+| `meter_type` | string | Type of meter: `water` or `gas`                                                            | `water`                          |
 
 ### Optional Parameters
 
 #### Radio Configuration
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `frequency` | float | `433.82` | RF frequency in MHz (433.0-434.8) |
-| `auto_scan` | bool | `true` | Automatically scan for optimal frequency |
+| Parameter   | Type  | Default  | Description                              |
+| ----------- | ----- | -------- | ---------------------------------------- |
+| `frequency` | float | `433.82` | RF frequency in MHz (433.0-434.8)        |
+| `auto_scan` | bool  | `true`   | Automatically scan for optimal frequency |
 
 #### Schedule Configuration
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `reading_schedule` | string | `Monday-Friday` | When to read: `Monday-Friday`, `Monday-Saturday`, or `Monday-Sunday` |
-| `read_hour` | int | `10` | Hour to perform reading (0-23, in UTC) |
-| `read_minute` | int | `0` | Minute to perform reading (0-59) |
-| `timezone_offset` | int | `0` | **Minutes** offset from UTC (-720 to +720). Example: `660` for UTC+11, `-300` for UTC-5 |
+| Parameter          | Type   | Default         | Description                                                                             |
+| ------------------ | ------ | --------------- | --------------------------------------------------------------------------------------- |
+| `reading_schedule` | string | `Monday-Friday` | When to read: `Monday-Friday`, `Monday-Saturday`, or `Monday-Sunday`                    |
+| `read_hour`        | int    | `10`            | Hour to perform reading (0-23, in UTC)                                                  |
+| `read_minute`      | int    | `0`             | Minute to perform reading (0-59)                                                        |
+| `timezone_offset`  | int    | `0`             | **Minutes** offset from UTC (-720 to +720). Example: `660` for UTC+11, `-300` for UTC-5 |
 
 **Important: Timezone Configuration**
 
@@ -211,33 +209,36 @@ timezone_offset: -420  # US Pacific PDT (UTC-7) - Summer
 
 #### Time Alignment
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `auto_align_time` | bool | `true` | Align readings to configured time |
-| `auto_align_midpoint` | bool | `true` | Use midpoint of reading window |
+| Parameter             | Type | Default | Description                       |
+| --------------------- | ---- | ------- | --------------------------------- |
+| `auto_align_time`     | bool | `true`  | Align readings to configured time |
+| `auto_align_midpoint` | bool | `true`  | Use midpoint of reading window    |
 
 #### Retry Configuration
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `max_retries` | int | `10` | Maximum number of read attempts |
-| `retry_cooldown` | duration | `1h` | Cooldown between retry sessions |
+| Parameter        | Type     | Default | Description                     |
+| ---------------- | -------- | ------- | ------------------------------- |
+| `max_retries`    | int      | `10`    | Maximum number of read attempts |
+| `retry_cooldown` | duration | `1h`    | Cooldown between retry sessions |
 
 #### Gas Meter Specific
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `gas_volume_divisor` | int | `100` | Volume divisor for gas meters (100 or 1000) |
+| Parameter            | Type | Default | Description                                 |
+| -------------------- | ---- | ------- | ------------------------------------------- |
+| `gas_volume_divisor` | int  | `100`   | Volume divisor for gas meters (100 or 1000) |
 
 ### Finding Your Meter Information
 
-#### Meter Year and Serial Number
+#### Meter Code
 
-Look for a label on your meter that shows:
-- **Year**: Usually 2 digits (e.g., "21" for 2021)
-- **Serial Number**: 8-digit number
+Look for the full code printed under the barcode on your meter label.
 
-Example label: `21-12345678` means year=21, serial=12345678
+Example label format: `YY-SSSSSSS-NNN`
+- Configure `meter_code` exactly as printed, with dashes — the 3-digit suffix is **optional**
+- Accepted: `YY-SSSSSSS` (no suffix) or `YY-SSSSSSS-NNN` (with suffix)
+- First 2 digits (`YY`) are parsed as year
+- Middle digits (`SSSSSSS`) are parsed as serial
+- Last 3 digits (`NNN`), if present, are the label suffix and are ignored by the radio protocol
 
 #### Frequency
 
@@ -254,35 +255,35 @@ The component provides various sensors for monitoring your meter:
 
 ### Numeric Sensors
 
-| Sensor | Unit | Description | State Class |
-|--------|------|-------------|-------------|
-| `volume` | L or m³ | Current volume reading | `total_increasing` |
-| `counter` | L or m³ | Alternative volume counter | `total_increasing` |
-| `battery` | years | Estimated battery life remaining | `measurement` |
-| `rssi` | dBm | Radio signal strength | `measurement` |
-| `rssi_percentage` | % | Signal strength as percentage (0-100) | `measurement` |
-| `lqi` | - | Link quality indicator (0-255) | `measurement` |
-| `lqi_percentage` | % | Link quality as percentage (0-100) | `measurement` |
-| `time_start` | ms | Reading start timestamp | `measurement` |
-| `time_end` | ms | Reading end timestamp | `measurement` |
-| `total_attempts` | - | Total read attempts | `total_increasing` |
-| `successful_reads` | - | Number of successful reads | `total_increasing` |
-| `failed_reads` | - | Number of failed reads | `total_increasing` |
+| Sensor             | Unit    | Description                           | State Class        |
+| ------------------ | ------- | ------------------------------------- | ------------------ |
+| `volume`           | L or m³ | Current volume reading                | `total_increasing` |
+| `counter`          | L or m³ | Alternative volume counter            | `total_increasing` |
+| `battery`          | years   | Estimated battery life remaining      | `measurement`      |
+| `rssi`             | dBm     | Radio signal strength                 | `measurement`      |
+| `rssi_percentage`  | %       | Signal strength as percentage (0-100) | `measurement`      |
+| `lqi`              | -       | Link quality indicator (0-255)        | `measurement`      |
+| `lqi_percentage`   | %       | Link quality as percentage (0-100)    | `measurement`      |
+| `time_start`       | ms      | Reading start timestamp               | `measurement`      |
+| `time_end`         | ms      | Reading end timestamp                 | `measurement`      |
+| `total_attempts`   | -       | Total read attempts                   | `total_increasing` |
+| `successful_reads` | -       | Number of successful reads            | `total_increasing` |
+| `failed_reads`     | -       | Number of failed reads                | `total_increasing` |
 
 ### Text Sensors
 
-| Sensor | Description | Values |
-|--------|-------------|--------|
-| `status` | Current meter status | `Idle`, `Reading`, `Success`, `Error` |
-| `error` | Last error message | Error description or empty |
-| `radio_state` | Current radio state | `Init`, `Scanning`, `Receiving`, `Idle` |
-| `timestamp` | Last successful reading timestamp | ISO 8601 format |
+| Sensor        | Description                       | Values                                  |
+| ------------- | --------------------------------- | --------------------------------------- |
+| `status`      | Current meter status              | `Idle`, `Reading`, `Success`, `Error`   |
+| `error`       | Last error message                | Error description or empty              |
+| `radio_state` | Current radio state               | `Init`, `Scanning`, `Receiving`, `Idle` |
+| `timestamp`   | Last successful reading timestamp | ISO 8601 format                         |
 
 ### Binary Sensors
 
-| Sensor | Description | Device Class |
-|--------|-------------|--------------|
-| `active_reading` | Whether a reading is in progress | `running` |
+| Sensor           | Description                      | Device Class |
+| ---------------- | -------------------------------- | ------------ |
+| `active_reading` | Whether a reading is in progress | `running`    |
 
 ### Sensor Configuration
 
@@ -310,8 +311,7 @@ Simple configuration with essential sensors:
 
 ```yaml
 everblu_meter:
-  meter_year: 21
-  meter_serial: 12345678
+  meter_code: "21-1234567-000"
   gdo0_pin: 4
   meter_type: water
   time_id: ha_time
@@ -333,8 +333,7 @@ Minimal configuration for gas meter:
 
 ```yaml
 everblu_meter:
-  meter_year: 22
-  meter_serial: 87654321
+  meter_code: "22-8765432-000"
   meter_type: gas
   gas_volume_divisor: 100
   time_id: ha_time
@@ -354,8 +353,7 @@ Full monitoring with all sensors and custom scheduling:
 
 ```yaml
 everblu_meter:
-  meter_year: 23
-  meter_serial: 12345678
+  meter_code: "23-1234567-000"
   gdo0_pin: 4
   meter_type: water
   
@@ -535,8 +533,7 @@ Multiple meters are supported by defining a YAML list under `everblu_meter`:
 ```yaml
 everblu_meter:
   - id: water_meter
-    meter_year: 21
-    meter_serial: 12345678
+    meter_code: "21-1234567-000"
     cs_pin:
       number: GPIO15
       allow_other_uses: true
@@ -548,8 +545,7 @@ everblu_meter:
       name: "Water Volume"
   
   - id: gas_meter
-    meter_year: 22
-    meter_serial: 87654321
+    meter_code: "22-8765432-000"
     cs_pin:
       number: GPIO15
       allow_other_uses: true
