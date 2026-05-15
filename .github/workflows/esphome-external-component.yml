@@ -5,6 +5,12 @@ on:
     branches: [main, master, develop]
   pull_request:
     branches: [main, master, develop]
+    paths:
+      - ESPHOME/components/everblu_meter/**
+      - .ci/esphome/everblu_meter/**
+      - ESPHOME/example-*.yaml
+      - ESPHOME/README.md
+      - .github/workflows/esphome-external-component.yml
   workflow_dispatch:
 
 permissions:

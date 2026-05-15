@@ -32,3 +32,9 @@ This project reads Itron/Actaris EverBlu Cyble water/gas meters via a CC1101 433
 - `include/private.h` is gitignored and contains real credentials; do not flag its absence as an error.
 - The project targets both ESP8266 (Arduino framework, no `std::` threading) and ESP32 + ESPHome; avoid suggestions that break 8266 compatibility unless the change is explicitly scoped to ESP32.
 - PlatformIO environments are defined in `platformio.ini`; the default build target is `huzzah` (Adafruit HUZZAH ESP8266).
+
+## Generated output policy
+
+- Treat `ESPHOME-release/` as read-only generated output.
+- Never edit files in `ESPHOME-release/` directly, even if a user asks for behavior changes.
+- Make changes only in `ESPHOME/components/everblu_meter/` (and related source), then regenerate `ESPHOME-release/` via `ESPHOME/prepare-component-release.ps1` or `.sh`.

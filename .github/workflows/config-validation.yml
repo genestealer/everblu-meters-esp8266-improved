@@ -5,6 +5,11 @@ on:
     branches: [main, master, develop]
   pull_request:
     branches: [main, master, develop]
+    paths:
+      - platformio.ini
+      - include/private.example.h
+      - src/**
+      - .github/workflows/config-validation.yml
   workflow_dispatch:
 
 permissions:

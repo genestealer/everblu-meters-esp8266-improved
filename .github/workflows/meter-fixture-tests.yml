@@ -5,6 +5,13 @@ on:
     branches: [main, master, develop]
   pull_request:
     branches: [main, master, develop]
+    paths:
+      - src/**
+      - include/**
+      - platformio.ini
+      - test/fixtures/**
+      - test/test_native_meter_fixtures/**
+      - .github/workflows/meter-fixture-tests.yml
   workflow_dispatch:
 
 permissions:
