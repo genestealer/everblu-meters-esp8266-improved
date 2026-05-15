@@ -5,6 +5,11 @@ on:
     branches: [main, master, develop]
   pull_request:
     branches: [main, master, develop]
+    paths:
+      - src/**
+      - include/**
+      - platformio.ini
+      - .github/workflows/build-esp32.yml
   workflow_dispatch:
 
 permissions:
