@@ -10,7 +10,7 @@ namespace everblu
     namespace core
     {
 
-        // Parse METER_CODE in format "YY-SSSSSSS" or "YY-SSSSSSS-NNN".
+        // Parse METER_CODE in format "YY-serial" or "YY-serial-NNN".
         // Returns true when format and numeric bounds are valid.
         inline bool parseMeterCode(const char *code, uint8_t *out_year, uint32_t *out_serial)
         {
@@ -20,7 +20,7 @@ namespace everblu
             }
 
             const size_t len = strlen(code);
-            if (len < 5)
+            if (len < 4)
             {
                 return false;
             }

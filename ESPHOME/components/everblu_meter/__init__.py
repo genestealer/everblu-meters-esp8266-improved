@@ -114,11 +114,11 @@ def validate_meter_code(value):
     code = value.strip()
     if " " in code:
         raise cv.Invalid("meter_code must not contain spaces")
-    if len(code) < 5:
+    if len(code) < 4:
         raise cv.Invalid(
             f"meter_code '{code}' is too short ({len(code)} characters). "
-            "Expected dashed format: YY-serial or YY-serial-NNN. "
-            "Example: '16-0039185-107'"
+            "Expected dashed format: YY-serial or YY-serial-NNN with 1..8 serial digits. "
+            "Examples: '20-1', '16-0039185-107'"
         )
     parts = code.split("-")
     if len(parts) not in (2, 3):

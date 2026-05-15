@@ -14,7 +14,7 @@
 // Only build real provider when private.h exists (standalone mode)
 #if !defined(USE_ESPHOME) && (__has_include("private.h") || __has_include("../../private.h"))
 #include "private.h"
-#include "../../core/meter_code_parser.h"
+#include "core/meter_code_parser.h"
 #if defined(ARDUINO)
 #include <Arduino.h>
 #endif

@@ -9,6 +9,8 @@
 
 #pragma once
 
+#include <string>
+
 // Editor note: VS Code/IntelliSense may display include errors such as
 // "cannot open source file \"esphome/core/component.h\"". These headers are
 // provided by the ESPHome/PlatformIO build environment, and paths are resolved
