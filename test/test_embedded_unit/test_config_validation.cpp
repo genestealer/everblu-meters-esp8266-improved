@@ -140,8 +140,14 @@ void test_meter_code_parse_rejects_zero_serial(void)
 
 void test_meter_code_parse_rejects_serial_over_24bit(void)
 {
-    // 16777216 is one above 0xFFFFFF.
+    // 8 digits is too long - must be exactly 7
     TEST_ASSERT_FALSE(everblu::core::parseMeterCode("20-16777216-000", nullptr, nullptr));
+}
+
+void test_meter_code_parse_rejects_short_serial(void)
+{
+    // Fewer than 7 digits is invalid
+    TEST_ASSERT_FALSE(everblu::core::parseMeterCode("20-257750-000", nullptr, nullptr));
 }
 
 void setup()
@@ -161,6 +167,7 @@ void setup()
     RUN_TEST(test_meter_code_parse_rejects_missing_dash_format);
     RUN_TEST(test_meter_code_parse_rejects_zero_serial);
     RUN_TEST(test_meter_code_parse_rejects_serial_over_24bit);
+    RUN_TEST(test_meter_code_parse_rejects_short_serial);
 
     UNITY_END();
 }

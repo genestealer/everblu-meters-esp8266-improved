@@ -10,7 +10,10 @@ namespace everblu
     namespace core
     {
 
-        // Parse METER_CODE in format "YY-serial" or "YY-serial-NNN".
+        // Parse METER_CODE in format "YY-SSSSSSS" or "YY-SSSSSSS-NNN".
+        // YY = exactly 2-digit year
+        // SSSSSSS = exactly 7-digit serial number (leading zeros allowed)
+        // NNN = optional 3-digit suffix (check digits, ignored if present)
         // Returns true when format and numeric bounds are valid.
         inline bool parseMeterCode(const char *code, uint8_t *out_year, uint32_t *out_serial)
         {
@@ -41,7 +44,7 @@ namespace everblu
                 i++;
             }
 
-            if (serial_digits == 0 || serial_digits > 8)
+            if (serial_digits != 7)
             {
                 return false;
             }

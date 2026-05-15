@@ -117,22 +117,22 @@ def validate_meter_code(value):
     if len(code) < 4:
         raise cv.Invalid(
             f"meter_code '{code}' is too short ({len(code)} characters). "
-            "Expected dashed format: YY-serial or YY-serial-NNN with 1..8 serial digits. "
-            "Examples: '20-1', '16-0039185-107'"
+            "Expected dashed format: YY-SSSSSSS or YY-SSSSSSS-NNN with exactly 7-digit serial. "
+            "Examples: '20-0257750', '16-0039185-107'"
         )
     parts = code.split("-")
     if len(parts) not in (2, 3):
         raise cv.Invalid(
-            "meter_code must use dashed format: YY-serial or YY-serial-NNN. "
-            "Example: '19-00000101-800'"
+            "meter_code must use dashed format: YY-SSSSSSS or YY-SSSSSSS-NNN. "
+            "Example: '19-0000101-800'"
         )
     year_str = parts[0]
     serial_str = parts[1]
     suffix_str = parts[2] if len(parts) == 3 else ""
     if len(year_str) != 2 or not year_str.isdigit():
         raise cv.Invalid("meter_code year section must be exactly 2 digits (YY)")
-    if not serial_str.isdigit() or len(serial_str) == 0 or len(serial_str) > 8:
-        raise cv.Invalid("meter_code serial section must be 1 to 8 digits")
+    if not serial_str.isdigit() or len(serial_str) != 7:
+        raise cv.Invalid("meter_code serial section must be exactly 7 digits")
     if suffix_str and (len(suffix_str) != 3 or not suffix_str.isdigit()):
         raise cv.Invalid("meter_code suffix section must be exactly 3 digits when provided")
 
