@@ -5,6 +5,9 @@ on:
     branches: [main, master, develop]
   pull_request:
     branches: [main, master, develop]
+    paths:
+      - platformio.ini
+      - .github/workflows/dependency-check.yml
   schedule:
     # Run weekly on Mondays at 00:00 UTC
     - cron: "0 0 * * 1"

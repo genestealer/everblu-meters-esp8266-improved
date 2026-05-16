@@ -5,6 +5,11 @@ on:
     branches: [main, master, develop]
   pull_request:
     branches: [main, master, develop]
+    paths:
+      - src/**
+      - include/**
+      - .clang-format
+      - .github/workflows/code-quality.yml
   workflow_dispatch:
 
 permissions:

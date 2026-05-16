@@ -70,8 +70,12 @@ everblu_meter:
   spi_id: main_bus
   
   # Meter identification (REQUIRED)
-  meter_year: 21          # Last 2 digits of year (e.g., 21 for 2021)
-  meter_serial: 12345678  # Your meter's serial number
+  # Enter the code printed under the barcode, with dashes.
+  # Format on label: YY-SSSSSSS-NNN  (year - serial - suffix)
+  # The 3-digit suffix is optional.
+  # Example (with suffix):    label '21-1234567-800' -> meter_code: '21-1234567-800'
+  # Example (without suffix): label '21-1234567-800' -> meter_code: '21-1234567'
+  meter_code: "21-1234567-800"  # Replace with your meter's code
   cs_pin: GPIO21          # Nano ESP32 D10 -> CC1101 CS / NSS
   gdo0_pin: GPIO5         # Nano ESP32 D2 -> CC1101 GDO0
   

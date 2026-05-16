@@ -3,6 +3,7 @@
 
 #include "utils.h"  // Utility functions
 #include "cc1101.h" // CC1101 interface
+#include "meter_code_parser.h"
 #include "radian_parser.h"
 #include "logging.h" // Cross-platform logging
 #include <Arduino.h> // Arduino core
@@ -1734,6 +1735,22 @@ struct tmeter_data get_meter_data(void)
   struct tmeter_data sdata = {};
   return sdata;
 #else
-  return get_meter_data_for_meter(METER_YEAR, METER_SERIAL);
+  struct tmeter_data sdata = {};
+
+#if !defined(METER_CODE)
+  echo_debug(1, "[METER] METER_CODE is not defined; cannot read meter\n");
+  return sdata;
+#else
+  const char *meter_code = METER_CODE;
+  uint8_t meter_year = 0;
+  uint32_t meter_serial = 0;
+  if (!everblu::core::parseMeterCode(meter_code, &meter_year, &meter_serial))
+  {
+    echo_debug(1, "[METER] Invalid METER_CODE: expected YY-SSSSSSS or YY-SSSSSSS-NNN\n");
+    return sdata;
+  }
+
+  return get_meter_data_for_meter(meter_year, meter_serial);
+#endif
 #endif
 }

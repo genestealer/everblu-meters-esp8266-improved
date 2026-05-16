@@ -14,6 +14,14 @@
 // Only build real provider when private.h exists (standalone mode)
 #if !defined(USE_ESPHOME) && (__has_include("private.h") || __has_include("../../private.h"))
 #include "private.h"
+#include "core/meter_code_parser.h"
+#if defined(ARDUINO)
+#include <Arduino.h>
+#endif
+
+#if !defined(METER_CODE)
+#error "METER_CODE must be defined in private.h"
+#endif
 
 /**
  * @class DefineConfigProvider
@@ -28,9 +36,18 @@ public:
         DefineConfigProvider() = default;
         ~DefineConfigProvider() override = default;
 
-        // Meter identification
-        uint8_t getMeterYear() const override { return METER_YEAR; }
-        uint32_t getMeterSerial() const override { return METER_SERIAL; }
+        // Meter identification — parsed at call time from the METER_CODE string.
+        // METER_CODE format: "YY-SSSSSSS" or "YY-SSSSSSS-NNN".
+        uint8_t getMeterYear() const override
+        {
+                ensureMeterCodeParsed();
+                return meterCodeValid_ ? parsedYear_ : 0;
+        }
+        uint32_t getMeterSerial() const override
+        {
+                ensureMeterCodeParsed();
+                return meterCodeValid_ ? parsedSerial_ : 0;
+        }
         bool isMeterGas() const override
         {
 #ifdef METER_IS_GAS
@@ -146,6 +163,39 @@ public:
         const char *getMqttPassword() const override { return SECRET_MQTT_PASSWORD; }
         const char *getMqttClientId() const override { return SECRET_MQTT_CLIENT_ID; }
         const char *getNtpServer() const override { return SECRET_NTP_SERVER; }
+
+private:
+        void ensureMeterCodeParsed() const
+        {
+                if (meterCodeParsed_)
+                {
+                        return;
+                }
+
+                meterCodeParsed_ = true;
+                meterCodeValid_ = everblu::core::parseMeterCode(METER_CODE, &parsedYear_, &parsedSerial_);
+
+                if (!meterCodeValid_)
+                {
+#if defined(ARDUINO)
+                        if (!meterCodeErrorLogged_)
+                        {
+                                Serial.println("[ERROR] Invalid METER_CODE in private.h; DefineConfigProvider meter identity unavailable");
+                                meterCodeErrorLogged_ = true;
+                        }
+#endif
+                        parsedYear_ = 0;
+                        parsedSerial_ = 0;
+                }
+        }
+
+        mutable bool meterCodeParsed_{false};
+        mutable bool meterCodeValid_{false};
+#if defined(ARDUINO)
+        mutable bool meterCodeErrorLogged_{false};
+#endif
+        mutable uint8_t parsedYear_{0};
+        mutable uint32_t parsedSerial_{0};
 };
 
 #else

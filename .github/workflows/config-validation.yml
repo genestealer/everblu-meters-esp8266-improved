@@ -5,6 +5,11 @@ on:
     branches: [main, master, develop]
   pull_request:
     branches: [main, master, develop]
+    paths:
+      - platformio.ini
+      - include/private.example.h
+      - src/**
+      - .github/workflows/config-validation.yml
   workflow_dispatch:
 
 permissions:
@@ -102,8 +107,7 @@ jobs:
             "SECRET_MQTT_SERVER"
             "SECRET_MQTT_USERNAME"
             "SECRET_MQTT_PASSWORD"
-            "METER_YEAR"
-            "METER_SERIAL"
+            "METER_CODE"
             "METER_TYPE"
           )
 
@@ -132,8 +136,7 @@ jobs:
             "192.168.xxx.xxx:SECRET_MQTT_SERVER"
             "xxxxxxxxx:SECRET_MQTT_USERNAME"
             "xxxxxxxxxxxxxxx:SECRET_MQTT_PASSWORD"
-            "xxxxxxx:METER_SERIAL"
-            "xx:METER_YEAR"
+            "xx-xxxxxxx-xxx:METER_CODE"
           )
 
           for placeholder in "${PLACEHOLDERS[@]}"; do

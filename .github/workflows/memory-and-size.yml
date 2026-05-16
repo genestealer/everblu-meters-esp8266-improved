@@ -5,6 +5,11 @@ on:
     branches: [main, master, develop]
   pull_request:
     branches: [main, master, develop]
+    paths:
+      - src/**
+      - include/**
+      - platformio.ini
+      - .github/workflows/memory-and-size.yml
   workflow_dispatch:
 
 permissions:
@@ -67,8 +72,7 @@ jobs:
           if [ ! -f include/private.h ]; then
             cp include/private.example.h include/private.h
           fi
-          sed -i 's/#define METER_YEAR xx/#define METER_YEAR 99/g' include/private.h
-          sed -i 's/#define METER_SERIAL xxxxxxx/#define METER_SERIAL 9999999/g' include/private.h
+          sed -i 's/#define METER_CODE "xx-xxxxxxx-xxx"/#define METER_CODE "99-1234567-000"/g' include/private.h
 
       - name: Build and capture memory usage
         id: build

@@ -4,6 +4,37 @@ All notable changes to this project will be documented in this file.
 
 Releases are created manually by tagging commits with version tags matching `v*.*.*` (e.g., `v2.1.0`). Users should build from source and configure `private.h` with their own meter settings.
 
+## [v2.3.0] - 2026-05-15
+
+> **⚠️ BREAKING CHANGE** — This release enforces strict validation of the meter code format. Existing configurations with flexible serial lengths (1–8 digits) **will not validate** without migration. See [Migration Required](#migration-required) below.
+
+### Breaking Changes
+
+- **Meter Code Validation**: The meter code format is now strictly enforced as `YY-SSSSSSS[-NNN]`:
+  - `YY`: Exactly 2-digit year
+  - `SSSSSSS`: Exactly 7-digit serial number (leading zeros allowed)
+  - `NNN`: Optional 3-digit suffix (check digits, ignored if present)
+- Serial numbers shorter or longer than 7 digits will now be rejected.
+- Error messages updated to clarify "exactly 7 digits" instead of "1 to 8 digits".
+
+### Migration Required
+
+- Update your `METER_CODE` in `include/private.h` to match the strict format `YY-SSSSSSS[-NNN]`.
+- Ensure all ESPHome YAML configurations use valid meter codes with exactly 7-digit serials.
+
+### Changed
+
+- Updated `src/core/meter_code_parser.h` to enforce strict 7-digit serial validation.
+- Updated ESPHome validator to require `len(serial_str) == 7`.
+- Updated error messages and examples to reflect the exact format.
+- Updated test cases to validate only 7-digit serials.
+
+### Fixed
+
+- Added new test case to reject short serials (<7 digits).
+- Removed outdated references to "1 to 8 digits" in comments and documentation.
+
+
 ## [v2.2.1] - 2026-05-07
 
 ### Added

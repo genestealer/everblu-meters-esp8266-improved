@@ -5,6 +5,9 @@
 # and Linux CI-regenerated content stay byte-for-byte identical.
 ESPHOME-release/**  text eol=lf
 
+# Mark release artifacts as generated in GitHub so PR review focuses on source.
+ESPHOME-release/**  linguist-generated=true
+
 # Shell scripts must always be LF (required for execution on Linux/macOS)
 *.sh  text eol=lf
 
