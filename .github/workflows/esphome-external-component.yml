@@ -5,6 +5,7 @@ on:
     branches: [main, master, develop]
   pull_request:
     branches: [main, master, develop]
+    types: [opened, reopened, ready_for_review]
     paths:
       - ESPHOME/components/everblu_meter/**
       - .ci/esphome/everblu_meter/**
@@ -13,11 +14,75 @@ on:
       - .github/workflows/esphome-external-component.yml
   workflow_dispatch:
 
+concurrency:
+  group: esphome-external-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
 jobs:
-  integration-test:
+  integration-test-pr:
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Xtensa / Arduino - water meter
+          - id: esp8266-ard
+            config: .ci/esphome/everblu_meter/test.esp8266-ard.yaml
+
+    name: ${{ matrix.id }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-esphome-${{ hashFiles('.github/workflows/esphome-external-component.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-esphome-
+
+      - name: Cache PlatformIO packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: ${{ runner.os }}-pio-esphome-${{ matrix.id }}-${{ hashFiles('.github/workflows/esphome-external-component.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-esphome-${{ matrix.id }}-
+            ${{ runner.os }}-pio-esphome-
+
+      - name: Install ESPHome
+        run: |
+          python -m pip install --upgrade pip
+          pip install "esphome>=2025.0"
+
+      - name: Validate configuration
+        run: esphome config ${{ matrix.config }}
+
+      - name: Compile
+        run: esphome compile ${{ matrix.config }}
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## ESPHome Integration Test: ${{ matrix.id }}"
+            echo ""
+            echo "Config: \`${{ matrix.config }}\`"
+            echo ""
+            echo "Validated with: \`esphome config\` + \`esphome compile\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  integration-test-full:
+    if: ${{ github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -44,16 +109,13 @@ jobs:
     name: ${{ matrix.id }}
     steps:
       - uses: actions/checkout@v4
-        if: ${{ matrix.id != 'esp8266-git' || github.event_name != 'pull_request' }}
 
       - name: Set up Python
-        if: ${{ matrix.id != 'esp8266-git' || github.event_name != 'pull_request' }}
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
       - name: Cache pip
-        if: ${{ matrix.id != 'esp8266-git' || github.event_name != 'pull_request' }}
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
@@ -62,7 +124,6 @@ jobs:
             ${{ runner.os }}-pip-esphome-
 
       - name: Cache PlatformIO packages
-        if: ${{ matrix.id != 'esp8266-git' || github.event_name != 'pull_request' }}
         uses: actions/cache@v4
         with:
           path: ~/.platformio
@@ -72,17 +133,14 @@ jobs:
             ${{ runner.os }}-pio-esphome-
 
       - name: Install ESPHome
-        if: ${{ matrix.id != 'esp8266-git' || github.event_name != 'pull_request' }}
         run: |
           python -m pip install --upgrade pip
           pip install "esphome>=2025.0"
 
       - name: Validate configuration
-        if: ${{ matrix.id != 'esp8266-git' || github.event_name != 'pull_request' }}
         run: esphome config ${{ matrix.config }}
 
       - name: Compile
-        if: ${{ matrix.id != 'esp8266-git' || github.event_name != 'pull_request' }}
         run: esphome compile ${{ matrix.config }}
 
       - name: Summary
