@@ -507,17 +507,35 @@ bool MeterReader::isReadingDayForConfiguredSchedule(const struct tm *ptm) const
     }
 
     const int dayOfWeek = ptm->tm_wday; // 0=Sunday, 1=Monday, ... 6=Saturday
-    if (strcmp(schedule, "Monday-Friday") == 0)
+    if (strcasecmp(schedule, "monday-friday") == 0)
     {
         return dayOfWeek >= 1 && dayOfWeek <= 5;
     }
-    if (strcmp(schedule, "Monday-Saturday") == 0)
+    if (strcasecmp(schedule, "monday-saturday") == 0)
     {
         return dayOfWeek >= 1 && dayOfWeek <= 6;
     }
-    if (strcmp(schedule, "Monday-Sunday") == 0)
+    if (strcasecmp(schedule, "monday-sunday") == 0)
     {
         return true;
+    }
+    // check for single day reading schedule
+    switch(dayOfWeek) 
+    {
+        case 0:
+            return strcasecmp(schedule, "sunday") == 0;
+        case 1:
+            return strcasecmp(schedule, "monday") == 0;
+        case 2:
+            return strcasecmp(schedule, "tuesday") == 0;
+        case 3:
+            return strcasecmp(schedule, "wednesday") == 0;
+        case 4:
+            return strcasecmp(schedule, "thursday") == 0;
+        case 5:
+            return strcasecmp(schedule, "friday") == 0;
+        case 6:
+            return strcasecmp(schedule, "saturday") == 0;
     }
 
     // Unknown schedule: log warning and skip read to avoid misconfiguration

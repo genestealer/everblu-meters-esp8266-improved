@@ -348,11 +348,25 @@ bool isValidReadingSchedule(const char *schedule)
 	}
 
 	// Allowed values based on unit tests
-	if (strcmp(schedule, "Monday-Friday") == 0)
+	if (strcasecmp(schedule, "monday-friday") == 0)
 		return true;
-	if (strcmp(schedule, "Monday-Saturday") == 0)
+	if (strcasecmp(schedule, "monday-saturday") == 0)
 		return true;
-	if (strcmp(schedule, "Monday-Sunday") == 0)
+	if (strcasecmp(schedule, "monday-sunday") == 0)
+		return true;
+	if (strcasecmp(schedule, "monday") == 0)
+		return true;
+	if (strcasecmp(schedule, "tuesday") == 0)
+		return true;
+	if (strcasecmp(schedule, "wednesday") == 0)
+		return true;
+	if (strcasecmp(schedule, "thursday") == 0)
+		return true;
+	if (strcasecmp(schedule, "friday") == 0)
+		return true;
+	if (strcasecmp(schedule, "saturday") == 0)
+		return true;
+	if (strcasecmp(schedule, "sunday") == 0)
 		return true;
 
 	// Everything else is considered invalid for now
