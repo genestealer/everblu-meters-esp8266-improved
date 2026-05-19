@@ -24,19 +24,19 @@ Water/gas meter data structure containing current readings and metadata.
 
 **Fields:**
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `volume` | `int` | Current consumption reading in liters (water) or liters (gas, pre-conversion) |
-| `reads_counter` | `int` | Number of times meter has been read (wraps 255→1) |
-| `battery_left` | `int` | Estimated battery life remaining in months |
-| `time_start` | `int` | Reading window start time (24-hour format, e.g., 8 = 8am) |
-| `time_end` | `int` | Reading window end time (24-hour format, e.g., 18 = 6pm) |
-| `rssi` | `int` | Radio Signal Strength Indicator (raw value) |
-| `rssi_dbm` | `int` | RSSI converted to dBm |
-| `lqi` | `int` | Link Quality Indicator (0-255, higher is better) |
-| `freqest` | `int8_t` | Frequency offset estimate from CC1101 for adaptive tracking |
-| `history[13]` | `uint32_t[]` | Monthly historical readings (13 months), index 0 = oldest, 12 = most recent |
-| `history_available` | `bool` | True if historical data was successfully extracted |
+| Field               | Type         | Description                                                                   |
+| ------------------- | ------------ | ----------------------------------------------------------------------------- |
+| `volume`            | `int`        | Current consumption reading in liters (water) or liters (gas, pre-conversion) |
+| `reads_counter`     | `int`        | Number of times meter has been read (wraps 255→1)                             |
+| `battery_left`      | `int`        | Estimated battery life remaining in months                                    |
+| `time_start`        | `int`        | Reading window start time (24-hour format, e.g., 8 = 8am)                     |
+| `time_end`          | `int`        | Reading window end time (24-hour format, e.g., 18 = 6pm)                      |
+| `rssi`              | `int`        | Radio Signal Strength Indicator (raw value)                                   |
+| `rssi_dbm`          | `int`        | RSSI converted to dBm                                                         |
+| `lqi`               | `int`        | Link Quality Indicator (0-255, higher is better)                              |
+| `freqest`           | `int8_t`     | Frequency offset estimate from CC1101 for adaptive tracking                   |
+| `history[13]`       | `uint32_t[]` | Monthly historical readings (13 months), index 0 = oldest, 12 = most recent   |
+| `history_available` | `bool`       | True if historical data was successfully extracted                            |
 
 **Note on Gas Meters:** For gas meters, the `volume` field contains the raw reading in liters. The firmware automatically converts this to cubic meters (m³) using the `GAS_VOLUME_DIVISOR` configuration value (default: 100, equivalent to 0.01 m³ per unit).
 
@@ -208,17 +208,17 @@ Constructs a complete RADIAN protocol request frame to query a water meter. Fram
 
 State machine states for meter reading operation.
 
-| State | Description |
-|-------|-------------|
-| `STATE_INIT` | Initial state after boot, transitions to IDLE |
-| `STATE_IDLE` | Waiting state, checks schedule every 500ms |
-| `STATE_CHECK_SCHEDULE` | Evaluates if it's time to read meter |
-| `STATE_COOLDOWN_WAIT` | Waiting during retry cooldown period (1 hour) |
-| `STATE_START_READING` | Initiates meter read operation |
-| `STATE_READING_IN_PROGRESS` | Performing actual meter read (blocking) |
-| `STATE_RETRY_WAIT` | Waiting before retry attempt |
-| `STATE_PUBLISH_SUCCESS` | Publishing successful read to MQTT |
-| `STATE_PUBLISH_FAILURE` | Handling failed read (retry or cooldown) |
+| State                       | Description                                   |
+| --------------------------- | --------------------------------------------- |
+| `STATE_INIT`                | Initial state after boot, transitions to IDLE |
+| `STATE_IDLE`                | Waiting state, checks schedule every 500ms    |
+| `STATE_CHECK_SCHEDULE`      | Evaluates if it's time to read meter          |
+| `STATE_COOLDOWN_WAIT`       | Waiting during retry cooldown period (1 hour) |
+| `STATE_START_READING`       | Initiates meter read operation                |
+| `STATE_READING_IN_PROGRESS` | Performing actual meter read (blocking)       |
+| `STATE_RETRY_WAIT`          | Waiting before retry attempt                  |
+| `STATE_PUBLISH_SUCCESS`     | Publishing successful read to MQTT            |
+| `STATE_PUBLISH_FAILURE`     | Handling failed read (retry or cooldown)      |
 
 ### Functions
 
@@ -359,6 +359,7 @@ Validate reading schedule string.
 - `"Monday-Friday"`
 - `"Monday-Saturday"`
 - `"Monday-Sunday"`
+- `"Monday"`, `"Tuesday"`, `"Wednesday"`, `"Thursday"`, `"Friday"`, `"Saturday"`, `"Sunday"`
 
 ---
 

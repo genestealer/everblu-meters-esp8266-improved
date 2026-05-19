@@ -260,6 +260,7 @@ esp32:
 - Monday-Friday - Weekdays (default)
 - Monday-Saturday - Monday through Saturday
 - Monday-Sunday - All days
+- Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday - Read only on the selected day
 
 ### Custom Schedule Example
 

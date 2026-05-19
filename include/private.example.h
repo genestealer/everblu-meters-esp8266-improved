@@ -73,6 +73,7 @@
 //   "Monday-Friday"
 //   "Monday-Saturday"
 //   "Monday-Sunday"
+//   "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"
 // Invalid or missing values fall back to "Monday-Friday".
 #define DEFAULT_READING_SCHEDULE "Monday-Friday"
 

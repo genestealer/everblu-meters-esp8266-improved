@@ -94,7 +94,7 @@ Supported meters:
 - Automatic CC1101 frequency calibration with manual fallback.
 - Wi-Fi diagnostics and OTA updates.
 - Built-in CRC-16/KERMIT verification to discard corrupted RADIAN frames before publishing data.
-- Reading Schedule Configuration: Configure the days when the meter should be queried (e.g., Monday-Friday, Monday-Saturday, or Monday-Sunday).
+- Reading Schedule Configuration: Configure reading days using presets (Monday-Friday, Monday-Saturday, Monday-Sunday) or a specific day (Monday-Sunday).
 - Daily scheduled meter readings.
 
 
@@ -638,6 +638,7 @@ Available options:
 - `"Monday-Friday"`: Queries the meter only on weekdays.
 - `"Monday-Saturday"`: Queries the meter from Monday to Saturday.
 - `"Monday-Sunday"`: Queries the meter every day.
+- `"Monday"`, `"Tuesday"`, `"Wednesday"`, `"Thursday"`, `"Friday"`, `"Saturday"`, `"Sunday"`: Queries the meter only on that day.
 
 Example configuration in `private.h`:
 ```cpp
