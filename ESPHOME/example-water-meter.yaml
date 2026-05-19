@@ -78,7 +78,7 @@ everblu_meter:
   
   # Optional: Reading schedule (default: Monday-Friday at 10:00 UTC)
   # read_hour is always in UTC - timezone_offset converts this to your local time
-  # reading_schedule: "Monday-Friday"  # Options: "Monday-Friday", "Monday-Saturday", "Monday-Sunday"
+  # reading_schedule: "Saturday"       # Presets: "Monday-Friday", "Monday-Saturday", "Monday-Sunday" or a single day: "Monday".."Sunday"
   # read_hour: 10        # Hour in UTC (0-23)
   # read_minute: 0       # Minute (0-59)
   

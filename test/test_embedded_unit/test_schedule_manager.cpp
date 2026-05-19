@@ -99,6 +99,114 @@ void test_schedule_monday_sunday_includes_sunday(void)
 }
 
 /**
+ * Test: Monday schedule includes Monday
+ */
+void test_schedule_monday_only(void)
+{
+    struct tm monday = createTmForDay(1);
+    struct tm tuesday = createTmForDay(2);
+    struct tm saturday = createTmForDay(6);
+    struct tm sunday = createTmForDay(0);
+
+    TEST_ASSERT_TRUE(isReadingDay(&monday, "Monday"));
+    TEST_ASSERT_FALSE(isReadingDay(&tuesday, "Monday"));
+    TEST_ASSERT_FALSE(isReadingDay(&saturday, "Monday"));
+    TEST_ASSERT_FALSE(isReadingDay(&sunday, "Monday"));
+}
+
+/**
+ * Test: Tuesday schedule includes Tuesday
+ */
+void test_schedule_tuesday_only(void)
+{
+    struct tm monday = createTmForDay(1);
+    struct tm tuesday = createTmForDay(2);
+    struct tm saturday = createTmForDay(6);
+    struct tm sunday = createTmForDay(0);
+
+    TEST_ASSERT_FALSE(isReadingDay(&monday, "Tuesday"));
+    TEST_ASSERT_TRUE(isReadingDay(&tuesday, "Tuesday"));
+    TEST_ASSERT_FALSE(isReadingDay(&saturday, "Tuesday"));
+    TEST_ASSERT_FALSE(isReadingDay(&sunday, "Tuesday"));
+}
+
+/**
+ * Test: Wednesday schedule includes Wednesday
+ */
+void test_schedule_wednesday_only(void)
+{
+    struct tm monday = createTmForDay(1);
+    struct tm wednesday = createTmForDay(3);
+    struct tm saturday = createTmForDay(6);
+    struct tm sunday = createTmForDay(0);
+
+    TEST_ASSERT_FALSE(isReadingDay(&monday, "Wednesday"));
+    TEST_ASSERT_TRUE(isReadingDay(&wednesday, "Wednesday"));
+    TEST_ASSERT_FALSE(isReadingDay(&saturday, "Wednesday"));
+    TEST_ASSERT_FALSE(isReadingDay(&sunday, "Wednesday"));
+}
+
+/**
+ * Test: Thursday schedule includes Thursday
+ */
+void test_schedule_thursday_only(void)
+{
+    struct tm monday = createTmForDay(1);
+    struct tm thursday = createTmForDay(4);
+    struct tm saturday = createTmForDay(6);
+    struct tm sunday = createTmForDay(0);
+
+    TEST_ASSERT_FALSE(isReadingDay(&monday, "Thursday"));
+    TEST_ASSERT_TRUE(isReadingDay(&thursday, "Thursday"));
+    TEST_ASSERT_FALSE(isReadingDay(&saturday, "Thursday"));
+    TEST_ASSERT_FALSE(isReadingDay(&sunday, "Thursday"));
+}
+
+/**
+ * Test: Friday schedule includes Friday
+ */
+void test_schedule_friday_only(void)
+{
+    struct tm monday = createTmForDay(1);
+    struct tm friday = createTmForDay(5);
+    struct tm saturday = createTmForDay(6);
+    struct tm sunday = createTmForDay(0);
+
+    TEST_ASSERT_FALSE(isReadingDay(&monday, "Friday"));
+    TEST_ASSERT_TRUE(isReadingDay(&friday, "Friday"));
+    TEST_ASSERT_FALSE(isReadingDay(&saturday, "Friday"));
+    TEST_ASSERT_FALSE(isReadingDay(&sunday, "Friday"));
+}
+
+/**
+ * Test: Saturday schedule includes Saturday
+ */
+void test_schedule_saturday_only(void)
+{
+    struct tm monday = createTmForDay(1);
+    struct tm saturday = createTmForDay(6);
+    struct tm sunday = createTmForDay(0);
+
+    TEST_ASSERT_FALSE(isReadingDay(&monday, "Saturday"));
+    TEST_ASSERT_TRUE(isReadingDay(&saturday, "Saturday"));
+    TEST_ASSERT_FALSE(isReadingDay(&sunday, "Saturday"));
+}
+
+/**
+ * Test: Sunday schedule includes Sunday
+ */
+void test_schedule_sunday_only(void)
+{
+    struct tm monday = createTmForDay(1);
+    struct tm saturday = createTmForDay(6);
+    struct tm sunday = createTmForDay(0);
+
+    TEST_ASSERT_FALSE(isReadingDay(&monday, "Sunday"));
+    TEST_ASSERT_FALSE(isReadingDay(&saturday, "Sunday"));
+    TEST_ASSERT_TRUE(isReadingDay(&sunday, "Sunday"));
+}
+
+/**
  * Test: Invalid schedule falls back to Monday-Friday schedule
  */
 void test_schedule_invalid(void)

@@ -24,15 +24,29 @@ bool isValidReadingSchedule(const char *schedule)
         return false;
     }
 
-    // Allowed values based on tests
+    // Allowed values based on unit tests
     if (strcmp(schedule, "Monday-Friday") == 0)
         return true;
     if (strcmp(schedule, "Monday-Saturday") == 0)
         return true;
     if (strcmp(schedule, "Monday-Sunday") == 0)
         return true;
+    if (strcmp(schedule, "Monday") == 0)
+        return true;
+    if (strcmp(schedule, "Tuesday") == 0)
+        return true;
+    if (strcmp(schedule, "Wednesday") == 0)
+        return true;
+    if (strcmp(schedule, "Thursday") == 0)
+        return true;
+    if (strcmp(schedule, "Friday") == 0)
+        return true;
+    if (strcmp(schedule, "Saturday") == 0)
+        return true;
+    if (strcmp(schedule, "Sunday") == 0)
+        return true;
 
-    // Everything else is invalid
+    // Everything else is considered invalid for now
     return false;
 }
 
@@ -60,6 +74,13 @@ void test_valid_reading_schedules(void)
     TEST_ASSERT_TRUE(isValidReadingSchedule("Monday-Friday"));
     TEST_ASSERT_TRUE(isValidReadingSchedule("Monday-Saturday"));
     TEST_ASSERT_TRUE(isValidReadingSchedule("Monday-Sunday"));
+    TEST_ASSERT_TRUE(isValidReadingSchedule("Monday"));
+    TEST_ASSERT_TRUE(isValidReadingSchedule("Tuesday"));
+    TEST_ASSERT_TRUE(isValidReadingSchedule("Wednesday"));
+    TEST_ASSERT_TRUE(isValidReadingSchedule("Thursday"));
+    TEST_ASSERT_TRUE(isValidReadingSchedule("Friday"));
+    TEST_ASSERT_TRUE(isValidReadingSchedule("Saturday"));
+    TEST_ASSERT_TRUE(isValidReadingSchedule("Sunday"));
 }
 
 /**

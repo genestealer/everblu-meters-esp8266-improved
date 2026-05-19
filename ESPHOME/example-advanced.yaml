@@ -87,7 +87,7 @@ everblu_meter:
   auto_scan: false        # Disable auto-scan for faster readings
   debug_cc1101: true      # Enable detailed CC1101 radio debug logs
   
-  # Advanced scheduling - weekend only
+  # Advanced scheduling - Saturday only
   reading_schedule: Saturday      # Read only on Saturdays
   read_hour: 6           # Early morning reading (in UTC)
   read_minute: 30
