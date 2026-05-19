@@ -78,22 +78,22 @@ bool ScheduleManager::isReadingDay(struct tm *ptm)
         return true; // All days including Sunday (dayOfWeek 0-6)
     }
     // check for single day reading schedule
-    switch(dayOfWeek)
+    switch (dayOfWeek)
     {
-        case 0:
-            return strcmp(s_schedule, "Sunday") == 0;
-        case 1:
-            return strcmp(s_schedule, "Monday") == 0;
-        case 2:
-            return strcmp(s_schedule, "Tuesday") == 0;
-        case 3:
-            return strcmp(s_schedule, "Wednesday") == 0;
-        case 4:
-            return strcmp(s_schedule, "Thursday") == 0;
-        case 5:
-            return strcmp(s_schedule, "Friday") == 0;
-        case 6:
-            return strcmp(s_schedule, "Saturday") == 0;
+    case 0:
+        return strcmp(s_schedule, "Sunday") == 0;
+    case 1:
+        return strcmp(s_schedule, "Monday") == 0;
+    case 2:
+        return strcmp(s_schedule, "Tuesday") == 0;
+    case 3:
+        return strcmp(s_schedule, "Wednesday") == 0;
+    case 4:
+        return strcmp(s_schedule, "Thursday") == 0;
+    case 5:
+        return strcmp(s_schedule, "Friday") == 0;
+    case 6:
+        return strcmp(s_schedule, "Saturday") == 0;
     }
     return false;
 }
