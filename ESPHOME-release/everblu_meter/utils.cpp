@@ -29,7 +29,7 @@
 // mode: 0=16 per line with newlines, 1=array format, 2=single line, 3=single line with 'S' separator
 void show_in_hex_formatted(const uint8_t *buffer, size_t len, int mode)
 {
-	int i = 0;
+	size_t i = 0;
 	char line_buf[256];
 	int line_pos = 0;
 
@@ -108,7 +108,7 @@ void show_in_bin(const uint8_t *buffer, size_t len)
 	const uint8_t *ptr;
 	uint8_t mask;
 	char bin_buf[512];
-	int bin_pos = 0;
+	size_t bin_pos = 0;
 
 	for (ptr = buffer; len--; ptr++)
 	{
