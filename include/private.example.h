@@ -159,7 +159,7 @@
 // 0:           Skip scan even if no offset is stored
 //
 // To re-run the scan, set CLEAR_EEPROM_ON_BOOT to 1 or re-enable this.
-#define AUTO_SCAN_ENABLED 1
+#define AUTO_SCAN_ENABLED 0
 
 // CC1101 GDO0 (data-ready) pin assignment
 // ESP8266 (D1 mini / HUZZAH): GPIO5 (D1)
