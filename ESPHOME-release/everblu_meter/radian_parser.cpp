@@ -61,6 +61,15 @@ bool radian_parse_primary_data(const uint8_t *decoded_buffer, size_t size, struc
         return false;
     }
 
+    // Reject physically impossible volumes. 1 billion litres (1 million m³) is
+    // far beyond any meter this protocol is used with; values above this
+    // threshold indicate corrupted decode alignment rather than real data.
+    if (out->volume > 1000000000UL)
+    {
+        memset(out, 0, sizeof(*out));
+        return false;
+    }
+
     if (size >= 49)
     {
         out->reads_counter = decoded_buffer[48];
@@ -68,11 +77,10 @@ bool radian_parse_primary_data(const uint8_t *decoded_buffer, size_t size, struc
         out->time_start = decoded_buffer[44];
         out->time_end = decoded_buffer[45];
 
-        if (out->time_start > 23 || out->time_end > 23)
-        {
-            memset(out, 0, sizeof(*out));
-            return false;
-        }
+        // time_start/time_end can be corrupted by decode framing errors even
+        // when the volume bytes (18-21) are correct.  Out-of-range values are
+        // passed through as-is rather than being treated as a hard failure so
+        // that a valid volume reading is not discarded.
 
         if (out->battery_left == 0xFF || out->reads_counter == 0xFF)
         {
