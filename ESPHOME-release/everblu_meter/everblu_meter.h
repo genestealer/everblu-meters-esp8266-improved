@@ -101,6 +101,7 @@ namespace esphome
             void set_initial_read_on_boot(bool v) { initial_read_on_boot_ = v; }
             void set_adaptive_threshold(int threshold) { adaptive_threshold_ = threshold; }
             void set_gdo0_pin(InternalGPIOPin *pin) { gdo0_pin_ = pin; }
+            void set_gdo2_pin(InternalGPIOPin *pin) { gdo2_pin_ = pin; }
 
             // Sensor setters
             void set_volume_sensor(sensor::Sensor *sensor) { volume_sensor_ = sensor; }
@@ -162,8 +163,9 @@ namespace esphome
             void apply_radio_context();
             bool gdo0_error_logged_{false}; // One-shot flag to prevent log flooding
 
-            // GDO0 pin (raw GPIO number for CC1101 Arduino driver)
+            // GDO0 pin (required) and GDO2 pin (optional TX FIFO threshold)
             InternalGPIOPin *gdo0_pin_{nullptr};
+            InternalGPIOPin *gdo2_pin_{nullptr};
 
             // ESPHome components
             time::RealTimeClock *time_component_{nullptr};

@@ -342,6 +342,17 @@ namespace esphome
                     gdo0_error_logged_ = true;
                 }
             }
+
+            // GDO2 is optional: when wired and configured, it drives hardware-assisted
+            // TX FIFO threshold detection instead of SPI TXBYTES polling.
+            if (gdo2_pin_ != nullptr)
+            {
+                cc1101_set_gdo2_pin(gdo2_pin_->get_pin());
+            }
+            else
+            {
+                cc1101_set_gdo2_pin(-1); // Ensure fallback mode on re-entry
+            }
         }
 
         void EverbluMeterComponent::update()
@@ -370,6 +381,8 @@ namespace esphome
             ESP_LOGCONFIG(TAG, "  Max Retries: %d", max_retries_);
             ESP_LOGCONFIG(TAG, "  Retry Cooldown: %lu ms", retry_cooldown_ms_);
             ESP_LOGCONFIG(TAG, "  Initial Read On Boot: %s", initial_read_on_boot_ ? "Enabled" : "Disabled");
+            ESP_LOGCONFIG(TAG, "  GDO0 Pin: %s", gdo0_pin_ != nullptr ? "configured" : "NOT configured (error)");
+            ESP_LOGCONFIG(TAG, "  GDO2 Pin: %s", gdo2_pin_ != nullptr ? "configured (HW TX FIFO threshold)" : "not wired (SPI polling fallback)");
 
             ESP_LOGCONFIG(TAG, "  Sensors:");
             LOG_SENSOR("    ", "Volume", volume_sensor_);

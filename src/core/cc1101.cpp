@@ -87,13 +87,18 @@ static const uint8_t debug_out = (uint8_t)(DEBUG_CC1101);
 
 /*-------------------------[CC1100 - Register Values]----------------------------*/
 // IOCFG2 - GDO2 Output Pin Configuration
-#define IOCFG2_SERIAL_DATA_OUTPUT 0x0D // GDO2: Serial Data Output
+#define IOCFG2_SERIAL_DATA_OUTPUT 0x0D // GDO2: Serial Data Output (kept for reference, not used)
+#define IOCFG2_TX_FIFO_THR        0x02 // GDO2: asserts HIGH when TX FIFO >= threshold; de-asserts LOW when below threshold
 
 // IOCFG0 - GDO0 Output Pin Configuration
 #define IOCFG0_SYNC_WORD_DETECT 0x06 // Asserts when sync word detected, deasserts at end of packet
 
 // FIFOTHR - RX FIFO and TX FIFO Thresholds
-#define FIFOTHR_FIFO_THR_33_32 0x47 // RX FIFO threshold: 33 bytes, TX FIFO threshold: 32 bytes
+// FIFO_THR=9 (0x49): TX threshold=25 bytes — de-assertion guarantees >=40 free bytes, safely fits both
+//                    the 8-byte WUP buffer and the 39-byte interrogation frame with a single GDO2 check.
+//                    RX threshold shifts to 40 bytes (no impact: RX loop uses GDO0 + RXBYTES, not FIFO signal).
+#define FIFOTHR_FIFO_THR_33_32 0x47 // FIFO_THR=7: TX threshold 33 bytes, RX threshold 33 bytes (legacy)
+#define FIFOTHR_FIFO_THR_25_40 0x49 // FIFO_THR=9: TX threshold 25 bytes, RX threshold 40 bytes
 
 // SYNC1/SYNC0 - Sync Word Configuration
 #define SYNC1_PATTERN_55 0x55 // Sync word pattern: 0x55 (01010101)
@@ -219,6 +224,7 @@ using CC1101SpiDevice = esphome::spi::SPIDevice<esphome::spi::BIT_ORDER_MSB_FIRS
                                                 esphome::spi::DATA_RATE_1MHZ>;
 static CC1101SpiDevice *_spi_device = nullptr;
 static int _gdo0_pin = -1;
+static int _gdo2_pin = -1;
 
 void cc1101_set_spi_device(void *device)
 {
@@ -231,11 +237,22 @@ void cc1101_set_gdo0_pin(int gdo0_pin)
   _gdo0_pin = gdo0_pin;
 }
 
-// Macro to get GDO0 pin - use variable in ESPHome mode, build flag otherwise
+void cc1101_set_gdo2_pin(int gdo2_pin)
+{
+  _gdo2_pin = gdo2_pin;
+}
+
+// Macros to get GDO pin numbers - use variables in ESPHome mode, build flags otherwise
 #define GET_GDO0_PIN() (_gdo0_pin)
+#define GET_GDO2_PIN() (_gdo2_pin)
 #else
-// Non-ESPHome mode: GDO0 comes from build flag
+// Non-ESPHome mode: GDO0 comes from build flag; GDO2 is optional
 #define GET_GDO0_PIN() (GDO0)
+#ifdef GDO2
+#define GET_GDO2_PIN() (GDO2)
+#else
+#define GET_GDO2_PIN() (-1)
+#endif
 #endif
 
 // Change these define according to your ESP8266 board
@@ -527,9 +544,12 @@ void cc1101_configureRF_0(float freq)
   //
   // RF settings for CC1101 - RADIAN protocol (Itron EverBlu)
   //
-  halRfWriteReg(IOCFG2, IOCFG2_SERIAL_DATA_OUTPUT); // GDO2: Serial data output
+  // GDO2: TX FIFO threshold signal when pin is wired; falls back to IOCFG2_SERIAL_DATA_OUTPUT
+  // if not connected (output floats harmlessly). Using IOCFG2_TX_FIFO_THR lets the TX feeding
+  // loop replace SPI TXBYTES polling with a fast digitalRead() for proactive underflow prevention.
+  halRfWriteReg(IOCFG2, IOCFG2_TX_FIFO_THR);        // GDO2: TX FIFO at/above threshold
   halRfWriteReg(IOCFG0, IOCFG0_SYNC_WORD_DETECT);   // GDO0: Sync word detection
-  halRfWriteReg(FIFOTHR, FIFOTHR_FIFO_THR_33_32);   // FIFO thresholds
+  halRfWriteReg(FIFOTHR, FIFOTHR_FIFO_THR_25_40);   // FIFO thresholds: TX=25 bytes, RX=40 bytes
   halRfWriteReg(SYNC1, SYNC1_PATTERN_55);           // Sync word MSB: 0x55
   halRfWriteReg(SYNC0, SYNC0_PATTERN_00);           // Sync word LSB: 0x00
 
@@ -573,6 +593,13 @@ bool cc1101_init(float freq)
 #endif
 
   pinMode(GET_GDO0_PIN(), INPUT_PULLUP);
+
+  // GDO2 is optional; configure as input only when a pin is assigned.
+  if (GET_GDO2_PIN() >= 0)
+  {
+    pinMode(GET_GDO2_PIN(), INPUT);
+    echo_debug(debug_out, "[CC1101] GDO2 pin %d configured as TX FIFO threshold input\n", GET_GDO2_PIN());
+  }
 
   // Initialize SPI transport for CC1101 communication.
   // Standalone builds configure Arduino SPI here at 500 kHz.
@@ -1569,26 +1596,58 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
     {
       if (wup2send < 0xFF)
       {
-        if (CC1101_status_FIFO_FreeByte <= 10)
-        { // this gives 10+20ms from previous frame : 8*8/2.4k=26.6ms  time to send a wupbuffer
-          delay(20);
-          tmo++;
-          tmo++;
+        if (GET_GDO2_PIN() >= 0)
+        {
+          // GDO2 configured: asserts HIGH when TX FIFO >= 25 bytes (FIFOTHR_FIFO_THR_25_40).
+          // Only refill when GDO2 de-asserts LOW (FIFO below threshold, >= 40 free bytes).
+          // This replaces the stale CC1101_status_FIFO_FreeByte check + fixed delay(20) with
+          // a real-time hardware signal, preventing underflows under ESPHome scheduler load.
+          if (digitalRead(GET_GDO2_PIN()) == LOW)
+          {
+            SPIWriteBurstReg(TX_FIFO_ADDR, wupbuffer, 8);
+            wup2send--;
+          }
+          // else: FIFO still above threshold — skip write this iteration
         }
-        SPIWriteBurstReg(TX_FIFO_ADDR, wupbuffer, 8);
-        wup2send--;
+        else
+        {
+          // Fallback: use SPI status byte FIFO level (may be stale by one transaction).
+          if (CC1101_status_FIFO_FreeByte <= 10)
+          { // this gives 10+20ms from previous frame : 8*8/2.4k=26.6ms  time to send a wupbuffer
+            delay(20);
+            tmo++;
+            tmo++;
+          }
+          SPIWriteBurstReg(TX_FIFO_ADDR, wupbuffer, 8);
+          wup2send--;
+        }
       }
     }
     else
     {
-      // Wait for enough FIFO space for the 39-byte interrogation frame.
-      // Poll TXBYTES register instead of fixed delay(130) to prevent
-      // TXFIFO_UNDERFLOW when FIFO level is low. This commonly occurs in
-      // ESPHome builds where yield()/delay() service heavy background tasks
-      // (WiFi, API server, OTA, logger, mDNS, web_server) causing the FIFO
-      // feeding loop to fall behind the 2.4 kbps TX drain rate.
-      // See: https://github.com/genestealer/everblu-meters-esp8266-improved/issues/58
+      // Wait for TX FIFO to drain enough to fit the 39-byte interrogation frame.
+      if (GET_GDO2_PIN() >= 0)
       {
+        // With FIFOTHR_FIFO_THR_25_40: GDO2 de-asserts (LOW) when FIFO < 25 bytes,
+        // guaranteeing >= 40 free bytes — safely fits the 39-byte frame.
+        // See: https://github.com/genestealer/everblu-meters-esp8266-improved/issues/83
+        uint8_t wait_count = 0;
+        while (digitalRead(GET_GDO2_PIN()) == HIGH && wait_count < 100) // Safety limit ~500ms
+        {
+          delay(5);
+          wait_count++;
+          if (wait_count % 10 == 0)
+            FEED_WDT();
+        }
+        // Final underflow check: if FIFO underflowed during the wait, abort TX loop.
+        uint8_t txbytes_reg = halRfReadReg(TXBYTES_ADDR);
+        if (txbytes_reg & 0x80)
+          break; // TXFIFO_UNDERFLOW already occurred
+      }
+      else
+      {
+        // Fallback: poll TXBYTES register until <= 25 bytes remain (39 free bytes).
+        // See: https://github.com/genestealer/everblu-meters-esp8266-improved/issues/58
         uint8_t wait_count = 0;
         while (wait_count < 100) // Safety limit ~500ms
         {
