@@ -32,6 +32,12 @@ extern WifiSerialStream WiFiSerial;
 
 class WifiSerialStream : public Print
 {
+    // Compile-time guards: ring logic requires a power-of-two size and 16-bit counters.
+    static_assert((WIFI_SERIAL_TX_BUF_SIZE & (WIFI_SERIAL_TX_BUF_SIZE - 1)) == 0,
+                  "WIFI_SERIAL_TX_BUF_SIZE must be a power of two");
+    static_assert(WIFI_SERIAL_TX_BUF_SIZE <= 65536U,
+                  "WIFI_SERIAL_TX_BUF_SIZE must fit within uint16_t arithmetic (max 65536)");
+
 public:
     // Use Stream& to support HardwareSerial, HWCDC (ESP32-S3 USB), and other Serial types
     explicit WifiSerialStream(Stream &usb) : _usb(usb), _head(0), _tail(0), _dropped(0), _lastSendMs(0) {}
