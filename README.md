@@ -531,84 +531,76 @@ Both MQTT and ESPHome modes expose a **history sensor** containing 12 months of 
 ### Local Development Setup
 
 1. **Install Required Tools**
-  - Download and install [Visual Studio Code](https://code.visualstudio.com/).
-- Install the [PlatformIO extension for VS Code](https://platformio.org/).
-This will install all required dependencies and may require restarting VS Code.
+   - Download and install [Visual Studio Code](https://code.visualstudio.com/).
+   - Install the [PlatformIO extension for VS Code](https://platformio.org/).
+   - This will install all required dependencies and may require restarting VS Code.
 
 2. **Prepare Configuration Files**
-  - Copy `include/private.example.h` to `include/private.h`.
-  - Update the following details in `private.h`:
-- Wi-Fi and MQTT credentials.
-If your MQTT setup does not require a username and password, comment out those lines using `//`.
-    - **Meter Code** - Copy the code under the barcode (ignore the manufacturing date):
-      - Label format: `YY-SSSSSSS-NNN` (example: `23-1875247-234`)
-      - Set `METER_CODE` to the same value **with dashes** — suffix `-NNN` is optional
-      - Year is parsed from the first 2 digits (`YY`)
-      - Serial is parsed from the middle section (`SSSSSSS`) and used in topics/entity prefixes
-      - Last 3 digits (`NNN`), if present, are ignored by the radio protocol
+   - Copy `include/private.example.h` to `include/private.h`.
+   - Update the following details in `private.h`:
+     - Wi-Fi and MQTT credentials. If your MQTT setup does not require a username and password, comment out those lines using `//`.
+     - **Meter Code** - Copy the code under the barcode (ignore the manufacturing date):
+       - Label format: `YY-SSSSSSS-NNN` (example: `23-1875247-234`)
+       - Set `METER_CODE` to the same value **with dashes** — suffix `-NNN` is optional
+       - Year is parsed from the first 2 digits (`YY`)
+       - Serial is parsed from the middle section (`SSSSSSS`) and used in topics/entity prefixes
+       - Last 3 digits (`NNN`), if present, are ignored by the radio protocol
+     - Example:
+       ```cpp
+       // Label text: 23-1875247-234  (with suffix, 12 digits)
+       #define METER_CODE "23-1875247-234"
 
-      Example:
-      ```cpp
-      // Label text: 23-1875247-234  (with suffix, 12 digits)
-      #define METER_CODE "23-1875247-234"
+       // Same meter, without suffix (9 digits — also valid)
+       #define METER_CODE "23-1875247"
 
-      // Same meter, without suffix (9 digits — also valid)
-      #define METER_CODE "23-1875247"
-
-      // Label with leading zeros in serial: 23-0123456-234
-      #define METER_CODE "23-0123456-234"
-      ```
-     ![Cyble Meter Label](docs/images/meter_label.jpg)
-- **Wi-Fi PHY Mode**: To enable 802.11g Wi-Fi PHY mode, set `ENABLE_WIFI_PHY_MODE_11G` to `1` in the `private.h` file.
-By default, it is set to `0` (disabled).
-    - Radio debug: control verbose CC1101/RADIAN debug output with `DEBUG_CC1101` in `private.h`.
-      - `#define DEBUG_CC1101 1` enables verbose radio debugging (default in the example file).
-      - `#define DEBUG_CC1101 0` disables verbose radio debugging.
+       // Label with leading zeros in serial: 23-0123456-234
+       #define METER_CODE "23-0123456-234"
+       ```
+     - ![Cyble Meter Label](docs/images/meter_label.jpg)
+     - **Wi-Fi PHY Mode**: To enable 802.11g Wi-Fi PHY mode, set `ENABLE_WIFI_PHY_MODE_11G` to `1` in the `private.h` file. By default, it is set to `0` (disabled).
+     - Radio debug: control verbose CC1101/RADIAN debug output with `DEBUG_CC1101` in `private.h`.
+       - `#define DEBUG_CC1101 1` enables verbose radio debugging (default in the example file).
+       - `#define DEBUG_CC1101 0` disables verbose radio debugging.
 
 3. **Select Your Board Environment**
-  - Use the PlatformIO status bar at the bottom of VS Code to select your board:
-    - `env:huzzah` - Adafruit HUZZAH ESP8266 (USB upload)
-    - `env:huzzah-ota` - Adafruit HUZZAH ESP8266 (OTA upload)
-    - `env:d1_mini` - WeMos D1 Mini (USB upload)
-    - `env:d1_mini-ota` - WeMos D1 Mini (OTA upload)
-    - `env:d1_mini_pro` - WeMos D1 Mini Pro (USB upload)
-    - `env:d1_mini_pro-ota` - WeMos D1 Mini Pro (OTA upload)
-    - `env:nodemcuv2` - NodeMCU v2 (USB upload)
-    - `env:nodemcuv2-ota` - NodeMCU v2 (OTA upload)
-    - `env:esp32dev` - ESP32 DevKit (USB upload)
-    - `env:esp32dev-ota` - ESP32 DevKit (OTA upload)
-  - **For first-time setup**: Use the standard environment (without `-ota`)
-  - **For OTA updates**: After your device is running on Wi-Fi, use the `-ota` environment and update the IP address in `platformio.ini`
-  - See the "Quick Start" section above for detailed build and upload instructions
+   - Use the PlatformIO status bar at the bottom of VS Code to select your board:
+     - `env:huzzah` - Adafruit HUZZAH ESP8266 (USB upload)
+     - `env:huzzah-ota` - Adafruit HUZZAH ESP8266 (OTA upload)
+     - `env:d1_mini` - WeMos D1 Mini (USB upload)
+     - `env:d1_mini-ota` - WeMos D1 Mini (OTA upload)
+     - `env:d1_mini_pro` - WeMos D1 Mini Pro (USB upload)
+     - `env:d1_mini_pro-ota` - WeMos D1 Mini Pro (OTA upload)
+     - `env:nodemcuv2` - NodeMCU v2 (USB upload)
+     - `env:nodemcuv2-ota` - NodeMCU v2 (OTA upload)
+     - `env:esp32dev` - ESP32 DevKit (USB upload)
+     - `env:esp32dev-ota` - ESP32 DevKit (OTA upload)
+   - **For first-time setup**: Use the standard environment (without `-ota`)
+   - **For OTA updates**: After your device is running on Wi-Fi, use the `-ota` environment and update the IP address in `platformio.ini`
+   - See the "Quick Start" section above for detailed build and upload instructions
 
 4. **Perform Frequency Discovery (First-Time Setup)**
-- On the very first boot (or anytime there is no stored frequency offset), the firmware automatically launches a wide scan while `AUTO_SCAN_ENABLED` is set to `1` (default).
-- If you need to skip the scan during development (for example, when you already know the meter's frequency), add `#define AUTO_SCAN_ENABLED 0` to your `include/private.h`.
-  - Compile and upload the code to your ESP device using PlatformIO. Use **PlatformIO > Upload and Monitor**.
-- **Keep the device connected to your computer during this process.** The serial monitor will display debug output as the device scans frequencies in the 433 MHz range.
-- **Important**: During the initial scan (first boot with no stored frequency offset), the device performs a wide frequency scan that takes approximately 2 minutes **before** connecting to MQTT.
-You will see no MQTT/Home Assistant activity during this time - this is normal.
-Monitor the serial output to see the scan progress.
-Once the scan completes and the optimal frequency is found, the device will connect to MQTT and publish telemetry data.
-- Once the correct frequency is identified, update the `FREQUENCY` value in `private.h` if needed (the automatic scan stores the offset, so manual adjustment is usually not required).
-- To re-run the wide scan later, either set `CLEAR_EEPROM_ON_BOOT` to `1` for a single boot cycle or re-enable `AUTO_SCAN_ENABLED`.
-- For best results, perform this step during local business hours when the meter is most likely to transmit.
-Refer to the "Frequency Adjustment" section below for additional guidance.
+   - On the very first boot (or anytime there is no stored frequency offset), the firmware automatically launches a wide scan while `AUTO_SCAN_ENABLED` is set to `1` (default).
+   - If you need to skip the scan during development (for example, when you already know the meter's frequency), add `#define AUTO_SCAN_ENABLED 0` to your `include/private.h`.
+   - Compile and upload the code to your ESP device using PlatformIO. Use **PlatformIO > Upload and Monitor**.
+   - **Keep the device connected to your computer during this process.** The serial monitor will display debug output as the device scans frequencies in the 433 MHz range.
+   - **Important**: During the initial scan (first boot with no stored frequency offset), the device performs a wide frequency scan that takes approximately 2 minutes **before** connecting to MQTT. You will see no MQTT/Home Assistant activity during this time - this is normal. Monitor the serial output to see the scan progress. Once the scan completes and the optimal frequency is found, the device will connect to MQTT and publish telemetry data.
+   - Once the correct frequency is identified, update the `FREQUENCY` value in `private.h` if needed (the automatic scan stores the offset, so manual adjustment is usually not required).
+   - To re-run the wide scan later, either set `CLEAR_EEPROM_ON_BOOT` to `1` for a single boot cycle or re-enable `AUTO_SCAN_ENABLED`.
+   - For best results, perform this step during local business hours when the meter is most likely to transmit. Refer to the "Frequency Adjustment" section below for additional guidance.
 
 5. **Build and Upload**
-  - Follow the build and upload instructions in the "Quick Start" section above.
-  - For first-time setup, use USB upload with the standard environment (e.g., `env:huzzah`).
-  - Keep the device connected to your computer during USB upload.
+   - Follow the build and upload instructions in the "Quick Start" section above.
+   - For first-time setup, use USB upload with the standard environment (e.g., `env:huzzah`).
+   - Keep the device connected to your computer during USB upload.
 
 6. **Verify Meter Data**
-- After WiFi and MQTT connection is established (or after the initial frequency scan completes), the meter data should appear in the terminal (bottom panel) and be pushed to MQTT.
-  - If Frequency Discovery is still enabled, its output will also be displayed during this step.
-- **Note**: On first boot with no stored frequency offset, there will be a ~2 minute delay before any MQTT activity while the wide frequency scan runs.
-This is normal - monitor the serial output to see progress.
+   - After WiFi and MQTT connection is established (or after the initial frequency scan completes), the meter data should appear in the terminal (bottom panel) and be pushed to MQTT.
+   - If Frequency Discovery is still enabled, its output will also be displayed during this step.
+   - **Note**: On first boot with no stored frequency offset, there will be a ~2 minute delay before any MQTT activity while the wide frequency scan runs. This is normal - monitor the serial output to see progress.
 
 7. **Automatic Meter Query**
-- The device will automatically query the meter once every 24 hours.
-If the query fails, it will retry every hour until successful.
+   - The device will automatically query the meter once every 24 hours.
+   - If the query fails, it will retry every hour until successful.
 
 <details>
 <summary>Continuous Integration (for contributors)</summary>
@@ -710,11 +702,8 @@ The firmware auto-calibrates the CC1101 frequency. The base frequency is configu
 #### How it works
 
 1. **Base frequency**: Set with `FREQUENCY` in `private.h` (e.g., `#define FREQUENCY 433.82`).
-2.
-**Default**: If `FREQUENCY` is not defined, it defaults to **433.82 MHz** (RADIAN center frequency for EverBlu).
-A warning is logged.
-3.
-**Calibration**: CC1101 synthesizer calibration runs automatically; the firmware also triggers a manual calibration during init.
+2. **Default**: If `FREQUENCY` is not defined, it defaults to **433.82 MHz** (RADIAN center frequency for EverBlu). A warning is logged.
+3. **Calibration**: CC1101 synthesizer calibration runs automatically; the firmware also triggers a manual calibration during init.
 4. **FOC**: Frequency Offset Compensation is enabled to handle small drift during reception.
 5. **Not published to MQTT**: It’s a low-level setting and already visible in the serial startup log.
 
@@ -746,8 +735,7 @@ The effective frequency is printed at startup:
 To handle CC1101 crystal tolerance, the firmware can adapt over time:
 
 1. **Wide scan (first boot)**: If no offset is stored, scans ±100 kHz around the base frequency (~1–2 minutes).
-2.
-**Tracking**: After successful reads, averages frequency error and updates the stored offset when it’s consistently off.
+2. **Tracking**: After successful reads, averages frequency error and updates the stored offset when it’s consistently off.
 3. **FOC tuned**: CC1101 FOC is configured for EverBlu/RADIAN frames.
 
 #### When to clear EEPROM
