@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cerrno>
+#include <cstring>
 #include <fstream>
 #include <limits>
 #include <sstream>
