@@ -140,24 +140,29 @@ void WifiSerialStream::loop()
             pending = (_head - _tail) & (WIFI_SERIAL_TX_BUF_SIZE - 1);
         }
 
-        // Keepalive: if no data has been sent for 20 seconds, send a small marker
-        // line.  This prevents NAT routers from expiring the idle TCP session
-        // (typical home/VLAN NAT idle timeout is 30-300s).
+        // Keepalive: if no data has been sent for 20 seconds, enqueue a small
+        // marker line so NAT routers don't expire the idle TCP session.
+        // Enqueued (not written directly) to keep all TCP writes non-blocking.
         if (millis() - _lastSendMs > 20000UL)
         {
             const char *ka = "# [WiFi Serial] alive\n";
-            wifiSerialClient.print(ka);
+            for (size_t i = 0; ka[i] != '\0'; i++)
+                _enqueue((uint8_t)ka[i]);
             _lastSendMs = millis();
         }
 
         if (_dropped > 0)
         {
-            // Report drops once the buffer drains enough to fit the notice
-            if (_free() > 48)
+            // Snapshot the counter and format the notice, then enqueue only if
+            // the full notice fits.  Only clear _dropped after a successful
+            // complete enqueue so partial failures don't silently hide drops.
+            char notice[48];
+            uint32_t snap = _dropped;
+            int nlen = snprintf(notice, sizeof(notice), "[WiFi Serial] %lu bytes dropped\n",
+                                (unsigned long)snap);
+            if (nlen > 0 && _free() >= (uint16_t)nlen)
             {
-                char notice[48];
-                snprintf(notice, sizeof(notice), "[WiFi Serial] %lu bytes dropped\n", (unsigned long)_dropped);
-                for (size_t i = 0; i < strlen(notice); i++)
+                for (int i = 0; i < nlen; i++)
                     _enqueue((uint8_t)notice[i]);
                 _dropped = 0;
             }
