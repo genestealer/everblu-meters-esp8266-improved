@@ -128,8 +128,10 @@ void WifiSerialStream::loop()
         while (pending > 0)
         {
             uint16_t tailIdx = _tail & (WIFI_SERIAL_TX_BUF_SIZE - 1);
-            uint16_t contiguous = WIFI_SERIAL_TX_BUF_SIZE - tailIdx;
-            uint16_t toSend = (pending < contiguous) ? pending : contiguous;
+            // Use size_t to avoid uint16_t truncation when WIFI_SERIAL_TX_BUF_SIZE
+            // equals 65536 and tailIdx is 0 (65536 wraps to 0 in uint16_t).
+            size_t contiguous = WIFI_SERIAL_TX_BUF_SIZE - tailIdx;
+            size_t toSend = (pending < contiguous) ? (size_t)pending : contiguous;
             size_t sent = wifiSerialClient.write(&_txBuf[tailIdx], toSend);
             if (sent == 0)
                 break; // TCP send buffer full; retry next loop() call
@@ -197,6 +199,10 @@ size_t WifiSerialStream::write(const uint8_t *buffer, size_t size)
 
 size_t WifiSerialStream::printf(const char *format, ...)
 {
+    // Note: static to avoid stack pressure on ESP8266 (81920 bytes RAM total).
+    // Safe here because WifiSerialStream is used exclusively from the main loop
+    // on single-core, cooperative-scheduler platforms (ESP8266, ESP32 Arduino)
+    // where no concurrent caller can re-enter this function before it returns.
     static char buffer[WIFI_SERIAL_PRINTF_BUFFER_SIZE];
     va_list args;
     va_start(args, format);
@@ -224,8 +230,10 @@ void WifiSerialStream::flush()
         if (pending > 0)
         {
             uint16_t tailIdx = _tail & (WIFI_SERIAL_TX_BUF_SIZE - 1);
-            uint16_t contiguous = WIFI_SERIAL_TX_BUF_SIZE - tailIdx;
-            uint16_t toSend = (pending < contiguous) ? pending : contiguous;
+            // Use size_t to avoid uint16_t truncation when WIFI_SERIAL_TX_BUF_SIZE
+            // equals 65536 and tailIdx is 0 (65536 wraps to 0 in uint16_t).
+            size_t contiguous = WIFI_SERIAL_TX_BUF_SIZE - tailIdx;
+            size_t toSend = (pending < contiguous) ? (size_t)pending : contiguous;
             size_t sent = wifiSerialClient.write(&_txBuf[tailIdx], toSend);
             _tail += (uint16_t)sent;
         }
