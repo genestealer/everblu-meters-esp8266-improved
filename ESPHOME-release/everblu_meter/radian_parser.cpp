@@ -77,14 +77,11 @@ bool radian_parse_primary_data(const uint8_t *decoded_buffer, size_t size, struc
         out->time_start = decoded_buffer[44];
         out->time_end = decoded_buffer[45];
 
-        // Decode framing errors can corrupt bytes 44-45 even when the volume
-        // bytes (18-21) are correct.  Clamp out-of-range values to 0 rather
-        // than hard-failing so a valid volume reading is not discarded, and to
-        // prevent downstream publishers from formatting invalid times like "128:00".
-        if (out->time_start > 23)
-            out->time_start = 0;
-        if (out->time_end > 23)
-            out->time_end = 0;
+        if (out->time_start > 23 || out->time_end > 23)
+        {
+            memset(out, 0, sizeof(*out));
+            return false;
+        }
 
         if (out->battery_left == 0xFF || out->reads_counter == 0xFF)
         {

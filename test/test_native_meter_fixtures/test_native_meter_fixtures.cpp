@@ -236,31 +236,24 @@ void test_radian_parse_primary_volume_rejection(void)
     TEST_ASSERT_EQUAL_UINT32(774431UL, out.volume);
 }
 
-void test_radian_parse_primary_time_clamping(void)
+void test_radian_parse_primary_time_rejection(void)
 {
     uint8_t buf[120];
     struct radian_primary_data out;
 
-    // time_start out of range: frame accepted, value clamped to 0
+    // time_start out of range: frame must be rejected
     make_test_buf(buf, sizeof(buf), 774431UL, 128, 6);
-    TEST_ASSERT_TRUE(radian_parse_primary_data(buf, sizeof(buf), &out));
-    TEST_ASSERT_EQUAL_UINT32(774431UL, out.volume);
-    TEST_ASSERT_EQUAL_UINT32(0, out.time_start); // clamped
-    TEST_ASSERT_EQUAL_UINT32(6, out.time_end);   // unchanged
+    TEST_ASSERT_FALSE(radian_parse_primary_data(buf, sizeof(buf), &out));
 
-    // time_end out of range: frame accepted, value clamped to 0
+    // time_end out of range: frame must be rejected
     make_test_buf(buf, sizeof(buf), 774431UL, 6, 255);
-    TEST_ASSERT_TRUE(radian_parse_primary_data(buf, sizeof(buf), &out));
-    TEST_ASSERT_EQUAL_UINT32(6, out.time_start); // unchanged
-    TEST_ASSERT_EQUAL_UINT32(0, out.time_end);   // clamped
+    TEST_ASSERT_FALSE(radian_parse_primary_data(buf, sizeof(buf), &out));
 
-    // both out of range: both clamped to 0
+    // both out of range: frame must be rejected
     make_test_buf(buf, sizeof(buf), 774431UL, 200, 200);
-    TEST_ASSERT_TRUE(radian_parse_primary_data(buf, sizeof(buf), &out));
-    TEST_ASSERT_EQUAL_UINT32(0, out.time_start);
-    TEST_ASSERT_EQUAL_UINT32(0, out.time_end);
+    TEST_ASSERT_FALSE(radian_parse_primary_data(buf, sizeof(buf), &out));
 
-    // valid time values: passed through unchanged
+    // valid time values: frame accepted and values passed through unchanged
     make_test_buf(buf, sizeof(buf), 774431UL, 6, 18);
     TEST_ASSERT_TRUE(radian_parse_primary_data(buf, sizeof(buf), &out));
     TEST_ASSERT_EQUAL_UINT32(6, out.time_start);
@@ -322,7 +315,7 @@ int main(int argc, char **argv)
 
     UNITY_BEGIN();
     RUN_TEST(test_radian_parse_primary_volume_rejection);
-    RUN_TEST(test_radian_parse_primary_time_clamping);
+    RUN_TEST(test_radian_parse_primary_time_rejection);
     RUN_TEST(test_replay_meter_fixtures);
     return UNITY_END();
 }
