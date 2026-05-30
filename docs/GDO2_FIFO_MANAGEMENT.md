@@ -7,7 +7,7 @@
 | **Implemented in**     | `feature/gdo2-fifo-threshold` (Part 1 only)                                                                                                                                                                                                 |
 | **Future work branch** | New branch off `main` after this merges (Parts 2 & 3)                                                                                                                                                                                       |
 
-GDO2 is currently configured as async serial data output (`IOCFG2 = 0x0D`) and left physically
+GDO2 was previously configured as async serial data output (`IOCFG2 = 0x0D`) and left physically
 unconnected. This document describes how wiring GDO2 to a free MCU GPIO and reconfiguring it as
 a FIFO threshold signal improves both TX FIFO feeding (preventing underflows) and RX FIFO draining
 (reducing unnecessary SPI traffic and improving ESPHome task scheduling).
@@ -23,7 +23,7 @@ a FIFO threshold signal improves both TX FIFO feeding (preventing underflows) an
 
 ### Problem
 
-The TX FIFO refill loop in `cc1101_send_and_listen()` is driven by polling the `TXBYTES` status
+The TX FIFO refill loop in `get_meter_data_for_meter()` is driven by polling the `TXBYTES` status
 register over SPI and a fixed `delay(20)` heuristic:
 
 ```cpp
@@ -219,7 +219,7 @@ if (GET_GDO2_PIN() >= 0) {
 
 | File                                                 | Change                                                                                                                                                        |
 | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/core/cc1101.cpp`                                | New `IOCFG2_TX_FIFO_THR`/`IOCFG2_RX_FIFO_THR_EOP` defines; `_gdo2_pin` var + `cc1101_set_gdo2_pin()`; update `cc1101_configureRF_0()`; update TX and RX loops |
+| `src/core/cc1101.cpp`                                | New `IOCFG2_TX_FIFO_THR` define; `_gdo2_pin` var + `cc1101_set_gdo2_pin()`; update `cc1101_configureRF_0()`; update TX FIFO feeding loop in `get_meter_data_for_meter()` |
 | `src/core/cc1101.h`                                  | Expose `cc1101_set_gdo2_pin()`                                                                                                                                |
 | `include/private.example.h`                          | Add `GDO2` with wiring note                                                                                                                                   |
 | `src/main.cpp`                                       | Report GDO2 pin status in startup validation                                                                                                                  |
