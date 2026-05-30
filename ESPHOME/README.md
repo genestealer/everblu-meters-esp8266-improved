@@ -331,28 +331,28 @@ Three complete example configurations are provided:
 
 ### Wiring (ESP8266 D1 Mini)
 
-| CC1101 Pin | D1 Mini | GPIO |
-| ---------- | ------- | ---- |
-| VCC        | 3.3V    | -    |
-| GND        | GND     | -    |
-| SCK        | D5      | 14   |
-| MISO       | D6      | 12   |
-| MOSI       | D7      | 13   |
-| CSN        | D8      | 15   |
-| GDO0       | D1      | 5    |
+| CC1101 Pin | D1 Mini | GPIO         |
+| ---------- | ------- | ------------ |
+| VCC        | 3.3V    | -            |
+| GND        | GND     | -            |
+| SCK        | D5      | 14           |
+| MISO       | D6      | 12           |
+| MOSI       | D7      | 13           |
+| CSN        | D8      | 15           |
+| GDO0       | D1      | 5            |
 | GDO2       | D2      | 4 (optional) |
 
 ### Wiring (ESP32)
 
-| CC1101 | ESP32 |
-| ------ | ----- |
-| VCC    | 3.3V  |
-| GND    | GND   |
-| SCK    | 18    |
-| MISO   | 19    |
-| MOSI   | 23    |
-| CSN    | 5     |
-| GDO0   | 4     |
+| CC1101 | ESP32        |
+| ------ | ------------ |
+| VCC    | 3.3V         |
+| GND    | GND          |
+| SCK    | 18           |
+| MISO   | 19           |
+| MOSI   | 23           |
+| CSN    | 5            |
+| GDO0   | 4            |
 | GDO2   | 2 (optional) |
 
 Important: The CC1101 requires 3.3V power. Do not connect to 5V!
