@@ -1642,7 +1642,10 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
         // Final underflow check: if FIFO underflowed during the wait, abort TX loop.
         uint8_t txbytes_reg = halRfReadReg(TXBYTES_ADDR);
         if (txbytes_reg & 0x80)
+        {
+          marcstate = halRfReadReg(MARCSTATE_ADDR); // refresh so tx_aborted check below is accurate
           break; // TXFIFO_UNDERFLOW already occurred
+        }
       }
       else
       {
