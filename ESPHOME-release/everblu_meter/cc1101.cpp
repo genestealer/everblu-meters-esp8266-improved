@@ -89,7 +89,7 @@ static const uint8_t debug_out = (uint8_t)(DEBUG_CC1101);
 // IOCFG2 - GDO2 Output Pin Configuration
 #define IOCFG2_SERIAL_DATA_OUTPUT 0x0D // GDO2: Serial Data Output (kept for reference, not used)
 #define IOCFG2_TX_FIFO_THR 0x02        // GDO2: asserts HIGH when TX FIFO >= threshold; de-asserts LOW when below threshold
-#define IOCFG2_RX_FIFO_THR_EOP 0x01     // GDO2: asserts HIGH when RX FIFO >= threshold OR end-of-packet; de-asserts LOW when FIFO empties
+#define IOCFG2_RX_FIFO_THR_EOP 0x01    // GDO2: asserts HIGH when RX FIFO >= threshold OR end-of-packet; de-asserts LOW when FIFO empties
 
 // IOCFG0 - GDO0 Output Pin Configuration
 #define IOCFG0_SYNC_WORD_DETECT 0x06 // Asserts when sync word detected, deasserts at end of packet
@@ -599,7 +599,7 @@ bool cc1101_init(float freq)
   if (GET_GDO2_PIN() >= 0)
   {
     pinMode(GET_GDO2_PIN(), INPUT);
-    echo_debug(debug_out, "[CC1101] GDO2 pin %d configured as TX FIFO threshold input\n", GET_GDO2_PIN());
+    echo_debug(debug_out, "[CC1101] GDO2 pin %d configured as FIFO threshold input (TX/RX dynamic)\n", GET_GDO2_PIN());
   }
 
   // Initialize SPI transport for CC1101 communication.
