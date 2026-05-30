@@ -88,7 +88,7 @@ static const uint8_t debug_out = (uint8_t)(DEBUG_CC1101);
 /*-------------------------[CC1100 - Register Values]----------------------------*/
 // IOCFG2 - GDO2 Output Pin Configuration
 #define IOCFG2_SERIAL_DATA_OUTPUT 0x0D // GDO2: Serial Data Output (kept for reference, not used)
-#define IOCFG2_TX_FIFO_THR        0x02 // GDO2: asserts HIGH when TX FIFO >= threshold; de-asserts LOW when below threshold
+#define IOCFG2_TX_FIFO_THR 0x02        // GDO2: asserts HIGH when TX FIFO >= threshold; de-asserts LOW when below threshold
 
 // IOCFG0 - GDO0 Output Pin Configuration
 #define IOCFG0_SYNC_WORD_DETECT 0x06 // Asserts when sync word detected, deasserts at end of packet
@@ -547,11 +547,11 @@ void cc1101_configureRF_0(float freq)
   // GDO2: TX FIFO threshold signal when pin is wired; falls back to IOCFG2_SERIAL_DATA_OUTPUT
   // if not connected (output floats harmlessly). Using IOCFG2_TX_FIFO_THR lets the TX feeding
   // loop replace SPI TXBYTES polling with a fast digitalRead() for proactive underflow prevention.
-  halRfWriteReg(IOCFG2, IOCFG2_TX_FIFO_THR);        // GDO2: TX FIFO at/above threshold
-  halRfWriteReg(IOCFG0, IOCFG0_SYNC_WORD_DETECT);   // GDO0: Sync word detection
-  halRfWriteReg(FIFOTHR, FIFOTHR_FIFO_THR_25_40);   // FIFO thresholds: TX=25 bytes, RX=40 bytes
-  halRfWriteReg(SYNC1, SYNC1_PATTERN_55);           // Sync word MSB: 0x55
-  halRfWriteReg(SYNC0, SYNC0_PATTERN_00);           // Sync word LSB: 0x00
+  halRfWriteReg(IOCFG2, IOCFG2_TX_FIFO_THR);      // GDO2: TX FIFO at/above threshold
+  halRfWriteReg(IOCFG0, IOCFG0_SYNC_WORD_DETECT); // GDO0: Sync word detection
+  halRfWriteReg(FIFOTHR, FIFOTHR_FIFO_THR_25_40); // FIFO thresholds: TX=25 bytes, RX=40 bytes
+  halRfWriteReg(SYNC1, SYNC1_PATTERN_55);         // Sync word MSB: 0x55
+  halRfWriteReg(SYNC0, SYNC0_PATTERN_00);         // Sync word LSB: 0x00
 
   halRfWriteReg(PKTCTRL1, PKTCTRL1_NO_ADDR_CHECK); // No address check
   halRfWriteReg(PKTCTRL0, PKTCTRL0_FIXED_LENGTH);  // Fixed packet length

@@ -66,6 +66,7 @@ everblu_meter:
     gdo0_pin:
       number: ${cc1101_gdo0}
       allow_other_uses: true
+    # gdo2_pin: GPIO12      # Optional: hardware TX FIFO threshold (prevents TXFIFO_UNDERFLOW)
     time_id: homeassistant_time
     timezone_offset: ${tz_offset_min}
     read_hour: 11
@@ -149,6 +150,7 @@ everblu_meter:
     gdo0_pin:
       number: ${cc1101_gdo0}
       allow_other_uses: true
+    # gdo2_pin: GPIO12      # Optional: hardware TX FIFO threshold (prevents TXFIFO_UNDERFLOW)
     time_id: homeassistant_time
     timezone_offset: ${tz_offset_min}
     read_hour: 11
