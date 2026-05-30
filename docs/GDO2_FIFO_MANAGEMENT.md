@@ -217,17 +217,17 @@ if (GET_GDO2_PIN() >= 0) {
 
 ### Files affected
 
-| File                                                 | Change                                                                                                                                                        |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| File                                                 | Change                                                                                                                                                                   |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `src/core/cc1101.cpp`                                | New `IOCFG2_TX_FIFO_THR` define; `_gdo2_pin` var + `cc1101_set_gdo2_pin()`; update `cc1101_configureRF_0()`; update TX FIFO feeding loop in `get_meter_data_for_meter()` |
-| `src/core/cc1101.h`                                  | Expose `cc1101_set_gdo2_pin()`                                                                                                                                |
-| `include/private.example.h`                          | Add `GDO2` with wiring note                                                                                                                                   |
-| `src/main.cpp`                                       | Report GDO2 pin status in startup validation                                                                                                                  |
-| `ESPHOME/components/everblu_meter/__init__.py`       | Add optional `gdo2_pin` config key                                                                                                                            |
-| `ESPHOME/components/everblu_meter/everblu_meter.h`   | `set_gdo2_pin()` setter + `gdo2_pin_` member                                                                                                                  |
-| `ESPHOME/components/everblu_meter/everblu_meter.cpp` | Call `cc1101_set_gdo2_pin()` in `apply_radio_context()`; log in `dump_config()`                                                                               |
-| `ESPHOME/example-*.yaml`                             | Document optional `gdo2_pin:` parameter                                                                                                                       |
-| `ESPHOME-release/`                                   | Regenerated via `prepare-component-release.ps1`                                                                                                               |
+| `src/core/cc1101.h`                                  | Expose `cc1101_set_gdo2_pin()`                                                                                                                                           |
+| `include/private.example.h`                          | Add `GDO2` with wiring note                                                                                                                                              |
+| `src/main.cpp`                                       | Report GDO2 pin status in startup validation                                                                                                                             |
+| `ESPHOME/components/everblu_meter/__init__.py`       | Add optional `gdo2_pin` config key                                                                                                                                       |
+| `ESPHOME/components/everblu_meter/everblu_meter.h`   | `set_gdo2_pin()` setter + `gdo2_pin_` member                                                                                                                             |
+| `ESPHOME/components/everblu_meter/everblu_meter.cpp` | Call `cc1101_set_gdo2_pin()` in `apply_radio_context()`; log in `dump_config()`                                                                                          |
+| `ESPHOME/example-*.yaml`                             | Document optional `gdo2_pin:` parameter                                                                                                                                  |
+| `ESPHOME-release/`                                   | Regenerated via `prepare-component-release.ps1`                                                                                                                          |
 
 ### Not in scope
 
