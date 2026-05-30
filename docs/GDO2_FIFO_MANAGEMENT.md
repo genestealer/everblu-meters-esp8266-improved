@@ -205,15 +205,21 @@ UART TX/RX. Declare it as `GDO2` in `private.h` (MQTT build) or `gdo2_pin:` in E
 
 ### Backward compatibility
 
-`gdo2_pin` defaults to `-1` (not configured). All new code paths are guarded:
+`gdo2_pin` defaults to `-1` (not configured). The TX/RX loop code paths are guarded:
 
 ```cpp
 if (GET_GDO2_PIN() >= 0) {
     // GDO2 fast path
 } else {
-    // existing SPI polling fallback — no behaviour change
+    // SPI polling fallback (runs with updated IOCFG2/FIFOTHR register values — see note below)
 }
 ```
+
+> **Note:** `IOCFG2` (→ `IOCFG2_TX_FIFO_THR`, `0x02`) and `FIFOTHR` (→ `FIFOTHR_FIFO_THR_25_40`,
+> `0x49`) are written unconditionally in `cc1101_configureRF_0()` regardless of whether GDO2 is
+> wired. The SPI polling fallback path therefore runs with the updated register values. The TX
+> threshold shifts from 33 → 25 bytes and the RX threshold from 33 → 40 bytes. The RX change
+> has no functional impact since the RX loop is gated by GDO0 and `RXBYTES`, not the FIFO signal.
 
 ### Files affected
 

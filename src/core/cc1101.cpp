@@ -544,9 +544,9 @@ void cc1101_configureRF_0(float freq)
   //
   // RF settings for CC1101 - RADIAN protocol (Itron EverBlu)
   //
-  // GDO2: TX FIFO threshold signal when pin is wired; falls back to IOCFG2_SERIAL_DATA_OUTPUT
-  // if not connected (output floats harmlessly). Using IOCFG2_TX_FIFO_THR lets the TX feeding
-  // loop replace SPI TXBYTES polling with a fast digitalRead() for proactive underflow prevention.
+  // GDO2: always configured as TX FIFO threshold signal (IOCFG2_TX_FIFO_THR = 0x02).
+  // When GDO2 is not physically wired, the output is unused; the TX feeding loop falls back
+  // to SPI TXBYTES polling instead of digitalRead(). IOCFG2_SERIAL_DATA_OUTPUT is not restored.
   halRfWriteReg(IOCFG2, IOCFG2_TX_FIFO_THR);      // GDO2: TX FIFO at/above threshold
   halRfWriteReg(IOCFG0, IOCFG0_SYNC_WORD_DETECT); // GDO0: Sync word detection
   halRfWriteReg(FIFOTHR, FIFOTHR_FIFO_THR_25_40); // FIFO thresholds: TX=25 bytes, RX=40 bytes
