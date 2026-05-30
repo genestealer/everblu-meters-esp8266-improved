@@ -1644,7 +1644,7 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
         if (txbytes_reg & 0x80)
         {
           marcstate = halRfReadReg(MARCSTATE_ADDR); // refresh so tx_aborted check below is accurate
-          break; // TXFIFO_UNDERFLOW already occurred
+          break;                                    // TXFIFO_UNDERFLOW already occurred
         }
       }
       else

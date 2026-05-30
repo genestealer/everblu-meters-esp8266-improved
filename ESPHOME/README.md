@@ -344,15 +344,15 @@ Three complete example configurations are provided:
 
 ### Wiring (ESP32)
 
-| CC1101 | ESP32        |
-| ------ | ------------ |
-| VCC    | 3.3V         |
-| GND    | GND          |
-| SCK    | 18           |
-| MISO   | 19           |
-| MOSI   | 23           |
-| CSN    | 5            |
-| GDO0   | 4            |
+| CC1101 | ESP32         |
+| ------ | ------------- |
+| VCC    | 3.3V          |
+| GND    | GND           |
+| SCK    | 18            |
+| MISO   | 19            |
+| MOSI   | 23            |
+| CSN    | 5             |
+| GDO0   | 4             |
 | GDO2   | 27 (optional) |
 
 Important: The CC1101 requires 3.3V power. Do not connect to 5V!
