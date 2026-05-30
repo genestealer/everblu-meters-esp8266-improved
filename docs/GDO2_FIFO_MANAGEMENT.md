@@ -4,7 +4,7 @@
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Issue**              | [#83](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/83) (TX FIFO — implemented) · [#84](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/84) (RX FIFO + dynamic reconfiguration — implemented) |
 | **Integration target** | Both (ESPHome + MQTT)                                                                                                                                                                                                                       |
-| **Implemented in**     | `feature/gdo2-fifo-threshold` (Part 1) · `feature/gdo2-rx-fifo-threshold` (Parts 2 & 3)                                                                                                                                                    |
+| **Implemented in**     | `feature/gdo2-fifo-threshold` (Part 1) · `feature/gdo2-rx-fifo-threshold` (Parts 2 & 3)                                                                                                                                                     |
 | **Future work branch** | n/a — all parts implemented                                                                                                                                                                                                                 |
 
 GDO2 is currently configured as async serial data output (`IOCFG2 = 0x0D`) and left physically
