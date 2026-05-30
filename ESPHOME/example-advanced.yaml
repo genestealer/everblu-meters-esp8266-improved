@@ -81,6 +81,7 @@ everblu_meter:
   cs_pin: GPIO5
   gdo0_pin: 4
   # gdo2_pin: 12          # Optional: wire CC1101 GDO2 here for hardware TX FIFO threshold
+                          # Use any free GPIO (not SPI pins: avoid GPIO18/CLK, GPIO19/MISO, GPIO23/MOSI)
                           # (prevents TXFIFO_UNDERFLOW; leave unset to use SPI polling fallback)
   meter_type: water
   
