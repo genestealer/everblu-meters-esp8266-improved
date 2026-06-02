@@ -94,6 +94,7 @@ SCHEDULE_MONDAY_SATURDAY = "Monday-Saturday"
 SCHEDULE_MONDAY_SUNDAY = "Monday-Sunday"
 
 CONF_GDO0_PIN = "gdo0_pin"
+CONF_GDO2_PIN = "gdo2_pin"
 
 
 def validate_meter_code(value):
@@ -161,6 +162,7 @@ CONFIG_SCHEMA = (
             cv.GenerateID(): cv.declare_id(EverbluMeterComponent),
             cv.Required(CONF_METER_CODE): validate_meter_code,
             cv.Required(CONF_GDO0_PIN): pins.internal_gpio_input_pin_schema,
+            cv.Optional(CONF_GDO2_PIN): pins.internal_gpio_input_pin_schema,
             cv.Required(CONF_TIME_ID): cv.use_id(time_.RealTimeClock),
             cv.Optional(CONF_METER_TYPE, default=METER_TYPE_WATER): cv.enum(
                 {METER_TYPE_WATER: False, METER_TYPE_GAS: True}
@@ -339,6 +341,10 @@ async def to_code(config):
     # CS pin is managed by SPIDevice; pass the InternalGPIOPin for CC1101 interrupts.
     gdo0 = await cg.gpio_pin_expression(config[CONF_GDO0_PIN])
     cg.add(var.set_gdo0_pin(gdo0))
+
+    if CONF_GDO2_PIN in config:
+        gdo2 = await cg.gpio_pin_expression(config[CONF_GDO2_PIN])
+        cg.add(var.set_gdo2_pin(gdo2))
 
     # No custom include paths needed when using flat release layout
 

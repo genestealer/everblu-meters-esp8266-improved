@@ -63,6 +63,9 @@ everblu_meter:
   meter_code: "21-1234567-800"  # Replace with your meter's code
   cs_pin: GPIO15          # CC1101 CS / NSS on ESP8266 Huzzah GPIO15
   gdo0_pin: GPIO5         # GPIO connected to CC1101 GDO0 on ESP8266 Huzzah GPIO5 (D1)
+  # gdo2_pin: GPIO4       # Optional: wire CC1101 GDO2 here for hardware TX FIFO threshold
+                          # Use GPIO4 (D2) — free GPIO. Do NOT use GPIO12 (D6/MISO), GPIO13 (D7/MOSI), GPIO14 (D5/SCK)
+                          # (prevents TXFIFO_UNDERFLOW; leave unset to use SPI polling fallback)
   
   # Optional: set meter_type to 'gas' for gas meters (defaults to water)
   

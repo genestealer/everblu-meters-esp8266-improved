@@ -31,6 +31,18 @@ void cc1101_set_spi_device(void *device);
  * @param gdo0_pin GPIO pin number for GDO0 interrupt signal
  */
 void cc1101_set_gdo0_pin(int gdo0_pin);
+
+/**
+ * @brief Set GDO2 pin for ESPHome mode (optional)
+ *
+ * When configured, GDO2 is read as a hardware TX FIFO threshold signal
+ * (IOCFG2 = 0x02), replacing SPI-based TXBYTES polling in the TX feeding loop.
+ * If not called (or called with -1), the driver falls back to the legacy
+ * CC1101_status_FIFO_FreeByte + delay(20) approach.
+ *
+ * @param gdo2_pin GPIO pin number connected to CC1101 GDO2, or -1 to disable
+ */
+void cc1101_set_gdo2_pin(int gdo2_pin);
 #endif
 
 /**

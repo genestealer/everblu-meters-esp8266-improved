@@ -1954,6 +1954,12 @@ bool validateConfiguration()
   valid = false;
 #endif
 
+#ifdef GDO2
+  Serial.printf("✓ GDO2 Pin: GPIO %d (TX FIFO threshold - hardware-assisted underflow prevention)\n", GDO2);
+#else
+  Serial.println("  GDO2 Pin: not defined (TX FIFO managed via SPI polling fallback)");
+#endif
+
   // Validate reading schedule
   if (!isValidReadingSchedule(readingSchedule))
   {
