@@ -198,7 +198,7 @@ entity_id: sensor.2777550_everblu_meter_battery
 - **Conflicting entity IDs:** Home Assistant cannot distinguish between meters
 - **Unreliable readings:** The last meter to publish wins, so readings are inconsistent
 
-**Solution:** 
+**Solution:**
 - Set all devices to: `#define ENABLE_METER_PREFIX_IN_ENTITY_IDS 1`
 - Restart all devices
 - Home Assistant will discover them with unique prefixed entity IDs

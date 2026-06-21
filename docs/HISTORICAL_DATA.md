@@ -122,7 +122,7 @@ template:
         state: >
           {{ state_attr('sensor.water_meter_value', 'current_month_usage') | int(0) }}
         icon: mdi:water-pump
-        
+
       - name: "Water Usage Last Month"
         unique_id: water_usage_last_month
         unit_of_measurement: "L"
@@ -130,7 +130,7 @@ template:
           {% set monthly = state_attr('sensor.water_meter_value', 'monthly_usage') %}
           {{ monthly[12] | int(0) if monthly else 0 }}
         icon: mdi:water-pump
-        
+
       - name: "Water Usage Average (12 months)"
         unique_id: water_usage_average_12mo
         unit_of_measurement: "L"
@@ -214,7 +214,7 @@ After publishing the main liters value, the code constructs and publishes a JSON
 ## Limitations and Notes
 
 ### No Exact Timestamps
-The basic RADIAN protocol **does not provide exact dates** for the historical readings. The meter's internal RTC tracks when these snapshots were taken, but this information is not transmitted in the basic query response. 
+The basic RADIAN protocol **does not provide exact dates** for the historical readings. The meter's internal RTC tracks when these snapshots were taken, but this information is not transmitted in the basic query response.
 
 **Assumption**: The values represent end-of-month snapshots. This is based on:
 1. The meter having 13 values (13 months of history)

@@ -167,15 +167,15 @@ everblu_meter:
   meter_type: water
   gdo0_pin: 4
   time_id: ha_time
-  
+
   # Optional: Enable for troubleshooting corrupted readings (default: false)
   # debug_cc1101: true
-  
+
   volume:
     name: "Water Volume"
     device_class: water
     state_class: total_increasing
-  
+
   status:
     name: "Status"
 ```
@@ -207,7 +207,7 @@ esp32:
   board: arduino_nano_esp32
   framework:
     type: arduino
-  
+
   # May be required on some Arduino Nano ESP32 toolchain setups
   platformio_options:
     build_unflags:
@@ -273,16 +273,16 @@ everblu_meter:
   gdo0_pin: 4
   meter_type: water
   time_id: ha_time
-  
+
   # Weekend-only, early morning
   schedule: Saturday
   read_hour: 6
   read_minute: 30
-  
+
   # Aggressive retries
   max_retries: 15
   retry_cooldown: 30min
-  
+
   volume:
     name: "Volume"
 ```
@@ -452,7 +452,7 @@ template:
         state: >-
           {% set data = states('sensor.water_meter_monitor_meter_history_json') | from_json %}
           {{ data.monthly_usage[-1] if data.monthly_usage else 0 }}
-      
+
       - name: "Average Monthly Usage"
         unit_of_measurement: "L"
         state: >-
@@ -557,7 +557,7 @@ everblu_meter:
   gdo0_pin: 4
   time_id: ha_time
   debug_cc1101: false  # Optional: Enable hex dump debugging (default: false)
-  
+
   volume:
     name: "Volume"
   battery:

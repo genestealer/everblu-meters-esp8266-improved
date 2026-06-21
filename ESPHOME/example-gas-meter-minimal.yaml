@@ -48,7 +48,7 @@ external_components:
 everblu_meter:
   id: my_gas_meter
   spi_id: main_bus
-  
+
   # REQUIRED: Meter identification
   # Enter the code printed under the barcode, with dashes.
   # Format on label: YY-SSSSSSS-NNN  (year - serial - suffix)
@@ -61,23 +61,23 @@ everblu_meter:
   # gdo2_pin: 5           # Optional: wire CC1101 GDO2 here for hardware FIFO threshold (TX+RX)
                           # Use GPIO5 (D1) — free GPIO when GDO0 uses GPIO4 (D2). Do NOT use GPIO12 (MISO), GPIO13 (MOSI), GPIO14 (SCK)
                           # (prevents TXFIFO_UNDERFLOW; leave unset to use SPI polling fallback)
-  
+
   # REQUIRED: Meter type
   meter_type: gas
   gas_volume_divisor: 100  # Gas meters use divisor (100 or 1000)
-  
+
   # Optional: Link to time component
   time_id: ha_time
-  
+
   # Optional: Timezone offset in MINUTES (default: 0 = UTC)
   # ⚠️ IMPORTANT: Set this to match your local timezone!
   # ESPHome's 'timezone' setting above is NOT automatically used by everblu_meter.
   # This is a static offset - doesn't handle DST automatically.
   # Examples: 60 = UTC+1, -300 = UTC-5, 660 = UTC+11
   # timezone_offset: 60  # Central Europe CET (UTC+1)
-  
+
   # Minimal sensors - just the essentials
-  
+
   # Control button (optional but handy)
   request_reading_button:
     name: "Read Gas Meter Now"
@@ -85,7 +85,7 @@ everblu_meter:
     name: "Scan Frequency"
   reset_frequency_button:
     name: "Reset Frequency Offset"
-  
+
   volume:
     name: "Gas Volume"
 
@@ -121,7 +121,7 @@ everblu_meter:
 
   tuned_frequency:
     name: "Tuned Frequency (MHz)"
-  
+
   frequency_estimate:
     name: "Frequency Estimate"
 

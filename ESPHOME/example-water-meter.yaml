@@ -53,7 +53,7 @@ external_components:
 everblu_meter:
   id: my_water_meter
   spi_id: main_bus
-  
+
   # Meter identification (REQUIRED)
   # Enter the code printed under the barcode, with dashes.
   # Format on label: YY-SSSSSSS-NNN  (year - serial - suffix)
@@ -66,25 +66,25 @@ everblu_meter:
   # gdo2_pin: GPIO4       # Optional: wire CC1101 GDO2 here for hardware FIFO threshold (TX+RX)
                           # Use GPIO4 (D2) — free GPIO. Do NOT use GPIO12 (D6/MISO), GPIO13 (D7/MOSI), GPIO14 (D5/SCK)
                           # (prevents TXFIFO_UNDERFLOW; leave unset to use SPI polling fallback)
-  
+
   # Optional: set meter_type to 'gas' for gas meters (defaults to water)
-  
+
   # Link to time component
   time_id: homeassistant_time
-  
+
   # Optional: Timezone offset in MINUTES (default: 0 = UTC)
   # ⚠️ IMPORTANT: ESPHome's 'timezone' setting above is NOT automatically used!
   # You must manually set this parameter for scheduling in your local timezone.
   # This is a static offset (doesn't auto-adjust for DST).
   # Examples: 60 = UTC+1, -300 = UTC-5, 660 = UTC+11 (Melbourne summer)
   # timezone_offset: -240  # US Eastern EDT (UTC-4)
-  
+
   # Optional: Reading schedule (default: Monday-Friday at 10:00 UTC)
   # read_hour is always in UTC - timezone_offset converts this to your local time
   # reading_schedule: "Saturday"       # Presets: "Monday-Friday", "Monday-Saturday", "Monday-Sunday" or a single day: "Monday".."Sunday"
   # read_hour: 10        # Hour in UTC (0-23)
   # read_minute: 0       # Minute (0-59)
-  
+
   # Control buttons
   request_reading_button:
     name: "Read Meter Now"
@@ -92,47 +92,47 @@ everblu_meter:
     name: "Scan Frequency"
   reset_frequency_button:
     name: "Reset Frequency Offset"
-  
+
   # Volume sensors
   volume:
     name: "Water Volume"
-  
+
   counter:
     name: "Read Counter"
-  
+
   # Battery sensor
   battery:
     name: "Meter Battery"
-  
+
   # Radio quality sensors
   rssi:
     name: "Meter RSSI"
-  
+
   rssi_percentage:
     name: "RSSI Percentage"
-  
+
   lqi:
     name: "LQI"
-  
+
   lqi_percentage:
     name: "LQI Percentage"
-  
+
   # Statistics sensors
   total_attempts:
     name: "Total Read Attempts"
-  
+
   successful_reads:
     name: "Successful Reads"
-  
+
   failed_reads:
     name: "Failed Reads"
-  
+
   frequency_offset:
     name: "Frequency Offset"
 
   tuned_frequency:
     name: "Tuned Frequency (MHz)"
-  
+
   frequency_estimate:
     name: "Frequency Estimate"
 
@@ -145,36 +145,36 @@ everblu_meter:
     name: "Reading Schedule"
   reading_time_utc_sensor:
     name: "Reading Time (UTC)"
-  
+
   # Timing sensors (24-hour format: HH:MM)
   time_start:
     name: "Reading Start Time"
-  
+
   time_end:
     name: "Reading End Time"
-  
+
   # Status text sensors
   status:
     name: "Meter Status"
-  
+
   error:
     name: "Last Error"
-  
+
   radio_state:
     name: "CC1101 State"
-  
+
   timestamp:
     name: "Last Reading Time"
-  
+
   history_json:
     name: "Meter History (JSON)"
 
   firmware_version:
     name: "Firmware Version"
-  
+
   # Binary sensors
   active_reading:
     name: "Reading Active"
-  
+
   radio_connected:
     name: "CC1101 Connected"

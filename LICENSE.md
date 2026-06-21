@@ -27,4 +27,3 @@ SOFTWARE.
 This project includes code that interacts with the proprietary RADIAN protocol used by Itron and other utility meters. While the implementation is based on reverse engineering for personal, educational use, use of this software may not be legally permitted in all jurisdictions.
 
 You are responsible for ensuring compliance with local laws and regulations regarding wireless communications and reverse engineering.
-

@@ -12,9 +12,9 @@ $gitHooksDir = Join-Path -Path ".git" -ChildPath "hooks"
 foreach ($hook in $hooks) {
     $source = $hook.FullName
     $dest = Join-Path -Path $gitHooksDir -ChildPath $hook.Name
-    
+
     Copy-Item $source $dest -Force
-    
+
     # On Unix-like systems (Linux/macOS), set executable bit
     if (-not $isWindows) {
         try {
