@@ -2,7 +2,7 @@
 
 This guide explains how to use the EverBlu Cyble Enhanced meter reader with ESPHome, allowing seamless integration with Home Assistant.
 
-> **📖 Quick Navigation**: 
+> **📖 Quick Navigation**:
 > - [Main Documentation](README.md) - Overview and links to all docs
 > - [Configuration Reference](README.md#configuration-reference) - Quick lookup for common tasks
 > - [Home Assistant Integration](ESPHOME_HOME_ASSISTANT_INTEGRATION.md) - Accessing meter data in Home Assistant
@@ -146,7 +146,7 @@ everblu_meter:
   gdo0_pin: 4                 # GPIO connected to CC1101 GDO0 (D2 on D1 mini)
   meter_type: water           # 'water' or 'gas'
   time_id: ha_time
-  
+
   volume:
     name: "Water Volume"
 ```
@@ -315,12 +315,12 @@ everblu_meter:
   gdo0_pin: 4
   meter_type: water
   time_id: ha_time
-  
+
   volume:
     name: "Water Volume"
     device_class: water
     state_class: total_increasing
-  
+
   status:
     name: "Meter Status"
 ```
@@ -337,7 +337,7 @@ everblu_meter:
   meter_type: gas
   gas_volume_divisor: 100
   time_id: ha_time
-  
+
   volume:
     name: "Gas Volume"
     unit_of_measurement: "m³"
@@ -356,16 +356,16 @@ everblu_meter:
   meter_code: "23-1234567-000"
   gdo0_pin: 4
   meter_type: water
-  
+
   # Weekend readings only
   reading_schedule: Saturday
   read_hour: 6
   read_minute: 30
-  
+
   # Fast retry strategy
   max_retries: 15
   retry_cooldown: 30min
-  
+
   # All sensors enabled
   volume:
     name: "Water Volume"
@@ -543,7 +543,7 @@ everblu_meter:
     meter_type: water
     volume:
       name: "Water Volume"
-  
+
   - id: gas_meter
     meter_code: "22-8765432-000"
     cs_pin:
@@ -602,17 +602,17 @@ void EverbluMeterComponent::setup() {
     auto config = new ESPHomeConfigProvider();
     auto time = new ESPHomeTimeProvider(this->time_);
     auto publisher = new ESPHomeDataPublisher();
-    
+
     // Configure adapters from YAML settings
     config->setMeterYear(this->meter_year_);
     config->setMeterSerial(this->meter_serial_);
     // ... more configuration ...
-    
+
     // Link sensors to publisher
     publisher->set_volume_sensor(this->volume_sensor_);
     publisher->set_battery_sensor(this->battery_sensor_);
     // ... more sensors ...
-    
+
     // Create meter reader with injected dependencies
     this->meter_reader_ = new MeterReader(config, time, publisher);
     this->meter_reader_->begin();

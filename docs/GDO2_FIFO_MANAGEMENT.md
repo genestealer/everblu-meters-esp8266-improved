@@ -2,20 +2,22 @@
 
 |                        |                                                                                                                                                                                                                                             |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Issue**              | [#83](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/83) (TX FIFO — implemented) · [#84](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/84) (RX FIFO + dynamic reconfiguration — future work) |
+| **Issue**              | [#83](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/83) (TX FIFO — implemented) · [#84](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/84) (RX FIFO + dynamic reconfiguration — implemented) |
 | **Integration target** | Both (ESPHome + MQTT)                                                                                                                                                                                                                       |
-| **Implemented in**     | `feature/gdo2-fifo-threshold` (Part 1 only)                                                                                                                                                                                                 |
-| **Future work branch** | New branch off `main` after this merges (Parts 2 & 3)                                                                                                                                                                                       |
+| **Implemented in**     | `feature/gdo2-fifo-threshold` (Part 1) · `feature/gdo2-rx-fifo-threshold` (Parts 2 & 3)                                                                                                                                                     |
+| **Future work branch** | n/a — all parts implemented                                                                                                                                                                                                                 |
 
-GDO2 was previously configured as async serial data output (`IOCFG2 = 0x0D`) and left physically
-unconnected. This document describes how wiring GDO2 to a free MCU GPIO and reconfiguring it as
-a FIFO threshold signal improves both TX FIFO feeding (preventing underflows) and RX FIFO draining
-(reducing unnecessary SPI traffic and improving ESPHome task scheduling).
+The driver configures GDO2 as a FIFO threshold signal, dynamically reconfiguring `IOCFG2` per phase
+(`0x02` for the TX FIFO threshold, `0x01` for the RX FIFO threshold / end-of-packet). The GDO2 pin is
+optional: when left physically unconnected the register write is harmless and the driver falls back to
+SPI polling. This document describes how wiring GDO2 to a free MCU GPIO and reading it as a FIFO
+threshold signal improves both TX FIFO feeding (preventing underflows) and RX FIFO draining (reducing
+unnecessary SPI traffic and improving ESPHome task scheduling).
 
 > **Status summary**
 > - **Part 1 (TX FIFO threshold)** — ✅ implemented in `feature/gdo2-fifo-threshold`
-> - **Part 2 (RX FIFO threshold)** — ⏳ future work, tracked in issue [#84](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/84)
-> - **Part 3 (dynamic IOCFG2 reconfiguration)** — ⏳ future work, tracked in issue [#84](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/84)
+> - **Part 2 (RX FIFO threshold)** — ✅ implemented in `feature/gdo2-rx-fifo-threshold`
+> - **Part 3 (dynamic IOCFG2 reconfiguration)** — ✅ implemented in `feature/gdo2-rx-fifo-threshold`
 
 ---
 
@@ -91,7 +93,7 @@ threshold signal.
 
 ---
 
-## Part 2 — RX FIFO Threshold ⏳ Future work
+## Part 2 — RX FIFO Threshold ✅ Implemented
 
 ### Current RX loop behaviour
 
@@ -175,7 +177,7 @@ in one burst"**.
 
 ---
 
-## Part 3 — Dynamic GDO2 Reconfiguration ⏳ Future work
+## Part 3 — Dynamic GDO2 Reconfiguration ✅ Implemented
 
 The firmware already reconfigures `MDMCFG2` and `PKTCTRL0` between TX and RX phases. GDO2 follows
 the same pattern — one extra register write per phase transition:

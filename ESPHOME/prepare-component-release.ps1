@@ -99,6 +99,19 @@ and re-run the release script to regenerate.
 Set-Content -Path "$RELEASE_ROOT\README_DO_NOT_EDIT.md" -Value $warningText
 Set-Content -Path "$RELEASE_DIR\DO_NOT_EDIT.md" -Value $warningText
 
+# Normalize all generated files to LF line endings.
+# .gitattributes forces "ESPHOME-release/** text eol=lf", but Copy-Item/Set-Content on
+# Windows PowerShell emit CRLF, which would make every regenerated file show as modified
+# in git even when its content is unchanged. Rewrite each file with LF to stay byte-for-byte
+# identical to the Linux/CI-generated output.
+Write-Host "Normalizing line endings to LF..." -ForegroundColor Green
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+Get-ChildItem -Path $RELEASE_ROOT -Recurse -File | ForEach-Object {
+    $raw = [System.IO.File]::ReadAllText($_.FullName)
+    $lf = $raw -replace "`r`n", "`n" -replace "`r", "`n"
+    [System.IO.File]::WriteAllText($_.FullName, $lf, $utf8NoBom)
+}
+
 attrib +R "$RELEASE_DIR\*" /S /D
 
 Write-Host ""

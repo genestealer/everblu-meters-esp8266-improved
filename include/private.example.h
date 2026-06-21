@@ -166,10 +166,12 @@
 // ESP32 DevKit: GPIO4 or GPIO27
 #define GDO0 5
 
-// CC1101 GDO2 (TX FIFO threshold) pin assignment — OPTIONAL
-// When defined, the TX FIFO feeding loop uses a fast digitalRead() on this pin
-// instead of polling the TXBYTES register over SPI, preventing TXFIFO_UNDERFLOW
-// under ESPHome scheduler load. Leave commented out if GDO2 is not wired.
+// CC1101 GDO2 (FIFO threshold signal) pin assignment — OPTIONAL
+// When defined, GDO2 is dynamically reconfigured per phase:
+//   TX phase: IOCFG2=0x02 (HIGH when TX FIFO >=25 bytes) — prevents TXFIFO_UNDERFLOW
+//   RX phase: IOCFG2=0x01 (HIGH when RX FIFO >=40 bytes OR end-of-packet) — eliminates
+//             unnecessary RXBYTES SPI reads and improves ESPHome scheduler efficiency
+// Leave commented out if GDO2 is not wired (falls back to SPI polling, fully functional).
 // Connect CC1101 GDO2 to any free GPIO. Avoid SPI bus pins and GDO0:
 //   ESP8266 SPI bus: GPIO12 (D6)=MISO, GPIO13 (D7)=MOSI, GPIO14 (D5)=SCK, GPIO15 (D8)=CS
 // ESP8266 example: GPIO4 (D2) when GDO0 uses GPIO5 (D1), or GPIO5 (D1) when GDO0 uses GPIO4

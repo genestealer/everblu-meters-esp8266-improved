@@ -38,7 +38,7 @@
      - Returns `String(METER_SERIAL) + "_"` when prefix enabled
      - Returns empty string when prefix disabled
      - Compile-time decision via `#if` preprocessor conditional
-   
+
    - **Updated:** `buildDeviceJson()`
      - Conditionally includes meter serial in device name
      - Uses fixed device ID `"everblu_meter_device"` when prefix disabled

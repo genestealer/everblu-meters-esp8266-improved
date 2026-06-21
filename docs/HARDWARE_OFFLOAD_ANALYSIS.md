@@ -115,7 +115,7 @@ halRfWriteReg(PKTCTRL1, 0x04); // Set APPEND_STATUS
 - Can discard bad packets before software processing
 - Frees ~200 cycles for other tasks
 
-**Caution**: 
+**Caution**:
 The CC1101 CRC must be configured to cover the exact same bytes as the current software implementation. Based on the code, CRC covers bytes after the length field:
 ```cpp
 // Current: CRC covers decoded_buffer[1] to decoded_buffer[expected_len-3]

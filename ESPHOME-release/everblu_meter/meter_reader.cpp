@@ -255,6 +255,10 @@ bool MeterReader::shouldPerformScheduledRead()
     // Get current local time
     time_t localTime = m_timeProvider->getLocalTime(m_config->getTimezoneOffsetMinutes());
     struct tm *ptm = gmtime(&localTime);
+    if (!ptm)
+    {
+        return false;
+    }
 
     // Check if today is a valid reading day
     bool isDayMatch = isReadingDayForConfiguredSchedule(ptm);
@@ -520,7 +524,7 @@ bool MeterReader::isReadingDayForConfiguredSchedule(const struct tm *ptm) const
         return true;
     }
     // check for single day reading schedule
-    switch(dayOfWeek) 
+    switch(dayOfWeek)
     {
         case 0:
             return strcmp(schedule, "Sunday") == 0;

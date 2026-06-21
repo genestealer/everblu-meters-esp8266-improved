@@ -50,7 +50,7 @@ FrequencyManager::setMeterReadCallback(your_meter_read_function);
 FrequencyManager::begin(433.82);  // Now uses YOUR functions
 ```
 
-**Reusability**: 
+**Reusability**:
 - ✅ No hard dependencies on specific CC1101 implementation
 - ✅ No MQTT dependencies
 - ✅ Works with Arduino, ESPHome, ESP-IDF, etc.
@@ -67,8 +67,8 @@ FrequencyManager::begin(433.82);  // Now uses YOUR functions
 **Example**:
 ```cpp
 // Old way (tight coupling):
-performFrequencyScan([](const char *s, const char *m) { 
-    publishMQTT(...); 
+performFrequencyScan([](const char *s, const char *m) {
+    publishMQTT(...);
 });
 
 // New way (dependency injection):
@@ -225,10 +225,10 @@ FrequencyManager::saveFrequencyOffset(offset_mhz);
 bool your_radio_init(float frequency_mhz) {
     // Initialize your CC1101 at this frequency
     // Return true if successful, false if failed
-    
+
     // Example for Arduino:
     return cc1101_init(frequency_mhz);
-    
+
     // Example for ESPHome:
     this->cc1101_->set_frequency(frequency_mhz);
     return this->cc1101_->begin();
@@ -240,10 +240,10 @@ bool your_radio_init(float frequency_mhz) {
 tmeter_data your_meter_read() {
     // Attempt to read meter data
     // Return tmeter_data structure with results
-    
+
     // Example for Arduino:
     return get_meter_data();
-    
+
     // Example for ESPHome:
     tmeter_data result = {};
     // ... your reading logic ...
@@ -256,11 +256,11 @@ tmeter_data your_meter_read() {
 void your_status_update(const char *state, const char *message) {
     // Called during frequency scans to report progress
     // Can be nullptr if you don't need status updates
-    
+
     // Example for Arduino/MQTT:
     publishMQTT("state", state);
     publishMQTT("status", message);
-    
+
     // Example for ESPHome:
     ESP_LOGI(TAG, "%s: %s", state, message);
 }

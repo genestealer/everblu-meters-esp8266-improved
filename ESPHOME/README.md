@@ -167,15 +167,15 @@ everblu_meter:
   meter_type: water
   gdo0_pin: 4
   time_id: ha_time
-  
+
   # Optional: Enable for troubleshooting corrupted readings (default: false)
   # debug_cc1101: true
-  
+
   volume:
     name: "Water Volume"
     device_class: water
     state_class: total_increasing
-  
+
   status:
     name: "Status"
 ```
@@ -207,7 +207,7 @@ esp32:
   board: arduino_nano_esp32
   framework:
     type: arduino
-  
+
   # May be required on some Arduino Nano ESP32 toolchain setups
   platformio_options:
     build_unflags:
@@ -237,24 +237,24 @@ esp32:
 
 ### Key Parameters
 
-| Parameter            | Type     | Default       | Required | Description                                                                                                                                                               |
-| -------------------- | -------- | ------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `meter_code`         | string   | -             | Yes      | Dashed meter code: `YY-SSSSSSS` or `YY-SSSSSSS-NNN` (suffix optional)                                                                                                     |
-| `spi_id`             | id       | -             | Yes      | SPI bus ID from the top-level `spi:` block                                                                                                                                |
-| `cs_pin`             | pin      | -             | Yes      | CC1101 chip select pin                                                                                                                                                    |
-| `meter_type`         | enum     | water         | No       | `water` or `gas`                                                                                                                                                          |
-| `gdo0_pin`           | pin      | -             | Yes      | CC1101 GDO0 pin (e.g. `GPIO4`, `D2`, `4`)                                                                                                                                 |
-| `gdo2_pin`           | pin      | (none)        | No       | CC1101 GDO2 pin for hardware TX FIFO threshold. When wired, replaces SPI-polling fallback and eliminates `TXFIFO_UNDERFLOW` under ESPHome load. Leave unset if not wired. |
-| `time_id`            | id       | -             | Yes      | Time component ID                                                                                                                                                         |
-| `frequency`          | float    | 433.82        | No       | RF frequency (MHz)                                                                                                                                                        |
-| `auto_scan`          | bool     | true          | No       | Auto frequency scan                                                                                                                                                       |
-| `schedule`           | enum     | Monday-Friday | No       | Reading schedule                                                                                                                                                          |
-| `read_hour`          | int      | 10            | No       | Read hour (0-23)                                                                                                                                                          |
-| `read_minute`        | int      | 0             | No       | Read minute (0-59)                                                                                                                                                        |
-| `max_retries`        | int      | 10            | No       | Max read attempts                                                                                                                                                         |
-| `retry_cooldown`     | duration | 1h            | No       | Cooldown time                                                                                                                                                             |
-| `gas_volume_divisor` | int      | 100           | No       | Gas divisor (100/1000)                                                                                                                                                    |
-| `debug_cc1101`       | bool     | false         | No       | Enable hex dump for debugging                                                                                                                                             |
+| Parameter            | Type     | Default       | Required | Description                                                                                                                                                                                                                                  |
+| -------------------- | -------- | ------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `meter_code`         | string   | -             | Yes      | Dashed meter code: `YY-SSSSSSS` or `YY-SSSSSSS-NNN` (suffix optional)                                                                                                                                                                        |
+| `spi_id`             | id       | -             | Yes      | SPI bus ID from the top-level `spi:` block                                                                                                                                                                                                   |
+| `cs_pin`             | pin      | -             | Yes      | CC1101 chip select pin                                                                                                                                                                                                                       |
+| `meter_type`         | enum     | water         | No       | `water` or `gas`                                                                                                                                                                                                                             |
+| `gdo0_pin`           | pin      | -             | Yes      | CC1101 GDO0 pin (e.g. `GPIO4`, `D2`, `4`)                                                                                                                                                                                                    |
+| `gdo2_pin`           | pin      | (none)        | No       | CC1101 GDO2 pin for hardware FIFO threshold signal. Dynamically reconfigured per phase: TX phase prevents `TXFIFO_UNDERFLOW`; RX phase eliminates unnecessary SPI reads and improves ESPHome scheduler efficiency. Leave unset if not wired. |
+| `time_id`            | id       | -             | Yes      | Time component ID                                                                                                                                                                                                                            |
+| `frequency`          | float    | 433.82        | No       | RF frequency (MHz)                                                                                                                                                                                                                           |
+| `auto_scan`          | bool     | true          | No       | Auto frequency scan                                                                                                                                                                                                                          |
+| `schedule`           | enum     | Monday-Friday | No       | Reading schedule                                                                                                                                                                                                                             |
+| `read_hour`          | int      | 10            | No       | Read hour (0-23)                                                                                                                                                                                                                             |
+| `read_minute`        | int      | 0             | No       | Read minute (0-59)                                                                                                                                                                                                                           |
+| `max_retries`        | int      | 10            | No       | Max read attempts                                                                                                                                                                                                                            |
+| `retry_cooldown`     | duration | 1h            | No       | Cooldown time                                                                                                                                                                                                                                |
+| `gas_volume_divisor` | int      | 100           | No       | Gas divisor (100/1000)                                                                                                                                                                                                                       |
+| `debug_cc1101`       | bool     | false         | No       | Enable hex dump for debugging                                                                                                                                                                                                                |
 
 ### Schedule Options
 
@@ -273,16 +273,16 @@ everblu_meter:
   gdo0_pin: 4
   meter_type: water
   time_id: ha_time
-  
+
   # Weekend-only, early morning
   schedule: Saturday
   read_hour: 6
   read_minute: 30
-  
+
   # Aggressive retries
   max_retries: 15
   retry_cooldown: 30min
-  
+
   volume:
     name: "Volume"
 ```
@@ -357,7 +357,7 @@ Three complete example configurations are provided:
 
 Important: The CC1101 requires 3.3V power. Do not connect to 5V!
 
-> **GDO2 is optional.** When wired and configured via `gdo2_pin:`, the driver reads GDO2 as a hardware TX FIFO threshold signal, preventing `TXFIFO_UNDERFLOW` errors under ESPHome scheduler load. Without GDO2, the driver falls back to SPI-based TXBYTES polling (original behaviour, still fully functional).
+> **GDO2 is optional.** When wired and configured via `gdo2_pin:`, GDO2 is dynamically reconfigured per phase: during TX it acts as a TX FIFO threshold signal preventing `TXFIFO_UNDERFLOW`; during RX it signals when the RX FIFO has data (or end-of-packet), eliminating unnecessary `RXBYTES` SPI reads and allowing the ESPHome scheduler to run freely between batches. Without GDO2, both TX and RX fall back to SPI polling (original behaviour, still fully functional).
 
 ## Benefits
 
@@ -452,7 +452,7 @@ template:
         state: >-
           {% set data = states('sensor.water_meter_monitor_meter_history_json') | from_json %}
           {{ data.monthly_usage[-1] if data.monthly_usage else 0 }}
-      
+
       - name: "Average Monthly Usage"
         unit_of_measurement: "L"
         state: >-
@@ -557,7 +557,7 @@ everblu_meter:
   gdo0_pin: 4
   time_id: ha_time
   debug_cc1101: false  # Optional: Enable hex dump debugging (default: false)
-  
+
   volume:
     name: "Volume"
   battery:

@@ -43,37 +43,37 @@ jobs:
           try:
               config = configparser.ConfigParser()
               config.read('platformio.ini')
-              
+
               # Check required sections exist
               required_sections = ['platformio']
               for section in required_sections:
                   if not config.has_section(section):
                       print(f"❌ Missing required section: [{section}]")
                       sys.exit(1)
-              
+
               # Check for at least one environment
               env_sections = [s for s in config.sections() if s.startswith('env:')]
               if not env_sections:
                   print("❌ No environment sections found (e.g., [env:huzzah])")
                   sys.exit(1)
-              
+
               print(f"✅ Found {len(env_sections)} environment(s): {', '.join([s.replace('env:', '') for s in env_sections])}")
-              
+
               # Validate each environment has required keys
               for env in env_sections:
                   env_name = env.replace('env:', '')
-                  
+
                   # Check for extends or platform
                   if not config.has_option(env, 'extends') and not config.has_option(env, 'platform'):
                       print(f"⚠️  Environment '{env_name}' should have 'platform' or 'extends'")
-                  
+
                   # Check for framework if platform is specified
                   if config.has_option(env, 'platform'):
                       if not config.has_option(env, 'framework') and not config.has_option('env:base', 'framework'):
                           print(f"⚠️  Environment '{env_name}' should specify 'framework' (typically 'arduino')")
-              
+
               print("\n✅ platformio.ini syntax is valid")
-              
+
           except configparser.Error as e:
               print(f"❌ platformio.ini syntax error: {e}")
               sys.exit(1)
@@ -176,20 +176,20 @@ jobs:
           if config.has_option('env:base', 'lib_deps'):
               libs = config.get('env:base', 'lib_deps').strip().split('\n')
               libs = [lib.strip() for lib in libs if lib.strip()]
-              
+
               print(f"📚 Found {len(libs)} library dependencies:")
               for lib in libs:
                   print(f"   - {lib}")
-              
+
               # Check for critical libraries
               critical_libs = ['EspMQTTClient', 'ArduinoOTA']
               missing_critical = []
-              
+
               for critical in critical_libs:
                   found = any(critical.lower() in lib.lower() for lib in libs)
                   if not found:
                       missing_critical.append(critical)
-              
+
               if missing_critical:
                   print(f"\n⚠️  Potentially missing critical libraries: {', '.join(missing_critical)}")
               else:

@@ -7,11 +7,11 @@ This directory contains unit tests for the EverBlu Meters ESP8266/ESP32 project 
 - **test_config_validation.cpp** - Tests for configuration validation functions
   - Valid/invalid reading schedules
   - Meter year, serial, frequency validation
-  
+
 - **test_utils.cpp** - Tests for utility functions
   - CRC calculation correctness and determinism
   - Hex display functions
-  
+
 - **test_state_machine.cpp** - Tests for state machine implementation
   - State enumeration validation
   - State transition logic

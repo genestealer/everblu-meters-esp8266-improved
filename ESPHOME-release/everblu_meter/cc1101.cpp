@@ -89,6 +89,7 @@ static const uint8_t debug_out = (uint8_t)(DEBUG_CC1101);
 // IOCFG2 - GDO2 Output Pin Configuration
 #define IOCFG2_SERIAL_DATA_OUTPUT 0x0D // GDO2: Serial Data Output (kept for reference, not used)
 #define IOCFG2_TX_FIFO_THR 0x02        // GDO2: asserts HIGH when TX FIFO >= threshold; de-asserts LOW when below threshold
+#define IOCFG2_RX_FIFO_THR_EOP 0x01    // GDO2: asserts HIGH when RX FIFO >= threshold OR end-of-packet; de-asserts LOW when FIFO empties
 
 // IOCFG0 - GDO0 Output Pin Configuration
 #define IOCFG0_SYNC_WORD_DETECT 0x06 // Asserts when sync word detected, deasserts at end of packet
@@ -96,7 +97,7 @@ static const uint8_t debug_out = (uint8_t)(DEBUG_CC1101);
 // FIFOTHR - RX FIFO and TX FIFO Thresholds
 // FIFO_THR=9 (0x49): TX threshold=25 bytes — de-assertion guarantees >=40 free bytes, safely fits both
 //                    the 8-byte WUP buffer and the 39-byte interrogation frame with a single GDO2 check.
-//                    RX threshold shifts to 40 bytes (no impact: RX loop uses GDO0 + RXBYTES, not FIFO signal).
+//                    RX threshold=40 bytes — used by GDO2 RX mode (IOCFG2=0x01): asserts at 40 bytes OR EOP.
 #define FIFOTHR_FIFO_THR_33_32 0x47 // FIFO_THR=7: TX threshold 33 bytes, RX threshold 33 bytes (legacy)
 #define FIFOTHR_FIFO_THR_25_40 0x49 // FIFO_THR=9: TX threshold 25 bytes, RX threshold 40 bytes
 
@@ -498,7 +499,12 @@ void setMHZ(float mhz)
 
   // Serial.printf("%.4f Mhz : ", mhz);
 
-  for (bool i = 0; i == 0;)
+  // Decompose the target frequency into the CC1101 FREQ2/FREQ1/FREQ0 registers by
+  // subtracting each register's frequency weight until the remainder is below the
+  // smallest step. Because the FREQ1 branch reduces mhz below 0.1015625 before the
+  // FREQ0 branch runs (0.1015625 / 0.00039675 ~= 256), freq0 never exceeds 255, so
+  // no carry into freq1 is required.
+  while (true)
   {
     if (mhz >= 26)
     {
@@ -517,13 +523,8 @@ void setMHZ(float mhz)
     }
     else
     {
-      i = 1;
+      break;
     }
-  }
-  if (freq0 > 255)
-  {
-    freq1 += 1;
-    freq0 -= 256;
   }
 
   /*
@@ -544,9 +545,11 @@ void cc1101_configureRF_0(float freq)
   //
   // RF settings for CC1101 - RADIAN protocol (Itron EverBlu)
   //
-  // GDO2: always configured as TX FIFO threshold signal (IOCFG2_TX_FIFO_THR = 0x02).
-  // When GDO2 is not physically wired, the output is unused; the TX feeding loop falls back
-  // to SPI TXBYTES polling instead of digitalRead(). IOCFG2_SERIAL_DATA_OUTPUT is not restored.
+  // GDO2: IOCFG2 is always configured as a TX FIFO threshold signal here. The GDO2 *pin* is only
+  // read when wired and configured (GET_GDO2_PIN() >= 0); when no pin is set the register write is
+  // harmless (the output simply floats unread) and the TX feeding loop uses SPI TXBYTES polling.
+  // When the pin is available, IOCFG2_TX_FIFO_THR lets the TX feeding loop replace SPI polling with
+  // a fast digitalRead() for proactive underflow prevention.
   halRfWriteReg(IOCFG2, IOCFG2_TX_FIFO_THR);      // GDO2: TX FIFO at/above threshold
   halRfWriteReg(IOCFG0, IOCFG0_SYNC_WORD_DETECT); // GDO0: Sync word detection
   halRfWriteReg(FIFOTHR, FIFOTHR_FIFO_THR_25_40); // FIFO thresholds: TX=25 bytes, RX=40 bytes
@@ -598,7 +601,7 @@ bool cc1101_init(float freq)
   if (GET_GDO2_PIN() >= 0)
   {
     pinMode(GET_GDO2_PIN(), INPUT);
-    echo_debug(debug_out, "[CC1101] GDO2 pin %d configured as TX FIFO threshold input\n", GET_GDO2_PIN());
+    echo_debug(debug_out, "[CC1101] GDO2 pin %d configured as FIFO threshold input (TX/RX dynamic)\n", GET_GDO2_PIN());
   }
 
   // Initialize SPI transport for CC1101 communication.
@@ -668,6 +671,9 @@ int8_t cc1100_rssi_convert2dbm(uint8_t Rssi_dec)
 void cc1101_rec_mode(void)
 {
   uint8_t marcstate;
+  // Switch GDO2 to RX FIFO threshold + end-of-packet signal for the receive phase
+  if (GET_GDO2_PIN() >= 0)
+    halRfWriteReg(IOCFG2, IOCFG2_RX_FIFO_THR_EOP);
   CC1101_CMD(SIDLE);                                                        // sets to idle first. must be in
   CC1101_CMD(SRX);                                                          // writes receive strobe (receive mode)
   marcstate = 0xFF;                                                         // set unknown/dummy state value
@@ -747,7 +753,19 @@ uint8_t cc1101_check_packet_received(void)
     bool buffer_overflow = false;
     while (digitalRead(GET_GDO0_PIN()) == TRUE)
     {
-      delay(2); // Reduced from 5ms to 2ms for faster FIFO reading (prevents overflow)
+      if (GET_GDO2_PIN() >= 0)
+      {
+        if (digitalRead(GET_GDO2_PIN()) == LOW)
+        {
+          yield(); // RX FIFO below threshold — yield to ESPHome scheduler, no SPI read needed
+          continue;
+        }
+        // GDO2 HIGH: RX FIFO at/above threshold or end-of-packet → drain now
+      }
+      else
+      {
+        delay(2); // Fallback: blind poll (original behaviour)
+      }
 
       // Check for FIFO overflow (bit 7 of RXBYTES register)
       uint8_t rxbytes_reg = halRfReadReg(RXBYTES_ADDR);
@@ -1309,6 +1327,9 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
     delay(5);
     l_tmo += 5; // wait for some byte received
     FEED_WDT(); // Feed watchdog during receive wait
+    // Skip SPI read if GDO2 says RX FIFO is empty (below threshold and no EOP yet)
+    if (GET_GDO2_PIN() >= 0 && digitalRead(GET_GDO2_PIN()) == LOW)
+      continue;
     l_byte_in_rx = (halRfReadReg(RXBYTES_ADDR) & RXBYTES_MASK);
     if (l_byte_in_rx)
     {
@@ -1400,6 +1421,9 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
     l_tmo += 5; // wait for some byte received
     if (l_tmo % 50 == 0)
       FEED_WDT(); // Feed watchdog every 50ms during frame receive
+    // Skip SPI read if GDO2 says RX FIFO is empty (below threshold and no EOP yet)
+    if (GET_GDO2_PIN() >= 0 && digitalRead(GET_GDO2_PIN()) == LOW)
+      continue;
     l_byte_in_rx = (halRfReadReg(RXBYTES_ADDR) & RXBYTES_MASK);
     if (l_byte_in_rx)
     {
@@ -1556,6 +1580,10 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
 
   halRfWriteReg(MDMCFG2, MDMCFG2_NO_PREAMBLE_SYNC);  // No preamble/sync for WUP
   halRfWriteReg(PKTCTRL0, PKTCTRL0_INFINITE_LENGTH); // Infinite packet length
+
+  // Reconfigure GDO2 for TX phase: TX FIFO threshold signal (switches back from RX mode)
+  if (GET_GDO2_PIN() >= 0)
+    halRfWriteReg(IOCFG2, IOCFG2_TX_FIFO_THR);
 
   // Pre-fill FIFO to near capacity before starting TX.
   // A fuller FIFO provides much larger buffer (~186ms vs ~27ms) against
