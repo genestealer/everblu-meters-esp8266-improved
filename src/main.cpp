@@ -1955,7 +1955,7 @@ bool validateConfiguration()
 #endif
 
 #ifdef GDO2
-  Serial.printf("✓ GDO2 Pin: GPIO %d (TX FIFO threshold - hardware-assisted underflow prevention)\n", GDO2);
+  Serial.printf("✓ GDO2 Pin: GPIO %d (TX/RX FIFO threshold - hardware-assisted underflow prevention)\n", GDO2);
 #else
   Serial.println("  GDO2 Pin: not defined (TX/RX FIFO managed via SPI polling fallback)");
 #endif
