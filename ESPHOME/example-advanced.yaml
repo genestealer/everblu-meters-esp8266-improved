@@ -80,7 +80,9 @@ everblu_meter:
   meter_code: "23-1234567-800"  # Replace with your meter's code
   cs_pin: GPIO5
   gdo0_pin: 4
-  # gdo2_pin: 12          # Optional: wire CC1101 GDO2 here for hardware FIFO threshold (TX+RX)
+  # gdo2_pin: 27          # Optional: wire CC1101 GDO2 here for hardware FIFO threshold (TX+RX)
+                          # Use any free GPIO (not SPI pins: avoid GPIO18/CLK, GPIO19/MISO, GPIO23/MOSI)
+                          # (not strapping pins: avoid GPIO0, GPIO2, GPIO12; GPIO27 is safe)
                           # (prevents TXFIFO_UNDERFLOW; leave unset to use SPI polling fallback)
   meter_type: water
   

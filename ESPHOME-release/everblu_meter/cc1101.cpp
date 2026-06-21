@@ -1654,6 +1654,9 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
     else
     {
       // Wait for TX FIFO to drain enough to fit the 39-byte interrogation frame.
+      // Only write when FIFO space is confirmed; skip and retry the outer TX loop if
+      // the safety limit fires before the FIFO drains (avoids write with no headroom).
+      bool fifo_ready = false;
       if (GET_GDO2_PIN() >= 0)
       {
         // With FIFOTHR_FIFO_THR_25_40: GDO2 de-asserts (LOW) when FIFO < 25 bytes,
@@ -1670,7 +1673,12 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
         // Final underflow check: if FIFO underflowed during the wait, abort TX loop.
         uint8_t txbytes_reg = halRfReadReg(TXBYTES_ADDR);
         if (txbytes_reg & 0x80)
-          break; // TXFIFO_UNDERFLOW already occurred
+        {
+          marcstate = halRfReadReg(MARCSTATE_ADDR); // refresh so tx_aborted check below is accurate
+          break;                                    // TXFIFO_UNDERFLOW already occurred
+        }
+        // Confirm GDO2 is actually LOW (FIFO drained), not merely timed out with FIFO still full.
+        fifo_ready = (digitalRead(GET_GDO2_PIN()) == LOW);
       }
       else
       {
@@ -1681,23 +1689,29 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
         {
           uint8_t txbytes_reg = halRfReadReg(TXBYTES_ADDR);
           if (txbytes_reg & 0x80)
-            break; // TXFIFO_UNDERFLOW already occurred
+            break; // TXFIFO_UNDERFLOW — marcstate check at loop bottom will abort
           uint8_t num_txbytes = txbytes_reg & 0x7F;
           if (num_txbytes <= 25)
-            break; // 64 - 25 = 39 free bytes available
+          {
+            fifo_ready = true; // 64 - 25 = 39 free bytes confirmed
+            break;
+          }
           delay(5);
           wait_count++;
           if (wait_count % 10 == 0)
             FEED_WDT();
         }
       }
-      SPIWriteBurstReg(TX_FIFO_ADDR, txbuffer, 39);
-      if (debug_out && 0)
+      if (fifo_ready)
       {
-        echo_debug(debug_out, "txbuffer:\n");
-        show_in_hex_array(&txbuffer[0], 39);
+        SPIWriteBurstReg(TX_FIFO_ADDR, txbuffer, 39);
+        if (debug_out && 0)
+        {
+          echo_debug(debug_out, "txbuffer:\n");
+          show_in_hex_array(&txbuffer[0], 39);
+        }
+        wup2send = 0xFF;
       }
-      wup2send = 0xFF;
     }
     delay(10);
     tmo++;

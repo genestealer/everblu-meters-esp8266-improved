@@ -172,10 +172,11 @@
 //   RX phase: IOCFG2=0x01 (HIGH when RX FIFO >=40 bytes OR end-of-packet) — eliminates
 //             unnecessary RXBYTES SPI reads and improves ESPHome scheduler efficiency
 // Leave commented out if GDO2 is not wired (falls back to SPI polling, fully functional).
-// Connect CC1101 GDO2 to any free GPIO (avoid SPI bus pins and GDO0).
-// ESP8266 example: GPIO12 (D6), GPIO14 (D5 conflicts with CLK — use D6 or D7)
+// Connect CC1101 GDO2 to any free GPIO. Avoid SPI bus pins and GDO0:
+//   ESP8266 SPI bus: GPIO12 (D6)=MISO, GPIO13 (D7)=MOSI, GPIO14 (D5)=SCK, GPIO15 (D8)=CS
+// ESP8266 example: GPIO4 (D2) when GDO0 uses GPIO5 (D1), or GPIO5 (D1) when GDO0 uses GPIO4
 // ESP32 example:   GPIO27, GPIO26
-// #define GDO2 12
+// #define GDO2 4
 
 // Radio protocol debug output
 // 1 = enable verbose CC1101 / RADIAN logging
