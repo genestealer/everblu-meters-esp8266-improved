@@ -1421,9 +1421,11 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
     l_tmo += 5; // wait for some byte received
     if (l_tmo % 50 == 0)
       FEED_WDT(); // Feed watchdog every 50ms during frame receive
-    // Skip SPI read if GDO2 says RX FIFO is empty (below threshold and no EOP yet)
-    if (GET_GDO2_PIN() >= 0 && digitalRead(GET_GDO2_PIN()) == LOW)
-      continue;
+    // NOTE: GDO2 (IOCFG2_RX_FIFO_THR_EOP, 0x01) cannot gate reads here. This stage
+    // runs in PKTCTRL0_INFINITE_LENGTH mode, where no end-of-packet is ever generated,
+    // so GDO2 only asserts at the 40-byte RX FIFO threshold. The final sub-threshold
+    // remainder of the frame would leave GDO2 LOW indefinitely and be skipped forever,
+    // truncating the frame. Always poll RXBYTES so the tail bytes are drained.
     l_byte_in_rx = (halRfReadReg(RXBYTES_ADDR) & RXBYTES_MASK);
     if (l_byte_in_rx)
     {
