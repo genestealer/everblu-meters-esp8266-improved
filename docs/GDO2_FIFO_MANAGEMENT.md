@@ -7,10 +7,12 @@
 | **Implemented in**     | `feature/gdo2-fifo-threshold` (Part 1) · `feature/gdo2-rx-fifo-threshold` (Parts 2 & 3)                                                                                                                                                     |
 | **Future work branch** | n/a — all parts implemented                                                                                                                                                                                                                 |
 
-GDO2 is currently configured as async serial data output (`IOCFG2 = 0x0D`) and left physically
-unconnected. This document describes how wiring GDO2 to a free MCU GPIO and reconfiguring it as
-a FIFO threshold signal improves both TX FIFO feeding (preventing underflows) and RX FIFO draining
-(reducing unnecessary SPI traffic and improving ESPHome task scheduling).
+The driver configures GDO2 as a FIFO threshold signal, dynamically reconfiguring `IOCFG2` per phase
+(`0x02` for the TX FIFO threshold, `0x01` for the RX FIFO threshold / end-of-packet). The GDO2 pin is
+optional: when left physically unconnected the register write is harmless and the driver falls back to
+SPI polling. This document describes how wiring GDO2 to a free MCU GPIO and reading it as a FIFO
+threshold signal improves both TX FIFO feeding (preventing underflows) and RX FIFO draining (reducing
+unnecessary SPI traffic and improving ESPHome task scheduling).
 
 > **Status summary**
 > - **Part 1 (TX FIFO threshold)** — ✅ implemented in `feature/gdo2-fifo-threshold`
@@ -23,7 +25,7 @@ a FIFO threshold signal improves both TX FIFO feeding (preventing underflows) an
 
 ### Problem
 
-The TX FIFO refill loop in `cc1101_send_and_listen()` is driven by polling the `TXBYTES` status
+The TX FIFO refill loop in `get_meter_data_for_meter()` is driven by polling the `TXBYTES` status
 register over SPI and a fixed `delay(20)` heuristic:
 
 ```cpp
