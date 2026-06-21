@@ -499,7 +499,12 @@ void setMHZ(float mhz)
 
   // Serial.printf("%.4f Mhz : ", mhz);
 
-  for (bool i = 0; i == 0;)
+  // Decompose the target frequency into the CC1101 FREQ2/FREQ1/FREQ0 registers by
+  // subtracting each register's frequency weight until the remainder is below the
+  // smallest step. Because the FREQ1 branch reduces mhz below 0.1015625 before the
+  // FREQ0 branch runs (0.1015625 / 0.00039675 ~= 256), freq0 never exceeds 255, so
+  // no carry into freq1 is required.
+  while (true)
   {
     if (mhz >= 26)
     {
@@ -518,13 +523,8 @@ void setMHZ(float mhz)
     }
     else
     {
-      i = 1;
+      break;
     }
-  }
-  if (freq0 > 255)
-  {
-    freq1 += 1;
-    freq0 -= 256;
   }
 
   /*
