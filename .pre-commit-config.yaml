@@ -22,8 +22,10 @@ repos:
       - id: trailing-whitespace
         args: [--markdown-linebreak-ext=md]
       - id: end-of-file-fixer
-      - id: mixed-line-ending
-        args: [--fix=lf]
+      # NOTE: line endings are governed by .gitattributes
+      # (text=auto, *.sh eol=lf, *.ps1 eol=crlf). A mixed-line-ending hook
+      # conflicts with eol=crlf for *.ps1 and causes an infinite autofix loop,
+      # so it is intentionally omitted.
       - id: check-merge-conflict
       - id: check-added-large-files
         args: [--maxkb=2048]
