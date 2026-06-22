@@ -1582,6 +1582,23 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
 {
   // Avoid leading newline so ESPHome log doesn't emit an empty line first
   echo_debug(1, "[METER] Starting meter read sequence...\n");
+
+  // Re-emit the radio's FIFO mode and the full meter identity on every read.
+  // The cc1101_init() startup banner is printed once at boot, before the
+  // WiFi serial monitor / ESPHome API logger has connected, so remote log
+  // viewers miss it. Logging here guarantees the active mode and target
+  // meter are visible alongside each read.
+  if (GET_GDO2_PIN() >= 0)
+  {
+    echo_debug(1, "[CC1101] FIFO mode: GDO2 hardware-assisted (pin %d) - TX underflow prevention active\n", GET_GDO2_PIN());
+  }
+  else
+  {
+    echo_debug(1, "[CC1101] FIFO mode: SPI polling fallback (GDO2 not wired/configured)\n");
+  }
+  echo_debug(1, "[METER] Target meter serial: %02d%07lu (Year=%02d, Serial=%lu)\n",
+             meter_year, (unsigned long)meter_serial, meter_year, (unsigned long)meter_serial);
+
   struct tmeter_data sdata;
   uint8_t marcstate = 0xFF;
   uint8_t wupbuffer[] = {0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55};
