@@ -35,10 +35,19 @@ void cc1101_set_gdo0_pin(int gdo0_pin);
 /**
  * @brief Set GDO2 pin for ESPHome mode (optional)
  *
- * When configured, GDO2 is read as a hardware TX FIFO threshold signal
- * (IOCFG2 = 0x02), replacing SPI-based TXBYTES polling in the TX feeding loop.
- * If not called (or called with -1), the driver falls back to the legacy
- * CC1101_status_FIFO_FreeByte + delay(20) approach.
+ * When configured, GDO2 is used as a hardware FIFO threshold signal whose
+ * meaning is switched dynamically per phase via IOCFG2:
+ *   - TX phase (IOCFG2 = 0x02): asserts HIGH when the TX FIFO is at/above the
+ *     threshold, replacing SPI-based TXBYTES polling in the TX feeding loop and
+ *     preventing TXFIFO_UNDERFLOW under scheduler load.
+ *   - RX phase (IOCFG2 = 0x01): asserts HIGH when the RX FIFO reaches the
+ *     threshold OR at end-of-packet, letting the RX drain loop skip unnecessary
+ *     RXBYTES SPI reads while still draining the FIFO promptly.
+ * If not called (or called with -1), the driver falls back to SPI polling
+ * (CC1101_status_FIFO_FreeByte + delay on TX, blind RXBYTES polling on RX).
+ *
+ * Wiring: connect CC1101 GDO2 to any free GPIO that is not used by the SPI bus
+ * or GDO0. Leaving GDO2 unwired is fully supported via the SPI-polling fallback.
  *
  * @param gdo2_pin GPIO pin number connected to CC1101 GDO2, or -1 to disable
  */

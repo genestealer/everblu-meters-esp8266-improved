@@ -801,6 +801,34 @@ uint8_t cc1101_check_packet_received(void)
       CC1101_CMD(SFRX); // Flush RX FIFO to recover
       return FALSE;
     }
+
+    // Final drain after end-of-packet. With GDO2 wired, the loop above yields and
+    // continues whenever GDO2 is LOW (RX FIFO below threshold). If GDO0 deasserts
+    // (EOP) during that yield, the loop exits before the sub-threshold tail is read,
+    // leaving unread bytes in the FIFO. Pull any remaining bytes here so the packet
+    // is fully drained before parsing. Harmless in the SPI-polling fallback path too.
+    {
+      uint8_t rxbytes_reg = halRfReadReg(RXBYTES_ADDR);
+      if (rxbytes_reg & 0x80)
+      {
+        echo_debug(1, "[ERROR] RX FIFO overflow detected during final drain - data corrupted\n");
+        CC1101_CMD(SFRX); // Flush RX FIFO to recover
+        return FALSE;
+      }
+      uint8_t l_tail_byte = rxbytes_reg & RXBYTES_MASK;
+      if (l_tail_byte && ((pktLen + l_tail_byte) <= 100))
+      {
+        SPIReadBurstReg(RX_FIFO_ADDR, &rxBuffer[pktLen], l_tail_byte); // Pull remaining tail
+        pktLen += l_tail_byte;
+      }
+      else if (l_tail_byte && ((pktLen + l_tail_byte) > 100))
+      {
+        echo_debug(1, "[ERROR] Would overflow rxBuffer draining tail (pktLen=%u + l_tail=%u > 100)\n", pktLen, l_tail_byte);
+        CC1101_CMD(SFRX); // Flush RX FIFO to recover
+        return FALSE;
+      }
+    }
+
     // These registers are latched at end-of-packet and contain final quality metrics
     l_lqi = halRfReadReg(LQI_ADDR);
     l_freq_est = halRfReadReg(FREQEST_ADDR);

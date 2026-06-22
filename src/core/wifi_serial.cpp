@@ -123,8 +123,10 @@ void WifiSerialStream::loop()
     // unreliable on ESP8266 WiFiClient.
     if (wifiSerialClient && wifiSerialClient.connected())
     {
-        // Drain all pending bytes in one shot (multiple contiguous chunks)
-        uint16_t pending = (_head - _tail) & (WIFI_SERIAL_TX_BUF_SIZE - 1);
+        // Drain all pending bytes in one shot (multiple contiguous chunks).
+        // Cast the delta to uint16_t before masking so wraparound is well-defined
+        // (the subtraction is otherwise promoted to signed int).
+        uint16_t pending = (uint16_t)(_head - _tail) & (WIFI_SERIAL_TX_BUF_SIZE - 1);
         while (pending > 0)
         {
             uint16_t tailIdx = _tail & (WIFI_SERIAL_TX_BUF_SIZE - 1);
@@ -137,7 +139,7 @@ void WifiSerialStream::loop()
                 break; // TCP send buffer full; retry next loop() call
             _tail += (uint16_t)sent;
             _lastSendMs = millis();
-            pending = (_head - _tail) & (WIFI_SERIAL_TX_BUF_SIZE - 1);
+            pending = (uint16_t)(_head - _tail) & (WIFI_SERIAL_TX_BUF_SIZE - 1);
         }
 
         // Keepalive: if no data has been sent for 20 seconds, enqueue a small
@@ -231,7 +233,7 @@ void WifiSerialStream::flush()
 #if WIFI_SERIAL_HAS_WIFI
     if (wifiSerialClient && wifiSerialClient.connected())
     {
-        uint16_t pending = (_head - _tail) & (WIFI_SERIAL_TX_BUF_SIZE - 1);
+        uint16_t pending = (uint16_t)(_head - _tail) & (WIFI_SERIAL_TX_BUF_SIZE - 1);
         if (pending > 0)
         {
             uint16_t tailIdx = _tail & (WIFI_SERIAL_TX_BUF_SIZE - 1);

@@ -74,8 +74,11 @@ private:
     // Returns number of free bytes in the ring buffer
     inline uint16_t _free() const
     {
+        // Cast the head/tail delta to uint16_t before masking: the subtraction is
+        // otherwise promoted to signed int and can be negative after wraparound,
+        // which would make the bitwise AND rely on implementation-defined behaviour.
         return (WIFI_SERIAL_TX_BUF_SIZE - 1) -
-               ((_head - _tail) & (WIFI_SERIAL_TX_BUF_SIZE - 1));
+               ((uint16_t)(_head - _tail) & (WIFI_SERIAL_TX_BUF_SIZE - 1));
     }
 
     // Enqueue one byte; returns false and increments _dropped if full
