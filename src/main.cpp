@@ -539,7 +539,10 @@ static const char *wifiStatusToString(wl_status_t st)
 //              Retries up to 10 times if data retrieval fails.
 void onUpdateData()
 {
-  Serial.printf("[STATUS] Firmware version: %s\n", EVERBLU_FW_VERSION);
+  Serial.println("");
+  Serial.println("========================================");
+  Serial.printf("        METER READ - START (fw %s)\n", EVERBLU_FW_VERSION);
+  Serial.println("========================================");
   Serial.printf("[STATUS] Updating data from meter...\n");
   Serial.printf("[STATUS] Retry count: %d\n", _retry);
   Serial.printf("[STATUS] Reading schedule: %s\n", readingSchedule);
@@ -560,7 +563,7 @@ void onUpdateData()
   // Get current UTC time
   time_t tnow = time(nullptr);
   struct tm *ptm = gmtime(&tnow);
-  Serial.printf("[TIME] Current date (UTC): %04d/%02d/%02d %02d:%02d/%02d - %ld\n", ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, (long)tnow);
+  Serial.printf("[TIME] Current date (UTC): %04d/%02d/%02d %02d:%02d:%02d - %ld\n", ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, (long)tnow);
 
   char iso8601[128];
   strftime(iso8601, sizeof iso8601, "%FT%TZ", gmtime(&tnow));
@@ -607,6 +610,10 @@ void onUpdateData()
       digitalWrite(LED_BUILTIN, HIGH); // Turn off LED
       _retry = 0;                      // Reset retry counter for next scheduled attempt
     }
+    Serial.println("========================================");
+    Serial.println("        METER READ - FAILED");
+    Serial.println("========================================");
+    Serial.println("");
     return;
   }
 
@@ -891,7 +898,10 @@ skip_history_publish:;
   // Reset scheduled read flag for next invocation
   g_isScheduledRead = false;
 
-  Serial.println("[STATUS] Data update complete.\n");
+  Serial.println("========================================");
+  Serial.println("        METER READ - COMPLETE");
+  Serial.println("========================================");
+  Serial.println("");
 }
 
 // Function: onScheduled
@@ -1329,13 +1339,13 @@ void onConnectionEstablished()
   }
 
   struct tm *ptm = gmtime(&tnow);
-  Serial.printf("[TIME] current date (UTC) : %04d/%02d/%02d %02d:%02d/%02d - %ld\n", ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, (long)tnow);
+  Serial.printf("[TIME] current date (UTC) : %04d/%02d/%02d %02d:%02d:%02d - %ld\n", ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, (long)tnow);
   // Print simple offset and derived local time for debugging
   int offsetMin = TIMEZONE_OFFSET_MINUTES;
   time_t tlocal = tnow + (time_t)offsetMin * 60;
   struct tm *plocal = gmtime(&tlocal);
   Serial.printf("[TIME] Configured UTC offset: %+d minutes\n", offsetMin);
-  Serial.printf("[TIME] Current date (UTC+offset): %04d/%02d/%02d %02d:%02d/%02d - %ld\n",
+  Serial.printf("[TIME] Current date (UTC+offset): %04d/%02d/%02d %02d:%02d:%02d - %ld\n",
                 plocal->tm_year + 1900, plocal->tm_mon + 1, plocal->tm_mday,
                 plocal->tm_hour, plocal->tm_min, plocal->tm_sec, (long)tlocal);
 

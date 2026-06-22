@@ -1,6 +1,9 @@
-/*
- * WiFi Serial Monitor
- * Provides TCP serial server that mirrors Serial output over WiFi
+/**
+ * @file wifi_serial.h
+ * @brief WiFi serial monitor — TCP server that mirrors Serial output over WiFi
+ *
+ * Exposes a Telnet-compatible TCP server so the device's Serial log output can
+ * be viewed remotely over the network in standalone (MQTT) builds.
  */
 
 #ifndef WIFI_SERIAL_H

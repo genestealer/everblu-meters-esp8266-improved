@@ -1,3 +1,12 @@
+/**
+ * @file meter_code_parser.h
+ * @brief Shared parser for the meter METER_CODE identifier string
+ *
+ * Parses the meter code in the form "YY-SSSSSSS" or "YY-SSSSSSS-NNN" into a
+ * 2-digit year and 7-digit serial number. Header-only and dependency-free so
+ * it can be reused by both standalone and ESPHome builds.
+ */
+
 #ifndef METER_CODE_PARSER_H
 #define METER_CODE_PARSER_H
 

@@ -1,3 +1,11 @@
+/**
+ * @file radian_parser.cpp
+ * @brief Implementation of RADIAN protocol frame parsing and CRC validation
+ *
+ * Validates the CRC-16/KERMIT trailer of RADIAN frames and decodes the
+ * primary meter reading fields from the decoded payload buffer.
+ */
+
 #include "radian_parser.h"
 #include "crc_kermit.h"
 

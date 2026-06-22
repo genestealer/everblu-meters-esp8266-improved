@@ -1,6 +1,9 @@
-/*
- * WiFi Serial Monitor Implementation
- * Provides TCP serial server that mirrors Serial output over WiFi
+/**
+ * @file wifi_serial.cpp
+ * @brief Implementation of the WiFi serial monitor TCP server
+ *
+ * Mirrors Serial output to connected TCP (Telnet) clients and provides the
+ * platform-specific WiFi glue for ESP8266 and ESP32 standalone builds.
  */
 
 #ifndef WIFI_SERIAL_NO_REMAP

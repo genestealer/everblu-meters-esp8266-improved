@@ -1700,14 +1700,12 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
     }
   }
 
-  // Check if TX loop ended because the TX FIFO drained (MARCSTATE 0x16).
-  // This is the normal end-of-frame condition once all wake-up/interrogation
-  // bytes have been transmitted, NOT a failure on its own. Whether the meter
-  // actually responded is decided later by the ACK/data frame reception below.
+  // Check if TX was aborted due to underflow
   bool tx_aborted = ((marcstate & 0x1F) == 0x16);
   if (tx_aborted)
   {
-    echo_debug(1, "[METER] TX FIFO drained at end of frame after %dms (MARCSTATE=0x%02X)\n", tmo * 10, marcstate & 0x1F);
+    echo_debug(1, "[METER] No response during wake-up/interrogation (TXFIFO_UNDERFLOW after %dms, MARCSTATE=0x%02X)\n", tmo * 10, marcstate & 0x1F);
+    echo_debug(1, "[METER] This is expected when meter is asleep, out of range, or Year/Serial is incorrect\n");
   }
   else
   {
@@ -1723,7 +1721,6 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
   // delay(30); //43ms de bruit
   /*34ms 0101...01  14.25ms 000...000  14ms 1111...11111  83.5ms de data acquitement*/
   echo_debug(1, "[METER] Waiting for ACK frame (18-byte frame, 150ms timeout)...\n");
-  bool ack_received = false;
   if (!receive_radian_frame(0x12, 150, rxBuffer, sizeof(rxBuffer)))
   {
     echo_debug(1, "[METER] No ACK frame received (meter may be asleep/out of range)\n");
@@ -1731,7 +1728,6 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
   }
   else
   {
-    ack_received = true;
     echo_debug(1, "[METER] ACK frame received\n");
   }
   // delay(30); //50ms de 111111  , mais on a 7+3ms de printf et xxms calculs
@@ -1774,18 +1770,9 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
     }
     else
     {
-      // Even without debug_cc1101, show first 32 bytes for basic troubleshooting.
-      // Build the hex string locally so the label and bytes stay on a single
-      // line with one log prefix (show_in_hex_one_line emits its own LOG_D
-      // prefix and newline, which would split this across two lines).
-      int hex_count = (meter_data_size < 32) ? meter_data_size : 32;
-      char hex_str[100];
-      int hex_pos = 0;
-      for (int i = 0; i < hex_count; i++)
-      {
-        hex_pos += snprintf(hex_str + hex_pos, sizeof(hex_str) - hex_pos, "%02X ", meter_data[i]);
-      }
-      echo_debug(1, "[METER] First 32 bytes (header + volume field): %s\n", hex_str);
+      // Even without debug_cc1101, show first 32 bytes for basic troubleshooting
+      echo_debug(1, "[METER] First 32 bytes (header + volume field): ");
+      show_in_hex_one_line(meter_data, (meter_data_size < 32) ? meter_data_size : 32);
     }
 
     echo_debug(1, "[METER] Validating CRC...\n");
@@ -1805,16 +1792,6 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
     echo_debug(1, "[METER] No data frame received (timeout)\n");
     echo_debug(debug_out, "[METER] Meter data frame timeout\n");
   }
-
-  // Only now, after both reception stages, decide whether the meter actually
-  // responded. The earlier TX FIFO drain is a normal end-of-frame event, so
-  // the "meter asleep / wrong serial" guidance belongs here, not at TX time.
-  if (!ack_received && !rxBuffer_size)
-  {
-    echo_debug(1, "[METER] No response from meter (no ACK and no data frame)\n");
-    echo_debug(1, "[METER] This is expected when the meter is asleep, out of range, or Year/Serial is incorrect\n");
-  }
-
   sdata.rssi = halRfReadReg(RSSI_ADDR);                              // Read RSSI value from CC1101
   sdata.rssi_dbm = cc1100_rssi_convert2dbm(halRfReadReg(RSSI_ADDR)); // Read RSSI value from CC1101 and convert to dBm
   sdata.lqi = halRfReadReg(LQI_ADDR);                                // Read LQI value from CC1101

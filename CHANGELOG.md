@@ -4,6 +4,37 @@ All notable changes to this project will be documented in this file.
 
 Releases are created manually by tagging commits with version tags matching `v*.*.*` (e.g., `v2.1.0`). Users should build from source and configure `private.h` with their own meter settings.
 
+## [v2.4.0] - 2026-06-22
+
+> Adds optional CC1101 GDO2 hardware-assisted FIFO threshold management (TX + RX) plus reliability, diagnostics, and data-validation improvements. **Fully backwards compatible** — GDO2 is optional and the driver falls back to SPI polling when it is not wired. Preserves ESP8266 (Arduino) and ESP32 + ESPHome support.
+
+### Added
+
+- **Hardware-assisted GDO2 FIFO threshold management** (Issues [#83](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/83), [#84](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/84)): the CC1101 driver can optionally use the GDO2 pin as a hardware FIFO threshold signal on both standalone (MQTT) and ESPHome targets, dynamically reconfiguring `IOCFG2` per phase:
+  - **TX phase** (`IOCFG2 = 0x02`): GDO2 asserts at the TX FIFO threshold and replaces the stale SPI `TXBYTES` status check and fixed `delay()` in the WUP feeding loop and interrogation-frame gate, proactively preventing `TXFIFO_UNDERFLOW` under ESPHome scheduler load.
+  - **RX phase** (`IOCFG2 = 0x01`): GDO2 signals the RX FIFO threshold / end-of-packet, letting the RX drain loop skip unnecessary `RXBYTES` SPI reads while still draining promptly.
+- Optional `gdo2_pin` configuration in the ESPHome Python schema (`__init__.py`) and C++ integration, plus the standalone `GDO2` macro; new `cc1101_set_gdo2_pin()` API and `GET_GDO2_PIN()` accessor with an `#ifdef GDO2` fallback so both targets share the same logic.
+- Native unit tests covering RADIAN volume and out-of-range time rejection behaviour.
+- Pre-commit configuration for automated code checks.
+
+### Changed
+
+- `FIFOTHR` changed from `0x47` (TX threshold 33 bytes) to `0x49` (TX threshold 25 bytes), guaranteeing ≥ 40 free bytes so the 8-byte WUP buffer and 39-byte interrogation frame can be written after a single GDO2 check. Applied regardless of GDO2 wiring.
+- **Non-blocking WiFi serial monitor**: all TCP output now flows through a power-of-two ring buffer drained in `loop()`, so a slow or full TCP socket can no longer stall the main loop. Dropped-byte counts are reported to the client on overrun, the buffer is reset on each new client connection, and the welcome banner now includes the ESP8266 reset reason.
+- **Configuration logging**: the ESPHome `dump_config` and the standalone startup banner report whether GDO0/GDO2 are configured and how FIFO threshold detection is performed.
+- GDO2 is fully optional: when left unwired the register write is harmless and the driver falls back to SPI polling (`CC1101_status_FIFO_FreeByte` + delay on TX, `RXBYTES` polling on RX).
+- Updated `ESPHOME/README.md` wiring tables, all `ESPHOME/example-*.yaml` files, and `include/private.example.h` with the `gdo2_pin` parameter, safe free-GPIO examples, and SPI-bus pin warnings (avoiding GPIO12/13/14 on ESP8266).
+- Standardized file header comments across `src/core/` to the Doxygen `@file`/`@brief` style already used throughout `src/services/` and `src/adapters/`, resolving documentation drift from multiple contributors; added missing headers to `crc_kermit.h`/`.cpp`, `radian_parser.h`/`.cpp`, and `meter_code_parser.h`, and converted plain-comment headers in `cc1101.cpp`, `wifi_serial.h`/`.cpp`, and `version.h`.
+- Added the `docs/GDO2_FIFO_MANAGEMENT.md` design document (TX and RX paths).
+- Regenerated the `ESPHOME-release/` bundle so it reflects the new GDO2 support and standardized headers.
+
+### Fixed
+
+- **RX frame truncation when GDO2 is wired**: the Stage-2 payload receive loop runs in `PKTCTRL0_INFINITE_LENGTH` mode where the CC1101 never generates an end-of-packet, so GDO2 (`IOCFG2 = 0x01`) only asserted at the 40-byte RX FIFO threshold and the final sub-threshold remainder of each frame was skipped indefinitely. The Stage-2 loop now always polls `RXBYTES` to drain the tail (Stage-1 fixed-length sync loop and TX-side GDO2 logic are unchanged).
+- RADIAN data validation now rejects physically impossible meter volumes (> 1 billion litres) and out-of-range time values (instead of clamping), guarding against corrupted decode alignment.
+- `meter_reader` now maintains the active reading state throughout the retry sequence.
+- Refresh `MARCSTATE` on a GDO2 underflow break and guard the interrogation-frame write with a FIFO-ready check.
+
 ## [v2.3.0] - 2026-05-15
 
 > **⚠️ BREAKING CHANGE** — This release enforces strict validation of the meter code format. Existing configurations with flexible serial lengths (1–8 digits) **will not validate** without migration. See [Migration Required](#migration-required) below.
