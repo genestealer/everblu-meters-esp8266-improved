@@ -384,17 +384,19 @@ void MeterReader::handleFailedRead()
 
     if (m_retryCount < m_config->getMaxRetries() - 1)
     {
-        // Schedule retry after delay
+        // Schedule retry after delay.
+        // Keep the "Active Reading" sensor true and the radio state as "Reading"
+        // for the whole retry sequence so they don't flicker running/idle between
+        // attempts. They are cleared only on final success or after max retries.
+        // m_readingInProgress also stays true to keep the sequence atomic (the
+        // retry timer in loop() calls performReading() directly, bypassing the
+        // m_readingInProgress guard).
         m_retryCount++;
         m_nextRetryTime = millis() + RETRY_DELAY_MS;
         m_lastErrorMessage = "No meter response (asleep/out of range/wrong Year/Serial) - retrying";
 
         m_publisher->publishStatusMessage("Retry scheduled");
         m_publisher->publishError(m_lastErrorMessage);
-        m_publisher->publishActiveReading(false);
-        m_publisher->publishRadioState("Idle");
-
-        m_readingInProgress = false;
 
         LOG_I("everblu_meter", "Retry %d/%d scheduled in %lu seconds",
               m_retryCount + 1, m_config->getMaxRetries(), RETRY_DELAY_MS / 1000);
