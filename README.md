@@ -80,6 +80,7 @@ Supported meters:
 - Daily scheduled readings (with configurable reading days).
 - Built-in frame validation (CRC-16/KERMIT) plus signal diagnostics (RSSI/LQI).
 - Automatic CC1101 frequency calibration plus first-boot wide scan.
+- Optional hardware-assisted CC1101 FIFO threshold management via GDO2 (improves TX/RX reliability).
 
 
 ### Full feature list
@@ -92,6 +93,7 @@ Supported meters:
 - MQTT integration for Home Assistant with AutoDiscovery.
 - **Native ESPHome component** for seamless integration.
 - Automatic CC1101 frequency calibration with manual fallback.
+- Optional hardware-assisted CC1101 FIFO threshold management via GDO2: dynamically reconfigured per phase to prevent TX FIFO underflows and reduce unnecessary RX SPI reads. Falls back to SPI polling when GDO2 is left unwired.
 - Wi-Fi diagnostics and OTA updates.
 - Built-in CRC-16/KERMIT verification to discard corrupted RADIAN frames before publishing data.
 - Reading Schedule Configuration: Configure reading days using presets (Monday-Friday, Monday-Saturday, Monday-Sunday) or a specific day (Monday-Sunday).
@@ -293,12 +295,14 @@ Below are the wiring diagrams for common ESP8266 boards and ESP32 DevKit.
 - **MOSI (Master Out Slave In)**: GPIO 13
 - **CS/SS (Chip Select)**: GPIO 15
 - **GDO0 (CC1101 Data Ready)**: GPIO 5 (configurable in `private.h`)
+- **GDO2 (CC1101 FIFO Threshold)**: Optional, any free GPIO (e.g. GPIO 4 / D2). Leave unwired to fall back to SPI polling.
 
 #### Important Notes
 
 - **Voltage:** The CC1101 operates at **3.3V only**. Do not connect to 5V or you will damage the module.
 - **Hardware SPI:** This project uses the ESP8266/ESP32's hardware SPI interface for reliable, high-speed communication.
 - **GDO0 Pin:** Default is GPIO 5 for ESP8266, GPIO 4 for ESP32. You can change this in your `private.h` file if needed.
+- **GDO2 Pin (optional):** Wiring CC1101 GDO2 to a free MCU GPIO enables hardware-assisted FIFO threshold management. The driver dynamically reconfigures GDO2 per phase: TX (prevents `TXFIFO_UNDERFLOW`) and RX (skips unnecessary SPI reads and improves scheduler efficiency). Set it via `#define GDO2` in `private.h` (MQTT firmware) or `gdo2_pin` in YAML (ESPHome). Leave it unset/unwired and the driver falls back to SPI polling with no loss of functionality. Use any free GPIO that does not collide with the SPI bus or GDO0. See [docs/GDO2_FIFO_MANAGEMENT.md](docs/GDO2_FIFO_MANAGEMENT.md).
 - **Distance & Signal Quality:** The RADIAN protocol implementation does not have publicly available CRC checksums for the manufacturer's proprietary encoding, making readings somewhat vulnerable to RF interference. Weak signal (distance > 10+ meters) or electrical interference can cause read failures. **Keep the CC1101 radio within a few meters (~2-5m ideally) of your meter for reliable communication.** If you experience frequent "No ACK frame received" or "No data frame received" failures, try moving the radio closer to the meter to rule out signal strength issues before investigating hardware wiring.
 
 #### Wiring Table
@@ -314,7 +318,7 @@ Pin wiring for the [Wemos D1 Mini](https://www.wemos.cc/en/latest/d1/index.html)
 | **MOSI**       | SPI Data Out | GPIO 13          | D7                | #13                | GPIO 23        | MOSI             | Hardware SPI MOSI                                   |
 | **CSN/CS**     | Chip Select  | GPIO 15          | D8                | #15                | GPIO 5         | SS               | SPI chip select                                     |
 | **GDO0**       | Data Ready   | GPIO 5           | D1                | #5                 | GPIO 4         | GPIO 4           | Digital interrupt pin (configurable in `private.h`) |
-| **GDO2**       | Not used     | -                | -                 | -                  | -              | -                | Leave disconnected (optional)                       |
+| **GDO2**       | FIFO Threshold (optional) | GPIO 4 | D2 | #4 | GPIO 27 | GPIO 27 | Optional FIFO threshold signal. Leave disconnected to use SPI polling. See `private.h` (`#define GDO2`) / `gdo2_pin` in ESPHome |
 
 <details>
 <summary>Wiring notes and board-specific quick references (optional)</summary>
@@ -335,6 +339,7 @@ MISO   → D6 (GPIO 12)
 MOSI   → D7 (GPIO 13)
 CSN    → D8 (GPIO 15)
 GDO0   → D1 (GPIO 5)
+GDO2   → D2 (GPIO 4)  ← optional, set #define GDO2 in private.h
 ```
 
 #### Quick Reference: Adafruit Feather HUZZAH ESP8266
@@ -348,6 +353,7 @@ MISO   → #12 (GPIO 12)
 MOSI   → #13 (GPIO 13)
 CSN    → #15 (GPIO 15)
 GDO0   → #5  (GPIO 5)
+GDO2   → #4  (GPIO 4)  ← optional, set #define GDO2 in private.h
 ```
 
 #### Quick Reference: ESP32 DevKit (esp32dev)
@@ -361,12 +367,14 @@ MISO   → MISO (GPIO 19)
 MOSI   → MOSI (GPIO 23)
 CSN    → SS (GPIO 5 by default on many boards)
 GDO0   → GPIO 4 (or GPIO 27)  ← set this in include/private.h as GDO0
+GDO2   → GPIO 27 (or another free GPIO)  ← optional, set #define GDO2 in private.h
 ```
 
 Notes for ESP32
 - Use the board’s hardware SPI pins (SCK/MISO/MOSI/SS).
 The defaults are provided by the Arduino core and used automatically by this project.
 - Choose a free GPIO for GDO0 (e.g., 4 or 27) and set `#define GDO0 <pin>` in `include/private.h`.
+- Optionally wire GDO2 to another free GPIO and set `#define GDO2 <pin>` to enable hardware FIFO threshold management; leave it unset to use SPI polling.
 - Power the CC1101 from 3.3V only.
 
 #### Adafruit Feather HUZZAH Silkscreen Labels
