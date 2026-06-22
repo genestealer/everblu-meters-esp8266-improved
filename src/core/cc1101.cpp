@@ -601,7 +601,11 @@ bool cc1101_init(float freq)
   if (GET_GDO2_PIN() >= 0)
   {
     pinMode(GET_GDO2_PIN(), INPUT);
-    echo_debug(debug_out, "[CC1101] GDO2 pin %d configured as FIFO threshold input (TX/RX dynamic)\n", GET_GDO2_PIN());
+    echo_debug(1, "[CC1101] FIFO mode: GDO2 hardware-assisted (pin %d) - TX underflow prevention active\n", GET_GDO2_PIN());
+  }
+  else
+  {
+    echo_debug(1, "[CC1101] FIFO mode: SPI polling fallback (GDO2 not wired/configured)\n");
   }
 
   // Initialize SPI transport for CC1101 communication.

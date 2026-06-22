@@ -169,8 +169,10 @@
 // CC1101 GDO2 (FIFO threshold signal) pin assignment — OPTIONAL
 // When defined, GDO2 is dynamically reconfigured per phase:
 //   TX phase: IOCFG2=0x02 (HIGH when TX FIFO >=25 bytes) — prevents TXFIFO_UNDERFLOW
-//   RX phase: IOCFG2=0x01 (HIGH when RX FIFO >=40 bytes OR end-of-packet) — eliminates
-//             unnecessary RXBYTES SPI reads and improves ESPHome scheduler efficiency
+//   RX phase: IOCFG2=0x01 (HIGH when RX FIFO >=40 bytes OR end-of-packet)
+// The main benefit is TXFIFO_UNDERFLOW prevention during transmit. The RX payload
+// stage runs in infinite-length mode (no end-of-packet), so it always polls RXBYTES
+// and does not rely on GDO2 to gate reads.
 // Leave commented out if GDO2 is not wired (falls back to SPI polling, fully functional).
 // Connect CC1101 GDO2 to any free GPIO. Avoid SPI bus pins and GDO0:
 //   ESP8266 SPI bus: GPIO12 (D6)=MISO, GPIO13 (D7)=MOSI, GPIO14 (D5)=SCK, GPIO15 (D8)=CS
