@@ -225,5 +225,5 @@
 //   telnet <device-ip> 23
 #define WIFI_SERIAL_MONITOR_ENABLED 0
 #if WIFI_SERIAL_MONITOR_ENABLED
-#warning "WiFi serial monitor is ENABLED: this may expose credentials and internal state over the network"
+#warning "WiFi serial monitor is ENABLED: meter readings may fail due to timing/compensation limits on the ESP"
 #endif
