@@ -12,7 +12,7 @@ except Exception as exc:  # noqa: BLE001 - broad for robustness in PlatformIO en
         % (locals().get("_custom_monitor_connect_delay", None), exc)
     )
 _RETRY_INTERVAL = 1.0  # seconds between connection attempts
-_INITIAL_DELAY = 3.0   # seconds to wait for ESP to reboot before first connection attempt
+_INITIAL_DELAY = 6.0   # seconds to wait for ESP to reboot before first connection attempt
 
 
 def _wait_for_monitor_ready(*args, **kwargs):
