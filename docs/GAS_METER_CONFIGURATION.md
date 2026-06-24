@@ -200,4 +200,3 @@ Then set: `#define GAS_VOLUME_DIVISOR 10`
 | Verify readings | Compare first RADIAN reading to meter register |
 | If readings are wrong | Check meter label for pulse weight, adjust divisor |
 | Monitor over time | Verify monthly consumption trends match physical meter |
-

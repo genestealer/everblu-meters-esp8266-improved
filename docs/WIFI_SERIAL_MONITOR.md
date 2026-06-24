@@ -111,7 +111,7 @@ You'll see:
 
 1. **Initialization**: `wifiSerialBegin()` is called in `onConnectionEstablished()` after WiFi and OTA setup
 2. **Main Loop**: `wifiSerialLoop()` is called in `loop()` to handle client connections (non-blocking)
-3. **Output Functions**: 
+3. **Output Functions**:
    - `wifiSerialPrint(const char* str)`
    - `wifiSerialPrintln(const char* str)`
    - `wifiSerialPrintf(const char* format, ...)`

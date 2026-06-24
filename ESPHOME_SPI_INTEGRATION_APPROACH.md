@@ -46,12 +46,12 @@ everblu_meter:
   spi_id: main_bus
   cs_pin: 21    # D10 (CS)
   gdo0_pin: 5   # D2 (GDO0)
-  
+
   # Meter configuration
   meter_year: 20
   meter_serial: 12345678
   time_id: homeassistant_time
-  
+
   # Sensors
   volume:
     name: "Water Volume"
@@ -72,7 +72,7 @@ everblu_meter:
   spi_id: main_bus
   cs_pin: 15    # GPIO15 (D8)
   gdo0_pin: 4   # GPIO4 (D2)
-  
+
   meter_year: 20
   meter_serial: 12345678
   time_id: homeassistant_time

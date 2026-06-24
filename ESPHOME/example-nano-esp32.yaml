@@ -68,7 +68,7 @@ external_components:
 everblu_meter:
   id: my_water_meter
   spi_id: main_bus
-  
+
   # Meter identification (REQUIRED)
   # Enter the code printed under the barcode, with dashes.
   # Format on label: YY-SSSSSSS-NNN  (year - serial - suffix)
@@ -78,12 +78,12 @@ everblu_meter:
   meter_code: "21-1234567-800"  # Replace with your meter's code
   cs_pin: GPIO21          # Nano ESP32 D10 -> CC1101 CS / NSS
   gdo0_pin: GPIO5         # Nano ESP32 D2 -> CC1101 GDO0
-  
+
   # Optional: set meter_type to 'gas' for gas meters (defaults to water)
-  
+
   # Link to time component
   time_id: homeassistant_time
-  
+
   # Control buttons
   request_reading_button:
     name: "Read Meter Now"
@@ -91,44 +91,44 @@ everblu_meter:
     name: "Scan Frequency"
   reset_frequency_button:
     name: "Reset Frequency Offset"
-  
+
   # Volume sensors
   volume:
     name: "Water Volume"
-  
+
   counter:
     name: "Read Counter"
-  
+
   # Battery sensor
   battery:
     name: "Meter Battery"
-  
+
   # Radio quality sensors
   rssi:
     name: "Meter RSSI"
-  
+
   rssi_percentage:
     name: "RSSI Percentage"
-  
+
   lqi:
     name: "LQI"
-  
+
   lqi_percentage:
     name: "LQI Percentage"
 
   firmware_version:
     name: "Firmware Version"
-  
+
   # Statistics sensors
   total_attempts:
     name: "Total Read Attempts"
-  
+
   successful_reads:
     name: "Successful Reads"
-  
+
   failed_reads:
     name: "Failed Reads"
-  
+
   # Last frequency offset used
   frequency_offset:
     name: "Frequency Offset"

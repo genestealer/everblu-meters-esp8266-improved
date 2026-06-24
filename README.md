@@ -58,7 +58,7 @@ The meter includes a built-in **read counter** that increments each time it's qu
 **Note:** Most utilities won't notice or care, but it's good to be aware of this if they mention unexpected counter values during their wireless reading attempts.
 
 ---
- 
+
 Based on regulatory paperwork, this may also work with the following models (untested):
 
 - AnyQuest Cyble Enhanced
@@ -107,7 +107,7 @@ The firmware implements multiple layers of validation to ensure data integrity:
 
 2. **CRC-16/KERMIT Checksum**: Each RADIAN frame includes a 16-bit checksum (polynomial 0x8408, init 0x0000). Technically this is a Frame Check Sequence (FCS), not a true CRC, but it's highly effective at catching transmission errors and corrupted frames. The firmware rejects any frame that fails this check.
 
-3. **Frame Structure Validation**: 
+3. **Frame Structure Validation**:
    - Preamble pattern matching (0xAAAAAAAA sync word)
    - Fixed-length frame verification (58 bytes expected)
    - Header field sanity checks (protocol version, frame type)

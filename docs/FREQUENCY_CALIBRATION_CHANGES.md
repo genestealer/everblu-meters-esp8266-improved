@@ -37,17 +37,17 @@ This document details the changes made to transition from manual frequency scann
 // Old frequency scanning code (removed)
 if (SCAN_FREQUENCY_433MHZ) {
   Serial.println("Scanning 433 MHz band...");
-  
+
   // Manual scan loop with static FSCAL writes
   for (float freq = 433.00; freq <= 434.00; freq += 0.01) {
     cc1101_set_frequency(freq);
-    
+
     // Write static calibration values
     halRfWriteReg(FSCAL3, 0xE9);
     halRfWriteReg(FSCAL2, 0x2A);
     halRfWriteReg(FSCAL1, 0x00);
     halRfWriteReg(FSCAL0, 0x1F);
-    
+
     // Test for meter response...
   }
 }
@@ -62,7 +62,7 @@ if (!cc1101_init(FREQUENCY)) {
 }
 ```
 
-**Rationale**: 
+**Rationale**:
 - Manual scanning was time-consuming and error-prone
 - Static `FSCAL` values don't adapt to environmental changes
 - The CC1101 can calibrate itself more accurately
@@ -83,15 +83,15 @@ halRfWriteReg(MCSM0, 0x18);  // FS_AUTOCAL=01b (calibrate from IDLE to RX/TX)
 ```cpp
 bool cc1101_init(float frequency) {
   // ... existing setup code ...
-  
+
   // Set the target frequency
   cc1101_set_frequency(frequency);
-  
+
   // Manually trigger frequency synthesizer calibration
   // This ensures calibration is current after frequency configuration
   CC1101_CMD(SCAL);  // Strobe command: Calibrate frequency synthesizer
   delay(5);          // Wait for calibration to complete
-  
+
   // ... rest of initialization ...
 }
 ```
@@ -182,7 +182,7 @@ Serial.printf("> Frequency (effective): %.6f MHz\n", (double)FREQUENCY);
 
 #### New Workflow (Simple)
 1. **Option A (Quick Start)**: Skip frequency config entirely-use default 433.82 MHz
-2. **Option B (Precise)**: 
+2. **Option B (Precise)**:
    - Use frequency scanning mode to find optimal frequency
    - Set `FREQUENCY` in `private.h`
    - Compile and upload

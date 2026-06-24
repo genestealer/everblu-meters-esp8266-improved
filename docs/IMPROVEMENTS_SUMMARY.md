@@ -9,7 +9,7 @@ This document summarizes the improvements made to the EverBlu Meters ESP8266/ESP
 
 **Problem:** Multiple `delay(50)` calls throughout the code were causing significant delays during MQTT publishing operations, totaling ~500ms+ per update cycle.
 
-**Solution:** 
+**Solution:**
 - Reduced all MQTT publish delays from `delay(50)` to `delay(5)` throughout the codebase
 - This reduces total delay overhead by ~90% (from ~500ms to ~50ms)
 - Locations updated:
@@ -313,4 +313,3 @@ All changes maintain backward compatibility:
 Improvements by: GitHub Copilot (October 2025)
 Based on original work by: Psykokwak and Neutrinus
 Enhanced and maintained by: Genestealer
-

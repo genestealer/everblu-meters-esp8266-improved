@@ -82,11 +82,11 @@ class YourComponent : public Component {
 public:
     void setup() override;
     void loop() override;
-    
+
     // Your CC1101 wrapper methods
     bool init_radio(float freq);
     tmeter_data read_meter();
-    
+
 private:
     // CC1101 instance (ESPHome's CC1101 component)
     CC1101 *cc1101_;
@@ -102,14 +102,14 @@ void YourComponent::setup() {
     FrequencyManager::setRadioInitCallback([this](float freq) {
         return this->init_radio(freq);
     });
-    
+
     FrequencyManager::setMeterReadCallback([this]() {
         return this->read_meter();
     });
-    
+
     // Now initialize - FrequencyManager will use YOUR functions
     FrequencyManager::begin(433.82f);
-    
+
     // Optionally perform frequency scan
     if (FrequencyManager::shouldPerformAutoScan()) {
         auto status_cb = [](const char *state, const char *msg) {
@@ -140,12 +140,12 @@ tmeter_data YourComponent::read_meter() {
 void YourComponent::loop() {
     // Get current optimal frequency
     float freq = FrequencyManager::getTunedFrequency();
-    
+
     // After successful meter read, adapt frequency
     if (meter_read_successful) {
         FrequencyManager::adaptiveFrequencyTracking(freqest_value);
     }
-    
+
     // Manual frequency scan if needed
     if (should_scan) {
         FrequencyManager::performFrequencyScan(nullptr);
@@ -171,14 +171,14 @@ class EverbluMeter : public PollingComponent {
 public:
     void setup() override;
     void update() override;
-    
+
     void set_frequency(float freq) { base_frequency_ = freq; }
     void set_cc1101(/* ESPHome CC1101 component */) { /* ... */ }
-    
+
 protected:
     bool init_radio_at_frequency(float freq);
     tmeter_data read_meter_data();
-    
+
     float base_frequency_{433.82f};
     // CC1101 reference...
 };
@@ -199,28 +199,28 @@ static const char *TAG = "everblu_meter";
 
 void EverbluMeter::setup() {
     ESP_LOGI(TAG, "Setting up EverBlu meter component...");
-    
+
     // Inject our methods into FrequencyManager using lambdas
     FrequencyManager::setRadioInitCallback([this](float freq) -> bool {
         return this->init_radio_at_frequency(freq);
     });
-    
+
     FrequencyManager::setMeterReadCallback([this]() -> tmeter_data {
         return this->read_meter_data();
     });
-    
+
     // Initialize frequency management
     float stored_offset = FrequencyManager::begin(this->base_frequency_);
     ESP_LOGI(TAG, "Frequency offset loaded: %.6f MHz", stored_offset);
-    
+
     // Perform initial scan if no stored offset
     if (FrequencyManager::shouldPerformAutoScan()) {
         ESP_LOGW(TAG, "No frequency offset found - performing initial scan...");
-        
+
         auto status = [](const char *state, const char *msg) {
             ESP_LOGI(TAG, "[SCAN] %s: %s", state, msg);
         };
-        
+
         FrequencyManager::performWideInitialScan(status);
         ESP_LOGI(TAG, "Initial scan complete!");
     }
@@ -229,22 +229,22 @@ void EverbluMeter::setup() {
 void EverbluMeter::update() {
     // Called every polling interval
     float freq = FrequencyManager::getTunedFrequency();
-    
+
     // Initialize radio at optimal frequency
     if (!init_radio_at_frequency(freq)) {
         ESP_LOGE(TAG, "Failed to initialize radio at %.6f MHz", freq);
         return;
     }
-    
+
     // Read meter data
     tmeter_data data = read_meter_data();
-    
+
     if (data.reads_counter > 0) {
         ESP_LOGI(TAG, "Meter read successful - RSSI: %d dBm", data.rssi_dbm);
-        
+
         // Adaptive tracking: let FrequencyManager optimize frequency
         FrequencyManager::adaptiveFrequencyTracking(data.freqest);
-        
+
         // Publish to sensors...
     } else {
         ESP_LOGW(TAG, "No meter data received");
@@ -254,25 +254,25 @@ void EverbluMeter::update() {
 bool EverbluMeter::init_radio_at_frequency(float freq) {
     // Use ESPHome's CC1101 component to initialize radio
     ESP_LOGD(TAG, "Initializing CC1101 at %.6f MHz", freq);
-    
+
     // Example (adapt to your CC1101 component):
     // this->cc1101_->set_frequency(freq);
     // this->cc1101_->set_modulation(...);
     // return this->cc1101_->begin();
-    
+
     return true; // Replace with actual implementation
 }
 
 tmeter_data EverbluMeter::read_meter_data() {
     tmeter_data result = {};
-    
+
     // Your meter reading logic here using ESPHome's CC1101
     // Example:
     // this->cc1101_->receive_mode();
     // ... wait for data ...
     // result.reads_counter = 1;
     // result.rssi_dbm = this->cc1101_->get_rssi();
-    
+
     return result;
 }
 
@@ -288,7 +288,7 @@ external_components:
 
 everblu_meter:
   frequency: 433.82  # Base meter frequency in MHz
-  
+
 sensor:
   - platform: everblu_meter
     name: "Water Consumption"

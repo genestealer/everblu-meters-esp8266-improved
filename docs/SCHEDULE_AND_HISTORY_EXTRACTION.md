@@ -106,10 +106,10 @@ MeterHistory::printToSerial(history, currentVolume, "[HISTORY]");
    ```cpp
    void setup() {
        // ... other setup code ...
-       
-       ScheduleManager::begin(DEFAULT_READING_SCHEDULE, 
-                             DEFAULT_READING_HOUR_UTC, 
-                             DEFAULT_READING_MINUTE_UTC, 
+
+       ScheduleManager::begin(DEFAULT_READING_SCHEDULE,
+                             DEFAULT_READING_HOUR_UTC,
+                             DEFAULT_READING_MINUTE_UTC,
                              TIMEZONE_OFFSET_MINUTES);
    }
    ```
@@ -119,7 +119,7 @@ MeterHistory::printToSerial(history, currentVolume, "[HISTORY]");
    void loop() {
        time_t tnow = time(nullptr);
        struct tm *ptm = gmtime(&tnow);
-       
+
        if (ScheduleManager::isReadingDay(ptm)) {
            // It's a scheduled reading day
        }
@@ -129,16 +129,16 @@ MeterHistory::printToSerial(history, currentVolume, "[HISTORY]");
 3. **Process history data**
    ```cpp
    struct tmeter_data meter_data = get_meter_data();
-   
+
    if (meter_data.history_available) {
        // Print to serial
        MeterHistory::printToSerial(meter_data.history, meter_data.volume);
-       
+
        // Generate JSON
        char json[1024];
-       MeterHistory::generateHistoryJson(meter_data.history, 
-                                        meter_data.volume, 
-                                        json, 
+       MeterHistory::generateHistoryJson(meter_data.history,
+                                        meter_data.volume,
+                                        json,
                                         sizeof(json));
        mqtt.publish(topic, json);
    }
@@ -168,13 +168,13 @@ public:
         // Initialize schedule manager
         ScheduleManager::begin("Monday-Friday", 10, 0, 120);  // 10:00 UTC, UTC+2
     }
-    
+
     void update() override {
         // Check if today is a reading day
         time_t now = time(nullptr);
         if (ScheduleManager::isReadingDay(gmtime(&now))) {
             // Perform reading...
-            
+
             // Process history
             if (meter_data.history_available) {
                 MeterHistory::printToSerial(meter_data.history, meter_data.volume);

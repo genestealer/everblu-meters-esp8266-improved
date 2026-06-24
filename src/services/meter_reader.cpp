@@ -520,7 +520,7 @@ bool MeterReader::isReadingDayForConfiguredSchedule(const struct tm *ptm) const
         return true;
     }
     // check for single day reading schedule
-    switch(dayOfWeek) 
+    switch(dayOfWeek)
     {
         case 0:
             return strcmp(schedule, "Sunday") == 0;

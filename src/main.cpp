@@ -1401,12 +1401,12 @@ void onConnectionEstablished()
       mqtt.publish(topicBuffer, "Invalid trigger command", true);
       return;
     }
-    
+
     // Check if we're in cooldown period
     if (lastFailedAttempt > 0 && (millis() - lastFailedAttempt) < RETRY_COOLDOWN) {
       unsigned long remainingCooldown = (RETRY_COOLDOWN - (millis() - lastFailedAttempt)) / 1000;
       Serial.printf("[WARN] Cannot trigger update: Still in cooldown period. %lu seconds remaining.\n", remainingCooldown);
-      
+
       char cooldownMsg[64];
       snprintf(cooldownMsg, sizeof(cooldownMsg), "Cooldown active, %lus remaining", remainingCooldown);
       char topicBuffer[MQTT_TOPIC_BUFFER_SIZE];
@@ -1475,7 +1475,7 @@ void onConnectionEstablished()
       mqtt.publish(topicBuffer, "Invalid scan command", true);
       return;
     }
-    
+
     Serial.println("Frequency scan command received via MQTT");
     performFrequencyScan(); });
 
