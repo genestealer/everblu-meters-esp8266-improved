@@ -2,13 +2,12 @@ name: Dependency Check
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, develop]
     paths:
       - platformio.ini
       - .github/workflows/dependency-check.yml
   pull_request:
-    types: [opened, reopened, ready_for_review]
-    branches: [main, master, develop]
+    types: [opened, reopened, synchronize, ready_for_review]
     paths:
       - platformio.ini
       - .github/workflows/dependency-check.yml

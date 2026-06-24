@@ -2,7 +2,7 @@ name: ESPHome External Component Integration
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, develop]
     paths:
       - ESPHOME/components/everblu_meter/**
       - .ci/esphome/everblu_meter/**
@@ -10,8 +10,7 @@ on:
       - ESPHOME/README.md
       - .github/workflows/esphome-external-component.yml
   pull_request:
-    branches: [main, master, develop]
-    types: [opened, reopened, ready_for_review]
+    types: [opened, reopened, synchronize, ready_for_review]
     paths:
       - ESPHOME/components/everblu_meter/**
       - .ci/esphome/everblu_meter/**

@@ -2,7 +2,7 @@ name: Meter Fixture Replay Tests
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, develop]
     paths:
       - src/**
       - include/**
@@ -11,8 +11,7 @@ on:
       - test/test_native_meter_fixtures/**
       - .github/workflows/meter-fixture-tests.yml
   pull_request:
-    types: [opened, reopened, ready_for_review]
-    branches: [main, master, develop]
+    types: [opened, reopened, synchronize, ready_for_review]
     paths:
       - src/**
       - include/**
