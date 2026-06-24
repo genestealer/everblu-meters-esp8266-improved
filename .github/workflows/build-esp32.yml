@@ -113,14 +113,14 @@ jobs:
             echo "" >> warnings-summary.md
             echo "## ⚠️ Compiler Warnings Found: $WARNING_COUNT" >> warnings-summary.md
             echo "" >> warnings-summary.md
-            
+
             # Categorize warnings
             UNUSED_VAR=$(grep -c "unused variable" warnings.txt || echo 0)
             DEPRECATED=$(grep -c "deprecated" warnings.txt || echo 0)
             COMPARISON=$(grep -c "comparison" warnings.txt || echo 0)
             SIGN_COMPARE=$(grep -c "sign-compare" warnings.txt || echo 0)
             TYPE_LIMITS=$(grep -c "type-limits" warnings.txt || echo 0)
-            
+
             echo "### Warning Categories" >> warnings-summary.md
             echo "- Unused variables: $UNUSED_VAR" >> warnings-summary.md
             echo "- Deprecated: $DEPRECATED" >> warnings-summary.md
@@ -128,15 +128,15 @@ jobs:
             echo "- Sign comparison: $SIGN_COMPARE" >> warnings-summary.md
             echo "- Type limits: $TYPE_LIMITS" >> warnings-summary.md
             echo "" >> warnings-summary.md
-            
+
             # Show first 20 warnings
             echo "### First 20 Warnings" >> warnings-summary.md
             echo '```' >> warnings-summary.md
             head -20 warnings.txt >> warnings-summary.md
             echo '```' >> warnings-summary.md
-            
+
             cat warnings-summary.md >> $GITHUB_STEP_SUMMARY
-            
+
             # Warning threshold (fail if too many)
             if [ $WARNING_COUNT -gt 50 ]; then
               echo "❌ Too many warnings ($WARNING_COUNT > 50 threshold)"

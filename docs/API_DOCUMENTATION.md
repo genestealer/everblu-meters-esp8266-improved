@@ -562,7 +562,7 @@ if (data.reads_counter > 0 && data.liters > 0) {
   Serial.printf("Current reading: %d liters\n", data.liters);
   Serial.printf("Battery: %d months\n", data.battery_left);
   Serial.printf("RSSI: %d dBm\n", data.rssi_dbm);
-  
+
   // Access historical data if available
   if (data.history_available) {
     for (int i = 0; i < 13; i++) {
@@ -599,7 +599,7 @@ void loop() {
   mqtt.loop();           // Handle MQTT
   ArduinoOTA.handle();   // Handle OTA updates
   handleStateMachine();  // Execute state machine
-  
+
   // Periodic WiFi diagnostics
   if (millis() - lastWifiUpdate > 300000) {
     publishWifiDetails();

@@ -14,7 +14,7 @@ Your codebase has been successfully refactored into **independent, reusable modu
 
 ### 2. **Frequency Manager** (`frequency_manager.h/cpp`)
 - **Purpose**: Frequency calibration and optimization for CC1101
-- **Features**: 
+- **Features**:
   - Narrow & wide frequency scanning
   - Adaptive tracking using FREQEST
   - Dependency injection (callbacks) for radio operations
@@ -90,11 +90,11 @@ void onUpdateData() {
     time_t now = time(nullptr);
     if (ScheduleManager::isReadingDay(gmtime(&now))) {
         // Perform read...
-        
+
         // Process history
         MeterHistory::printToSerial(meter_data.history, meter_data.volume);
         char json[1024];
-        MeterHistory::generateHistoryJson(meter_data.history, 
+        MeterHistory::generateHistoryJson(meter_data.history,
                                          meter_data.volume, json, 1024);
         mqtt.publish(topic, json);
     }
@@ -112,17 +112,17 @@ class EverbluMeter : public PollingComponent {
     void setup() {
         // No MQTT dependency!
         ScheduleManager::begin("Monday-Friday", 10, 0, timezone);
-        
+
         // Inject frequency functions
-        FrequencyManager::setRadioInitCallback([this](float f) { 
-            return this->init_cc1101(f); 
+        FrequencyManager::setRadioInitCallback([this](float f) {
+            return this->init_cc1101(f);
         });
-        FrequencyManager::setMeterReadCallback([this]() { 
-            return this->read_meter(); 
+        FrequencyManager::setMeterReadCallback([this]() {
+            return this->read_meter();
         });
         FrequencyManager::begin(433.82);
     }
-    
+
     void update() {
         // Use the modules - they work the same!
         if (ScheduleManager::isReadingDay(gmtime(&now))) {
@@ -137,7 +137,7 @@ class EverbluMeter : public PollingComponent {
 
 Previously (91JJ fork): Had to rewrite frequency code, schedule code, history code - duplicating 500+ lines
 
-Now: 
+Now:
 - Copy 4 files: `storage_abstraction.h/cpp`, `frequency_manager.h/cpp`, `schedule_manager.h/cpp`, `meter_history.h/cpp`
 - Inject 2 callbacks for CC1101
 - Done! All features work

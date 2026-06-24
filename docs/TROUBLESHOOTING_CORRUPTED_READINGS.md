@@ -33,7 +33,7 @@ everblu_meter:
   meter_year: 15
   meter_serial: 5020386
   # ... other settings ...
-  
+
   debug_cc1101: true  # ⬅️ Add this line
 ```
 
@@ -91,11 +91,11 @@ Shows complete 200-byte frame with offset markers:
 ```
 [CC1101] Full hex dump of decoded frame (200 bytes):
 Offset  : Hex Data
-[000-015]: 7C 11 00 45 20 0A 50 14 12 03 00 20 40 14 03 00 
-[016-031]: 6E 17 EE 01 0B 00 40 06 1E 0A 50 14 12 01 00 65 
-[032-047]: 31 33 33 32 39 20 30 41 4C 30 32 00 00 06 12 04 
-[048-063]: 01 30 75 04 C0 6D 05 00 02 81 9A 20 12 09 00 00 
-[064-079]: 00 00 23 9A 08 00 97 CA 08 00 36 EE 08 00 B6 1E 
+[000-015]: 7C 11 00 45 20 0A 50 14 12 03 00 20 40 14 03 00
+[016-031]: 6E 17 EE 01 0B 00 40 06 1E 0A 50 14 12 01 00 65
+[032-047]: 31 33 33 32 39 20 30 41 4C 30 32 00 00 06 12 04
+[048-063]: 01 30 75 04 C0 6D 05 00 02 81 9A 20 12 09 00 00
+[064-079]: 00 00 23 9A 08 00 97 CA 08 00 36 EE 08 00 B6 1E
 ...
 Note: Bytes [18-21]=volume, [31]=battery, [44-45]=wake/sleep, [66-117]=history
 ```
@@ -227,7 +227,7 @@ print(f"Looking for bytes: {' '.join(f'{b:02X}' for b in target_bytes)}")
 for i in range(len(bytes_data) - 3):
     if bytes_data[i:i+4] == target_bytes:
         print(f"✅ Found volume at offset [{i}-{i+3}]")
-        
+
     # Also try as big-endian (MSB-first)
     target_reversed = list(reversed(target_bytes))
     if bytes_data[i:i+4] == target_reversed:
@@ -338,7 +338,7 @@ Battery: 0 months (impossible)
 ### Key Byte Positions (Standard)
 - **Volume**: [18-21] uint32 LSB-first
 - **Battery**: [31] uint8 months
-- **Counter**: [48] uint8 
+- **Counter**: [48] uint8
 - **Wake/Sleep**: [44-45] uint8 hours
 
 ### Analysis Tools

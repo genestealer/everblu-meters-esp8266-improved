@@ -274,13 +274,13 @@ jobs:
               RAM=$(grep "RAM:" "$dir/memory-full-report.md" | grep -oP '\d+%' | head -1 || echo "N/A")
               FLASH=$(grep "Flash:" "$dir/memory-full-report.md" | grep -oP '\d+%' | head -1 || echo "N/A")
               SIZE=$(grep "Binary Size:" "$dir/memory-full-report.md" | grep -oP '\d+' || echo "N/A")
-              
+
               # Format size in KB
               if [ "$SIZE" != "N/A" ]; then
                 SIZE_KB=$(echo "scale=2; $SIZE / 1024" | bc)
                 SIZE="${SIZE_KB}KB"
               fi
-              
+
               echo "| $BOARD | $RAM | $FLASH | $SIZE |" >> $GITHUB_STEP_SUMMARY
             fi
           done

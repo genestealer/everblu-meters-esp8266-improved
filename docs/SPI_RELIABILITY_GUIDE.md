@@ -69,7 +69,7 @@ void SPIReadBurstReg(uint8_t spi_instr, uint8_t *pArr, uint8_t len)
 }
 ```
 
-**Problem (Now Fixed)**: 
+**Problem (Now Fixed)**:
 - ESP8266 has limited stack space (~4KB)
 - When reading large frames (682 bytes for RADIAN data), this created 683-byte stack arrays
 - Stack overflow caused memory corruption, crashes, or silent data corruption
@@ -90,16 +90,16 @@ void SPIReadBurstReg(uint8_t spi_instr, uint8_t *pArr, uint8_t len)
 void SPIReadBurstReg(uint8_t spi_instr, uint8_t *pArr, uint8_t len)
 {
   static uint8_t rbuf[MAX_SPI_BURST_SIZE + 1]; // Static = data segment, not stack
-  
+
   if (len > MAX_SPI_BURST_SIZE) {
     echo_debug(1, "ERROR: SPI burst read too large (%d > %d)\n", len, MAX_SPI_BURST_SIZE);
     return;
   }
-  
+
   memset(rbuf, 0, len + 1);
   rbuf[0] = spi_instr | READ_BURST;
   wiringPiSPIDataRW(0, rbuf, len + 1);
-  
+
   for (uint8_t i = 0; i < len; i++)
   {
     pArr[i] = rbuf[i + 1];
@@ -111,12 +111,12 @@ void SPIReadBurstReg(uint8_t spi_instr, uint8_t *pArr, uint8_t len)
 void SPIWriteBurstReg(uint8_t spi_instr, uint8_t *pArr, uint8_t len)
 {
   static uint8_t tbuf[MAX_SPI_BURST_SIZE + 1]; // Static = safe
-  
+
   if (len > MAX_SPI_BURST_SIZE) {
     echo_debug(1, "ERROR: SPI burst write too large (%d > %d)\n", len, MAX_SPI_BURST_SIZE);
     return;
   }
-  
+
   tbuf[0] = spi_instr | WRITE_BURST;
   for (uint8_t i = 0; i < len; i++)
   {
@@ -189,7 +189,7 @@ while (digitalRead(GDO0) == TRUE)
 {
   delay(2); // Reduce from 5ms to 2ms for faster reads
   l_nb_byte = (halRfReadReg(RXBYTES_ADDR) & RXBYTES_MASK);
-  
+
   // Check for FIFO overflow (bit 7 of RXBYTES)
   uint8_t rxbytes_reg = halRfReadReg(RXBYTES_ADDR);
   if (rxbytes_reg & 0x80) {
@@ -197,7 +197,7 @@ while (digitalRead(GDO0) == TRUE)
     CC1101_CMD(SFRX); // Flush RX FIFO
     return FALSE;
   }
-  
+
   if ((l_nb_byte) && ((pktLen + l_nb_byte) < 100))
   {
     SPIReadBurstReg(RX_FIFO_ADDR, &rxBuffer[pktLen], l_nb_byte);
@@ -220,14 +220,14 @@ while (digitalRead(GDO0) == TRUE)
 void SPIReadBurstReg(uint8_t spi_instr, uint8_t *pArr, uint8_t len)
 {
   static uint8_t rbuf[MAX_SPI_BURST_SIZE + 1];
-  
+
   if (len > MAX_SPI_BURST_SIZE) return;
-  
+
   // Feed watchdog before long operations
   if (len > 64) {
     FEED_WDT();
   }
-  
+
   memset(rbuf, 0, len + 1);
   // ... rest of function
 }
@@ -249,7 +249,7 @@ digitalWrite(SPI_SS, 1);  // De-assert CS
 **Risk**: CC1101 draws ~30mA during TX, causing voltage dips that corrupt SPI
 
 **Solutions**:
-- **Hardware**: 
+- **Hardware**:
   - 10µF + 100nF capacitors near CC1101 VCC pin
   - Separate 3.3V regulator for CC1101 (ideal)
   - Short, thick power wires
@@ -336,7 +336,7 @@ if ((l_total_byte + l_byte_in_rx) > rxBuffer_size) {
 - [ ] **Wire Length**: Keep SPI wires < 15cm (shorter is better)
 - [ ] **Wire Quality**: Use solid core or twisted pairs
 - [ ] **Ground**: Dedicated GND wire, star ground at ESP8266
-- [ ] **Power**: 
+- [ ] **Power**:
   - 10µF bulk + 100nF ceramic capacitor at CC1101 VCC
   - Measure voltage during TX - should not drop > 100mV
 - [ ] **Pull-ups**: GDO0 pin has internal pull-up enabled ✅
@@ -425,13 +425,13 @@ After implementing fixes:
 
 ### For Users Experiencing Issue #20:
 
-**Before this fix**: 
+**Before this fix**:
 - Some users: 100% success rate
 - Some users: 50-70% success rate
 - Some users: <10% success rate
 - Pattern: Those with active WiFi, lots of MQTT traffic, or additional libraries had worst results
 
-**After this fix**: 
+**After this fix**:
 - **All users should see >95% success rate** regardless of:
   - Board type (D1 Mini, NodeMCU, Huzzah, etc.)
   - WiFi activity level

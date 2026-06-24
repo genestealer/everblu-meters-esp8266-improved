@@ -136,11 +136,11 @@ utility_meter:
   water_consumption_daily:
     source: sensor.water_meter_calibrated
     cycle: daily
-    
+
   water_consumption_monthly:
     source: sensor.water_meter_calibrated
     cycle: monthly
-    
+
   water_consumption_yearly:
     source: sensor.water_meter_calibrated
     cycle: yearly
@@ -166,7 +166,7 @@ When you need to replace the ESP or change meter configuration:
    - New ESP reading: 728,836 L (the actual meter value)
    - You want HA to continue from 725,000 L
    - Set calibration offset: `725000 - 728836 = -3836`
-   
+
    Alternatively, if you want to sync HA to the physical meter:
    - Just use the new reading directly (no offset needed)
    - Home Assistant will continue tracking from the new value
@@ -221,17 +221,17 @@ utility_meter:
     source: sensor.water_meter_calibrated
     name: Daily Water Consumption
     cycle: daily
-    
+
   water_consumption_weekly:
     source: sensor.water_meter_calibrated
     name: Weekly Water Consumption
     cycle: weekly
-    
+
   water_consumption_monthly:
     source: sensor.water_meter_calibrated
     name: Monthly Water Consumption
     cycle: monthly
-    
+
   water_consumption_yearly:
     source: sensor.water_meter_calibrated
     name: Yearly Water Consumption
@@ -249,7 +249,7 @@ cards:
     name: Current Meter Reading
     graph: line
     hours_to_show: 168
-    
+
   # Consumption periods
   - type: entities
     title: Water Consumption
@@ -268,7 +268,7 @@ cards:
       - type: divider
       - entity: input_number.water_meter_calibration_offset
         name: Calibration Offset
-  
+
   # Statistics card showing long-term trends
   - type: statistics-graph
     title: Monthly Water Usage History
