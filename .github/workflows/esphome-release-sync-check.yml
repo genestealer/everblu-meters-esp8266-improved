@@ -2,8 +2,7 @@ name: ESPHOME Sync Check
 
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review]
-    branches: [main, master, develop]
+    types: [opened, reopened, synchronize, ready_for_review]
     paths:
       - src/**
       - ESPHOME/components/everblu_meter/**

@@ -2,7 +2,7 @@ name: ESPHome External Component Integration
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, develop]
     paths:
       - ESPHOME/components/everblu_meter/**
       - .ci/esphome/everblu_meter/**
@@ -10,8 +10,7 @@ on:
       - ESPHOME/README.md
       - .github/workflows/esphome-external-component.yml
   pull_request:
-    branches: [main, master, develop]
-    types: [opened, reopened, ready_for_review]
+    types: [opened, reopened, synchronize, ready_for_review]
     paths:
       - ESPHOME/components/everblu_meter/**
       - .ci/esphome/everblu_meter/**
@@ -35,9 +34,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Xtensa / Arduino - water meter
+          # Minimal baseline - ESP8266 water meter with GDO2 hardware path
           - id: esp8266-ard
             config: .ci/esphome/everblu_meter/test.esp8266-ard.yaml
+          # Full coverage - every sensor, button, and non-default option on ESP8266
+          - id: esp8266-full
+            config: .ci/esphome/everblu_meter/test.esp8266-full.yaml
+          # Legacy GDO2 opt-out path - disable_gdo2_fifo_management: true
+          - id: esp8266-legacy-gdo2
+            config: .ci/esphome/everblu_meter/test.esp8266-legacy-gdo2.yaml
 
     name: ${{ matrix.id }}
     steps:
@@ -95,14 +100,23 @@ jobs:
       matrix:
         include:
           # CI scope rationale:
-          # - Cover architecture families with water on Xtensa (ESP8266) and RISC-V (ESP32-C3)
-          # - Cover the gas-specific code path once (ESP32)
-          # - Keep one git-source smoke test for real external_components install flow
-          # This keeps runtime reasonable while still exercising the main compatibility paths.
-          # Xtensa / Arduino - water meter
+          # - Minimal baseline on every architecture family
+          # - Full sensor/option coverage on ESP8266 (all paths exercised)
+          # - Gas meter path on ESP32 (different meter_type codegen)
+          # - Legacy GDO2 opt-out on ESP8266 (disable_gdo2_fifo_management: true)
+          # - RISC-V architecture on ESP32-C3
+          # - Git external_components smoke test (real-world install, main branch only)
+
+          # Xtensa / Arduino - water meter, minimal
           - id: esp8266-ard
             config: .ci/esphome/everblu_meter/test.esp8266-ard.yaml
-          # Xtensa / Arduino - gas meter (verifies gas meter codegen path)
+          # Xtensa / Arduino - all sensors, all options, all buttons
+          - id: esp8266-full
+            config: .ci/esphome/everblu_meter/test.esp8266-full.yaml
+          # Xtensa / Arduino - legacy GDO2 polling (disable_gdo2_fifo_management: true)
+          - id: esp8266-legacy-gdo2
+            config: .ci/esphome/everblu_meter/test.esp8266-legacy-gdo2.yaml
+          # Xtensa / Arduino - gas meter on ESP32
           - id: esp32-ard
             config: .ci/esphome/everblu_meter/test.esp32-ard.yaml
           # RISC-V / Arduino - different architecture family

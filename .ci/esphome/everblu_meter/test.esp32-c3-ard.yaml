@@ -4,6 +4,7 @@ substitutions:
   spi_mosi_pin: GPIO7
   cs_pin: GPIO10
   gdo0_pin: GPIO4
+  gdo2_pin: GPIO3
   meter_type: water
 
 esphome:

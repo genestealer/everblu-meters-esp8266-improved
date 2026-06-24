@@ -1,3 +1,4 @@
+# Full-coverage ESP8266 test: every sensor, button and non-default option.
 substitutions:
   spi_clk_pin: GPIO14
   spi_miso_pin: GPIO12
@@ -8,7 +9,7 @@ substitutions:
   meter_type: water
 
 esphome:
-  name: ci-esp8266-ard
+  name: ci-esp8266-full
   min_version: 2024.6.0
 
 esp8266:
@@ -27,4 +28,4 @@ wifi:
   ssid: CI-WIFI
   password: CI-PASSWORD
 
-<<: !include common.yaml
+<<: !include common-full.yaml
