@@ -1695,27 +1695,34 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
     marcstate = halRfReadReg(MARCSTATE_ADDR); // read out state of cc1100 to be sure in IDLE and TX is finished this update also CC1101_status_state
     // echo_debug(debug_out,"%ifree_byte:0x%02X sts:0x%02X\n",tmo,CC1101_status_FIFO_FreeByte,CC1101_status_state);
 
-    // Detect TXFIFO_UNDERFLOW (MARCSTATE 0x16) early and abort instead of
-    // spinning for the full TX timeout. The FIFO underflowed mid-TX,
-    // so continuing to feed data is pointless.
-    if ((marcstate & 0x1F) == 0x16) // TXFIFO_UNDERFLOW
+    // MARCSTATE 0x16 means the TX FIFO has emptied. Once the full wake-up burst
+    // and interrogation frame have been clocked out on-air, this is the normal,
+    // expected end of transmission — there is simply no more data left to send,
+    // so we stop feeding and move on to listen for the meter's reply. This is
+    // NOT a code fault. (An unusually early exit here would instead indicate the
+    // feeding loop fell behind the 2.4 kbps drain rate, e.g. under heavy
+    // background load.)
+    if ((marcstate & 0x1F) == 0x16) // TX FIFO drained — end of transmit burst
     {
-      echo_debug(1, "[CC1101] TXFIFO_UNDERFLOW detected at tmo=%d, aborting TX loop\n", tmo);
+      echo_debug(1, "[CC1101] Wake-up burst sent; TX FIFO drained at tmo=%d (normal end of transmit)\n", tmo);
       break;
     }
   }
 
-  // Check if TX was aborted due to underflow
-  bool tx_aborted = ((marcstate & 0x1F) == 0x16);
-  if (tx_aborted)
+  // A drained TX FIFO (MARCSTATE 0x16) is the normal end of transmit. The only
+  // abnormal case here is the loop hitting its timeout WITHOUT the FIFO ever
+  // draining, which points to an SPI/feeding problem rather than anything RF.
+  // Reaching this point says nothing about whether the meter replied — that is
+  // determined below by the ACK/data frames, so any "meter asleep / out of
+  // range / run a scan" guidance is deferred until a read actually fails.
+  bool tx_fifo_drained = ((marcstate & 0x1F) == 0x16);
+  if (tx_fifo_drained)
   {
-    echo_debug(1, "[METER] No response during wake-up/interrogation (TXFIFO_UNDERFLOW after %dms, MARCSTATE=0x%02X)\n", tmo * 10, marcstate & 0x1F);
-    echo_debug(1, "[METER] This usually means the meter is asleep, out of range, or the configured Year/Serial is incorrect.\n");
-    echo_debug(1, "[METER] If this persists, try running a frequency scan to recalibrate the radio (see AUTO_SCAN_ENABLED / CLEAR_EEPROM_ON_BOOT).\n");
+    echo_debug(1, "[METER] Wake-up/interrogation transmitted in %dms (MARCSTATE=0x%02X)\n", tmo * 10, marcstate & 0x1F);
   }
   else
   {
-    echo_debug(1, "[METER] TX complete after %dms (MARCSTATE=0x%02X)\n", tmo * 10, marcstate & 0x1F);
+    echo_debug(1, "[METER] WARNING: TX loop timed out after %dms before the FIFO drained (MARCSTATE=0x%02X); possible SPI/feeding issue\n", tmo * 10, marcstate & 0x1F);
   }
   echo_debug(debug_out, "[CC1101] tmo=%i free_byte:0x%02X sts:0x%02X", tmo, CC1101_status_FIFO_FreeByte, CC1101_status_state);
   CC1101_CMD(SIDLE); // Ensure IDLE before flushing (required by CC1101 datasheet)
@@ -1789,13 +1796,16 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
     }
     else
     {
-      echo_debug(1, "[METER] ERROR: CRC validation failed\n");
+      echo_debug(1, "[METER] CRC check failed: a frame was received but arrived corrupted, so this reading was discarded.\n");
+      echo_debug(1, "[METER] This points to a marginal/noisy RF link (weak signal or a slight frequency offset), not a code fault. Improving antenna placement or running a frequency scan usually fixes it.\n");
       meter_data_size = 0;
     }
   }
   else
   {
-    echo_debug(1, "[METER] No data frame received (timeout)\n");
+    echo_debug(1, "[METER] No data frame received within the timeout window — the meter did not respond.\n");
+    echo_debug(1, "[METER] This usually means the meter is asleep (outside its daily listening window), out of range, the signal is too weak, or the configured Year/Serial is incorrect.\n");
+    echo_debug(1, "[METER] If this persists, try improving antenna placement or running a frequency scan to recalibrate the radio (see AUTO_SCAN_ENABLED / CLEAR_EEPROM_ON_BOOT).\n");
     echo_debug(debug_out, "[METER] Meter data frame timeout\n");
   }
   sdata.rssi = halRfReadReg(RSSI_ADDR);                              // Read RSSI value from CC1101
