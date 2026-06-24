@@ -724,9 +724,9 @@ void show_cc1101_registers_settings(void)
 
 uint8_t is_look_like_radian_frame(uint8_t *buffer, size_t len)
 {
-  int i, ret;
+  int ret;
   ret = FALSE;
-  for (i = 0; i < len; i++)
+  for (size_t i = 0; i < len; i++)
   {
     if (buffer[i] == 0xFF)
       ret = TRUE;
@@ -988,7 +988,7 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
       if (history_ok && data.volume > 0 && num_values > 0)
       {
         uint32_t newest = data.history[num_values - 1];
-        if (newest > data.volume)
+        if (newest > (uint32_t)data.volume)
         {
           uint32_t diff = newest - data.volume;
           // Allow a small tolerance for off-by-one / rounding, but reject
