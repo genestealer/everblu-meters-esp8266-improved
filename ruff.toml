@@ -1,0 +1,68 @@
+# Ruff configuration — mirrors ESPHome's upstream Python style so this repo's Python
+# (the ESPHome component and helper scripts) matches the ESPHome project.
+#
+# Reference: https://github.com/esphome/esphome/blob/dev/pyproject.toml  ([tool.ruff])
+#
+# Tooling is intentionally unpinned: the latest ruff is used locally (.pre-commit-config.yaml)
+# and in CI (.github/workflows/lint.yml), so there is no version to maintain.
+
+target-version = "py311"
+
+# ESPHOME-release/ is generated output (never hand-edited); .pio is a build dir.
+extend-exclude = ["ESPHOME-release", ".pio"]
+
+[lint]
+# Rule families selected by ESPHome (numpy-only NPY dropped as irrelevant here).
+select = [
+  "B",    # flake8-bugbear
+  "BLE",  # flake8-blind-except
+  "C4",   # flake8-comprehensions
+  "DTZ",  # flake8-datetimez
+  "E",    # pycodestyle errors
+  "EXE",  # flake8-executable
+  "F",    # pyflakes
+  "FA",   # flake8-future-annotations
+  "FLY",  # flynt
+  "FURB", # refurb
+  "G",    # flake8-logging-format
+  "I",    # isort
+  "ICN",  # flake8-import-conventions
+  "ISC",  # flake8-implicit-str-concat
+  "LOG",  # flake8-logging
+  "PERF", # perflint
+  "PGH",  # pygrep-hooks
+  "PIE",  # flake8-pie
+  "PL",   # pylint
+  "PTH",  # flake8-use-pathlib
+  "PYI",  # flake8-pyi
+  "Q",    # flake8-quotes
+  "RSE",  # flake8-raise
+  "RET",  # flake8-return
+  "SIM",  # flake8-simplify
+  "SLOT", # flake8-slots
+  "T10",  # flake8-debugger
+  "UP",   # pyupgrade
+  "W",    # pycodestyle warnings
+  "YTT",  # flake8-2020
+]
+ignore = [
+  "E501",    # line too long (handled by the formatter)
+  "PLC0415", # `import` should be at top level of a file
+  "PLR0911", # too many return statements
+  "PLR0912", # too many branches
+  "PLR0913", # too many arguments
+  "PLR0915", # too many statements
+  "PLR2004", # magic value used in comparison
+  "PLW2901", # loop variable overwritten
+]
+
+[lint.isort]
+force-sort-within-sections = true
+combine-as-imports = true
+split-on-trailing-comma = false
+
+[lint.per-file-ignores]
+# PlatformIO advanced-scripting injects the SCons `env` / `Import` globals at runtime,
+# and requires `Import("env")` to run before the stdlib imports. Neither is resolvable
+# by static analysis, so suppress undefined-name and import-position here only.
+"extra/monitor_delay.py" = ["F821", "E402"]

@@ -633,3 +633,71 @@ Based on the EverBlu Meters ESP8266 project with architectural improvements for 
 - See the Configuration Reference above for parameters and quick fixes
 - See [Troubleshooting](docs/ESPHOME_INTEGRATION_GUIDE.md#troubleshooting) for common issues
 - Developers: See [Developer Guide](docs/DEVELOPER_GUIDE.md) for architecture details
+
+## Development: Code Style & Formatting
+
+The C++ sources of this ESPHome component follow **ESPHome's own coding standards** so the
+code matches what ships in ESPHome core and stays compatible with the upstream review bar.
+
+- **Formatter:** [`clang-format`](https://clang.llvm.org/docs/ClangFormat.html), configured with a
+  verbatim copy of ESPHome's upstream style.
+- **Style file:** [`components/everblu_meter/.clang-format`](components/everblu_meter/.clang-format)
+  — copied from [esphome/esphome `.clang-format`](https://github.com/esphome/esphome/blob/dev/.clang-format).
+  It is placed in the component directory (not the repo root) so it applies **only** to the
+  ESPHome component; the portable library under [`src/`](../src) keeps its own house style.
+- **Naming / `this->` / `final` conventions** follow ESPHome's
+  [code standards](https://developers.esphome.io/contributing/code/) and
+  [`.clang-tidy`](https://github.com/esphome/esphome/blob/dev/.clang-tidy)
+  (private/protected members use a trailing `_`, `lower_case` methods, leaf classes marked `final`).
+
+### Running the formatter
+
+The component clang-format style is wired into pre-commit (below), so it runs automatically on
+commit. To run it manually, use the helper scripts (they auto-install the latest `clang-format`
+if it is missing):
+
+```powershell
+# Windows / PowerShell
+./ESPHOME/format-component.ps1          # check only (non-zero exit if changes needed)
+./ESPHOME/format-component.ps1 -Fix     # reformat in place
+```
+
+```bash
+# Linux / macOS
+ESPHOME/format-component.sh             # check only
+ESPHOME/format-component.sh --fix       # reformat in place
+```
+
+Or invoke `clang-format` directly (it auto-discovers the component `.clang-format`):
+
+```bash
+clang-format -style=file -i ESPHOME/components/everblu_meter/everblu_meter.{cpp,h}
+```
+
+### Linting & pre-commit
+
+Repo-wide linting mirrors ESPHome's toolchain and runs through [pre-commit](https://pre-commit.com):
+
+| Tool | Scope | Config |
+| --- | --- | --- |
+| **ruff** (lint + format) | all Python | [`ruff.toml`](../ruff.toml) (mirrors ESPHome) |
+| **yamllint** | all YAML | [`.yamllint`](../.yamllint) |
+| **clang-format** | ESPHome component C++ | [`.clang-format`](components/everblu_meter/.clang-format) |
+| trailing-whitespace, end-of-file, check-yaml, … | repo hygiene | [`.pre-commit-config.yaml`](../.pre-commit-config.yaml) |
+
+All tools install **unpinned** (latest), so there are no versions to maintain.
+
+```bash
+pip install pre-commit
+pre-commit install          # run automatically on every commit
+pre-commit run --all-files  # run across the whole repo now
+```
+
+On pull requests, the **[pre-commit.ci](https://pre-commit.ci)** app (if enabled for the repo,
+via the `ci:` block in [`.pre-commit-config.yaml`](../.pre-commit-config.yaml)) runs these hooks
+and can auto-fix them. They are advisory, not a hard merge gate.
+
+> Note: ESPHome also enforces `clang-tidy` upstream, but that requires a full ESPHome/PlatformIO
+> build environment (a compilation database with the ESPHome headers), so it is not wired into this
+> repository's lightweight CI. The [`.clang-tidy`](https://github.com/esphome/esphome/blob/dev/.clang-tidy)
+> rules are linked above for reference.

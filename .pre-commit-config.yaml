@@ -16,6 +16,43 @@ exclude: |
   )$
 
 repos:
+  - repo: local
+    # These hooks install the LATEST tool into an isolated env (no pinned versions
+    # to maintain), mirroring ESPHome's toolchain. See ruff.toml / .yamllint and
+    # ESPHOME/components/everblu_meter/.clang-format for the rules.
+    hooks:
+      # --- Python: ruff (mirrors ESPHome) ---
+      - id: ruff-check
+        name: ruff (lint, autofix)
+        entry: ruff check --fix --force-exclude
+        language: python
+        additional_dependencies: ["ruff"]
+        types_or: [python, pyi]
+        require_serial: true
+      - id: ruff-format
+        name: ruff (format)
+        entry: ruff format --force-exclude
+        language: python
+        additional_dependencies: ["ruff"]
+        types_or: [python, pyi]
+        require_serial: true
+
+      # --- YAML ---
+      - id: yamllint
+        name: yamllint
+        entry: yamllint --strict
+        language: python
+        additional_dependencies: ["yamllint"]
+        types: [yaml]
+
+      # --- C++: ESPHome component only (uses the component .clang-format) ---
+      - id: clang-format
+        name: clang-format (ESPHome component)
+        entry: clang-format -style=file -i
+        language: python
+        additional_dependencies: ["clang-format"]
+        files: ^ESPHOME/components/everblu_meter/.*\.(cpp|h)$
+
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:

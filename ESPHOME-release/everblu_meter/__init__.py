@@ -7,21 +7,28 @@ using the RADIAN protocol over 433 MHz with a CC1101 transceiver.
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome import pins
-from esphome.components import sensor, text_sensor, binary_sensor, button, time as time_, spi
 from esphome.const import (
-    CONF_ID,
     CONF_FREQUENCY,
+    CONF_ID,
     CONF_TIME_ID,
-    DEVICE_CLASS_ENERGY,
     DEVICE_CLASS_CONNECTIVITY,
     DEVICE_CLASS_RUNNING,
     DEVICE_CLASS_SIGNAL_STRENGTH,
     DEVICE_CLASS_TIMESTAMP,
-    STATE_CLASS_TOTAL_INCREASING,
     STATE_CLASS_MEASUREMENT,
-    UNIT_PERCENT,
+    STATE_CLASS_TOTAL_INCREASING,
     UNIT_DECIBEL_MILLIWATT,
+    UNIT_PERCENT,
+)
+
+from esphome import pins
+from esphome.components import (
+    binary_sensor,
+    button,
+    sensor,
+    spi,
+    text_sensor,
+    time as time_,
 )
 
 DEPENDENCIES = ["time", "spi"]
@@ -32,8 +39,12 @@ AUTO_LOAD = ["sensor", "text_sensor", "binary_sensor", "button"]
 MULTI_CONF = True
 
 everblu_meter_ns = cg.esphome_ns.namespace("everblu_meter")
-EverbluMeterComponent = everblu_meter_ns.class_("EverbluMeterComponent", cg.PollingComponent)
-EverbluMeterTriggerButton = everblu_meter_ns.class_("EverbluMeterTriggerButton", button.Button)
+EverbluMeterComponent = everblu_meter_ns.class_(
+    "EverbluMeterComponent", cg.PollingComponent
+)
+EverbluMeterTriggerButton = everblu_meter_ns.class_(
+    "EverbluMeterTriggerButton", button.Button
+)
 
 # Configuration keys
 CONF_METER_CODE = "meter_code"
@@ -136,7 +147,9 @@ def validate_meter_code(value):
     if not serial_str.isdigit() or len(serial_str) != 7:
         raise cv.Invalid("meter_code serial section must be exactly 7 digits")
     if suffix_str and (len(suffix_str) != 3 or not suffix_str.isdigit()):
-        raise cv.Invalid("meter_code suffix section must be exactly 3 digits when provided")
+        raise cv.Invalid(
+            "meter_code suffix section must be exactly 3 digits when provided"
+        )
 
     year = int(year_str)
     if not serial_str:
@@ -169,20 +182,32 @@ CONFIG_SCHEMA = (
             cv.Optional(CONF_METER_TYPE, default=METER_TYPE_WATER): cv.enum(
                 {METER_TYPE_WATER: False, METER_TYPE_GAS: True}
             ),
-            cv.Optional(CONF_GAS_VOLUME_DIVISOR, default=100): cv.int_range(min=1, max=1000),
-            cv.Optional(CONF_FREQUENCY, default=433.82): cv.float_range(min=300.0, max=928.0),
+            cv.Optional(CONF_GAS_VOLUME_DIVISOR, default=100): cv.int_range(
+                min=1, max=1000
+            ),
+            cv.Optional(CONF_FREQUENCY, default=433.82): cv.float_range(
+                min=300.0, max=928.0
+            ),
             cv.Optional(CONF_AUTO_SCAN, default=True): cv.boolean,
-            cv.Optional(CONF_READING_SCHEDULE, default=SCHEDULE_MONDAY_FRIDAY): cv.string,
+            cv.Optional(
+                CONF_READING_SCHEDULE, default=SCHEDULE_MONDAY_FRIDAY
+            ): cv.string,
             cv.Optional(CONF_READ_HOUR, default=10): cv.int_range(min=0, max=23),
             cv.Optional(CONF_READ_MINUTE, default=0): cv.int_range(min=0, max=59),
-            cv.Optional(CONF_TIMEZONE_OFFSET, default=0): cv.int_range(min=-720, max=720),
+            cv.Optional(CONF_TIMEZONE_OFFSET, default=0): cv.int_range(
+                min=-720, max=720
+            ),
             cv.Optional(CONF_AUTO_ALIGN_TIME, default=True): cv.boolean,
             cv.Optional(CONF_AUTO_ALIGN_MIDPOINT, default=True): cv.boolean,
             cv.Optional(CONF_MAX_RETRIES, default=10): cv.int_range(min=1, max=50),
-            cv.Optional(CONF_RETRY_COOLDOWN, default="1h"): cv.positive_time_period_milliseconds,
+            cv.Optional(
+                CONF_RETRY_COOLDOWN, default="1h"
+            ): cv.positive_time_period_milliseconds,
             cv.Optional(CONF_INITIAL_READ_ON_BOOT, default=False): cv.boolean,
             cv.Optional(CONF_DEBUG_CC1101, default=False): cv.boolean,
-            cv.Optional(CONF_ADAPTIVE_THRESHOLD, default=1): cv.int_range(min=1, max=100),
+            cv.Optional(CONF_ADAPTIVE_THRESHOLD, default=1): cv.int_range(
+                min=1, max=100
+            ),
             # Sensors
             cv.Optional(CONF_VOLUME): sensor.sensor_schema(
                 state_class=STATE_CLASS_TOTAL_INCREASING,
@@ -314,16 +339,16 @@ CONFIG_SCHEMA = (
                 device_class=DEVICE_CLASS_CONNECTIVITY,
                 entity_category="diagnostic",
             ),
-            cv.Optional(CONF_REQUEST_READING_BUTTON): button.button_schema(EverbluMeterTriggerButton),
+            cv.Optional(CONF_REQUEST_READING_BUTTON): button.button_schema(
+                EverbluMeterTriggerButton
+            ),
             cv.Optional(CONF_FREQUENCY_SCAN_BUTTON): button.button_schema(
                 EverbluMeterTriggerButton,
                 icon="mdi:magnify-scan",
-                entity_category="config"
+                entity_category="config",
             ),
             cv.Optional(CONF_RESET_FREQUENCY_BUTTON): button.button_schema(
-                EverbluMeterTriggerButton,
-                icon="mdi:restore",
-                entity_category="config"
+                EverbluMeterTriggerButton, icon="mdi:restore", entity_category="config"
             ),
         }
     )
@@ -418,11 +443,19 @@ async def to_code(config):
     if CONF_VOLUME in config:
         volume_cfg = dict(config[CONF_VOLUME])
         if "unit_of_measurement" not in volume_cfg:
-            volume_cfg["unit_of_measurement"] = "m³" if config[CONF_METER_TYPE] == METER_TYPE_GAS else "L"
+            volume_cfg["unit_of_measurement"] = (
+                "m³" if config[CONF_METER_TYPE] == METER_TYPE_GAS else "L"
+            )
         if "device_class" not in volume_cfg:
-            volume_cfg["device_class"] = "gas" if config[CONF_METER_TYPE] == METER_TYPE_GAS else "water"
+            volume_cfg["device_class"] = (
+                "gas" if config[CONF_METER_TYPE] == METER_TYPE_GAS else "water"
+            )
         if "icon" not in volume_cfg:
-            volume_cfg["icon"] = "mdi:gas-cylinder" if config[CONF_METER_TYPE] == METER_TYPE_GAS else "mdi:water"
+            volume_cfg["icon"] = (
+                "mdi:gas-cylinder"
+                if config[CONF_METER_TYPE] == METER_TYPE_GAS
+                else "mdi:water"
+            )
         if "accuracy_decimals" not in volume_cfg:
             volume_cfg["accuracy_decimals"] = 0
         if "state_class" not in volume_cfg:

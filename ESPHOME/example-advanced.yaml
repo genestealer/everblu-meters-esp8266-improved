@@ -132,8 +132,8 @@ everblu_meter:
     name: "Water Volume"
     filters:
       - or:
-        - throttle: 10s          # Limit updates
-        - delta: 0.1             # Only on change
+          - throttle: 10s          # Limit updates
+          - delta: 0.1             # Only on change
 
   counter:
     name: "Read Counter"
