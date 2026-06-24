@@ -5,6 +5,13 @@ Reads water/gas meter data from Itron EverBlu Cyble Enhanced meters
 using the RADIAN protocol over 433 MHz with a CC1101 transceiver.
 """
 
+# Pylance/Pyright false positives in this file: ESPHome's config_validation types
+# cv.Optional's `default` parameter as the `Undefined` sentinel, so every concrete
+# default literal is flagged as reportArgumentType. The pin helpers likewise return
+# `Any | None`, which trips the same rule on cg.add(var.set_gdoX_pin(...)). All of
+# these are valid ESPHome usage, so disable just this rule for this file.
+# pyright: reportArgumentType=false
+
 from esphome import pins
 import esphome.codegen as cg
 from esphome.components import (

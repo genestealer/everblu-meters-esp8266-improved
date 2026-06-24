@@ -87,8 +87,12 @@ static const uint8_t debug_out = (uint8_t)(DEBUG_CC1101);
 
 /*-------------------------[CC1100 - Register Values]----------------------------*/
 // IOCFG2 - GDO2 Output Pin Configuration
+// GDO2's meaning is switched dynamically per phase: TX feeding uses the TX FIFO
+// threshold signal (0x02); RADIAN frame reception uses the RX FIFO threshold /
+// end-of-packet signal (0x01) so the RX drain loop can skip needless RXBYTES reads.
 #define IOCFG2_SERIAL_DATA_OUTPUT 0x0D // GDO2: Serial Data Output (kept for reference, not used)
 #define IOCFG2_TX_FIFO_THR 0x02        // GDO2: asserts HIGH when TX FIFO >= threshold; de-asserts LOW when below threshold
+#define IOCFG2_RX_FIFO_THR_OR_EOP 0x01 // GDO2: asserts HIGH when RX FIFO >= threshold OR end-of-packet; de-asserts LOW when RX FIFO empty
 
 // IOCFG0 - GDO0 Output Pin Configuration
 #define IOCFG0_SYNC_WORD_DETECT 0x06 // Asserts when sync word detected, deasserts at end of packet
@@ -96,9 +100,16 @@ static const uint8_t debug_out = (uint8_t)(DEBUG_CC1101);
 // FIFOTHR - RX FIFO and TX FIFO Thresholds
 // FIFO_THR=9 (0x49): TX threshold=25 bytes — de-assertion guarantees >=40 free bytes, safely fits both
 //                    the 8-byte WUP buffer and the 39-byte interrogation frame with a single GDO2 check.
-//                    RX threshold shifts to 40 bytes (no impact: RX loop uses GDO0 + RXBYTES, not FIFO signal).
+//                    RX threshold=40 bytes — GDO2 (IOCFG2=0x01) asserts once the RX FIFO holds >=40 bytes,
+//                    letting the RX drain loop skip RXBYTES SPI reads until a worthwhile chunk is buffered.
 #define FIFOTHR_FIFO_THR_33_32 0x47 // FIFO_THR=7: TX threshold 33 bytes, RX threshold 33 bytes (legacy)
 #define FIFOTHR_FIFO_THR_25_40 0x49 // FIFO_THR=9: TX threshold 25 bytes, RX threshold 40 bytes
+
+// RX FIFO threshold in bytes for FIFOTHR_FIFO_THR_25_40 (FIFO_THR=9). The RX drain
+// loop uses this to know when the GDO2 fast-path no longer applies: the final tail
+// of a frame (< this many bytes) never raises GDO2 under infinite packet length
+// (no end-of-packet), so RXBYTES polling must resume to drain it.
+#define RX_FIFO_THRESHOLD_BYTES 40
 
 // SYNC1/SYNC0 - Sync Word Configuration
 #define SYNC1_PATTERN_55 0x55 // Sync word pattern: 0x55 (01010101)
@@ -549,9 +560,11 @@ void cc1101_configureRF_0(float freq)
   //
   // RF settings for CC1101 - RADIAN protocol (Itron EverBlu)
   //
-  // GDO2: always configured as TX FIFO threshold signal (IOCFG2_TX_FIFO_THR = 0x02).
-  // When GDO2 is not physically wired, the output is unused; the TX feeding loop falls back
-  // to SPI TXBYTES polling instead of digitalRead(). IOCFG2_SERIAL_DATA_OUTPUT is not restored.
+  // GDO2: configured here as the TX FIFO threshold signal (IOCFG2_TX_FIFO_THR = 0x02)
+  // for the transmit phase. receive_radian_frame() temporarily switches IOCFG2 to the
+  // RX FIFO threshold / end-of-packet signal (0x01) during reception and the next TX
+  // phase restores 0x02. When GDO2 is not physically wired, the output is unused and
+  // both phases fall back to SPI polling (TXBYTES on TX, RXBYTES on RX).
   halRfWriteReg(IOCFG2, IOCFG2_TX_FIFO_THR);      // GDO2: TX FIFO at/above threshold
   halRfWriteReg(IOCFG0, IOCFG0_SYNC_WORD_DETECT); // GDO0: Sync word detection
   halRfWriteReg(FIFOTHR, FIFOTHR_FIFO_THR_25_40); // FIFO thresholds: TX=25 bytes, RX=40 bytes
@@ -1283,6 +1296,11 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
     return 0;
   }
   CC1101_CMD(SFRX);
+  // Switch GDO2 to the RX FIFO threshold / end-of-packet signal for this receive
+  // phase (IOCFG2 = 0x01). The Stage 2 drain loop uses it to skip RXBYTES SPI reads
+  // until the FIFO has buffered a worthwhile chunk. The next TX phase restores 0x02.
+  if (GET_GDO2_PIN() >= 0)
+    halRfWriteReg(IOCFG2, IOCFG2_RX_FIFO_THR_OR_EOP);
   halRfWriteReg(MCSM1, MCSM1_CCA_ALWAYS_RX);       // CCA always, RX on exit
   halRfWriteReg(MDMCFG2, MDMCFG2_2FSK_16_16_SYNC); // 2-FSK, 16/16 sync bits
   /* configure to receive beginning of sync pattern */
@@ -1399,12 +1417,27 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
     return 0;
   }
   uint16_t l_expected_bytes = l_radian_frame_size_byte * 4;
+  bool l_use_gdo2 = (GET_GDO2_PIN() >= 0);
   while ((l_total_byte < l_expected_bytes) && (l_tmo < rx_tmo_ms))
   {
     delay(5);
     l_tmo += 5; // wait for some byte received
     if (l_tmo % 50 == 0)
       FEED_WDT(); // Feed watchdog every 50ms during frame receive
+
+    // GDO2 fast path (IOCFG2 = RX FIFO threshold / EOP): GDO2 is HIGH only once the
+    // RX FIFO holds at least RX_FIFO_THRESHOLD_BYTES. While it is LOW the FIFO is
+    // below threshold, so an RXBYTES SPI read would return little or nothing — skip
+    // it to avoid needless SPI traffic. Exception: the final tail of the frame
+    // (< threshold bytes) never raises GDO2 under infinite packet length (there is
+    // no end-of-packet), so once we are within one threshold of the expected total
+    // we must resume RXBYTES polling to drain those last bytes.
+    if (l_use_gdo2 && digitalRead(GET_GDO2_PIN()) == LOW &&
+        (l_expected_bytes - l_total_byte) > RX_FIFO_THRESHOLD_BYTES)
+    {
+      continue; // not enough buffered yet; skip the unnecessary RXBYTES read
+    }
+
     l_byte_in_rx = (halRfReadReg(RXBYTES_ADDR) & RXBYTES_MASK);
     if (l_byte_in_rx)
     {
@@ -1558,6 +1591,11 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
   CC1101_CMD(SFTX);  // Flush TX FIFO (clears any stale data / TXFIFO_UNDERFLOW)
   delay(1);          // Brief settle time after flush
   echo_debug(debug_out, "[CC1101] Pre-TX reset: IDLE + FIFO flush complete\n");
+
+  // Ensure GDO2 signals the TX FIFO threshold for this transmit phase. A previous
+  // receive_radian_frame() call may have left IOCFG2 set to the RX threshold (0x01).
+  if (GET_GDO2_PIN() >= 0)
+    halRfWriteReg(IOCFG2, IOCFG2_TX_FIFO_THR);
 
   halRfWriteReg(MDMCFG2, MDMCFG2_NO_PREAMBLE_SYNC);  // No preamble/sync for WUP
   halRfWriteReg(PKTCTRL0, PKTCTRL0_INFINITE_LENGTH); // Infinite packet length
