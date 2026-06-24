@@ -2,8 +2,12 @@ name: Dependency Check
 
 on:
   push:
-    branches: [main, master, develop]
+    branches: [main, master]
+    paths:
+      - platformio.ini
+      - .github/workflows/dependency-check.yml
   pull_request:
+    types: [opened, reopened, ready_for_review]
     branches: [main, master, develop]
     paths:
       - platformio.ini
@@ -13,12 +17,17 @@ on:
     - cron: "0 0 * * 1"
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   security-events: write
 
 jobs:
   dependency-scan:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     name: Scan Dependencies for Vulnerabilities
 

@@ -58,9 +58,6 @@ everblu_meter:
   meter_code: "22-8765432-100"  # Replace with your meter's code
   cs_pin: GPIO15
   gdo0_pin: 4
-  # gdo2_pin: 5           # Optional: wire CC1101 GDO2 here for hardware FIFO threshold (TX+RX)
-                          # Use GPIO5 (D1) — free GPIO when GDO0 uses GPIO4 (D2). Do NOT use GPIO12 (MISO), GPIO13 (MOSI), GPIO14 (SCK)
-                          # (prevents TXFIFO_UNDERFLOW; leave unset to use SPI polling fallback)
 
   # REQUIRED: Meter type
   meter_type: gas

@@ -2,8 +2,14 @@ name: ESP32 Build
 
 on:
   push:
-    branches: [main, master, develop]
+    branches: [main, master]
+    paths:
+      - src/**
+      - include/**
+      - platformio.ini
+      - .github/workflows/build-esp32.yml
   pull_request:
+    types: [opened, reopened, ready_for_review]
     branches: [main, master, develop]
     paths:
       - src/**
@@ -12,11 +18,16 @@ on:
       - .github/workflows/build-esp32.yml
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
 jobs:
   build:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     strategy:
       matrix:

@@ -64,6 +64,3 @@ __pycache__/
 *.pyc
 **/.esphome/
 extra/dev_notes.txt
-
-
-test/rommess/*

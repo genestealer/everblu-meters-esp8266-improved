@@ -2,8 +2,14 @@ name: Configuration Validation
 
 on:
   push:
-    branches: [main, master, develop]
+    branches: [main, master]
+    paths:
+      - platformio.ini
+      - include/private.example.h
+      - src/**
+      - .github/workflows/config-validation.yml
   pull_request:
+    types: [opened, reopened, ready_for_review]
     branches: [main, master, develop]
     paths:
       - platformio.ini
@@ -12,11 +18,16 @@ on:
       - .github/workflows/config-validation.yml
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
 jobs:
   validate-config:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     name: Validate Configuration Files
 
