@@ -348,7 +348,7 @@ async def to_code(config):
     cg.add_build_flag("-DWIFI_SERIAL_NO_REMAP")  # Don't remap Serial in ESPHome builds
     # Note: ESPHome automatically compiles all .cpp files in component directory
     # No need to explicitly list source files - just ensure main.cpp is excluded from release
-    
+
     # Set basic configuration
     meter_code = config[CONF_METER_CODE]
     cg.add(var.set_meter_code(meter_code["raw"]))
@@ -392,11 +392,11 @@ async def to_code(config):
             volume_cfg["state_class"] = STATE_CLASS_TOTAL_INCREASING
         sens = await sensor.new_sensor(volume_cfg)
         cg.add(var.set_volume_sensor(sens))
-    
+
     if CONF_BATTERY in config:
         sens = await sensor.new_sensor(config[CONF_BATTERY])
         cg.add(var.set_battery_sensor(sens))
-    
+
     if CONF_COUNTER in config:
         counter_cfg = dict(config[CONF_COUNTER])
         if "icon" not in counter_cfg:
@@ -407,51 +407,51 @@ async def to_code(config):
             counter_cfg["state_class"] = STATE_CLASS_TOTAL_INCREASING
         sens = await sensor.new_sensor(counter_cfg)
         cg.add(var.set_counter_sensor(sens))
-    
+
     if CONF_RSSI in config:
         sens = await sensor.new_sensor(config[CONF_RSSI])
         cg.add(var.set_rssi_sensor(sens))
-    
+
     if CONF_RSSI_PERCENTAGE in config:
         sens = await sensor.new_sensor(config[CONF_RSSI_PERCENTAGE])
         cg.add(var.set_rssi_percentage_sensor(sens))
-    
+
     if CONF_LQI in config:
         sens = await sensor.new_sensor(config[CONF_LQI])
         cg.add(var.set_lqi_sensor(sens))
-    
+
     if CONF_LQI_PERCENTAGE in config:
         sens = await sensor.new_sensor(config[CONF_LQI_PERCENTAGE])
         cg.add(var.set_lqi_percentage_sensor(sens))
-    
+
     if CONF_TIME_START in config:
         sens = await text_sensor.new_text_sensor(config[CONF_TIME_START])
         cg.add(var.set_time_start_sensor(sens))
-    
+
     if CONF_TIME_END in config:
         sens = await text_sensor.new_text_sensor(config[CONF_TIME_END])
         cg.add(var.set_time_end_sensor(sens))
-    
+
     if CONF_TOTAL_ATTEMPTS in config:
         sens = await sensor.new_sensor(config[CONF_TOTAL_ATTEMPTS])
         cg.add(var.set_total_attempts_sensor(sens))
-    
+
     if CONF_SUCCESSFUL_READS in config:
         sens = await sensor.new_sensor(config[CONF_SUCCESSFUL_READS])
         cg.add(var.set_successful_reads_sensor(sens))
-    
+
     if CONF_FAILED_READS in config:
         sens = await sensor.new_sensor(config[CONF_FAILED_READS])
         cg.add(var.set_failed_reads_sensor(sens))
-    
+
     if CONF_FREQUENCY_OFFSET in config:
         sens = await sensor.new_sensor(config[CONF_FREQUENCY_OFFSET])
         cg.add(var.set_frequency_offset_sensor(sens))
-    
+
     if CONF_TUNED_FREQUENCY in config:
         sens = await sensor.new_sensor(config[CONF_TUNED_FREQUENCY])
         cg.add(var.set_tuned_frequency_sensor(sens))
-    
+
     if CONF_FREQUENCY_ESTIMATE in config:
         sens = await sensor.new_sensor(config[CONF_FREQUENCY_ESTIMATE])
         cg.add(var.set_frequency_estimate_sensor(sens))
@@ -460,15 +460,15 @@ async def to_code(config):
     if CONF_STATUS in config:
         sens = await text_sensor.new_text_sensor(config[CONF_STATUS])
         cg.add(var.set_status_sensor(sens))
-    
+
     if CONF_ERROR in config:
         sens = await text_sensor.new_text_sensor(config[CONF_ERROR])
         cg.add(var.set_error_sensor(sens))
-    
+
     if CONF_RADIO_STATE in config:
         sens = await text_sensor.new_text_sensor(config[CONF_RADIO_STATE])
         cg.add(var.set_radio_state_sensor(sens))
-    
+
     if CONF_TIMESTAMP in config:
         sens = await text_sensor.new_text_sensor(config[CONF_TIMESTAMP])
         cg.add(var.set_timestamp_sensor(sens))
@@ -496,7 +496,7 @@ async def to_code(config):
     if CONF_READING_TIME_UTC_SENSOR in config:
         sens = await text_sensor.new_text_sensor(config[CONF_READING_TIME_UTC_SENSOR])
         cg.add(var.set_reading_time_utc_sensor(sens))
-    
+
     # Register binary sensors
     if CONF_ACTIVE_READING in config:
         sens = await binary_sensor.new_binary_sensor(config[CONF_ACTIVE_READING])

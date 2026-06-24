@@ -2,6 +2,7 @@ name: ESPHOME Sync Check
 
 on:
   pull_request:
+    types: [opened, reopened, ready_for_review]
     branches: [main, master, develop]
     paths:
       - src/**
@@ -11,11 +12,16 @@ on:
       - ESPHOME-release/**
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
 jobs:
   verify-generated-release:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

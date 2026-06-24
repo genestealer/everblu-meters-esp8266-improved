@@ -2,7 +2,13 @@ name: ESPHome External Component Integration
 
 on:
   push:
-    branches: [main, master, develop]
+    branches: [main, master]
+    paths:
+      - ESPHOME/components/everblu_meter/**
+      - .ci/esphome/everblu_meter/**
+      - ESPHOME/example-*.yaml
+      - ESPHOME/README.md
+      - .github/workflows/esphome-external-component.yml
   pull_request:
     branches: [main, master, develop]
     types: [opened, reopened, ready_for_review]
@@ -23,7 +29,7 @@ permissions:
 
 jobs:
   integration-test-pr:
-    if: ${{ github.event_name == 'pull_request' }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

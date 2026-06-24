@@ -93,7 +93,7 @@ Serial.printf("ERROR: CC1101: MDMCFG2 register mismatch (expected 0x%02X, got 0x
 Serial.printf("stop bit error%d\n", stop_bit);
 
 // After:
-Serial.printf("ERROR: Decoder: Invalid stop bit %d at position %d (expected %d) - Frame corruption detected\n", 
+Serial.printf("ERROR: Decoder: Invalid stop bit %d at position %d (expected %d) - Frame corruption detected\n",
               stop_bit, frame_position, expected_stop_bit);
 ```
 
@@ -143,25 +143,25 @@ Validates:
 ```cpp
 bool validateConfiguration() {
   bool isValid = true;
-  
+
   if (METER_YEAR < 2009) {
     Serial.printf("ERROR: Configuration: METER_YEAR=%d is invalid (protocol introduced in 2009)\n", METER_YEAR);
     isValid = false;
   }
-  
+
   if (METER_SERIAL == 0 || METER_SERIAL > 99999999) {
     Serial.printf("ERROR: Configuration: METER_SERIAL=%lu is invalid (must be 1-99999999)\n", METER_SERIAL);
     isValid = false;
   }
-  
+
   float freqDelta = abs(FREQUENCY - 433.82);
   if (freqDelta > 1.0) {
     Serial.printf("ERROR: Configuration: FREQUENCY=%.2f MHz exceeds ±1 MHz limit (regulatory violation)\n", FREQUENCY);
     isValid = false;
   }
-  
+
   // ... additional checks ...
-  
+
   return isValid;
 }
 ```
@@ -171,15 +171,15 @@ bool validateConfiguration() {
 void setup() {
   Serial.begin(115200);
   delay(100);
-  
+
   Serial.println("=== EverBlu Cyble Enhanced Water Meter Reader ===");
-  
+
   // Validate configuration before proceeding
   if (!validateConfiguration()) {
     Serial.println("FATAL: Configuration validation failed - halting");
     while (true) { delay(1000); }  // Halt system
   }
-  
+
   Serial.println("Configuration validated successfully");
   // Continue with normal initialization...
 }
@@ -262,7 +262,7 @@ mqtt.publish("everblu/cyble/wifi_rssi", valueBuffer, true);
 #### Error Messages (Lines 399-407)
 ```cpp
 // Before:
-mqtt.publish("everblu/cyble/status_message", 
+mqtt.publish("everblu/cyble/status_message",
              String("Cooldown active, " + String(remainingCooldown) + "s remaining").c_str(), true);
 
 // After:
@@ -275,7 +275,7 @@ mqtt.publish("everblu/cyble/status_message", cooldownMsg, true);
 ```cpp
 // Before:
 mqtt.publish("everblu/cyble/frequency_offset", String(offset, 6), true);
-mqtt.publish("everblu/cyble/status_message", 
+mqtt.publish("everblu/cyble/status_message",
              String("Scan complete: offset " + String(offset, 6) + " MHz, RSSI " + String(bestRSSI) + " dBm").c_str(), true);
 
 // After:
@@ -291,13 +291,13 @@ mqtt.publish("everblu/cyble/status_message", statusMsg, true);
 #### Time Conversions (Lines 230, 1114)
 ```cpp
 // Before:
-Serial.printf("Current date (UTC) : %04d/%02d/%02d %02d:%02d/%02d - %s\n", 
-              ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, 
+Serial.printf("Current date (UTC) : %04d/%02d/%02d %02d:%02d/%02d - %s\n",
+              ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday,
               ptm->tm_hour, ptm->tm_min, ptm->tm_sec, String(tnow, DEC).c_str());
 
 // After:
-Serial.printf("Current date (UTC) : %04d/%02d/%02d %02d:%02d/%02d - %ld\n", 
-              ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, 
+Serial.printf("Current date (UTC) : %04d/%02d/%02d %02d:%02d/%02d - %ld\n",
+              ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday,
               ptm->tm_hour, ptm->tm_min, ptm->tm_sec, (long)tnow);
 ```
 
