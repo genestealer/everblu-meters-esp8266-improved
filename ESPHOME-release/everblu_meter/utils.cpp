@@ -203,8 +203,27 @@ void echo_debug(bool l_flag, const char *fmt, ...)
 	// Use INFO level so messages are always visible in WiFi logs
 	LOG_I("everblu_meter", "%s", buf);
 #else
-	// MQTT mode: Route through WiFiSerial for USB + WiFi visibility
-	WiFiSerial.print(buf);
+	// MQTT mode: Route through WiFiSerial for USB + WiFi visibility.
+	// Colourise based on the leading "[TAG]" token (e.g. [METER], [FREQ]) so
+	// the VS Code terminal / PlatformIO monitor is easier to scan. The RESET is
+	// emitted before any trailing newline to avoid colouring blank line breaks.
+	const char *col = everblu_log_color_for_prefix(buf);
+	if (col[0] != '\0')
+	{
+		size_t len = strlen(buf);
+		bool hasNewline = (len > 0 && buf[len - 1] == '\n');
+		if (hasNewline)
+			buf[len - 1] = '\0';
+		WiFiSerial.print(col);
+		WiFiSerial.print(buf);
+		WiFiSerial.print(EVB_ANSI_RESET);
+		if (hasNewline)
+			WiFiSerial.print('\n');
+	}
+	else
+	{
+		WiFiSerial.print(buf);
+	}
 #endif
 
 	va_end(args);
