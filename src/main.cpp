@@ -582,8 +582,10 @@ void onUpdateData()
       snprintf(errorMsg, sizeof(errorMsg), "Retry %d/%d - No data received", _retry, max_retries);
       lastErrorMessage = errorMsg;
       Serial.printf("[STATUS] Scheduling retry in 10 seconds... (next attempt %d/%d)\n", _retry + 1, max_retries);
-      mqtt.publish(String(mqttBaseTopic) + "/active_reading", "false", true);
-      mqtt.publish(String(mqttBaseTopic) + "/cc1101_state", cc1101RadioConnected ? "Idle" : "unavailable", true);
+      // Keep the "Active Reading" sensor true and the radio state as "Reading"
+      // for the whole retry sequence so they don't flip to "Not running"/Idle
+      // between attempts. They are cleared only on final success or after max
+      // retries (see the else branch below).
       mqtt.publish(String(mqttBaseTopic) + "/last_error", lastErrorMessage, true);
       digitalWrite(LED_BUILTIN, HIGH); // Turn off LED
       // Use non-blocking callback instead of recursive call
@@ -1670,6 +1672,11 @@ void performFrequencyScan()
       bestFreq = freq;
       Serial.printf("[FREQ] Better signal at %.6f MHz: RSSI=%d dBm\n", freq, test_data.rssi_dbm);
     }
+
+    // Drain the WiFi serial ring buffer so remote logs stream live during the
+    // scan instead of all arriving at once after it completes. Safe here: the
+    // CC1101 RX phase for this step has already finished.
+    wifiSerialLoop();
   }
 
   // Calculate and save the offset
@@ -1757,6 +1764,10 @@ void performWideInitialScan()
       bestFreq = freq;
       Serial.printf("[FREQ] Found signal at %.6f MHz: RSSI=%d dBm\n", freq, test_data.rssi_dbm);
     }
+
+    // Drain the WiFi serial ring buffer so remote logs stream live during the
+    // scan instead of all arriving at once after it completes.
+    wifiSerialLoop();
   }
 
   if (bestRSSI > -120)
@@ -1790,6 +1801,9 @@ void performWideInitialScan()
         fineBestFreq = freq;
         Serial.printf("[FREQ] Refined signal at %.6f MHz: RSSI=%d dBm\n", freq, test_data.rssi_dbm);
       }
+
+      // Drain the WiFi serial ring buffer so remote logs stream live.
+      wifiSerialLoop();
     }
 
     bestFreq = fineBestFreq;
