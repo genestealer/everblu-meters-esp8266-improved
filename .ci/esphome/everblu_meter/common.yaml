@@ -26,6 +26,7 @@ everblu_meter:
   meter_code: "22-8765432-100"
   meter_type: ${meter_type}
   gdo0_pin: ${gdo0_pin}
+  gdo2_pin: ${gdo2_pin}
   time_id: ci_time
 
   volume:
