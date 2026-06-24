@@ -196,6 +196,13 @@ external_components:
 esphome run your-config.yaml
 ```
 
+## ESPHome Device Builder (Visual Dashboard)
+
+ESPHome 2026.6.0 replaced the legacy dashboard with the new **Device Builder**. This component works with it, with one caveat:
+
+- **YAML editor:** Fully supported. Paste any of the example configs (which use `external_components:`) into the Device Builder's YAML editor and it validates, compiles, flashes, and OTA-updates exactly as before.
+- **Visual component catalog:** Not supported. The drag-and-drop catalog is generated from a nightly sync of ESPHome's *built-in* component schemas, so `everblu_meter` (like every other `external_components:` source) does not appear as a catalog card. This is a Device Builder limitation for all external components, not specific to this project.
+
 ## Board-Specific Configuration
 
 ### Arduino Nano ESP32 (ESP32S3)
