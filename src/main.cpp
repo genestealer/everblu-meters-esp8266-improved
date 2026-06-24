@@ -1980,13 +1980,10 @@ bool validateConfiguration()
 
 #if defined(GDO2)
   Serial.printf("✓ GDO2 Pin: GPIO %d (TX/RX FIFO threshold - hardware-assisted underflow prevention)\n", GDO2);
-#elif defined(DISABLE_GDO2_FIFO_MANAGEMENT)
+#else // DISABLE_GDO2_FIFO_MANAGEMENT
+  // src/core/cc1101.cpp emits a compile-time #error when neither GDO2 nor
+  // DISABLE_GDO2_FIFO_MANAGEMENT is defined, so reaching here means the opt-out is set.
   Serial.println("  GDO2 Pin: disabled via DISABLE_GDO2_FIFO_MANAGEMENT (legacy SPI polling fallback)");
-#else
-  // Unreachable: src/core/cc1101.cpp emits a compile-time #error when neither GDO2 nor
-  // DISABLE_GDO2_FIFO_MANAGEMENT is defined. Kept as a defensive guard.
-  Serial.println("[ERROR] GDO2 not configured. Define GDO2 <pin> or DISABLE_GDO2_FIFO_MANAGEMENT in private.h");
-  valid = false;
 #endif
 
   // Validate reading schedule

@@ -209,10 +209,12 @@ size_t WifiSerialStream::write(const uint8_t *buffer, size_t size)
 
 size_t WifiSerialStream::printf(const char *format, ...)
 {
-    // Note: static to avoid stack pressure on ESP8266 (81920 bytes RAM total).
-    // Safe here because WifiSerialStream is used exclusively from the main loop
-    // on single-core, cooperative-scheduler platforms (ESP8266, ESP32 Arduino)
-    // where no concurrent caller can re-enter this function before it returns.
+    // PRECONDITION: this buffer is static to avoid stack pressure on ESP8266
+    // (81920 bytes RAM total), which REQUIRES that WifiSerialStream is only ever
+    // called from the main loop. The single-producer model of this class is a
+    // hard requirement, not merely current usage: on a preemptive platform
+    // (e.g. a FreeRTOS task on ESP32) a concurrent caller would re-enter this
+    // function and corrupt the shared buffer. Do not call from ISRs or tasks.
     static char buffer[WIFI_SERIAL_PRINTF_BUFFER_SIZE];
     va_list args;
     va_start(args, format);
@@ -231,13 +233,15 @@ size_t WifiSerialStream::printf(const char *format, ...)
 void WifiSerialStream::flush()
 {
     _usb.flush();
-    // Best-effort drain of pending bytes using write()'s return value.
-    // Does not block waiting for the full buffer to empty.
+    // Drain pending bytes to the client, looping across the ring-buffer
+    // wraparound so a flush() spanning the buffer boundary fully empties it.
+    // Stays non-blocking: stops as soon as write() returns 0 (TCP send buffer
+    // full), leaving any remainder for the next loop() drain.
 #if WIFI_SERIAL_HAS_WIFI
     if (wifiSerialClient && wifiSerialClient.connected())
     {
         uint16_t pending = (uint16_t)(_head - _tail) & (WIFI_SERIAL_TX_BUF_SIZE - 1);
-        if (pending > 0)
+        while (pending > 0)
         {
             uint16_t tailIdx = _tail & (WIFI_SERIAL_TX_BUF_SIZE - 1);
             // Use size_t to avoid uint16_t truncation when WIFI_SERIAL_TX_BUF_SIZE
@@ -245,7 +249,10 @@ void WifiSerialStream::flush()
             size_t contiguous = WIFI_SERIAL_TX_BUF_SIZE - tailIdx;
             size_t toSend = (pending < contiguous) ? (size_t)pending : contiguous;
             size_t sent = wifiSerialClient.write(&_txBuf[tailIdx], toSend);
+            if (sent == 0)
+                break; // TCP send buffer full; retry next loop() call
             _tail += (uint16_t)sent;
+            pending = (uint16_t)(_head - _tail) & (WIFI_SERIAL_TX_BUF_SIZE - 1);
         }
     }
 #endif
