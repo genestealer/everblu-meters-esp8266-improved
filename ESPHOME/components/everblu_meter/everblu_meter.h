@@ -156,6 +156,7 @@ class EverbluMeterComponent final : public PollingComponent,
   int adaptive_threshold_{1};
 
   // Internal state tracking
+  void publish_boot_states();
   void republish_initial_states();
   void apply_radio_context();
   bool gdo0_error_logged_{false};  // One-shot flag to prevent log flooding

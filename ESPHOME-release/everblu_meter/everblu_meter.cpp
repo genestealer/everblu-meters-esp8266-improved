@@ -137,7 +137,37 @@ void EverbluMeterComponent::setup() {
   // Create meter reader with all adapters (but don't initialize yet)
   this->meter_reader_ = new MeterReader(this->config_provider_, this->time_provider_, this->data_publisher_);
 
+  // Publish static configuration and clean initial states at boot so consumers
+  // (display lambdas, automations, other components) never read uninitialised
+  // sensor values before the meter reader is initialised / the first read (issue #69).
+  this->publish_boot_states();
+
   ESP_LOGCONFIG(TAG, "Setup complete; meter init deferred until connected");
+}
+
+void EverbluMeterComponent::publish_boot_states() {
+  if (this->data_publisher_ == nullptr) {
+    return;
+  }
+
+  ESP_LOGD(TAG, "Publishing boot-time states (static config + idle placeholders)");
+
+  // Static configuration values are known at boot and never change. Publishing
+  // them here ensures meter year/serial/schedule/frequency are valid from the
+  // start rather than holding uninitialised state.
+  char reading_time_buf[6];
+  snprintf(reading_time_buf, sizeof(reading_time_buf), "%02d:%02d", this->read_hour_, this->read_minute_);
+  this->data_publisher_->publishMeterSettings(this->meter_year_, this->meter_serial_, this->reading_schedule_.c_str(),
+                                              reading_time_buf, this->frequency_);
+  this->data_publisher_->publishFirmwareVersion(EVERBLU_FW_VERSION);
+
+  // Sensible idle placeholders for status text sensors until the radio is
+  // initialised and the first read completes. If radio init later fails,
+  // begin()/republish_initial_states() will overwrite these with the error state.
+  this->data_publisher_->publishRadioState("Idle");
+  this->data_publisher_->publishStatusMessage("Ready");
+  this->data_publisher_->publishError("None");
+  this->data_publisher_->publishActiveReading(false);
 }
 
 void EverbluMeterComponent::republish_initial_states() {
