@@ -9,7 +9,13 @@
 #ifndef ESPHOME_CONFIG_PROVIDER_H
 #define ESPHOME_CONFIG_PROVIDER_H
 
+#if __has_include("../config_provider.h")
 #include "../config_provider.h"
+#elif __has_include("config_provider.h")
+#include "config_provider.h"
+#else
+#error "Missing config_provider.h (expected ../config_provider.h or config_provider.h)"
+#endif
 
 /**
  * @class ESPHomeConfigProvider
