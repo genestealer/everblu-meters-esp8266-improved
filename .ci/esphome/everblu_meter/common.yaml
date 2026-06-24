@@ -1,8 +1,9 @@
-# Shared configuration included by each platform-specific test file via:
-#   <<: !include common.yaml
+# Minimal shared configuration — just enough to compile the component.
+# Tests: required params, GDO2 hardware path, water meter defaults.
+# Included by test.*.yaml platform files via <<: !include common.yaml
 #
-# Paths in external_components are resolved relative to the config file
-# that includes this file (test.*.yaml), not relative to this file itself.
+# For full sensor/option coverage see common-full.yaml.
+# For the GDO2 legacy-polled path see test.*-legacy-gdo2.yaml.
 
 spi:
   id: ci_spi
