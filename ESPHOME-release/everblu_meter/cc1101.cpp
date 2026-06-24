@@ -1710,7 +1710,8 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
   if (tx_aborted)
   {
     echo_debug(1, "[METER] No response during wake-up/interrogation (TXFIFO_UNDERFLOW after %dms, MARCSTATE=0x%02X)\n", tmo * 10, marcstate & 0x1F);
-    echo_debug(1, "[METER] This is expected when meter is asleep, out of range, or Year/Serial is incorrect\n");
+    echo_debug(1, "[METER] This usually means the meter is asleep, out of range, or the configured Year/Serial is incorrect.\n");
+    echo_debug(1, "[METER] If this persists, try running a frequency scan to recalibrate the radio (see AUTO_SCAN_ENABLED / CLEAR_EEPROM_ON_BOOT).\n");
   }
   else
   {
