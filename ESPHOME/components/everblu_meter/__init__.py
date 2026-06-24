@@ -5,16 +5,7 @@ Reads water/gas meter data from Itron EverBlu Cyble Enhanced meters
 using the RADIAN protocol over 433 MHz with a CC1101 transceiver.
 """
 
-from esphome import pins
 import esphome.codegen as cg
-from esphome.components import (
-    binary_sensor,
-    button,
-    sensor,
-    spi,
-    text_sensor,
-    time as time_,
-)
 import esphome.config_validation as cv
 from esphome.const import (
     CONF_FREQUENCY,
@@ -28,6 +19,16 @@ from esphome.const import (
     STATE_CLASS_TOTAL_INCREASING,
     UNIT_DECIBEL_MILLIWATT,
     UNIT_PERCENT,
+)
+
+from esphome import pins
+from esphome.components import (
+    binary_sensor,
+    button,
+    sensor,
+    spi,
+    text_sensor,
+    time as time_,
 )
 
 DEPENDENCIES = ["time", "spi"]
