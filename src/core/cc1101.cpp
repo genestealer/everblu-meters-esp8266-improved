@@ -246,12 +246,17 @@ void cc1101_set_gdo2_pin(int gdo2_pin)
 #define GET_GDO0_PIN() (_gdo0_pin)
 #define GET_GDO2_PIN() (_gdo2_pin)
 #else
-// Non-ESPHome mode: GDO0 comes from build flag; GDO2 is optional
+// Non-ESPHome mode: GDO0 comes from build flag.
+// GDO2 hardware-assisted FIFO management is ENABLED BY DEFAULT (v3.0.0+, breaking change).
+// Wire CC1101 GDO2 to a free GPIO and add '#define GDO2 <pin>' to include/private.h.
+// To keep the legacy SPI-polling behaviour instead, add '#define DISABLE_GDO2_FIFO_MANAGEMENT'.
 #define GET_GDO0_PIN() (GDO0)
-#ifdef GDO2
+#if defined(GDO2)
 #define GET_GDO2_PIN() (GDO2)
-#else
+#elif defined(DISABLE_GDO2_FIFO_MANAGEMENT)
 #define GET_GDO2_PIN() (-1)
+#else
+#error "BREAKING CHANGE (v3.0.0): CC1101 GDO2 hardware-assisted FIFO management is now enabled by default. Wire CC1101 GDO2 to a free GPIO and add '#define GDO2 <pin>' to include/private.h (see the README Hardware section and docs/GDO2_FIFO_MANAGEMENT.md). To keep the legacy SPI-polling behaviour instead, add '#define DISABLE_GDO2_FIFO_MANAGEMENT' to include/private.h."
 #endif
 #endif
 

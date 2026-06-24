@@ -78,6 +78,10 @@ everblu_meter:
   meter_code: "21-1234567-800"  # Replace with your meter's code
   cs_pin: GPIO21          # Nano ESP32 D10 -> CC1101 CS / NSS
   gdo0_pin: GPIO5         # Nano ESP32 D2 -> CC1101 GDO0
+  gdo2_pin: GPIO6         # REQUIRED (v3.0.0+): Nano ESP32 free GPIO -> CC1101 GDO2 (hardware FIFO threshold).
+                          # Use any free GPIO not on the SPI bus or gdo0_pin.
+                          # To keep legacy SPI polling instead, remove this line and add:
+                          #   disable_gdo2_fifo_management: true
 
   # Optional: set meter_type to 'gas' for gas meters (defaults to water)
 

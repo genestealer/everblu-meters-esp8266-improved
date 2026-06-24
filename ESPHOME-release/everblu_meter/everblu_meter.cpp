@@ -382,7 +382,7 @@ namespace esphome
             ESP_LOGCONFIG(TAG, "  Retry Cooldown: %lu ms", retry_cooldown_ms_);
             ESP_LOGCONFIG(TAG, "  Initial Read On Boot: %s", initial_read_on_boot_ ? "Enabled" : "Disabled");
             ESP_LOGCONFIG(TAG, "  GDO0 Pin: %s", gdo0_pin_ != nullptr ? "configured" : "NOT configured (error)");
-            ESP_LOGCONFIG(TAG, "  GDO2 Pin: %s", gdo2_pin_ != nullptr ? "configured (HW FIFO threshold, TX+RX dynamic)" : "not wired (SPI polling fallback)");
+            ESP_LOGCONFIG(TAG, "  GDO2 Pin: %s", gdo2_pin_ != nullptr ? "configured (HW FIFO threshold, TX+RX dynamic)" : "disabled (legacy SPI polling fallback)");
 
             ESP_LOGCONFIG(TAG, "  Sensors:");
             LOG_SENSOR("    ", "Volume", volume_sensor_);

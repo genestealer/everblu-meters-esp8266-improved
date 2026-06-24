@@ -4,16 +4,34 @@ All notable changes to this project will be documented in this file.
 
 Releases are created manually by tagging commits with version tags matching `v*.*.*` (e.g., `v2.1.0`). Users should build from source and configure `private.h` with their own meter settings.
 
-## [v2.4.0] - 2026-06-22
+## [v3.0.0] - 2026-06-24
 
-> Adds optional CC1101 GDO2 hardware-assisted FIFO threshold management (TX + RX) plus reliability, diagnostics, and data-validation improvements. **Fully backwards compatible** — GDO2 is optional and the driver falls back to SPI polling when it is not wired. Preserves ESP8266 (Arduino) and ESP32 + ESPHome support.
+> **⚠️ BREAKING CHANGE** — CC1101 GDO2 hardware-assisted FIFO threshold management is now the **default** mechanism for talking to the radio on **both** the standalone (MQTT) and ESPHome targets. You must wire CC1101 GDO2 to a free GPIO and configure it, **or** explicitly opt out. Existing setups that did not wire GDO2 require migration (see below).
+>
+> This release also rolls in the previously unreleased v2.4.0 work: the hardware-assisted GDO2 FIFO mechanism (TX + RX) plus reliability, diagnostics, and data-validation improvements. Preserves ESP8266 (Arduino) and ESP32 + ESPHome support.
+
+### Breaking Changes
+
+- **GDO2 is required by default.** The GDO2 hardware FIFO mechanism is now enabled by default instead of being optional:
+  - **MQTT / standalone firmware**: `include/private.h` must define either `GDO2 <pin>` (to enable, recommended) or `DISABLE_GDO2_FIFO_MANAGEMENT` (to opt out and keep legacy SPI polling). If neither is defined, the build fails with a clear compile-time `#error` from `src/core/cc1101.cpp` pointing to the README and `docs/GDO2_FIFO_MANAGEMENT.md`.
+  - **ESPHome component**: `gdo2_pin:` is now required unless `disable_gdo2_fifo_management: true` is set. If neither is provided, configuration validation fails with a descriptive `cv.Invalid` error explaining both options and linking to the docs.
+
+### Migration Required
+
+- **If you want the new (recommended) behaviour**: wire CC1101 GDO2 to a free GPIO that does not collide with the SPI bus or GDO0, then:
+  - MQTT: add `#define GDO2 <pin>` to `include/private.h` (e.g. `#define GDO2 4`).
+  - ESPHome: add `gdo2_pin: <GPIO>` to your `everblu_meter:` block (e.g. `GPIO4` on ESP8266, `GPIO27` on ESP32).
+- **If you cannot/do not want to wire GDO2**: opt out explicitly to keep the prior SPI-polling behaviour:
+  - MQTT: add `#define DISABLE_GDO2_FIFO_MANAGEMENT` to `include/private.h`.
+  - ESPHome: add `disable_gdo2_fifo_management: true` to your `everblu_meter:` block.
 
 ### Added
 
-- **Hardware-assisted GDO2 FIFO threshold management** (Issues [#83](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/83), [#84](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/84)): the CC1101 driver can optionally use the GDO2 pin as a hardware FIFO threshold signal on both standalone (MQTT) and ESPHome targets, dynamically reconfiguring `IOCFG2` per phase:
+- **Hardware-assisted GDO2 FIFO threshold management** (Issues [#83](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/83), [#84](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/84)): the CC1101 driver uses the GDO2 pin as a hardware FIFO threshold signal on both standalone (MQTT) and ESPHome targets, dynamically reconfiguring `IOCFG2` per phase:
   - **TX phase** (`IOCFG2 = 0x02`): GDO2 asserts at the TX FIFO threshold and replaces the stale SPI `TXBYTES` status check and fixed `delay()` in the WUP feeding loop and interrogation-frame gate, proactively preventing `TXFIFO_UNDERFLOW` under ESPHome scheduler load.
   - **RX phase** (`IOCFG2 = 0x01`): GDO2 signals the RX FIFO threshold / end-of-packet, letting the RX drain loop skip unnecessary `RXBYTES` SPI reads while still draining promptly.
-- Optional `gdo2_pin` configuration in the ESPHome Python schema (`__init__.py`) and C++ integration, plus the standalone `GDO2` macro; new `cc1101_set_gdo2_pin()` API and `GET_GDO2_PIN()` accessor with an `#ifdef GDO2` fallback so both targets share the same logic.
+- `gdo2_pin` configuration in the ESPHome Python schema (`__init__.py`) and C++ integration, plus the standalone `GDO2` macro; new `cc1101_set_gdo2_pin()` API and `GET_GDO2_PIN()` accessor so both targets share the same logic.
+- `disable_gdo2_fifo_management` ESPHome option and `DISABLE_GDO2_FIFO_MANAGEMENT` standalone macro to explicitly opt out of the GDO2 mechanism.
 - Native unit tests covering RADIAN volume and out-of-range time rejection behaviour.
 - Pre-commit configuration for automated code checks.
 
@@ -21,12 +39,14 @@ Releases are created manually by tagging commits with version tags matching `v*.
 
 - `FIFOTHR` changed from `0x47` (TX threshold 33 bytes) to `0x49` (TX threshold 25 bytes), guaranteeing ≥ 40 free bytes so the 8-byte WUP buffer and 39-byte interrogation frame can be written after a single GDO2 check. Applied regardless of GDO2 wiring.
 - **Non-blocking WiFi serial monitor**: all TCP output now flows through a power-of-two ring buffer drained in `loop()`, so a slow or full TCP socket can no longer stall the main loop. Dropped-byte counts are reported to the client on overrun, the buffer is reset on each new client connection, and the welcome banner now includes the ESP8266 reset reason.
-- **Configuration logging**: the ESPHome `dump_config` and the standalone startup banner report whether GDO0/GDO2 are configured and how FIFO threshold detection is performed.
-- GDO2 is fully optional: when left unwired the register write is harmless and the driver falls back to SPI polling (`CC1101_status_FIFO_FreeByte` + delay on TX, `RXBYTES` polling on RX).
-- Updated `ESPHOME/README.md` wiring tables, all `ESPHOME/example-*.yaml` files, and `include/private.example.h` with the `gdo2_pin` parameter, safe free-GPIO examples, and SPI-bus pin warnings (avoiding GPIO12/13/14 on ESP8266).
+- `include/private.example.h` now enables `#define GDO2 4` by default and documents the `DISABLE_GDO2_FIFO_MANAGEMENT` opt-out.
+- All ESPHome examples (`example-water-meter.yaml`, `example-gas-meter-minimal.yaml`, `example-advanced.yaml`, `example-nano-esp32.yaml`, `example-multi-meter.yaml`) now set `gdo2_pin` by default with safe free-GPIO choices and opt-out notes, and include SPI-bus pin warnings (avoiding GPIO12/13/14 on ESP8266).
+- **Configuration logging**: the ESPHome `dump_config` and the standalone startup banner report whether GDO0/GDO2 are configured and how FIFO threshold detection is performed. `dump_config` reports the GDO2 fallback state as "disabled (legacy SPI polling fallback)" and the standalone banner reports whether GDO2 is enabled, explicitly disabled via `DISABLE_GDO2_FIFO_MANAGEMENT`, or misconfigured.
+- README and `ESPHOME/README.md` updated: GDO2 documented as required-by-default with opt-out instructions, wiring tables marked accordingly, and ESPHome documentation links surfaced prominently near the top of the main README.
 - Standardized file header comments across `src/core/` to the Doxygen `@file`/`@brief` style already used throughout `src/services/` and `src/adapters/`, resolving documentation drift from multiple contributors; added missing headers to `crc_kermit.h`/`.cpp`, `radian_parser.h`/`.cpp`, and `meter_code_parser.h`, and converted plain-comment headers in `cc1101.cpp`, `wifi_serial.h`/`.cpp`, and `version.h`.
 - Added the `docs/GDO2_FIFO_MANAGEMENT.md` design document (TX and RX paths).
 - Regenerated the `ESPHOME-release/` bundle so it reflects the new GDO2 support and standardized headers.
+- Bumped firmware version to `3.0.0`.
 
 ### Fixed
 

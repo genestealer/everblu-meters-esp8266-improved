@@ -27,11 +27,17 @@ Integrated with Home Assistant via MQTT AutoDiscovery and ESPHome external compo
 
 ---
 
-### **ESPHome** - Release V2.2.1
-ESPHome integration is now production-ready. For setup and usage, see the ESPHome docs at [ESPHOME/README.md](ESPHOME/README.md)
- - Versioned external component in `ESPHOME-release` with the same 2.2.1 code as the main firmware
+### **ESPHome** - Release V3.0.0
+ESPHome integration is production-ready. **📖 Start here for ESPHome:**
+- **[ESPHOME/README.md](ESPHOME/README.md)** — ESPHome setup, wiring, and configuration reference
+- **[ESPHOME/ESPHOME_INTEGRATION_GUIDE.md](ESPHOME/ESPHOME_INTEGRATION_GUIDE.md)** — complete step-by-step installation guide
+- Ready-made configs: [water](ESPHOME/example-water-meter.yaml) · [gas](ESPHOME/example-gas-meter-minimal.yaml) · [advanced](ESPHOME/example-advanced.yaml) · [multi-meter](ESPHOME/example-multi-meter.yaml)
+
+> **⚠️ Breaking change in v3.0.0:** GDO2 hardware FIFO management is now enabled by default. You must wire CC1101 GDO2 and set `gdo2_pin:` (or opt out with `disable_gdo2_fifo_management: true`). See the [Hardware](#hardware) section and [ESPHOME/README.md](ESPHOME/README.md).
+
+ - Versioned external component in `ESPHOME-release` with the same 3.0.0 code as the main firmware
  - Tested on ESP8266 and ESP32 with water and gas meters; supports the same sensors and calibration logic
- - YAML stays simple: drop in the component, set `meter_code` and `meter_type`, and go
+ - YAML stays simple: drop in the component, set `meter_code`, `meter_type`, and `gdo2_pin`, and go
  - Build with the Arduino framework (set `esp32.framework.type: arduino`; ESP-IDF is not supported for this component)
  - Migration tip: if you move from MQTT firmware, keep the same meter serial values so your topics/entities stay aligned
 
@@ -80,7 +86,7 @@ Supported meters:
 - Daily scheduled readings (with configurable reading days).
 - Built-in frame validation (CRC-16/KERMIT) plus signal diagnostics (RSSI/LQI).
 - Automatic CC1101 frequency calibration plus first-boot wide scan.
-- Optional hardware-assisted CC1101 FIFO threshold management via GDO2 (improves TX/RX reliability).
+- Hardware-assisted CC1101 FIFO threshold management via GDO2, **enabled by default (v3.0.0+)** for improved TX/RX reliability (opt out to use legacy SPI polling).
 
 
 ### Full feature list
@@ -93,7 +99,7 @@ Supported meters:
 - MQTT integration for Home Assistant with AutoDiscovery.
 - **Native ESPHome component** for seamless integration.
 - Automatic CC1101 frequency calibration with manual fallback.
-- Optional hardware-assisted CC1101 FIFO threshold management via GDO2: dynamically reconfigured per phase to prevent TX FIFO underflows and reduce unnecessary RX SPI reads. Falls back to SPI polling when GDO2 is left unwired.
+- **Hardware-assisted CC1101 FIFO threshold management via GDO2 — enabled by default (v3.0.0+)**: dynamically reconfigured per phase to prevent TX FIFO underflows and reduce unnecessary RX SPI reads. Requires wiring GDO2 to a free GPIO; you can explicitly opt out to fall back to SPI polling.
 - Wi-Fi diagnostics and OTA updates.
 - Built-in CRC-16/KERMIT verification to discard corrupted RADIAN frames before publishing data.
 - Reading Schedule Configuration: Configure reading days using presets (Monday-Friday, Monday-Saturday, Monday-Sunday) or a specific day (Monday-Sunday).
@@ -181,6 +187,7 @@ See the Hardware section below for full wiring tables and pictures.
   - `ENABLE_HA_DISCOVERY` - set to `0` to disable Home Assistant discovery topic publishing (`homeassistant/...`) and keep raw MQTT topics only
   - `METER_CODE` (full under-barcode code with dashes)
   - `METER_TYPE` - set to `"water"` (default) or `"gas"` depending on your meter type
+  - `GDO2` - **required by default (v3.0.0+)**: GPIO connected to CC1101 GDO2 (hardware FIFO management). To opt out and use legacy SPI polling, define `DISABLE_GDO2_FIFO_MANAGEMENT` instead. The firmware will not compile until you do one or the other.
   - `MAX_RETRIES` - maximum reading retry attempts before cooldown (optional, default is 10)
   - `ADAPTIVE_THRESHOLD` - how many successful reads before adjusting frequency (optional, default is 1 = adjust after each read)
   - `WIFI_SERIAL_MONITOR_ENABLED` - set to `1` to enable WiFi serial monitor for remote debugging (default is `0` for security)
@@ -295,14 +302,14 @@ Below are the wiring diagrams for common ESP8266 boards and ESP32 DevKit.
 - **MOSI (Master Out Slave In)**: GPIO 13
 - **CS/SS (Chip Select)**: GPIO 15
 - **GDO0 (CC1101 Data Ready)**: GPIO 5 (configurable in `private.h`)
-- **GDO2 (CC1101 FIFO Threshold)**: Optional, any free GPIO (e.g. GPIO 4 / D2). Leave unwired to fall back to SPI polling.
+- **GDO2 (CC1101 FIFO Threshold)**: **Required by default (v3.0.0+)**, any free GPIO (e.g. GPIO 4 / D2). Opt out with `DISABLE_GDO2_FIFO_MANAGEMENT` to fall back to SPI polling.
 
 #### Important Notes
 
 - **Voltage:** The CC1101 operates at **3.3V only**. Do not connect to 5V or you will damage the module.
 - **Hardware SPI:** This project uses the ESP8266/ESP32's hardware SPI interface for reliable, high-speed communication.
 - **GDO0 Pin:** Default is GPIO 5 for ESP8266, GPIO 4 for ESP32. You can change this in your `private.h` file if needed.
-- **GDO2 Pin (optional):** Wiring CC1101 GDO2 to a free MCU GPIO enables hardware-assisted FIFO threshold management. The driver dynamically reconfigures GDO2 per phase: TX (prevents `TXFIFO_UNDERFLOW`) and RX (skips unnecessary SPI reads and improves scheduler efficiency). Set it via `#define GDO2` in `private.h` (MQTT firmware) or `gdo2_pin` in YAML (ESPHome). Leave it unset/unwired and the driver falls back to SPI polling with no loss of functionality. Use any free GPIO that does not collide with the SPI bus or GDO0. See [docs/GDO2_FIFO_MANAGEMENT.md](docs/GDO2_FIFO_MANAGEMENT.md).
+- **GDO2 Pin (required by default, v3.0.0+):** ⚠️ **Breaking change** — the CC1101 GDO2 pin now drives hardware-assisted FIFO threshold management by default. You must wire CC1101 GDO2 to a free MCU GPIO and configure it via `#define GDO2 <pin>` in `private.h` (MQTT firmware) or `gdo2_pin` in YAML (ESPHome). The driver dynamically reconfigures GDO2 per phase: TX (prevents `TXFIFO_UNDERFLOW`) and RX (skips unnecessary SPI reads and improves scheduler efficiency). To keep the legacy SPI-polling behaviour instead, explicitly opt out: define `DISABLE_GDO2_FIFO_MANAGEMENT` in `private.h`, or set `disable_gdo2_fifo_management: true` in ESPHome. The MQTT firmware will not compile, and the ESPHome config will not validate, until you either wire/configure GDO2 or opt out. Use any free GPIO that does not collide with the SPI bus or GDO0. See [docs/GDO2_FIFO_MANAGEMENT.md](docs/GDO2_FIFO_MANAGEMENT.md).
 - **Distance & Signal Quality:** The RADIAN protocol implementation does not have publicly available CRC checksums for the manufacturer's proprietary encoding, making readings somewhat vulnerable to RF interference. Weak signal (distance > 10+ meters) or electrical interference can cause read failures. **Keep the CC1101 radio within a few meters (~2-5m ideally) of your meter for reliable communication.** If you experience frequent "No ACK frame received" or "No data frame received" failures, try moving the radio closer to the meter to rule out signal strength issues before investigating hardware wiring.
 
 #### Wiring Table
@@ -318,7 +325,7 @@ Pin wiring for the [Wemos D1 Mini](https://www.wemos.cc/en/latest/d1/index.html)
 | **MOSI**       | SPI Data Out | GPIO 13          | D7                | #13                | GPIO 23        | MOSI             | Hardware SPI MOSI                                   |
 | **CSN/CS**     | Chip Select  | GPIO 15          | D8                | #15                | GPIO 5         | SS               | SPI chip select                                     |
 | **GDO0**       | Data Ready   | GPIO 5           | D1                | #5                 | GPIO 4         | GPIO 4           | Digital interrupt pin (configurable in `private.h`) |
-| **GDO2**       | FIFO Threshold (optional) | GPIO 4 | D2 | #4 | GPIO 27 | GPIO 27 | Optional FIFO threshold signal. Leave disconnected to use SPI polling. See `private.h` (`#define GDO2`) / `gdo2_pin` in ESPHome |
+| **GDO2**       | FIFO Threshold (required) | GPIO 4 | D2 | #4 | GPIO 27 | GPIO 27 | Required by default (v3.0.0+). Hardware FIFO threshold signal. Set via `private.h` (`#define GDO2`) / `gdo2_pin` in ESPHome, or opt out with `DISABLE_GDO2_FIFO_MANAGEMENT` / `disable_gdo2_fifo_management: true` |
 
 <details>
 <summary>Wiring notes and board-specific quick references (optional)</summary>
@@ -339,7 +346,7 @@ MISO   → D6 (GPIO 12)
 MOSI   → D7 (GPIO 13)
 CSN    → D8 (GPIO 15)
 GDO0   → D1 (GPIO 5)
-GDO2   → D2 (GPIO 4)  ← optional, set #define GDO2 in private.h
+GDO2   → D2 (GPIO 4)  ← required by default, set #define GDO2 in private.h (or opt out)
 ```
 
 #### Quick Reference: Adafruit Feather HUZZAH ESP8266
@@ -353,7 +360,7 @@ MISO   → #12 (GPIO 12)
 MOSI   → #13 (GPIO 13)
 CSN    → #15 (GPIO 15)
 GDO0   → #5  (GPIO 5)
-GDO2   → #4  (GPIO 4)  ← optional, set #define GDO2 in private.h
+GDO2   → #4  (GPIO 4)  ← required by default, set #define GDO2 in private.h (or opt out)
 ```
 
 #### Quick Reference: ESP32 DevKit (esp32dev)
@@ -367,14 +374,14 @@ MISO   → MISO (GPIO 19)
 MOSI   → MOSI (GPIO 23)
 CSN    → SS (GPIO 5 by default on many boards)
 GDO0   → GPIO 4 (or GPIO 27)  ← set this in include/private.h as GDO0
-GDO2   → GPIO 27 (or another free GPIO)  ← optional, set #define GDO2 in private.h
+GDO2   → GPIO 27 (or another free GPIO)  ← required by default, set #define GDO2 in private.h (or opt out)
 ```
 
 Notes for ESP32
 - Use the board’s hardware SPI pins (SCK/MISO/MOSI/SS).
 The defaults are provided by the Arduino core and used automatically by this project.
 - Choose a free GPIO for GDO0 (e.g., 4 or 27) and set `#define GDO0 <pin>` in `include/private.h`.
-- Optionally wire GDO2 to another free GPIO and set `#define GDO2 <pin>` to enable hardware FIFO threshold management; leave it unset to use SPI polling.
+- Wire GDO2 to another free GPIO and set `#define GDO2 <pin>` to enable hardware FIFO threshold management (required by default since v3.0.0); to keep legacy SPI polling instead, define `DISABLE_GDO2_FIFO_MANAGEMENT`.
 - Power the CC1101 from 3.3V only.
 
 #### Adafruit Feather HUZZAH Silkscreen Labels

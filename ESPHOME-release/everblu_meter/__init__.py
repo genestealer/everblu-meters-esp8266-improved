@@ -95,6 +95,7 @@ SCHEDULE_MONDAY_SUNDAY = "Monday-Sunday"
 
 CONF_GDO0_PIN = "gdo0_pin"
 CONF_GDO2_PIN = "gdo2_pin"
+CONF_DISABLE_GDO2 = "disable_gdo2_fifo_management"
 
 
 def validate_meter_code(value):
@@ -163,6 +164,7 @@ CONFIG_SCHEMA = (
             cv.Required(CONF_METER_CODE): validate_meter_code,
             cv.Required(CONF_GDO0_PIN): pins.internal_gpio_input_pin_schema,
             cv.Optional(CONF_GDO2_PIN): pins.internal_gpio_input_pin_schema,
+            cv.Optional(CONF_DISABLE_GDO2, default=False): cv.boolean,
             cv.Required(CONF_TIME_ID): cv.use_id(time_.RealTimeClock),
             cv.Optional(CONF_METER_TYPE, default=METER_TYPE_WATER): cv.enum(
                 {METER_TYPE_WATER: False, METER_TYPE_GAS: True}
@@ -328,6 +330,35 @@ CONFIG_SCHEMA = (
     .extend(cv.polling_component_schema("24h"))
     .extend(spi.spi_device_schema(cs_pin_required=True))
 )
+
+
+def validate_gdo2_required(config):
+    """Require gdo2_pin by default (v3.0.0 breaking change) unless explicitly disabled.
+
+    GDO2 hardware-assisted FIFO management is now the default mechanism for talking to
+    the CC1101. Users must wire CC1101 GDO2 to a free GPIO and set ``gdo2_pin:``, or
+    explicitly opt out with ``disable_gdo2_fifo_management: true``.
+    """
+    if not config.get(CONF_DISABLE_GDO2, False) and CONF_GDO2_PIN not in config:
+        raise cv.Invalid(
+            "BREAKING CHANGE (v3.0.0): CC1101 GDO2 hardware-assisted FIFO management is now "
+            "enabled by default and 'gdo2_pin:' is required.\n"
+            "\n"
+            "Fix one of the following ways:\n"
+            "  1. (Recommended) Wire CC1101 GDO2 to a free GPIO and add it to your "
+            "everblu_meter config, e.g.:\n"
+            "         gdo2_pin: GPIO4    # ESP8266 D2 (avoid the SPI bus pins and gdo0_pin)\n"
+            "         gdo2_pin: GPIO27   # ESP32\n"
+            "  2. To keep the legacy SPI-polling behaviour instead, opt out explicitly:\n"
+            "         disable_gdo2_fifo_management: true\n"
+            "\n"
+            "See ESPHOME/README.md (Wiring) and docs/GDO2_FIFO_MANAGEMENT.md for full details.",
+            path=[CONF_GDO2_PIN],
+        )
+    return config
+
+
+CONFIG_SCHEMA = cv.All(CONFIG_SCHEMA, validate_gdo2_required)
 
 
 async def to_code(config):

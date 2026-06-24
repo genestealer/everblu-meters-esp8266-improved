@@ -4,6 +4,7 @@ substitutions:
 
   cc1101_cs: "GPIO15"
   cc1101_gdo0: "GPIO5"
+  cc1101_gdo2: "GPIO4"   # REQUIRED (v3.0.0+): free GPIO -> CC1101 GDO2 (hardware FIFO threshold)
   tz_offset_min: "0"
   meter_1_prefix: "Meter 1"
   meter_2_prefix: "Meter 2"
@@ -66,9 +67,9 @@ everblu_meter:
     gdo0_pin:
       number: ${cc1101_gdo0}
       allow_other_uses: true
-    # gdo2_pin:              # Optional: hardware FIFO threshold (TX+RX, prevents TXFIFO_UNDERFLOW)
-    #   number: GPIO4        # D2 — free GPIO (not SPI: avoid GPIO12/MISO, GPIO13/MOSI, GPIO14/SCK)
-    #   allow_other_uses: true  # Required — both meter entries share the same CC1101
+    gdo2_pin:               # REQUIRED (v3.0.0+): hardware FIFO threshold (TX+RX, prevents TXFIFO_UNDERFLOW)
+      number: ${cc1101_gdo2}  # free GPIO (not SPI: avoid GPIO12/MISO, GPIO13/MOSI, GPIO14/SCK) and not gdo0_pin
+      allow_other_uses: true  # Required — both meter entries share the same CC1101
     time_id: homeassistant_time
     timezone_offset: ${tz_offset_min}
     read_hour: 11
@@ -152,9 +153,9 @@ everblu_meter:
     gdo0_pin:
       number: ${cc1101_gdo0}
       allow_other_uses: true
-    # gdo2_pin:              # Optional: hardware FIFO threshold (TX+RX, prevents TXFIFO_UNDERFLOW)
-    #   number: GPIO4        # D2 — free GPIO (not SPI: avoid GPIO12/MISO, GPIO13/MOSI, GPIO14/SCK)
-    #   allow_other_uses: true  # Required — both meter entries share the same CC1101
+    gdo2_pin:               # REQUIRED (v3.0.0+): hardware FIFO threshold (TX+RX, prevents TXFIFO_UNDERFLOW)
+      number: ${cc1101_gdo2}  # free GPIO (not SPI: avoid GPIO12/MISO, GPIO13/MOSI, GPIO14/SCK) and not gdo0_pin
+      allow_other_uses: true  # Required — both meter entries share the same CC1101
     time_id: homeassistant_time
     timezone_offset: ${tz_offset_min}
     read_hour: 11

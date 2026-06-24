@@ -166,19 +166,28 @@
 // ESP32 DevKit: GPIO4 or GPIO27
 #define GDO0 5
 
-// CC1101 GDO2 (FIFO threshold signal) pin assignment — OPTIONAL
+// CC1101 GDO2 (FIFO threshold signal) pin assignment — ENABLED BY DEFAULT (v3.0.0+)
+//
+// ⚠️ BREAKING CHANGE (v3.0.0): GDO2 hardware-assisted FIFO management is now the default.
+// You MUST either wire CC1101 GDO2 to a free GPIO and set the pin below, OR explicitly
+// opt out by defining DISABLE_GDO2_FIFO_MANAGEMENT. The firmware will not compile if
+// neither is set (a clear compile-time error is emitted from src/core/cc1101.cpp).
+//
 // When defined, GDO2 is dynamically reconfigured per phase:
 //   TX phase: IOCFG2=0x02 (HIGH when TX FIFO >=25 bytes) — prevents TXFIFO_UNDERFLOW
 //   RX phase: IOCFG2=0x01 (HIGH when RX FIFO >=40 bytes OR end-of-packet)
 // The main benefit is TXFIFO_UNDERFLOW prevention during transmit. The RX payload
 // stage runs in infinite-length mode (no end-of-packet), so it always polls RXBYTES
 // and does not rely on GDO2 to gate reads.
-// Leave commented out if GDO2 is not wired (falls back to SPI polling, fully functional).
 // Connect CC1101 GDO2 to any free GPIO. Avoid SPI bus pins and GDO0:
 //   ESP8266 SPI bus: GPIO12 (D6)=MISO, GPIO13 (D7)=MOSI, GPIO14 (D5)=SCK, GPIO15 (D8)=CS
 // ESP8266 example: GPIO4 (D2) when GDO0 uses GPIO5 (D1), or GPIO5 (D1) when GDO0 uses GPIO4
 // ESP32 example:   GPIO27, GPIO26
-// #define GDO2 4
+#define GDO2 4
+//
+// To OPT OUT and keep the legacy SPI-polling behaviour, comment out the #define GDO2 line
+// above and uncomment the line below instead:
+// #define DISABLE_GDO2_FIFO_MANAGEMENT
 
 // Radio protocol debug output
 // 1 = enable verbose CC1101 / RADIAN logging

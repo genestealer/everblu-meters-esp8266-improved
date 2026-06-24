@@ -244,7 +244,8 @@ esp32:
 | `cs_pin`             | pin      | -             | Yes      | CC1101 chip select pin                                                                                                                                                                                                                       |
 | `meter_type`         | enum     | water         | No       | `water` or `gas`                                                                                                                                                                                                                             |
 | `gdo0_pin`           | pin      | -             | Yes      | CC1101 GDO0 pin (e.g. `GPIO4`, `D2`, `4`)                                                                                                                                                                                                    |
-| `gdo2_pin`           | pin      | (none)        | No       | CC1101 GDO2 pin for hardware FIFO threshold signal. Dynamically reconfigured per phase: TX phase prevents `TXFIFO_UNDERFLOW`; RX phase eliminates unnecessary SPI reads and improves ESPHome scheduler efficiency. Leave unset if not wired. |
+| `gdo2_pin`           | pin      | -             | Yes\*    | **Required by default (v3.0.0+).** CC1101 GDO2 pin for hardware FIFO threshold signal. Dynamically reconfigured per phase: TX phase prevents `TXFIFO_UNDERFLOW`; RX phase eliminates unnecessary SPI reads and improves ESPHome scheduler efficiency. \*Not required only if `disable_gdo2_fifo_management: true` is set. |
+| `disable_gdo2_fifo_management` | bool | false | No | Opt out of the GDO2 hardware FIFO mechanism and use the legacy SPI-polling behaviour. When `true`, `gdo2_pin` is not required and need not be wired. |
 | `time_id`            | id       | -             | Yes      | Time component ID                                                                                                                                                                                                                            |
 | `frequency`          | float    | 433.82        | No       | RF frequency (MHz)                                                                                                                                                                                                                           |
 | `auto_scan`          | bool     | true          | No       | Auto frequency scan                                                                                                                                                                                                                          |
@@ -340,7 +341,7 @@ Three complete example configurations are provided:
 | MOSI       | D7      | 13           |
 | CSN        | D8      | 15           |
 | GDO0       | D1      | 5            |
-| GDO2       | D2      | 4 (optional) |
+| GDO2       | D2      | 4 (required) |
 
 ### Wiring (ESP32)
 
@@ -353,11 +354,11 @@ Three complete example configurations are provided:
 | MOSI   | 23            |
 | CSN    | 5             |
 | GDO0   | 4             |
-| GDO2   | 27 (optional) |
+| GDO2   | 27 (required) |
 
 Important: The CC1101 requires 3.3V power. Do not connect to 5V!
 
-> **GDO2 is optional.** When wired and configured via `gdo2_pin:`, GDO2 is dynamically reconfigured per phase: during TX it acts as a TX FIFO threshold signal preventing `TXFIFO_UNDERFLOW`; during RX it signals when the RX FIFO has data (or end-of-packet), eliminating unnecessary `RXBYTES` SPI reads and allowing the ESPHome scheduler to run freely between batches. Without GDO2, both TX and RX fall back to SPI polling (original behaviour, still fully functional).
+> **⚠️ Breaking change (v3.0.0): GDO2 is now required by default.** You must wire CC1101 GDO2 to a free GPIO and set `gdo2_pin:`. GDO2 is dynamically reconfigured per phase: during TX it acts as a TX FIFO threshold signal preventing `TXFIFO_UNDERFLOW`; during RX it signals when the RX FIFO has data (or end-of-packet), eliminating unnecessary `RXBYTES` SPI reads and allowing the ESPHome scheduler to run freely between batches. If you cannot or do not want to wire GDO2, explicitly opt out by setting `disable_gdo2_fifo_management: true`, which restores the original SPI-polling behaviour (still fully functional). If you neither set `gdo2_pin:` nor opt out, the configuration will fail validation with an error pointing you back here.
 
 ## Benefits
 
