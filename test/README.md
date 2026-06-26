@@ -46,7 +46,7 @@ This suite runs on host (PlatformIO `native` environment), so it is suitable for
 To generate fixture entries from firmware logs, use:
 
 ```bash
-python script/extract-meter-fixture.py --input meter-capture.log --append --name-prefix capture
+python scripts/extract-meter-fixture.py --input meter-capture.log --append --name-prefix capture
 ```
 
 ### Test Framework

@@ -42,7 +42,7 @@ The extractor handles both log formats automatically:
 Run:
 
 ```powershell
-python script/extract-meter-fixture.py --input meter-capture.log --append --name-prefix home
+python scripts/extract-meter-fixture.py --input meter-capture.log --append --name-prefix home
 ```
 
 This appends fixtures to:

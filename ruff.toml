@@ -65,8 +65,8 @@ split-on-trailing-comma = false
 # PlatformIO advanced-scripting injects the SCons `env` / `Import` globals at runtime,
 # and requires `Import("env")` to run before the stdlib imports. Neither is resolvable
 # by static analysis, so suppress undefined-name and import-position here only.
-"extra/monitor_delay.py" = ["F821", "E402"]
+"scripts/monitor_delay.py" = ["F821", "E402"]
 # This script has a shebang for direct invocation on Linux/macOS, but git does not
 # track the executable bit on Windows, so EXE001 (shebang-not-executable) is a false
 # positive in this repo's cross-platform workflow.
-"script/extract-meter-fixture.py" = ["EXE001"]
+"scripts/extract-meter-fixture.py" = ["EXE001"]

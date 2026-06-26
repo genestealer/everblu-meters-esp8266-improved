@@ -11,7 +11,7 @@
     partway and leave a partially-copied (broken) component on the share.
 
 .EXAMPLE
-    .\extra\deploy-esphome-to-ha.ps1
+    .\scripts\deploy-esphome-to-ha.ps1
 #>
 
 [CmdletBinding()]
