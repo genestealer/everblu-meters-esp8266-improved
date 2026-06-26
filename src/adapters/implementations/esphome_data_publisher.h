@@ -67,9 +67,25 @@ public:
     void set_total_attempts_sensor(esphome::sensor::Sensor *sensor) { total_attempts_sensor_ = sensor; }
     void set_successful_reads_sensor(esphome::sensor::Sensor *sensor) { successful_reads_sensor_ = sensor; }
     void set_failed_reads_sensor(esphome::sensor::Sensor *sensor) { failed_reads_sensor_ = sensor; }
-    void set_frequency_offset_sensor(esphome::sensor::Sensor *sensor) { frequency_offset_sensor_ = sensor; }
-    void set_tuned_frequency_sensor(esphome::sensor::Sensor *sensor) { tuned_frequency_sensor_ = sensor; }
-    void set_frequency_estimate_sensor(esphome::sensor::Sensor *sensor) { frequency_estimate_sensor_ = sensor; }
+    // Frequency calibration sensors are GLOBAL (per-radio, not per-meter): the
+    // pointers are static and shared by every everblu_meter instance, so the
+    // single offset is reflected in one sensor regardless of which meter is read.
+    // First non-null registration wins; define these on a single meter in YAML.
+    void set_frequency_offset_sensor(esphome::sensor::Sensor *sensor)
+    {
+        if (sensor != nullptr && frequency_offset_sensor_ == nullptr)
+            frequency_offset_sensor_ = sensor;
+    }
+    void set_tuned_frequency_sensor(esphome::sensor::Sensor *sensor)
+    {
+        if (sensor != nullptr && tuned_frequency_sensor_ == nullptr)
+            tuned_frequency_sensor_ = sensor;
+    }
+    void set_frequency_estimate_sensor(esphome::sensor::Sensor *sensor)
+    {
+        if (sensor != nullptr && frequency_estimate_sensor_ == nullptr)
+            frequency_estimate_sensor_ = sensor;
+    }
     void set_uptime_sensor(esphome::sensor::Sensor *sensor) { uptime_sensor_ = sensor; }
 
     // Text sensors
@@ -129,9 +145,10 @@ private:
     esphome::sensor::Sensor *total_attempts_sensor_{nullptr};
     esphome::sensor::Sensor *successful_reads_sensor_{nullptr};
     esphome::sensor::Sensor *failed_reads_sensor_{nullptr};
-    esphome::sensor::Sensor *frequency_offset_sensor_{nullptr};
-    esphome::sensor::Sensor *tuned_frequency_sensor_{nullptr};
-    esphome::sensor::Sensor *frequency_estimate_sensor_{nullptr};
+    // Global (per-radio) frequency calibration sensors - shared across all instances.
+    static esphome::sensor::Sensor *frequency_offset_sensor_;
+    static esphome::sensor::Sensor *tuned_frequency_sensor_;
+    static esphome::sensor::Sensor *frequency_estimate_sensor_;
     esphome::sensor::Sensor *uptime_sensor_{nullptr};
 
     // Text sensors

@@ -12,6 +12,12 @@
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/core/log.h"
 static const char *const TAG_PUB = "everblu_publisher";
+
+// Global (per-radio) frequency calibration sensors. Static so every meter
+// instance publishes the single shared offset to one set of HA entities.
+esphome::sensor::Sensor *ESPHomeDataPublisher::frequency_offset_sensor_ = nullptr;
+esphome::sensor::Sensor *ESPHomeDataPublisher::tuned_frequency_sensor_ = nullptr;
+esphome::sensor::Sensor *ESPHomeDataPublisher::frequency_estimate_sensor_ = nullptr;
 #endif
 
 ESPHomeDataPublisher::ESPHomeDataPublisher()

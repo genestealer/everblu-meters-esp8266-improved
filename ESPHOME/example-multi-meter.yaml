@@ -77,12 +77,15 @@ everblu_meter:
 
     request_reading_button:
       name: "${meter_1_prefix} Read Meter Now"
+    # Frequency calibration is a property of the shared CC1101 radio, not the meter.
+    # Declare these buttons/sensors on ONE meter only (here, the first). They are
+    # global: any meter's reads/scans update this single set of entities.
     frequency_scan_button:
-      name: "${meter_1_prefix} Scan Frequency"
+      name: "Radio Scan Frequency"
     wide_frequency_scan_button:
-      name: "${meter_1_prefix} Wide Frequency Scan"
+      name: "Radio Wide Frequency Scan"
     reset_frequency_button:
-      name: "${meter_1_prefix} Reset Frequency Offset"
+      name: "Radio Reset Frequency Offset"
 
     volume:
       name: "${meter_1_prefix} Water Volume"
@@ -105,12 +108,13 @@ everblu_meter:
       name: "${meter_1_prefix} Successful Reads"
     failed_reads:
       name: "${meter_1_prefix} Failed Reads"
+    # Global (per-radio) calibration sensors - declared on this meter only.
     frequency_offset:
-      name: "${meter_1_prefix} Frequency Offset"
+      name: "Radio Frequency Offset"
     tuned_frequency:
-      name: "${meter_1_prefix} Tuned Frequency (MHz)"
+      name: "Radio Tuned Frequency (MHz)"
     frequency_estimate:
-      name: "${meter_1_prefix} Frequency Estimate"
+      name: "Radio Frequency Estimate"
 
     meter_serial_sensor:
       name: "${meter_1_prefix} Meter Serial"
@@ -165,12 +169,8 @@ everblu_meter:
 
     request_reading_button:
       name: "${meter_2_prefix} Read Meter Now"
-    frequency_scan_button:
-      name: "${meter_2_prefix} Scan Frequency"
-    wide_frequency_scan_button:
-      name: "${meter_2_prefix} Wide Frequency Scan"
-    reset_frequency_button:
-      name: "${meter_2_prefix} Reset Frequency Offset"
+    # Frequency calibration buttons/sensors are radio-global and declared on the
+    # first meter only (see cold_water_meter above); they act on the shared CC1101.
 
     volume:
       name: "${meter_2_prefix} Water Volume"
@@ -193,12 +193,6 @@ everblu_meter:
       name: "${meter_2_prefix} Successful Reads"
     failed_reads:
       name: "${meter_2_prefix} Failed Reads"
-    frequency_offset:
-      name: "${meter_2_prefix} Frequency Offset"
-    tuned_frequency:
-      name: "${meter_2_prefix} Tuned Frequency (MHz)"
-    frequency_estimate:
-      name: "${meter_2_prefix} Frequency Estimate"
 
     meter_serial_sensor:
       name: "${meter_2_prefix} Meter Serial"
