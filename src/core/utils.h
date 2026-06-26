@@ -55,6 +55,28 @@ void show_in_bin(const uint8_t *buffer, size_t len);
 void echo_debug(bool l_flag, const char *fmt, ...);
 
 /**
+ * @brief When true, echo_debug() output is suppressed.
+ *
+ * Used to silence the verbose per-attempt radio/meter read sequence logging
+ * during frequency scans, where dozens of read attempts would otherwise flood
+ * the log with irrelevant detail. High-level scan progress messages use LOG_*
+ * directly and are unaffected.
+ */
+extern bool g_echo_debug_quiet;
+
+/**
+ * @brief RAII helper that suppresses echo_debug() output for the current scope.
+ *
+ * Restores the previous quiet state on destruction so nested uses are safe.
+ */
+struct EchoDebugQuietGuard
+{
+	bool previous;
+	EchoDebugQuietGuard() : previous(g_echo_debug_quiet) { g_echo_debug_quiet = true; }
+	~EchoDebugQuietGuard() { g_echo_debug_quiet = previous; }
+};
+
+/**
  * @brief Print current timestamp for debugging
  */
 void print_time(void);
