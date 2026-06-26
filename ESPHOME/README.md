@@ -1,6 +1,6 @@
 # ESPHome Integration for EverBlu Cyble Enhanced Meters
 
-Complete ESPHome custom component for reading EverBlu Cyble Enhanced water and gas meters. This integration provides seamless Home Assistant integration without requiring an MQTT broker.
+Complete ESPHome custom component for reading EverBlu Cyble Enhanced water and gas meters. This integration connects to Home Assistant without requiring an MQTT broker.
 
 ## Table of Contents
 
@@ -79,7 +79,7 @@ This will output detailed hex dumps of the decoded frame, helping identify:
 - Regional/manufacturing differences in data layout
 - Specific bytes causing parsing errors
 
-**📖 Complete troubleshooting guide:** [../docs/TROUBLESHOOTING_CORRUPTED_READINGS.md](../docs/TROUBLESHOOTING_CORRUPTED_READINGS.md)
+**Complete troubleshooting guide:** [../docs/TROUBLESHOOTING_CORRUPTED_READINGS.md](../docs/TROUBLESHOOTING_CORRUPTED_READINGS.md)
 
 ### No Meter Response
 
@@ -372,7 +372,7 @@ everblu_meter:
 
 ## Features
 
-- **Native ESPHome Integration**: Works seamlessly with Home Assistant via ESPHome API
+- **Native ESPHome Integration**: Works with Home Assistant via the ESPHome API
 - **Automatic Discovery**: Sensors appear automatically in Home Assistant
 - **Scheduled Readings**: Configure when and how often to read the meter
 - **Frequency Management**: Automatic frequency scanning and optimization
@@ -423,7 +423,7 @@ Three complete example configurations are provided:
 
 Important: The CC1101 requires 3.3V power. Do not connect to 5V!
 
-> **⚠️ Breaking change (v3.0.0): GDO2 is now required by default.** You must wire CC1101 GDO2 to a free GPIO and set `gdo2_pin:`. GDO2 is dynamically reconfigured per phase: during TX it acts as a TX FIFO threshold signal preventing `TXFIFO_UNDERFLOW`; during RX it signals when the RX FIFO has data (or end-of-packet), eliminating unnecessary `RXBYTES` SPI reads and allowing the ESPHome scheduler to run freely between batches. If you cannot or do not want to wire GDO2, explicitly opt out by setting `disable_gdo2_fifo_management: true`, which restores the original SPI-polling behaviour (still fully functional). If you neither set `gdo2_pin:` nor opt out, the configuration will fail validation with an error pointing you back here.
+> **Breaking change (v3.0.0): GDO2 is now required by default.** You must wire CC1101 GDO2 to a free GPIO and set `gdo2_pin:`. GDO2 is dynamically reconfigured per phase: during TX it acts as a TX FIFO threshold signal preventing `TXFIFO_UNDERFLOW`; during RX it signals when the RX FIFO has data (or end-of-packet), eliminating unnecessary `RXBYTES` SPI reads and allowing the ESPHome scheduler to run freely between batches. If you cannot or do not want to wire GDO2, explicitly opt out by setting `disable_gdo2_fifo_management: true`, which restores the original SPI-polling behaviour (still fully functional). If you neither set `gdo2_pin:` nor opt out, the configuration will fail validation with an error pointing you back here.
 
 ## Benefits
 
@@ -466,7 +466,7 @@ If you switch between ESPHome and MQTT, change meter serial numbers, or replace 
 **Benefits:**
 
 - Preserve history when switching ESPHome ↔ MQTT
-- Seamless meter serial number updates
+- Update the meter serial number in one place
 - Single point to update for hardware changes
 - Stable entity ID for dashboards and automations
 
@@ -554,7 +554,7 @@ EverbluMeterComponent (ESPHome)
 
 **Key Benefits**:
 
-- ~95% code shared between ESPHome and standalone modes
+- Most code is shared between ESPHome and standalone modes
 - Clean separation of concerns
 - Easy to test and maintain
 - Extensible for other platforms

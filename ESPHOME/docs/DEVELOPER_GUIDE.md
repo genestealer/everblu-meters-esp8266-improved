@@ -61,7 +61,7 @@ This means:
 
 Copy these files to your ESPHome custom component:
 
-```
+```text
 components/your_component/
 ├── storage_abstraction.h
 ├── storage_abstraction.cpp

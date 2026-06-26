@@ -38,3 +38,7 @@ globs:
 ignores:
   - "ESPHOME-release/**"
   - "docs/datasheets/**"
+  # docs/ is internal design notes / historical analysis (not shipped); not linted.
+  - "docs/**"
+  # LICENSE.md is the verbatim MIT license text; not linted.
+  - "LICENSE.md"

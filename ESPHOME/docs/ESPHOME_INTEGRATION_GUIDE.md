@@ -632,7 +632,7 @@ This pattern allows the same `MeterReader` code to work in both standalone MQTT 
 
 #### Component File Structure
 
-```
+```text
 ESPHOME/components/everblu_meter/
 ├── __init__.py              # Python config schema
 ├── everblu_meter.h          # Component header

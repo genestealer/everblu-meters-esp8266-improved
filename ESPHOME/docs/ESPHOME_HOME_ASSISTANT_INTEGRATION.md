@@ -324,7 +324,7 @@ The same principles and setup process apply.
 ## Benefits Summary
 
 | Without Utility Meter | With Utility Meter |
-|----------------------|-------------------|
+| --- | --- |
 | Data lost if ESP offline | Always available |
 | History lost on hardware change | Continuous history |
 | No consumption cycles | Daily/Weekly/Monthly/Yearly tracking |

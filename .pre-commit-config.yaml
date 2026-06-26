@@ -12,7 +12,9 @@ ci:
 exclude: |
   (?x)^(
     ESPHOME-release/.*|
-    docs/datasheets/.*
+    docs/datasheets/.*|
+    docs/.*|
+    LICENSE\.md
   )$
 
 repos:
