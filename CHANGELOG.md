@@ -15,6 +15,7 @@ Non-breaking hardening follow-up to the v3.0.0 GDO2 changes. The default and bot
 ### Added
 
 - **Stuck-GDO2 diagnostics.** When the TX interrogation-frame gate waits the full safety window with GDO2 still HIGH, the driver now logs an explicit "GDO2 still HIGH - check wiring" warning and increments a lifetime counter (`cc1101_get_gdo2_timeout_count()`), so a wiring fault is no longer silently misread as "meter asleep / out of range".
+- **Boot-time GDO2 wiring self-test.** `cc1101_init()` performs a one-time check that GDO2 reads LOW with an empty TX FIFO and HIGH once the FIFO is filled past the threshold. A failed toggle logs a warning and bumps the same diagnostic counter, so a miswired GDO2 is flagged at boot instead of only after the first failed read.
 - **ESPHome `gdo2_timeouts` diagnostic sensor** (optional) exposing that counter to Home Assistant.
 
 ### Changed

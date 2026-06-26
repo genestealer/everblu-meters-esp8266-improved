@@ -679,6 +679,42 @@ bool cc1101_init(float freq)
 
   echo_debug(debug_out, "[CC1101] Frequency synthesizer calibrated for %.6f MHz\n", freq);
 
+  // One-time GDO2 wiring self-test. With IOCFG2 in TX-FIFO-threshold mode (0x02, set by
+  // cc1101_configureRF_0) GDO2 must read LOW with an empty TX FIFO and HIGH once the FIFO
+  // is filled past the 25-byte threshold. If it does not toggle across that known
+  // transition, GDO2 is almost certainly miswired / on the wrong GPIO / not connected.
+  // Runs once per boot (skipped on the repeated cc1101_init() calls made by frequency
+  // scans). A failure increments the same diagnostic counter as the runtime stuck-HIGH
+  // detection, so the fault surfaces in telemetry from boot without waiting for a read.
+  if (GET_GDO2_PIN() >= 0)
+  {
+    static bool s_gdo2_selftest_done = false;
+    if (!s_gdo2_selftest_done)
+    {
+      s_gdo2_selftest_done = true;
+      halRfWriteReg(IOCFG2, IOCFG2_TX_FIFO_THR); // ensure GDO2 = TX FIFO threshold signal
+      CC1101_CMD(SFTX);                          // empty TX FIFO -> GDO2 expected LOW
+      delayMicroseconds(50);
+      bool low_when_empty = (digitalRead(GET_GDO2_PIN()) == LOW);
+      uint8_t selftest_buf[40] = {0};            // > 25-byte threshold -> GDO2 expected HIGH
+      SPIWriteBurstReg(TX_FIFO_ADDR, selftest_buf, sizeof(selftest_buf));
+      delayMicroseconds(50);
+      bool high_when_filled = (digitalRead(GET_GDO2_PIN()) == HIGH);
+      CC1101_CMD(SFTX);                          // restore empty FIFO for normal operation
+      if (low_when_empty && high_when_filled)
+      {
+        echo_debug(debug_out, "[CC1101] GDO2 self-test passed (LOW when empty / HIGH when filled)\n");
+      }
+      else
+      {
+        _gdo2_stuck_timeouts++;
+        LOG_W("everblu_meter",
+              "GDO2 self-test FAILED (empty read=%s, filled read=%s; expected LOW then HIGH) - check GDO2 wiring/pin. Reads may fail until fixed; opt out via DISABLE_GDO2_FIFO_MANAGEMENT / disable_gdo2_fifo_management to use legacy SPI polling.",
+              low_when_empty ? "LOW" : "HIGH", high_when_filled ? "HIGH" : "LOW");
+      }
+    }
+  }
+
   // Put radio into RX listening mode so it can receive meter data
   cc1101_rec_mode();
 
