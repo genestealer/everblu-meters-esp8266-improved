@@ -302,7 +302,7 @@ const char jsonTemplate[] = "{ "
 
 // Define the default maximum retries if missing from the private.h file
 #ifndef MAX_RETRIES
-#define MAX_RETRIES 10 // Default: 10 retry attempts before cooldown
+#define MAX_RETRIES 5 // Default: 5 retry attempts before cooldown
 #endif
 
 int _retry = 0;

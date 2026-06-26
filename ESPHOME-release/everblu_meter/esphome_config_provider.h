@@ -92,7 +92,7 @@ private:
     bool auto_align_midpoint_{true};
 
     // Retry configuration
-    int max_retries_{10};
+    int max_retries_{5};
     unsigned long retry_cooldown_ms_{3600000}; // 1 hour
 };
 
