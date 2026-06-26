@@ -33,7 +33,8 @@ ESPHome integration is production-ready. **📖 Start here for ESPHome:**
 - **[ESPHOME/ESPHOME_INTEGRATION_GUIDE.md](ESPHOME/ESPHOME_INTEGRATION_GUIDE.md)** — complete step-by-step installation guide
 - Ready-made configs: [water](ESPHOME/example-water-meter.yaml) · [gas](ESPHOME/example-gas-meter-minimal.yaml) · [advanced](ESPHOME/example-advanced.yaml) · [multi-meter](ESPHOME/example-multi-meter.yaml)
 
-> **⚠️ Breaking change in v3.0.0:** GDO2 hardware FIFO management is now enabled by default. You must wire CC1101 GDO2 and set `gdo2_pin:` (or opt out with `disable_gdo2_fifo_management: true`). See the [Hardware](#hardware) section and [ESPHOME/README.md](ESPHOME/README.md).
+> [!WARNING]
+> **Breaking change in v3.0.0:** GDO2 hardware FIFO management is now enabled by default. You must wire CC1101 GDO2 and set `gdo2_pin:` (or opt out with `disable_gdo2_fifo_management: true`). See the [Hardware](#hardware) section and [ESPHOME/README.md](ESPHOME/README.md).
 
  - Versioned external component in `ESPHOME-release` with the same 3.0.0 code as the main firmware
  - Tested on ESP8266 and ESP32 with water and gas meters; supports the same sensors and calibration logic
