@@ -53,6 +53,13 @@ repos:
         additional_dependencies: ["clang-format"]
         files: ^ESPHOME/components/everblu_meter/.*\.(cpp|h)$
 
+  # --- Markdown: markdownlint-cli2 (rules in .markdownlint-cli2.yaml) ---
+  # Node-based hook; pre-commit / pre-commit.ci provision Node automatically.
+  - repo: https://github.com/DavidAnson/markdownlint-cli2
+    rev: v0.22.1
+    hooks:
+      - id: markdownlint-cli2
+
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
