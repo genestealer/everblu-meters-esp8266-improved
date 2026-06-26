@@ -43,6 +43,12 @@ jobs:
           # Legacy GDO2 opt-out path - disable_gdo2_fifo_management: true
           - id: esp8266-legacy-gdo2
             config: .ci/esphome/everblu_meter/test.esp8266-legacy-gdo2.yaml
+          # Local twin of the git smoke test - validates the standalone git
+          # fixture's exact config shape against the PR's own component (no
+          # network). Catches a missed fixture update during a breaking change
+          # before merge - the git job itself is post-merge only.
+          - id: esp8266-git-local
+            config: .ci/esphome/everblu_meter/test.esp8266-git-local.yaml
 
     name: ${{ matrix.id }}
     steps:
@@ -122,7 +128,12 @@ jobs:
           # RISC-V / Arduino - different architecture family
           - id: esp32-c3-ard
             config: .ci/esphome/everblu_meter/test.esp32-c3-ard.yaml
-          # Git external_components smoke test - validates real-world install path
+          # Local twin of the git smoke test - same config shape via type: local
+          - id: esp8266-git-local
+            config: .ci/esphome/everblu_meter/test.esp8266-git-local.yaml
+          # Git external_components smoke test - validates real-world install path.
+          # Branch-aware: ref follows the pushed branch (github.ref_name) so a
+          # push to develop validates develop's ESPHOME-release, not main.
           - id: esp8266-git
             config: .ci/esphome/everblu_meter/test.esp8266-git.yaml
 
@@ -158,10 +169,17 @@ jobs:
           pip install "esphome>=2025.0"
 
       - name: Validate configuration
-        run: esphome config ${{ matrix.config }}
+        env:
+          # Only the git smoke test takes a ref override; it follows the pushed branch.
+          # NOTE: -s/--substitution is a GLOBAL ESPHome option and must precede the
+          # subcommand; placed after it, the override is silently ignored.
+          REF_ARG: ${{ matrix.id == 'esp8266-git' && format('-s git_ref {0}', github.ref_name) || '' }}
+        run: esphome $REF_ARG config ${{ matrix.config }}
 
       - name: Compile
-        run: esphome compile ${{ matrix.config }}
+        env:
+          REF_ARG: ${{ matrix.id == 'esp8266-git' && format('-s git_ref {0}', github.ref_name) || '' }}
+        run: esphome $REF_ARG compile ${{ matrix.config }}
 
       - name: Summary
         if: always()

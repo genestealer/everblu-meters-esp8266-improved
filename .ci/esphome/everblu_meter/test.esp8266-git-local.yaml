@@ -1,0 +1,39 @@
+# Local twin of test.esp8266-git.yaml.
+# Same config shape as the git smoke test, but sources the component from the
+# checked-out ESPHOME-release (type: local) instead of fetching from GitHub.
+#
+# Runs on PULL REQUESTS so the git fixture's exact config shape is validated
+# against the PR's own component. This is what catches a missed fixture update
+# during a breaking change (e.g. the v3.0.0 gdo2_pin requirement) BEFORE merge,
+# with no network dependency.
+#
+# The meter config lives in common-git-source.yaml so this file and
+# test.esp8266-git.yaml differ ONLY in their external_components source.
+
+esphome:
+  name: ci-esp8266-git-local
+  min_version: 2024.6.0
+
+esp8266:
+  board: d1_mini
+  framework:
+    version: recommended
+
+logger:
+
+api:
+
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: CI-WIFI
+  password: CI-PASSWORD
+
+external_components:
+  - source:
+      type: local
+      path: ../../../ESPHOME-release
+    components: [ everblu_meter ]
+
+<<: !include common-git-source.yaml
