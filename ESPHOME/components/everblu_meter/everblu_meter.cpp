@@ -293,15 +293,18 @@ void EverbluMeterComponent::loop() {
       this->meter_reader_->triggerReading(false);
     }
 
-    // Measure how long the radio read path blocks the ESPHome main loop. During an
-    // active CC1101 interrogation this is expected to exceed LOOP_BLOCK_WARN_MS by a
-    // wide margin (multi-second); the call already feeds the watchdog and yields
-    // internally, so this is a diagnostic measurement rather than a hard fault (issue #93).
+    // Measure how long the radio read path blocks the ESPHome main loop. An active
+    // CC1101 interrogation exceeds LOOP_BLOCK_WARN_MS by a wide margin (multi-second),
+    // but lighter periodic work (schedule checks, stats publishing) can also cross it;
+    // the call feeds the watchdog and yields internally, so this is a diagnostic
+    // measurement rather than a hard fault (issue #93).
     uint32_t loop_start = millis();
     this->meter_reader_->loop();
     uint32_t loop_elapsed = millis() - loop_start;
     if (loop_elapsed > LOOP_BLOCK_WARN_MS) {
-      ESP_LOGD(TAG, "meter_reader loop blocked for %lu ms (ESPHome budget %lu ms); expected during an active read",
+      ESP_LOGD(TAG,
+               "meter_reader loop blocked for %lu ms (ESPHome budget %lu ms); multi-second blocks are normal during an "
+               "active RF read",
                (unsigned long) loop_elapsed, (unsigned long) LOOP_BLOCK_WARN_MS);
     }
   }
