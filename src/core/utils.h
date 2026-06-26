@@ -74,6 +74,11 @@ struct EchoDebugQuietGuard
 	bool previous;
 	EchoDebugQuietGuard() : previous(g_echo_debug_quiet) { g_echo_debug_quiet = true; }
 	~EchoDebugQuietGuard() { g_echo_debug_quiet = previous; }
+
+	// Non-copyable / non-movable: copying would run the restore logic in more
+	// than one destructor and could leave g_echo_debug_quiet in the wrong state.
+	EchoDebugQuietGuard(const EchoDebugQuietGuard &) = delete;
+	EchoDebugQuietGuard &operator=(const EchoDebugQuietGuard &) = delete;
 };
 
 /**
