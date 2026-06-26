@@ -79,6 +79,8 @@ everblu_meter:
       name: "${meter_1_prefix} Read Meter Now"
     frequency_scan_button:
       name: "${meter_1_prefix} Scan Frequency"
+    wide_frequency_scan_button:
+      name: "${meter_1_prefix} Wide Frequency Scan"
     reset_frequency_button:
       name: "${meter_1_prefix} Reset Frequency Offset"
 
@@ -165,6 +167,8 @@ everblu_meter:
       name: "${meter_2_prefix} Read Meter Now"
     frequency_scan_button:
       name: "${meter_2_prefix} Scan Frequency"
+    wide_frequency_scan_button:
+      name: "${meter_2_prefix} Wide Frequency Scan"
     reset_frequency_button:
       name: "${meter_2_prefix} Reset Frequency Offset"
 

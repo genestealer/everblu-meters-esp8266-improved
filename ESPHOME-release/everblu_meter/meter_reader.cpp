@@ -92,7 +92,11 @@ void MeterReader::begin()
     FrequencyManager::setRadioInitCallback(MeterReader::radioInitCallback);
     FrequencyManager::setMeterReadCallback(MeterReader::meterReadCallback);
 
-    // Initialize FrequencyManager with configured frequency
+    // Initialize FrequencyManager with configured frequency.
+    // NOTE: The frequency offset is a property of the RADIO, not the meter. It is held in
+    // FrequencyManager's static state and persisted under a single storage key, so it is shared
+    // by every meter that uses the same CC1101. In multi-meter setups all meters on one radio must
+    // therefore be configured with the same base `frequency` for the shared offset to be valid.
     float frequency = m_config->getFrequency();
     FrequencyManager::begin(frequency);
     FrequencyManager::setAutoScanEnabled(m_config->isAutoScanEnabled());

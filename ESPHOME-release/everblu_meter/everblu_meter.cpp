@@ -23,7 +23,9 @@ void EverbluMeterTriggerButton::press_action() {
     return;
   }
 
-  if (this->is_frequency_scan_) {
+  if (this->is_wide_frequency_scan_) {
+    this->parent_->request_wide_frequency_scan();
+  } else if (this->is_frequency_scan_) {
     this->parent_->request_frequency_scan();
   } else if (this->is_reset_frequency_) {
     this->parent_->request_reset_frequency();
@@ -295,6 +297,17 @@ void EverbluMeterComponent::request_frequency_scan() {
   ESP_LOGI(TAG, "Frequency scan requested via button");
   this->apply_radio_context();
   this->meter_reader_->performFrequencyScan(false);
+}
+
+void EverbluMeterComponent::request_wide_frequency_scan() {
+  if (this->meter_reader_ == nullptr) {
+    ESP_LOGW(TAG, "Wide frequency scan ignored: meter reader not ready");
+    return;
+  }
+
+  ESP_LOGI(TAG, "Wide frequency scan requested via button");
+  this->apply_radio_context();
+  this->meter_reader_->performFrequencyScan(true);
 }
 
 void EverbluMeterComponent::request_reset_frequency() {

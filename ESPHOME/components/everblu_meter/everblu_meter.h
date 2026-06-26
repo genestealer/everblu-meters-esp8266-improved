@@ -46,6 +46,7 @@ class EverbluMeterTriggerButton final : public button::Button {
  public:
   void set_parent(EverbluMeterComponent *parent) { this->parent_ = parent; }
   void set_frequency_scan(bool is_frequency_scan) { this->is_frequency_scan_ = is_frequency_scan; }
+  void set_wide_frequency_scan(bool is_wide_frequency_scan) { this->is_wide_frequency_scan_ = is_wide_frequency_scan; }
   void set_reset_frequency(bool is_reset) { this->is_reset_frequency_ = is_reset; }
 
  protected:
@@ -54,6 +55,7 @@ class EverbluMeterTriggerButton final : public button::Button {
  private:
   EverbluMeterComponent *parent_{nullptr};
   bool is_frequency_scan_{false};
+  bool is_wide_frequency_scan_{false};
   bool is_reset_frequency_{false};
 };
 
@@ -134,6 +136,7 @@ class EverbluMeterComponent final : public PollingComponent,
   // External actions
   void request_manual_read();
   void request_frequency_scan();
+  void request_wide_frequency_scan();
   void request_reset_frequency();
 
  protected:
