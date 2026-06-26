@@ -27,6 +27,23 @@ Integrated with Home Assistant via MQTT AutoDiscovery and ESPHome external compo
 
 ---
 
+## Table of Contents
+
+- [Features](#features)
+- [Integration Options](#integration-options)
+- [Quick Start: First Successful Reading](#quick-start-first-successful-reading)
+- [Hardware](#hardware)
+- [MQTT Integration](#mqtt-integration)
+- [Multiple Devices](#multiple-devices)
+- [Home Assistant Best Practice: Utility Meter Helper](#home-assistant-best-practice-utility-meter-helper)
+- [Configuration](#configuration)
+- [Troubleshooting](#troubleshooting)
+- [Utility Read Counter Compatibility](#-important-utility-read-counter-compatibility)
+- [Credits](#credits)
+- [Legal Notice](#-legal-notice)
+
+---
+
 ### **ESPHome** - Release V3.0.0
 ESPHome integration is production-ready. **📖 Start here for ESPHome:**
 - **[ESPHOME/README.md](ESPHOME/README.md)** — ESPHome setup, wiring, and configuration reference
@@ -41,28 +58,6 @@ ESPHome integration is production-ready. **📖 Start here for ESPHome:**
  - YAML stays simple: drop in the component, set `meter_code`, `meter_type`, and `gdo2_pin`, and go
  - Build with the Arduino framework (set `esp32.framework.type: arduino`; ESP-IDF is not supported for this component)
  - Migration tip: if you move from MQTT firmware, keep the same meter serial values so your topics/entities stay aligned
-
----
-
-
-## ⚠️ Important: Utility Read Counter Compatibility
-
-The meter includes a built-in **read counter** that increments each time it's queried. When your water/gas company performs wireless readings, they expect this counter to match their scheduled read count. If you regularly read your meter yourself:
-
-- The counter will be **higher than expected** when the utility reads it
-- Their equipment may flag this discrepancy or refuse to download data
-- They may suspect tampering or out-of-sync equipment
-
-**This is not an MQTT or ESP issue** - it's how the RADIAN protocol and meter hardware work.
-
-### Recommended Actions
-
-1. **Record your initial counter value** when you first start using this device (check Home Assistant sensor or MQTT topic `/counter`)
-2. **If the utility reports issues**:
-   - They can still take a **manual reading** from the physical meter display (traditional method)
-   - Or you can **loop the counter** back to the expected value: the read counter wraps at 255 back to 0, so making enough reads before their scheduled visit can "reset" it (automate this in Home Assistant if needed)
-
-**Note:** Most utilities won't notice or care, but it's good to be aware of this if they mention unexpected counter values during their wireless reading attempts.
 
 ---
 
@@ -87,7 +82,7 @@ Supported meters:
 - Daily scheduled readings (with configurable reading days).
 - Built-in frame validation (CRC-16/KERMIT) plus signal diagnostics (RSSI/LQI).
 - Automatic CC1101 frequency calibration plus first-boot wide scan.
-- Hardware-assisted CC1101 FIFO threshold management via GDO2, **enabled by default (v3.0.0+)** for improved TX/RX reliability (opt out to use legacy SPI polling).
+- Hardware-assisted CC1101 FIFO threshold management via GDO2, **enabled by default (v3.0.0+)** for improved TX/RX reliability (opt out to use legacy SPI polling). See [Hardware](#hardware).
 
 
 ### Full feature list
@@ -100,7 +95,7 @@ Supported meters:
 - MQTT integration for Home Assistant with AutoDiscovery.
 - **Native ESPHome component** for seamless integration.
 - Automatic CC1101 frequency calibration with manual fallback.
-- **Hardware-assisted CC1101 FIFO threshold management via GDO2 — enabled by default (v3.0.0+)**: dynamically reconfigured per phase to prevent TX FIFO underflows and reduce unnecessary RX SPI reads. Requires wiring GDO2 to a free GPIO; you can explicitly opt out to fall back to SPI polling.
+- **Hardware-assisted CC1101 FIFO threshold management via GDO2 — enabled by default (v3.0.0+)**: per-phase reconfiguration prevents TX FIFO underflows and reduces unnecessary RX SPI reads. Requires wiring GDO2 to a free GPIO (or explicitly opt out to use legacy SPI polling) — see [Hardware](#hardware) for wiring and the opt-out.
 - Wi-Fi diagnostics and OTA updates.
 - Built-in CRC-16/KERMIT verification to discard corrupted RADIAN frames before publishing data.
 - Reading Schedule Configuration: Configure reading days using presets (Monday-Friday, Monday-Saturday, Monday-Sunday) or a specific day (Monday-Sunday).
@@ -109,6 +104,9 @@ Supported meters:
 
 
 ### Advanced Frame Validation
+
+<details>
+<summary>How the firmware validates every frame (5 layers)</summary>
 
 The firmware implements multiple layers of validation to ensure data integrity:
 
@@ -133,6 +131,8 @@ The firmware implements multiple layers of validation to ensure data integrity:
    - Frequency error estimation for adaptive tuning
 
 **Result**: You only get data when the firmware is highly confident the reading is genuine and accurate. No false positives, no corrupted values making it into Home Assistant.
+
+</details>
 
 ---
 
@@ -226,6 +226,9 @@ The conversion uses a configurable **gas volume divisor** that can be set in `in
 
 ##### How We Determined the Correct Divisor
 
+<details>
+<summary>Background: empirical derivation of the 0.01 m³/unit pulse weight</summary>
+
 Through empirical testing with an actual EverBlu Cyble gas meter, we discovered that many gas modules are configured with a pulse weight of **0.01 m³ per unit**, not the 0.001 m³ that might be expected from a naive "liters to cubic meters" conversion.
 
 **Real-world example:**
@@ -236,6 +239,8 @@ Through empirical testing with an actual EverBlu Cyble gas meter, we discovered 
 - Using divisor 100: 814.15 m³ (correct, ~11 m³ gap from register)
 
 The gap of ~11 m³ is consistent with the assumption that the EverBlu module was installed after the meter had already recorded some consumption. Without access to the meter's installation records or multiple data points, we cannot definitively confirm the exact pulse weight; however, **0.01 m³/unit proved more plausible through trial and error comparison with the actual mechanical meter register**.
+
+</details>
 
 **If your readings seem incorrect:** Verify your specific meter's pulse weight (often printed on the device label) and adjust `GAS_VOLUME_DIVISOR` accordingly.
 
@@ -870,6 +875,28 @@ Ignore the leading 0 and provide the serial number in the configuration without 
 Typically, a CC1101 433 MHz module with an external wire coil antenna has a maximum range of 300–500 m.
 SMA CC1101 boards with high-gain antennas may increase or even double this range.
 However, be mindful of the distance for effective use.
+
+---
+
+## ⚠️ Important: Utility Read Counter Compatibility
+
+> [!IMPORTANT]
+> The meter includes a built-in **read counter** that increments each time it's queried. When your water/gas company performs wireless readings, they expect this counter to match their scheduled read count. **This is not an MQTT or ESP issue** — it's how the RADIAN protocol and meter hardware work.
+
+If you regularly read your meter yourself:
+
+- The counter will be **higher than expected** when the utility reads it
+- Their equipment may flag this discrepancy or refuse to download data
+- They may suspect tampering or out-of-sync equipment
+
+### Recommended Actions
+
+1. **Record your initial counter value** when you first start using this device (check the Home Assistant sensor or MQTT topic `/counter`).
+2. **If the utility reports issues**:
+   - They can still take a **manual reading** from the physical meter display (traditional method).
+   - Or you can **loop the counter** back to the expected value: the read counter wraps at 255 back to 0, so making enough reads before their scheduled visit can "reset" it (automate this in Home Assistant if needed).
+
+**Note:** Most utilities won't notice or care, but it's good to be aware of this if they mention unexpected counter values during their wireless reading attempts.
 
 ---
 
