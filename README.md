@@ -270,7 +270,7 @@ Once your device is running and connected to Wi-Fi, you can update it wirelessly
 
 1. In `platformio.ini`, find your board's `-ota` environment (e.g., `[env:huzzah-ota]`).
 2. **Update the IP address** to match your device's IP:
-   
+
 ```ini
    upload_port = 192.168.2.21  ; Change to your device's IP
    monitor_port = socket://192.168.2.21:23  ; Change to match upload_port
@@ -570,7 +570,7 @@ Both MQTT and ESPHome modes expose a **history sensor** containing 12 months of 
        - Serial is parsed from the middle section (`SSSSSSS`) and used in topics/entity prefixes
        - Last 3 digits (`NNN`), if present, are ignored by the radio protocol
      - Example:
-       
+
        ```cpp
 // Label text: 23-1875247-234  (with suffix, 12 digits)
        #define METER_CODE "23-1875247-234"
