@@ -188,7 +188,7 @@ See the Hardware section below for full wiring tables and pictures.
   - `METER_CODE` (full under-barcode code with dashes)
   - `METER_TYPE` - set to `"water"` (default) or `"gas"` depending on your meter type
   - `GDO2` - **required by default (v3.0.0+)**: GPIO connected to CC1101 GDO2 (hardware FIFO management). To opt out and use legacy SPI polling, define `DISABLE_GDO2_FIFO_MANAGEMENT` instead. The firmware will not compile until you do one or the other.
-  - `MAX_RETRIES` - maximum reading retry attempts before cooldown (optional, default is 10)
+  - `MAX_RETRIES` - maximum reading retry attempts before cooldown (optional, default is 5)
   - `ADAPTIVE_THRESHOLD` - how many successful reads before adjusting frequency (optional, default is 1 = adjust after each read)
   - `WIFI_SERIAL_MONITOR_ENABLED` - set to `1` to enable WiFi serial monitor for remote debugging (default is `0` for security)
 - `platformio.ini`: select `env:huzzah` (ESP8266 HUZZAH) or `env:esp32dev` (ESP32 DevKit).

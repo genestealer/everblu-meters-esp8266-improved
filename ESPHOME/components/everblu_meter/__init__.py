@@ -206,7 +206,7 @@ CONFIG_SCHEMA = (
             ),
             cv.Optional(CONF_AUTO_ALIGN_TIME, default=True): cv.boolean,
             cv.Optional(CONF_AUTO_ALIGN_MIDPOINT, default=True): cv.boolean,
-            cv.Optional(CONF_MAX_RETRIES, default=10): cv.int_range(min=1, max=50),
+            cv.Optional(CONF_MAX_RETRIES, default=5): cv.int_range(min=1, max=50),
             cv.Optional(
                 CONF_RETRY_COOLDOWN, default="1h"
             ): cv.positive_time_period_milliseconds,

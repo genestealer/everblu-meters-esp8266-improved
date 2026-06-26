@@ -104,7 +104,7 @@ everblu_meter:
   auto_align_midpoint: false  # Use exact configured time
 
   # Aggressive retry strategy
-  max_retries: 15                    # More attempts
+  max_retries: 15                    # More attempts (default: 5)
   retry_cooldown: 30min              # Shorter cooldown
 
   # Adaptive frequency tracking

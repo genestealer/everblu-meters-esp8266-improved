@@ -200,8 +200,8 @@
 
 // Maximum number of retry attempts when reading fails
 // After this many failed attempts, the system enters a 1-hour cooldown period
-// Default: 10 retries
-#define MAX_RETRIES 10
+// Default: 5 retries
+#define MAX_RETRIES 5
 
 // Adaptive frequency tracking threshold
 // Controls how many successful meter reads trigger an automatic frequency adjustment

@@ -218,7 +218,7 @@ timezone_offset: -420  # US Pacific PDT (UTC-7) - Summer
 
 | Parameter        | Type     | Default | Description                     |
 | ---------------- | -------- | ------- | ------------------------------- |
-| `max_retries`    | int      | `10`    | Maximum number of read attempts |
+| `max_retries`    | int      | `5`     | Maximum number of read attempts |
 | `retry_cooldown` | duration | `1h`    | Cooldown between retry sessions |
 
 #### Gas Meter Specific

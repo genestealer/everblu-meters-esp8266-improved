@@ -35,7 +35,7 @@ This release adds complete ESPHome integration as an alternative to the standalo
 - `auto_align_time` / `auto_align_midpoint` - Time alignment features
 
 **Retry Logic**:
-- `max_retries` - Maximum read attempts (default: 10)
+- `max_retries` - Maximum read attempts (default: 5)
 - `retry_cooldown` - Cooldown between sessions (default: 1h)
 
 #### Sensors

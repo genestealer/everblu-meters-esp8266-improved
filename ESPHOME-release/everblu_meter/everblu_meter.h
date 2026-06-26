@@ -154,7 +154,7 @@ class EverbluMeterComponent final : public PollingComponent,
   int timezone_offset_{0};
   bool auto_align_time_{true};
   bool auto_align_midpoint_{true};
-  int max_retries_{10};
+  int max_retries_{5};
   unsigned long retry_cooldown_ms_{3600000};
   int adaptive_threshold_{1};
 
