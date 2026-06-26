@@ -13,19 +13,15 @@ Four critical issues identified in the code review have been successfully fixed 
 
 ### Problem
 
-
-
 Long-running loops could trigger watchdog timer resets, causing unexpected device reboots, especially during:
 
 - Frequency scanning (up to 2 minutes)
 - WUP transmission (up to 3 seconds)
 - Frame reception (up to 1 second)
 
-
 ### Solution
 
 Added `FEED_WDT()` calls in all critical loops to prevent watchdog resets.
-
 
 ### Changes Made
 
@@ -41,7 +37,6 @@ Added `FEED_WDT()` calls in all critical loops to prevent watchdog resets.
 
 #### `src/cc1101.cpp`
 
-
 - **Line 948:** Simplified watchdog feeding in WUP transmission loop (consolidated 3 calls to 1)
 - **Line 974:** Added in `receive_radian_frame()` during frame reception
 - Existing watchdog calls maintained in `cc1101_wait_for_packet()` and `get_meter_data()`
@@ -52,8 +47,6 @@ Added `FEED_WDT()` calls in all critical loops to prevent watchdog resets.
 - Test manual frequency scan via MQTT (13 frequency steps)
 - Verify no unexpected reboots during normal operation
 
-
-
 ---
 
 ## ✅ Fix #2: Stack Overflow Prevention (Recursion → Callbacks)
@@ -61,7 +54,6 @@ Added `FEED_WDT()` calls in all critical loops to prevent watchdog resets.
 ### Problem
 
 `onUpdateData()` used recursive calls for retries, risking stack overflow after multiple failed attempts:
-
 
 ```cpp
 // OLD - DANGEROUS:
@@ -73,7 +65,6 @@ onUpdateData(); // Recursive call stacks up
 ### Solution
 
 Replaced recursion with non-blocking callback scheduling using `mqtt.executeDelayed()`.
-
 
 ### Changes Made
 
@@ -91,9 +82,7 @@ mqtt.executeDelayed(10000, onUpdateData); // Schedules callback without recursio
 - Non-blocking - doesn't freeze the system during 10-second waits
 - Safer for long-term reliability
 
-
 ### Testing Recommendations
-
 
 - Trigger multiple failed reads to test retry logic
 - Monitor stack usage during retries (should remain constant)
@@ -101,20 +90,17 @@ mqtt.executeDelayed(10000, onUpdateData); // Schedules callback without recursio
 
 ---
 
-
 ## ✅ Fix #3: Buffer Overflow Protection
 
 ### Problem
 
 `decode_4bitpbit_serial()` and `parse_meter_report()` had no bounds checking, allowing potential buffer overruns with malformed/corrupted RF data.
 
-
 ### Solution
 
 Added comprehensive bounds checking with error logging.
 
 ### Changes Made
-
 
 #### `src/cc1101.cpp` - `decode_4bitpbit_serial()`
 
@@ -147,20 +133,17 @@ data.liters = ((uint32_t)decoded_buffer[18]) |
               ((uint32_t)decoded_buffer[21] << 24);
 ```
 
-
 ### Testing Recommendations
 
 - Test with corrupted RF data (if possible)
 - Monitor serial output for "ERROR: Decode buffer overflow" messages
 - Verify liters value handles large readings (> 16 million liters) correctly
 
-
 ---
 
 ## ✅ Fix #4: MQTT Command Input Validation
 
 ### Problem
-
 
 MQTT subscription callbacks accepted any input without validation, creating security risks:
 
@@ -173,13 +156,11 @@ MQTT subscription callbacks accepted any input without validation, creating secu
 
 Implemented strict input whitelisting with logging of invalid attempts.
 
-
 ### Changes Made
 
 #### `src/main.cpp` - `onConnectionEstablished()`
 
 **Trigger Command (Lines 1245-1252):**
-
 
 - ✅ Only accepts: `"update"` or `"read"`
 - ✅ Logs warnings for invalid commands

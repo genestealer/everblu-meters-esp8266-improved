@@ -14,7 +14,6 @@ This refactoring makes the codebase **maximally reusable** for other projects (e
 
 **Key APIs**:
 
-
 ```cpp
 StorageAbstraction::begin();
 StorageAbstraction::saveFloat(key, value, magic);
@@ -31,7 +30,6 @@ StorageAbstraction::clearAll();
 **Files**: `frequency_manager.h`, `frequency_manager.cpp`
 
 **Purpose**: Frequency calibration and optimization logic
-
 
 **Key Features**:
 
@@ -54,14 +52,12 @@ FrequencyManager::setMeterReadCallback(your_meter_read_function);
 FrequencyManager::begin(433.82);  // Now uses YOUR functions
 ```
 
-
 **Reusability**:
 
 - ✅ No hard dependencies on specific CC1101 implementation
 - ✅ No MQTT dependencies
 - ✅ Works with Arduino, ESPHome, ESP-IDF, etc.
 - ✅ Can inject mock functions for testing
-
 
 ### 3. Updated main.cpp
 
@@ -89,7 +85,6 @@ FrequencyManager::performFrequencyScan([](const char *s, const char *m) {
 });
 ```
 
-
 ## Why This Matters for ESPHome
 
 ### Problem with Original Code
@@ -103,7 +98,6 @@ The 91JJ ESPHome fork had to make **huge changes** because:
 - Had to duplicate/rewrite all frequency management
 
 ### Solution: Dependency Injection
-
 
 With the refactored code:
 
@@ -143,7 +137,6 @@ void EverbluComponent::setup() {
 
 ## Files That Are Reusable As-Is
 
-
 These files have **zero dependencies** on main.cpp, MQTT, or Arduino-specific code:
 
 ### ✅ Fully Portable
@@ -170,7 +163,6 @@ For ESPHome, you'll use ESPHome's own CC1101 component and inject it via callbac
 
 ## Dependency Graph
 
-
 ### Old Architecture (Tight Coupling)
 
 ```
@@ -183,7 +175,6 @@ main.cpp
 ```
 
 ### New Architecture (Loose Coupling)
-
 
 ```
 main.cpp (Application Layer)
@@ -199,7 +190,6 @@ main.cpp (Application Layer)
 ```
 
 For ESPHome:
-
 
 ```
 ESPHome Component
@@ -217,7 +207,6 @@ ESPHome Component
 ## API Surface for External Projects
 
 ### Initialization (REQUIRED)
-
 
 ```cpp
 // 1. Inject radio operations (MUST call before begin)
@@ -254,7 +243,6 @@ FrequencyManager::adaptiveFrequencyTracking(freqest_register_value);
 FrequencyManager::setOffset(offset_mhz);
 FrequencyManager::saveFrequencyOffset(offset_mhz);
 ```
-
 
 ## Callbacks You Must Provide
 
@@ -294,7 +282,6 @@ tmeter_data your_meter_read() {
 
 ### StatusCallback (OPTIONAL)
 
-
 ```cpp
 void your_status_update(const char *state, const char *message) {
     // Called during frequency scans to report progress
@@ -311,7 +298,6 @@ void your_status_update(const char *state, const char *message) {
 ```
 
 ## Breaking Changes
-
 
 ### From Original Code
 
@@ -333,7 +319,6 @@ If updating from the original monolithic main.cpp:
 - EEPROM-specific code in main.cpp (now in StorageAbstraction)
 
 ### Behavior Changes
-
 
 **None!** All functionality is preserved:
 
@@ -374,12 +359,10 @@ After refactoring, verify:
    cp frequency_manager.cpp components/everblu_meter/
    ```
 
-
 3. **Create component files**
    - See `ESPHOME_INTEGRATION.md` for complete example
    - Implement `RadioInitCallback` using ESPHome's CC1101 component
    - Implement `MeterReadCallback` with your meter reading logic
-
 
 4. **Use dependency injection in setup()**
 

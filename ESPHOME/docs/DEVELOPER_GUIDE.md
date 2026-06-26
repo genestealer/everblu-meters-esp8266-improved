@@ -50,7 +50,6 @@ FrequencyManager::setMeterReadCallback(your_meter_read_function);
 
 This means:
 
-
 - ✅ ESPHome can inject its own CC1101 wrapper methods
 - ✅ Arduino projects can inject raw CC1101 calls
 - ✅ Other frameworks can inject their own implementations
@@ -157,7 +156,6 @@ void YourComponent::loop() {
 
 ## Complete Example: ESPHome Custom Component
 
-
 ### esphome_meter.h
 
 ```cpp
@@ -190,7 +188,6 @@ protected:
 } // namespace everblu_meter
 } // namespace esphome
 ```
-
 
 ### esphome_meter.cpp
 
@@ -303,11 +300,9 @@ sensor:
     update_interval: 60s
 ```
 
-
 ## Benefits of This Approach
 
 ### ✅ No Code Duplication
-
 
 - Core frequency logic stays in one place
 - Bug fixes benefit all projects
@@ -315,11 +310,9 @@ sensor:
 
 ### ✅ Clean Separation
 
-
 - Storage abstraction handles platform differences
 - Frequency manager handles calibration logic
 - Your component handles CC1101 specifics
-
 
 ### ✅ Easy Testing
 
@@ -335,7 +328,6 @@ sensor:
 
 ## Migration from 91JJ Fork
 
-
 If you're currently using the 91JJ ESPHome fork:
 
 1. **Keep your CC1101 component** - no need to change it
@@ -344,7 +336,6 @@ If you're currently using the 91JJ ESPHome fork:
 4. **Remove old frequency code** - the new modules handle it all
 
 ### Before (91JJ Pattern)
-
 
 ```cpp
 // Had to rewrite everything in cc1101_component
@@ -370,7 +361,6 @@ FrequencyManager::performFrequencyScan(nullptr);
 
 ### Disable Auto-Scan
 
-
 ```cpp
 FrequencyManager::setAutoScanEnabled(false);
 ```
@@ -383,7 +373,6 @@ FrequencyManager::setAdaptiveThreshold(20);
 ```
 
 ### Manual Frequency Scan
-
 
 ```cpp
 // With status updates
@@ -398,7 +387,6 @@ FrequencyManager::performFrequencyScan(nullptr);
 
 ### Direct Offset Control
 
-
 ```cpp
 // Get current offset
 float offset = FrequencyManager::getOffset();
@@ -411,7 +399,6 @@ FrequencyManager::setOffset(-0.005f);  // -5 kHz
 FrequencyManager::saveFrequencyOffset(offset);
 ```
 
-
 ## Storage Behavior
 
 The `StorageAbstraction` module automatically handles:
@@ -421,7 +408,6 @@ The `StorageAbstraction` module automatically handles:
 - **Validation**: Magic number (0xABCD) prevents reading garbage
 - **Range checking**: Rejects offsets outside ±100 kHz
 
-
 Storage keys:
 
 - `freq_offset`: Frequency offset in MHz (validated)
@@ -429,7 +415,6 @@ Storage keys:
 ## Testing Your Integration
 
 ### Verify Callbacks Are Set
-
 
 ```cpp
 // FrequencyManager will print errors if callbacks not set
@@ -440,7 +425,6 @@ FrequencyManager::begin(433.82);
 ```
 
 ### Test Frequency Scan
-
 
 ```cpp
 // Run a narrow scan (±30 kHz)

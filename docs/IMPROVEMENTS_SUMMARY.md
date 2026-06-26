@@ -2,7 +2,6 @@
 
 ## Overview
 
-
 This document summarizes the improvements made to the EverBlu Meters ESP8266/ESP32 project to enhance performance, reliability, and diagnostics.
 
 ---
@@ -10,7 +9,6 @@ This document summarizes the improvements made to the EverBlu Meters ESP8266/ESP
 ## 1. ✅ Reduced MQTT Publish Delays
 
 **Problem:** Multiple `delay(50)` calls throughout the code were causing significant delays during MQTT publishing operations, totaling ~500ms+ per update cycle.
-
 
 **Solution:**
 
@@ -29,7 +27,6 @@ This document summarizes the improvements made to the EverBlu Meters ESP8266/ESP
 ## 2. ✅ Enhanced Error Handling and Diagnostics
 
 **New Features:**
-
 
 ### Success/Failure Metrics
 
@@ -75,13 +72,11 @@ This document summarizes the improvements made to the EverBlu Meters ESP8266/ESP
 
 ---
 
-
 ## 3. ✅ Frequency Offset Storage and Compensation
 
 **Problem:** CC1101 oscillator drift and environmental factors can cause the optimal frequency to differ from the nominal 433.82 MHz, requiring manual adjustment.
 
 **Solution:**
-
 
 ### Persistent Storage Implementation
 
@@ -89,7 +84,6 @@ This document summarizes the improvements made to the EverBlu Meters ESP8266/ESP
 - **ESP32:** Uses Preferences API for non-volatile storage
 - Stores frequency offset in MHz (e.g., +0.005 for +5 kHz)
 - Sanity checking prevents invalid offsets (±0.1 MHz limit)
-
 
 ### Functions Added
 
@@ -108,13 +102,11 @@ void performFrequencyScan();             // Automatic frequency scanning
 
 ### New MQTT Topic
 
-
 - `everblu/cyble/frequency_offset` - Current frequency offset in MHz
 
 **Impact:** Improved signal reception, automatic compensation for frequency drift, reduced manual configuration needs.
 
 ---
-
 
 ## 4. ✅ Frequency Scanning and Auto-Tuning
 
@@ -126,7 +118,6 @@ void performFrequencyScan();             // Automatic frequency scanning
 - **Step Size:** 5 kHz (0.005 MHz) for fine-grained scanning
 - **Total Steps:** 13 frequency points tested
 - **Criterion:** Best RSSI with valid data
-
 
 ### Scan Process
 
@@ -149,7 +140,6 @@ void performFrequencyScan();             // Automatic frequency scanning
 
 ### Example Output
 
-
 ```
 
 > Starting frequency scan...
@@ -159,11 +149,9 @@ void performFrequencyScan();             // Automatic frequency scanning
 > Frequency offset -0.005000 MHz saved to EEPROM
 ```
 
-
 **Impact:** Optimizes signal reception automatically, eliminates guesswork, adapts to environmental changes.
 
 ---
-
 
 ## 5. ✅ Code Quality Improvements
 
@@ -194,7 +182,6 @@ void show_in_hex_one_line_GET(const uint8_t* buffer, size_t len);
 
 **After:** Single unified function with mode parameter
 
-
 ```cpp
 
 void show_in_hex_formatted(const uint8_t* buffer, size_t len, int mode);
@@ -203,13 +190,11 @@ void show_in_hex_formatted(const uint8_t* buffer, size_t len, int mode);
 
 **Benefit:** Reduced code duplication, easier to maintain, legacy wrappers preserved for compatibility.
 
-
 ---
 
 ## 6. ✅ RADIAN Protocol Documentation
 
 **Added comprehensive comments explaining:**
-
 
 ### Protocol Overview
 
@@ -221,7 +206,6 @@ void show_in_hex_formatted(const uint8_t* buffer, size_t len, int mode);
 ### Communication Sequence
 
 Detailed timeline documentation:
-
 
 - Wake-up phase (2000ms)
 - Interrogation frame (130ms)
@@ -236,7 +220,6 @@ Detailed timeline documentation:
 - Bit encoding examples
 - Decoding algorithm explanation
 
-
 ### Key Functions Documented
 
 - `get_meter_data()` - Overall protocol flow
@@ -245,13 +228,11 @@ Detailed timeline documentation:
 
 **Impact:** Easier for developers to understand and maintain the protocol implementation, enables future enhancements.
 
-
 ---
 
 ## Summary of New Home Assistant Entities
 
 ### Sensors
-
 
 1. **Total Read Attempts** - Counter of all read attempts
 2. **Successful Reads** - Counter of successful reads
@@ -265,7 +246,6 @@ Detailed timeline documentation:
 1. **Scan Frequency** - Trigger automatic frequency scan
 
 ### All Entities Auto-Categorized
-
 
 - Diagnostic sensors appear in "Diagnostic" section
 - Configuration controls in "Configuration" section
@@ -332,7 +312,6 @@ Before deploying to production:
    - Observe success/failure metrics
    - Check CC1101 state transitions
    - Verify error messages are helpful
-
 
 4. **Performance Testing**
    - Measure time reduction in MQTT operations

@@ -2,7 +2,6 @@
 
 ## Issue Reference
 
-
 **Issue #48:** Make meter number prefix optional
 
 **Problem:** Users running a single meter for an extended period lose their Home Assistant history when entity IDs change due to meter serial prefixes.
@@ -15,13 +14,11 @@
 
 ### 1. **Configuration Files**
 
-
 #### `include/private.example.h`
 
 - Added new configuration option: `ENABLE_METER_PREFIX_IN_ENTITY_IDS`
 - Default: `1` (enabled - maintains backward compatibility)
 - Comprehensive documentation in comments
-
 
 #### `include/private.h`
 
@@ -71,9 +68,7 @@
      - Active reading binary sensor
      - Device identification in all discovery messages
 
-
 ### 3. **Documentation**
-
 
 #### `docs/METER_PREFIX_CONFIGURATION.md` (NEW)
 
@@ -171,7 +166,6 @@ Home Assistant entity IDs and discovery message paths follow the same prefix beh
 
 ---
 
-
 ## Testing Scenarios
 
 ### Scenario 1: Single Meter (Prefix Disabled)
@@ -191,7 +185,6 @@ Home Assistant entity IDs and discovery message paths follow the same prefix beh
 4. No MQTT conflicts ✓
 5. Home Assistant distinguishes each meter ✓
 
-
 ### Scenario 3: Meter Replacement (Prefix Disabled)
 
 1. Replace meter with new one (different serial)
@@ -202,8 +195,6 @@ Home Assistant entity IDs and discovery message paths follow the same prefix beh
 4. History continuity preserved ✓
 
 ---
-
-
 
 ## Build Instructions
 
@@ -238,7 +229,6 @@ pio run
 
 ---
 
-
 ## Configuration Reference
 
 | Setting | Value | Effect | Use Case |
@@ -246,11 +236,9 @@ pio run
 | `ENABLE_METER_PREFIX_IN_ENTITY_IDS` | `1` (default) | Meter serial in all entity IDs | Multi-meter setups |
 | `ENABLE_METER_PREFIX_IN_ENTITY_IDS` | `0` | No meter serial in entity IDs | Single-meter with history |
 
-
 ---
 
 ## Home Assistant Impact
-
 
 ### Entities Created
 
@@ -267,11 +255,9 @@ pio run
 - Entity ID: `sensor.everblu_meter_value`
 - Unique ID: `everblu_meter_value`
 
-
 ### Discovery Topics
 
 **With prefix enabled:**
-
 
 - Path: `homeassistant/sensor/{METER_SERIAL}_everblu_meter_value/config`
 
@@ -291,17 +277,14 @@ pio run
 - `publishDiscoveryMessage()` - Conditional entity ID in topic path
 - `publishHADiscovery()` - All discovery messages use getMeterPrefix()
 
-
 ### Modified Variables
 
 - `mqttBaseTopic` - Conditionally includes meter serial
 - `mqttLwtTopic` - Conditionally includes meter serial
 
-
 ### New Configuration Keys
 
 - `ENABLE_METER_PREFIX_IN_ENTITY_IDS` in private.h
-
 
 ---
 

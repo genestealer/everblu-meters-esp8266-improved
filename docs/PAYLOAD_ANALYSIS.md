@@ -2,7 +2,6 @@
 
 ## Overview
 
-
 This document details the complete analysis of the 122-byte payload returned by the Itron EverBlu Cyble Enhanced water meter via the RADIAN protocol.
 
 ## Complete Payload Map
@@ -42,7 +41,6 @@ This document details the complete analysis of the 122-byte payload returned by 
 
 ## Successfully Decoded Fields
 
-
 ### Currently Exposed to Home Assistant (Before This Update)
 
 1. **Current Volume** [bytes 18-21] - Total liters accumulated since meter installation
@@ -51,19 +49,15 @@ This document details the complete analysis of the 122-byte payload returned by 
 4. **Wake Hour** [byte 44] - Start of daily wake window (0-23)
 5. **Sleep Hour** [byte 45] - End of daily wake window (0-23)
 
-
 ### Newly Decoded (This Update)
 
-
-6. **13 Months Historical Volumes** [bytes 66-117] - Total volume at end of each of the last 13 months
+1. **13 Months Historical Volumes** [bytes 66-117] - Total volume at end of each of the last 13 months
 
 ### Identified But Not Decoded
 
-7. **Meter Model/Serial ASCII** [bytes 32-42] - Device identifier text (e.g., "13329 0AL02")
+1. **Meter Model/Serial ASCII** [bytes 32-42] - Device identifier text (e.g., "13329 0AL02")
    - Could be useful as a device identifier
    - Currently not extracted programmatically
-
-
 
 ## Unknown/Undecoded Fields
 
@@ -80,8 +74,6 @@ These bytes likely contain:
 
 Without official Itron protocol documentation, reverse engineering these fields would require:
 
-
-
 1. Capturing many different meter responses under varying conditions
 2. Comparing payloads from multiple meter models
 3. Analyzing bit patterns for flags/counters
@@ -91,13 +83,11 @@ Without official Itron protocol documentation, reverse engineering these fields 
 
 The frame length byte indicates 124 bytes (0x7C), but we only receive 122 bytes. This discrepancy could be:
 
-
 - **CRC bytes** - Checksum at the end (not included in decoded buffer)
 - **Framing overhead** - Start/stop bits that are stripped during 4-bit-per-bit decoding
 - **Padding** - Reserved space for future use
 
 ## Data Not Available via Basic RADIAN Protocol
-
 
 The following information is **stored internally** in the meter but **NOT transmitted** in the basic RADIAN query response:
 
@@ -108,7 +98,6 @@ The following information is **stored internally** in the meter but **NOT transm
 - **Timestamps for alarm events**
 - **Peak flow occurrence dates**
 
-
 ### Enhanced Historical Data
 
 - **181 consumption intervals** (hourly/daily/weekly/monthly) - only 13 monthly values available
@@ -118,7 +107,6 @@ The following information is **stored internally** in the meter but **NOT transm
 - **Backflow/reverse flow history**
 - **Leak detection events**
 - **Tamper detection alarms**
-
 
 ### Configuration Data
 
@@ -131,9 +119,7 @@ These enhanced features require **proprietary Itron commands** that are not docu
 
 ## Comparison with Reference Implementation
 
-
 The hallard/everblu-meters-pi Raspberry Pi reference implementation decodes the exact same fields:
-
 
 - Current volume (liters)
 - Battery remaining (months)
@@ -145,9 +131,7 @@ The hallard/everblu-meters-pi Raspberry Pi reference implementation decodes the 
 
 ## Decoding Methodology
 
-
 ### Integer Values (LSB First)
-
 
 All multi-byte integers use **little-endian (LSB first)** encoding:
 
@@ -167,14 +151,12 @@ Example: EE 01 0B 00
 
 Bytes [32-42] contain null-terminated ASCII text:
 
-
 ```
 31 33 33 32 39 30 41 4C 30 32 00
 = "13329 0AL02\0"
 ```
 
 ### Reserved Fields
-
 
 The value **0x80** (128 decimal) appears to be used as a "no data" or "unused field" marker:
 
@@ -189,15 +171,12 @@ Bytes [54-65]: 00 00 80 80 80 80 80 80 80 80 80 80
 
 ✅ **Fully Implemented and Tested**
 
-
-
 - Current volume extraction
 - Battery remaining
 - Read counter
 - Wake/sleep schedule
 - 13 months historical volumes (NEW)
 - JSON attributes for Home Assistant (NEW)
-
 
 ⚠️ **Identified But Not Implemented**
 
@@ -210,7 +189,6 @@ Bytes [54-65]: 00 00 80 80 80 80 80 80 80 80 80 80
 - Status flags decoding
 
 - Missing 2 bytes (118-121) investigation
-
 
 ## Recommendations
 

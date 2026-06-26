@@ -10,7 +10,6 @@ This feature allows you to control whether the meter serial number is included a
 
 When running a single meter for an extended period, the firmware previously always prefixed MQTT entity IDs with the meter serial number. For example:
 
-
 - With meter serial `257750`, entities would be named: `257750_everblu_meter_value`, `257750_everblu_meter_counter`, etc.
 
 Upgrading to a new firmware version would change the entity ID format, causing Home Assistant to lose all historical data associated with those entities, even though it's the same meter.
@@ -55,13 +54,11 @@ If you have a single meter and want to keep your Home Assistant history intact:
 #define ENABLE_METER_PREFIX_IN_ENTITY_IDS 0
 ```
 
-
 **Entity ID Format:**
 
 - `everblu_meter_value` (instead of `257750_everblu_meter_value`)
 - `everblu_meter_counter` (instead of `257750_everblu_meter_counter`)
 - `everblu_meter_battery` (instead of `257750_everblu_meter_battery`)
-
 
 **Advantages:**
 
@@ -80,7 +77,6 @@ If you have multiple EverBlu meters on the same MQTT broker:
 
 **Entity ID Format per meter:**
 
-
 - Meter `257750`: `257750_everblu_meter_value`, `257750_everblu_meter_counter`, etc.
 - Meter `2777550`: `2777550_everblu_meter_value`, `2777550_everblu_meter_counter`, etc.
 
@@ -91,7 +87,6 @@ If you have multiple EverBlu meters on the same MQTT broker:
 - ✅ Home Assistant distinguishes entities for different meters
 - ✅ Proper device grouping in Home Assistant
 
-
 ## What Changes When Prefix is Disabled
 
 ### MQTT Topics
@@ -101,13 +96,11 @@ MQTT **topic names** ARE affected by this setting:
 - With prefix disabled: Uses `everblu/cyble` base topic (meter serial NOT in topic path)
 - With prefix enabled: Uses `everblu/cyble/{METER_SERIAL}` base topic
 
-
 ### Home Assistant Entity IDs
 
 Entity IDs are affected - the prefix is removed from the entity identifier:
 
 **With prefix enabled (`ENABLE_METER_PREFIX_IN_ENTITY_IDS = 1`):**
-
 
 ```
 uniq_id: 257750_everblu_meter_value
@@ -115,7 +108,6 @@ obj_id: 257750_everblu_meter_value
 ```
 
 **With prefix disabled (`ENABLE_METER_PREFIX_IN_ENTITY_IDS = 0`):**
-
 
 ```
 uniq_id: everblu_meter_value
@@ -125,7 +117,6 @@ obj_id: everblu_meter_value
 ### Device Identification
 
 **With prefix enabled:**
-
 
 ```json
 {
@@ -146,7 +137,6 @@ obj_id: everblu_meter_value
 
 ## Migration Guide
 
-
 ### From v1.15 to v2.0 (With Existing History)
 
 If you had v1.15 running with a single meter and want to preserve your Home Assistant history:
@@ -154,11 +144,9 @@ If you had v1.15 running with a single meter and want to preserve your Home Assi
 1. **Locate your v1.15 entity IDs** - They should look like `257750_water_meter` or similar
 2. **Set in private.h:**
 
-
    ```cpp
    #define ENABLE_METER_PREFIX_IN_ENTITY_IDS 0
    ```
-
 
 3. **Compile and upload** the firmware
 4. **Verify in Home Assistant:** Your existing entities should continue to work with the same data
@@ -166,7 +154,6 @@ If you had v1.15 running with a single meter and want to preserve your Home Assi
 ### From v1.15 to v2.0 (Multi-Meter Setup)
 
 If you're running multiple meters:
-
 
 1. **Leave default setting:**
 
@@ -176,7 +163,6 @@ If you're running multiple meters:
 
 2. **Compile and upload** for each device
 3. **Each meter will get properly prefixed entities** with its unique serial number
-
 
 ## Home Assistant Integration
 
@@ -193,7 +179,6 @@ entity_id: binary_sensor.everblu_meter_active_reading
 ### Multi-Meter Setup (Prefix Enabled)
 
 For multiple meters, use the prefixed entity IDs:
-
 
 ```yaml
 # Meter 257750
@@ -212,13 +197,11 @@ entity_id: sensor.2777550_everblu_meter_battery
 
 **Solution:** Clear your Home Assistant's MQTT discovery cache:
 
-
 1. In Home Assistant, go to Settings → Devices & Services → MQTT
 2. Click the "Publish" button and publish to topic: `homeassistant/+/+/config`
 3. Restart the EverBlu device to republish discovery messages
 
 ### Entities disappeared after enabling/disabling the prefix
-
 
 **Solution:** This is expected behavior due to entity ID changes:
 

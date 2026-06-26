@@ -17,12 +17,10 @@ These modules are now independent of MQTT and can be reused across projects incl
 
 **Key Features**:
 
-
 - Three reading patterns: "Monday-Friday", "Monday-Saturday", "Monday-Sunday"
 - UTC ↔ Local timezone conversions
 - Auto-alignment to meter wake windows (time_start/time_end)
 - Schedule validation and fallback to safe defaults
-
 
 **API**:
 
@@ -48,7 +46,6 @@ ScheduleManager::autoAlignToMeterWindow(meterTimeStart, meterTimeEnd, useMidpoin
 ### 2. meter_history.h / meter_history.cpp
 
 **Purpose**: Processes historical meter data and generates JSON representations
-
 
 **Key Features**:
 
@@ -83,7 +80,6 @@ MeterHistory::printToSerial(history, currentVolume, "[HISTORY]");
 
 ---
 
-
 ## What Was Removed from main.cpp
 
 ### Old Schedule Code (Lines ~130-340)
@@ -98,7 +94,6 @@ MeterHistory::printToSerial(history, currentVolume, "[HISTORY]");
 
 ### Old History Processing Code (Lines ~550-710)
 
-
 - **Removed**: Complex JSON building with manual buffer management (~160 lines)
 - **Removed**: Monthly usage calculations (duplicated in MeterHistory now)
 - **Removed**: History validation logic
@@ -109,7 +104,6 @@ MeterHistory::printToSerial(history, currentVolume, "[HISTORY]");
 - **Lines removed**: ~330 lines from main.cpp
 - **Functionality**: 100% preserved through new modules
 - **Code clarity**: Much improved - main.cpp now focuses on MQTT orchestration only
-
 
 ---
 
@@ -233,13 +227,11 @@ assert(size > 0);
 assert(strstr(json, "\"months_available\":3"));
 ```
 
-
 ---
 
 ## Benefits of This Extraction
 
 ### Separation of Concerns
-
 
 - ✅ Schedule logic: Independent module
 - ✅ History processing: Independent module
@@ -247,7 +239,6 @@ assert(strstr(json, "\"months_available\":3"));
 - ✅ Meter communication: Stays in cc1101/everblu_meters (hardware layer)
 
 ### Reusability
-
 
 - ✅ ScheduleManager works with any project needing daily schedules
 - ✅ MeterHistory works with any meter using 13-month history arrays

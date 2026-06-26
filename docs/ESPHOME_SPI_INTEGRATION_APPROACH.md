@@ -18,13 +18,11 @@ Instead of adding individual `spi_clk_pin`, `spi_mosi_pin`, `spi_miso_pin` confi
 
 ### For End Users
 
-
 - ✅ **Cleaner configuration**: Standard ESPHome SPI syntax that's familiar to users
 - ✅ **Bus sharing**: Can add displays, SD cards, or other SPI devices alongside the CC1101
 - ✅ **Hardware/software SPI selection**: ESPHome can automatically choose the best SPI controller
 - ✅ **Better validation**: Pin conflicts detected at compile-time
 - ✅ **Consistent behavior**: Works the same way as other ESPHome SPI components
-
 
 ### For Developers
 
@@ -84,7 +82,6 @@ everblu_meter:
 
 ## Technical Implementation
 
-
 The component now:
 
 1. Inherits from `spi::SPIDevice` template class
@@ -101,7 +98,6 @@ The component now:
 - ✅ **Backward compatible**: Existing MQTT/PlatformIO builds unaffected
 
 ## Migration from Raw Pin Approach
-
 
 If you previously used (or expected) raw pin configuration:
 

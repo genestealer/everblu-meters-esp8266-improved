@@ -18,7 +18,6 @@ Commercial utility meter readers work universally with all meters without per-de
 
 **What it does:**
 
-
 - Performs a **coarse scan** of ±100 kHz around the configured base frequency (433.82 MHz default)
   - Step size: 10 kHz
   - ~21 frequency points tested
@@ -28,13 +27,11 @@ Commercial utility meter readers work universally with all meters without per-de
 - Saves the discovered frequency offset to EEPROM for future boots
 - Publishes results to MQTT (`everblu/cyble/frequency_offset`)
 
-
 **Benefits:**
 
 - New users can flash the firmware and it will automatically find their meter's frequency
 - No manual frequency scanning or tuning required
 - Makes the project more accessible to the community
-
 
 **Serial output example:**
 
@@ -51,7 +48,6 @@ Commercial utility meter readers work universally with all meters without per-de
 ### 2. Adaptive Frequency Tracking
 
 **Function:** `adaptiveFrequencyTracking(int8_t freqest)`
-
 
 **When it runs:** After every successful meter read in `onUpdateData()`.
 
@@ -73,7 +69,6 @@ Commercial utility meter readers work universally with all meters without per-de
 - No user intervention needed
 
 **Technical details:**
-
 
 - FREQEST resolution: ~1.59 kHz per LSB (based on 26 MHz crystal: Fxosc/2^14)
 - Threshold: 2 kHz average error over 10 reads
@@ -126,7 +121,6 @@ if (storedFrequencyOffset == 0.0 && autoScanEnabled) {
 
 ### In onUpdateData() function
 
-
 ```cpp
 // After successful meter read and all MQTT publishes...
 
@@ -135,7 +129,6 @@ adaptiveFrequencyTracking(meter_data.freqest);
 ```
 
 ## Data Flow
-
 
 1. **First Boot:**
 
@@ -155,8 +148,6 @@ adaptiveFrequencyTracking(meter_data.freqest);
            → cc1101_init(base + offset)
    ```
 
-
-
 3. **During Operation:**
 
    ```
@@ -172,13 +163,11 @@ adaptiveFrequencyTracking(meter_data.freqest);
 
 ### Disable Auto-Scan
 
-
 Set in `private.h`:
 
 ```cpp
 #define AUTO_SCAN_ENABLED false  // Disable automatic wide initial scan
 ```
-
 
 ### Manual Frequency Scan
 
@@ -192,13 +181,11 @@ mosquitto_pub -t "everblu/cyble/frequency_scan" -m "START"
 
 ### Published by these features
 
-
 - `everblu/cyble/frequency_offset` - Current frequency offset in MHz (retained)
 - `everblu/cyble/cc1101_state` - "Initial Frequency Scan", "Adjusting Frequency", "Idle"
 - `everblu/cyble/status_message` - Detailed status messages about scans and adjustments
 
 ### Monitored
-
 
 - `everblu/cyble/frequency_scan` - User can request manual scan
 
@@ -210,7 +197,6 @@ mosquitto_pub -t "everblu/cyble/frequency_scan" -m "START"
 2. **Replace CC1101 radio module** - Each CC1101 has unique crystal tolerance (±10-50 kHz typical)
 3. **Move to a different meter** - Different meters may transmit on slightly different frequencies
 
-
 **How to clear EEPROM:**
 
 In `include/private.h`, set:
@@ -219,13 +205,11 @@ In `include/private.h`, set:
 #define CLEAR_EEPROM_ON_BOOT 1
 ```
 
-
 Upload firmware, wait for one boot cycle (wide scan will run), then set back to:
 
 ```cpp
 #define CLEAR_EEPROM_ON_BOOT 0
 ```
-
 
 Upload again to preserve the discovered frequency.
 
@@ -235,14 +219,12 @@ Upload again to preserve the discovered frequency.
 
 ### Test 1: First Boot Behavior
 
-
 1. Set `CLEAR_EEPROM_ON_BOOT = 1` in `private.h`
 2. Upload firmware and power on ESP8266
 3. Watch serial monitor for wide scan progress (~1-2 minutes)
 4. Verify frequency offset is saved to EEPROM
 5. Set `CLEAR_EEPROM_ON_BOOT = 0` and upload again
 6. Verify subsequent boots skip the wde scan and use stored offset
-
 
 ### Test 2: Adaptive Tracking
 
@@ -261,7 +243,6 @@ Upload again to preserve the discovered frequency.
 4. Verify meter reads remain successful
 
 ## Troubleshooting
-
 
 ### Wide scan finds no signal
 

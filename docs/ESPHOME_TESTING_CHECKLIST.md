@@ -26,13 +26,11 @@ This checklist helps verify that the ESPHome integration works correctly across 
 
 ### Minimal Configuration
 
-
 - [ ] Copy `example-gas-meter-minimal.yaml` to test config
 - [ ] Update meter_year, meter_serial
 - [ ] Run `esphome config test-config.yaml`
 - [ ] No configuration errors
 - [ ] Component loads successfully
-
 
 ### Full Configuration
 
@@ -42,7 +40,6 @@ This checklist helps verify that the ESPHome integration works correctly across 
 - [ ] All sensors validate correctly
 - [ ] No warnings about unknown options
 
-
 ### Invalid Configuration Tests
 
 - [ ] Test meter_year out of range (100) - should fail
@@ -51,7 +48,6 @@ This checklist helps verify that the ESPHome integration works correctly across 
 - [ ] Test frequency too high (929 MHz) - should fail
 - [ ] Test invalid schedule value - should fail
 - [ ] Test missing required field (meter_serial) - should fail
-
 
 ## Compilation Tests
 
@@ -86,14 +82,12 @@ This checklist helps verify that the ESPHome integration works correctly across 
 
 ### CI Matrix Strategy (GitHub Actions)
 
-
 - [x] Water meter tested on Xtensa (ESP8266) and RISC-V (ESP32-C3)
 - [x] Gas meter tested at least once to validate gas-specific code path
 - [x] Git source external_components smoke test included
 - [x] Matrix balances coverage and CI runtime
 
 Notes:
-
 
 - Water-on-two-architectures validates cross-architecture compatibility.
 - Gas-on-one-board validates meter_type-specific generation and compile path.
@@ -104,7 +98,6 @@ Notes:
 
 ### First Boot
 
-
 - [ ] Upload firmware via USB
 - [ ] Device boots successfully
 - [ ] WiFi connects
@@ -112,7 +105,6 @@ Notes:
 - [ ] CC1101 initializes
 - [ ] No crashes in logs
 - [ ] Status LED/indicator works (if configured)
-
 
 ### Logging Output
 
@@ -131,7 +123,6 @@ Notes:
 - [ ] Boot without sensors - works without errors
 
 ## Sensor Functionality
-
 
 ### Sensor Discovery
 
@@ -154,7 +145,6 @@ Notes:
 - [ ] LQI percentage shows 0-100%
 - [ ] Status sensor shows "Idle" initially
 
-
 ### Sensor Properties
 
 - [ ] Volume sensor has correct unit (L or m³)
@@ -169,13 +159,11 @@ Notes:
 
 ## Home Assistant Integration
 
-
 ### API Connection
 
 - [ ] Device connects to Home Assistant API
 - [ ] Encryption key works (if configured)
 - [ ] Connection stays stable
-
 
 ### Entity Discovery
 
@@ -184,7 +172,6 @@ Notes:
 - [ ] Entity IDs are reasonable
 - [ ] Icons display correctly
 - [ ] Device class applied correctly
-
 
 ### Entity Updates
 
@@ -195,12 +182,10 @@ Notes:
 
 ### Device Information
 
-
 - [ ] Device appears in ESPHome integration
 - [ ] Device has correct name
 - [ ] Firmware version shown
 - [ ] Device area assignable
-
 
 ## Reading Functionality
 
@@ -237,13 +222,11 @@ Notes:
 
 ### Auto-Scan
 
-
 - [ ] Enable auto_scan in config
 - [ ] First boot performs wide scan
 - [ ] Logs show frequencies scanned
 - [ ] Optimal frequency detected
 - [ ] Reading succeeds with detected frequency
-
 
 ### Manual Frequency
 
@@ -251,7 +234,6 @@ Notes:
 - [ ] Set specific frequency
 - [ ] Reading uses configured frequency
 - [ ] No scanning occurs
-
 
 ### Frequency Adjustment
 
@@ -261,7 +243,6 @@ Notes:
 - [ ] Reading still works
 
 ## Schedule Configuration
-
 
 ### Different Schedule Types
 
@@ -283,7 +264,6 @@ Notes:
 
 ### Timezone Handling
 
-
 - [ ] timezone_offset=0 works
 - [ ] timezone_offset=-5 works
 - [ ] timezone_offset=+1 works
@@ -291,13 +271,11 @@ Notes:
 
 ## Retry Logic
 
-
 ### Retry Configuration
 
 - [ ] max_retries=1 - only tries once
 - [ ] max_retries=10 - tries up to 10 times
 - [ ] max_retries=20 - tries up to 20 times
-
 
 ### Cooldown Period
 
@@ -306,14 +284,12 @@ Notes:
 - [ ] retry_cooldown=24h works
 - [ ] Cooldown prevents excessive retries
 
-
 ### Retry Statistics
 
 - [ ] total_attempts sensor increments
 - [ ] successful_reads sensor increments on success
 - [ ] failed_reads sensor increments on failure
 - [ ] Statistics accumulate correctly
-
 
 ## OTA Updates
 
@@ -336,13 +312,11 @@ Notes:
 
 ### Update Failure Recovery
 
-
 - [ ] Simulate failed OTA (disconnect during update)
 - [ ] Device recovers (safe mode or previous version)
 - [ ] Can retry OTA successfully
 
 ## Memory and Performance
-
 
 ### Memory Usage
 
@@ -351,7 +325,6 @@ Notes:
 - [ ] No memory leaks over 24 hours
 - [ ] No crashes from out-of-memory
 
-
 ### CPU Usage
 
 - [ ] Device responsive during idle
@@ -359,14 +332,12 @@ Notes:
 - [ ] Web server responsive (if enabled)
 - [ ] Other components work during reading
 
-
 ### Network Performance
 
 - [ ] WiFi connection stable
 - [ ] API connection stable
 - [ ] Sensor updates timely
 - [ ] No packet loss
-
 
 ## Advanced Features
 
@@ -376,7 +347,6 @@ Notes:
 - [ ] All update correctly
 - [ ] No performance issues
 - [ ] No memory issues
-
 
 ### Filter Configuration
 
@@ -415,14 +385,12 @@ Notes:
 
 ### Gas Volume Divisor
 
-
 - [ ] Try gas_volume_divisor=100
 - [ ] Try gas_volume_divisor=1000
 - [ ] Reading values make sense
 - [ ] Units display correctly
 
 ## Documentation Tests
-
 
 ### Examples Work
 
@@ -433,12 +401,10 @@ Notes:
 
 ### Documentation Accuracy
 
-
 - [ ] Wiring diagrams match actual pins
 - [ ] Configuration examples work
 - [ ] Troubleshooting steps are helpful
 - [ ] Links in docs work
-
 
 ### Code Comments
 
@@ -446,7 +412,6 @@ Notes:
 - [ ] Complex functions have comments
 - [ ] Python schema has descriptions
 - [ ] Examples have explanatory comments
-
 
 ## Edge Cases and Stress Tests
 

@@ -10,7 +10,6 @@ This document details the changes made to transition from manual frequency scann
 
 ### What Changed
 
-
 - **Removed**: Manual frequency scanning loop with static `FSCAL` register writes
 - **Removed**: Frequency as an MQTT/Home Assistant discovery entity
 - **Added**: Automatic frequency synthesizer calibration via `MCSM0.FS_AUTOCAL`
@@ -18,7 +17,6 @@ This document details the changes made to transition from manual frequency scann
 - **Added**: Frequency Offset Compensation (FOC) enabled via `FOCCFG`
 - **Added**: Default frequency fallback (433.82 MHz) if not defined in `private.h`
 - **Improved**: Compile-time frequency configuration with startup logging
-
 
 ### Why These Changes Were Made
 
@@ -35,7 +33,6 @@ This document details the changes made to transition from manual frequency scann
 ## Detailed Changes
 
 ### 1. Removed Manual Frequency Scanning
-
 
 **Before** (`src/main.cpp` - old approach):
 
@@ -79,13 +76,11 @@ if (!cc1101_init(FREQUENCY)) {
 
 ---
 
-
 ### 2. Implemented Automatic Frequency Calibration
 
 **Changes in `src/cc1101.cpp`**:
 
 #### a) Enabled Automatic Calibration in MCSM0
-
 
 ```cpp
 // Enable automatic calibration on IDLE->RX/TX state transitions
@@ -113,7 +108,6 @@ bool cc1101_init(float frequency) {
 
 #### c) Enabled Frequency Offset Compensation
 
-
 ```cpp
 // Configure Frequency Offset Compensation
 // FOC automatically adjusts for small frequency errors during reception
@@ -122,7 +116,6 @@ halRfWriteReg(FOCCFG, 0x16);  // Default FOC configuration with tracking enabled
 
 **Benefits**:
 
-
 - `FS_AUTOCAL`: Calibrates on every state transition, adapting to temperature/voltage drift
 - Manual `SCAL`: Ensures calibration is fresh immediately after frequency configuration
 - `FOC`: Corrects for small frequency errors during packet reception (Doppler, drift, etc.)
@@ -130,7 +123,6 @@ halRfWriteReg(FOCCFG, 0x16);  // Default FOC configuration with tracking enabled
 ---
 
 ### 3. Removed Frequency from MQTT Discovery
-
 
 **Removed from `src/main.cpp`**:
 
@@ -168,7 +160,6 @@ Serial.printf("> Frequency (effective): %.6f MHz\n", (double)FREQUENCY);
 
 **Added to `src/main.cpp`**:
 
-
 ```cpp
 // Define a default meter frequency if missing from private.h.
 // RADIAN protocol nominal center frequency for EverBlu is 433.82 MHz.
@@ -188,7 +179,6 @@ Serial.printf("> Frequency (effective): %.6f MHz\n", (double)FREQUENCY);
 - Warning message alerts users if default is being used (encourages proper configuration)
 - Prevents compilation errors from missing `FREQUENCY` define
 
-
 **Documented in `include/private.example.h`**:
 
 ```cpp
@@ -197,7 +187,6 @@ Serial.printf("> Frequency (effective): %.6f MHz\n", (double)FREQUENCY);
 // Uncomment and adjust if your meter uses a different frequency:
 // #define FREQUENCY 433.82
 ```
-
 
 ---
 
@@ -212,7 +201,6 @@ Serial.printf("> Frequency (effective): %.6f MHz\n", (double)FREQUENCY);
 5. Manually set `FREQUENCY` and `FSCAL0/1/2/3` in config
 6. Disable scanning
 7. Recompile and upload
-
 
 #### New Workflow (Simple)
 
@@ -237,7 +225,6 @@ The CC1101 uses a PLL (Phase-Locked Loop) frequency synthesizer that requires pe
 - Crystal oscillator drift
 
 **Calibration Methods Used**:
-
 
 1. **FS_AUTOCAL (MCSM0 register)**:
    - `00b`: Never calibrate (old manual approach)
@@ -276,7 +263,6 @@ The CC1101 uses a PLL (Phase-Locked Loop) frequency synthesizer that requires pe
 6. ✅ RSSI and LQI values are comparable to previous implementation
 7. ✅ Default frequency fallback triggers warning when `FREQUENCY` is undefined
 
-
 ### Performance Comparison
 
 | Metric | Old (Manual) | New (Automatic) |
@@ -288,7 +274,6 @@ The CC1101 uses a PLL (Phase-Locked Loop) frequency synthesizer that requires pe
 | MQTT entities | +1 (frequency) | 0 (removed) |
 | Code complexity | High (scan loops) | Low (single init) |
 
-
 ---
 
 ## Migration Guide
@@ -296,7 +281,6 @@ The CC1101 uses a PLL (Phase-Locked Loop) frequency synthesizer that requires pe
 ### For Existing Users
 
 If you have an existing configuration with manual frequency and calibration values:
-
 
 **Old `private.h`**:
 
@@ -320,7 +304,6 @@ If you have an existing configuration with manual frequency and calibration valu
 
 ### For New Users
 
-
 **Minimal `private.h`** (uses default frequency):
 
 ```cpp
@@ -341,12 +324,9 @@ If you have an existing configuration with manual frequency and calibration valu
 #define FREQUENCY 433.82  // Or your measured optimal frequency
 ```
 
-
 ---
 
 ## Related Changes
-
-
 
 ### Files Modified
 
@@ -367,7 +347,6 @@ If you have an existing configuration with manual frequency and calibration valu
 ## Troubleshooting
 
 ### Issue: "Meter not responding after update"
-
 
 **Solution**: Your optimal frequency may differ slightly from the default. Run frequency scanning mode once to determine your exact frequency, then set it in `private.h`.
 

@@ -4,7 +4,6 @@
 
 ### Diagnostics & Metrics
 
-
 | Topic | Type | Description |
 |-------|------|-------------|
 | `everblu/cyble/cc1101_state` | Text | Current radio state: "Idle", "Reading", or "Frequency Scanning" |
@@ -13,7 +12,6 @@
 | `everblu/cyble/failed_reads` | Number | Number of failed reads |
 | `everblu/cyble/last_error` | Text | Description of last error (or "None") |
 | `everblu/cyble/frequency_offset` | Number | Current frequency offset in MHz |
-
 
 ### Commands
 
@@ -28,7 +26,6 @@
 ## Frequency Scanning
 
 ### How to Use
-
 
 **Method 1: Home Assistant**
 
@@ -56,7 +53,6 @@ mosquitto_pub -h <mqtt_broker> -t "everblu/cyble/frequency_scan" -m "scan"
 
 ### Interpreting Results
 
-
 - Positive offset (e.g., +0.005 MHz): Optimal frequency is 5 kHz above nominal
 - Negative offset (e.g., -0.010 MHz): Optimal frequency is 10 kHz below nominal
 - Zero offset: Nominal frequency is optimal
@@ -68,16 +64,13 @@ mosquitto_pub -h <mqtt_broker> -t "everblu/cyble/frequency_scan" -m "scan"
 - After significant temperature changes
 - If moving the device to a new location
 
-
 ---
 
 ## Monitoring System Health
 
-
 ### Key Metrics to Watch
 
 **Success Rate**
-
 
 ```
 Success Rate = (successful_reads / total_attempts) × 100%
@@ -101,11 +94,9 @@ Success Rate = (successful_reads / total_attempts) × 100%
   - Fair: 40-60%
   - Poor: <40%
 
-
 ### Troubleshooting with New Diagnostics
 
 **Problem: Frequent read failures**
-
 
 1. Check `last_error` for details
 2. Review `failed_reads` trend
@@ -191,13 +182,11 @@ template:
 
 ### MQTT Publish Speed
 
-
 - **Before:** ~500ms total delay for all publishes
 - **After:** ~50ms total delay for all publishes
 - **Improvement:** 90% faster (450ms reduction)
 
 ### System Responsiveness
-
 
 - Faster meter read cycles
 - Reduced blocking during MQTT operations
@@ -205,9 +194,7 @@ template:
 
 ---
 
-
 ## Persistent Storage Details
-
 
 ### ESP8266 (EEPROM)
 
@@ -216,7 +203,6 @@ template:
 - **Validation:** Magic number 0xABCD + range check (±0.1 MHz)
 
 ### ESP32 (Preferences)
-
 
 - **Namespace:** "everblu"
 - **Key:** "freq_offset"
@@ -265,7 +251,6 @@ prefs.end();
 > Frequency synthesizer calibrated for 433.825000 MHz
 ```
 
-
 ### Frequency Scan Output
 
 ```
@@ -282,8 +267,6 @@ prefs.end();
 
 ## Configuration Notes
 
-
-
 ### Frequency Settings
 
 The base frequency is defined in `private.h`:
@@ -296,13 +279,11 @@ The base frequency is defined in `private.h`:
 
 Discovery publishing is enabled by default. To disable `homeassistant/...` topic publishing and keep only raw MQTT topics:
 
-
 ```cpp
 #define ENABLE_HA_DISCOVERY 0
 ```
 
 If discovery was enabled before, retained `homeassistant/...` config topics may still exist on the broker until they are cleared, so Home Assistant entities may remain visible after switching this to `0`.
-
 
 The stored offset is automatically applied:
 
@@ -323,11 +304,9 @@ float scanStep = 0.005;             // 5 kHz steps
 
 ---
 
-
 ## Migration Notes
 
 ### Upgrading from Previous Version
-
 
 1. Flash new firmware
 2. Device will automatically initialize storage
@@ -335,9 +314,7 @@ float scanStep = 0.005;             // 5 kHz steps
 4. Optionally run frequency scan to optimize
 5. Offset persists across reboots
 
-
 ### No Breaking Changes
-
 
 - All existing MQTT topics unchanged
 - Configuration file format unchanged

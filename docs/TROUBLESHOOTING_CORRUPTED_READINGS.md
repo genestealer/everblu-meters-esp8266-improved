@@ -39,7 +39,6 @@ everblu_meter:
 
 Recompile and flash:
 
-
 ```bash
 esphome run your-config.yaml
 ```
@@ -51,7 +50,6 @@ Edit `include/private.h`:
 ```cpp
 #define DEBUG_CC1101 1  // Change from 0 to 1
 ```
-
 
 Rebuild and upload:
 
@@ -65,13 +63,11 @@ pio run --target upload
 
 ### ESPHome Logs
 
-
 View logs via:
 
 - **ESPHome web interface**: `http://water-meter.local:6052`
 - **Home Assistant**: Developer Tools → Logs
 - **Command line**: `esphome logs your-config.yaml`
-
 
 ### MQTT Logs
 
@@ -110,7 +106,6 @@ Note: Bytes [18-21]=volume, [31]=battery, [44-45]=wake/sleep, [66-117]=history
 
 ### Error-Triggered Hex Dumps
 
-
 When validation fails, additional debug output shows the problematic bytes:
 
 **Invalid Volume (0 or 0xFFFFFFFF):**
@@ -123,7 +118,6 @@ When validation fails, additional debug output shows the problematic bytes:
 ```
 
 **CRC Mismatch:**
-
 
 ```
 [ERROR] RADIAN CRC mismatch (computed=0x3A5C frame=0x0000) - discarding frame
@@ -168,11 +162,9 @@ Volume = (0x00 << 24) | (0x0B << 16) | (0x01 << 8) | 0xEE
 
 ---
 
-
 ## Step 5: Compare Your Data
 
 ### Check Volume Field (Bytes 18-21)
-
 
 From your hex dump, extract bytes [18-21]:
 
@@ -183,7 +175,6 @@ From your hex dump, extract bytes [18-21]:
 ```
 
 This decodes to volume = 0, which is clearly wrong for a meter installed in 2015.
-
 
 **Expected for 10-year-old meter:**
 Something like `D0 84 07 00` → ~500,000 liters (typical household cumulative usage)
@@ -203,7 +194,6 @@ If your volume field contains zeros but the meter is working, the actual volume 
 ## Step 6: Regional/Variant Differences
 
 ### Known Variants
-
 
 Different meter variants or manufacturing dates may use different data layouts:
 
@@ -284,7 +274,6 @@ If you discover a different byte layout, please report it to help others:
    - Include [METER-VARIANT] in title
    - Reference this troubleshooting guide
 
-
 ---
 
 ## Step 9: Code Modifications (Advanced)
@@ -292,7 +281,6 @@ If you discover a different byte layout, please report it to help others:
 If you've identified the correct byte offsets, you can modify the parsing code:
 
 ### Edit parse_meter_report() Function
-
 
 File: `ESPHOME-release/everblu_meter/cc1101.cpp` (or `src/core/cc1101.cpp` for MQTT)
 
@@ -317,7 +305,6 @@ data.volume = ((uint32_t)decoded_buffer[22]) |
               ((uint32_t)decoded_buffer[25] << 24);
 ```
 
-
 **Similarly for other fields:**
 
 - Battery: `decoded_buffer[31]` → adjust offset
@@ -327,11 +314,9 @@ data.volume = ((uint32_t)decoded_buffer[22]) |
 
 ---
 
-
 ## Common Patterns
 
 ### Pattern 1: All Zeros
-
 
 ```
 Volume bytes [18-21]: 00 00 00 00
@@ -340,7 +325,6 @@ Volume bytes [18-21]: 00 00 00 00
 
 **Cause:** Wrong byte offset, or meter hasn't transmitted real data
 **Solution:** Check other byte positions for expected volume
-
 
 ### Pattern 2: All Ones (0xFFFFFFFF)
 
@@ -354,11 +338,9 @@ Volume bytes [18-21]: FF FF FF FF
 
 ### Pattern 3: Single Bit Values
 
-
 ```
 Volume reads as: 1, 2, 4, 8, 16, 32...
 ```
-
 
 **Cause:** Reading single bits instead of full 32-bit value
 **Solution:** Check bit-shifting logic in volume extraction

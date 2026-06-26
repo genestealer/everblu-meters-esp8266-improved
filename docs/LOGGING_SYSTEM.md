@@ -19,12 +19,10 @@ LOG_E(tag, format, ...)  // Error level
 
 **ESPHome Mode** (`USE_ESPHOME` defined):
 
-
 - Routes to `ESP_LOGD()`, `ESP_LOGI()`, `ESP_LOGW()`, `ESP_LOGE()`
 - Logs captured by ESPHome logger infrastructure
 - **Visible over WiFi** in ESPHome web interface and Home Assistant
 - Also visible via USB serial
-
 
 **MQTT Standalone Mode** (`USE_ESPHOME` not defined):
 
@@ -76,7 +74,6 @@ LOG_E("Storage", "Failed to save offset: %f MHz", offset);
 
 ### Problem: WiFi Logs Were Invisible
 
-
 **Before:**
 
 ```
@@ -105,7 +102,6 @@ LOG_E("Storage", "Failed to save offset: %f MHz", offset);
 ...
 ```
 
-
 ### Technical Details
 
 **Direct Serial.print():**
@@ -133,13 +129,11 @@ LOG_E("Storage", "Failed to save offset: %f MHz", offset);
 | RF protocol | ✓ Critical | ❌ Too slow | Keep Serial |
 | SPI timing | ✓ Critical | ❌ Too slow | Keep Serial |
 
-
 ## Migration Guide
 
 ### When to Convert
 
 ✅ **Convert to LOG_* macros:**
-
 
 - Status messages
 - Configuration info
@@ -168,7 +162,6 @@ LOG_I("MeterReader", "Read attempt %d/%d", retry, maxRetries);
 
 **Note:** Remove `\n` from format strings - the macros add it automatically.
 
-
 ## Build Impact
 
 **Memory Usage:**
@@ -177,14 +170,12 @@ LOG_I("MeterReader", "Read attempt %d/%d", retry, maxRetries);
 - No runtime overhead in MQTT mode (direct Serial)
 - Slight overhead in ESPHome mode (logger buffer)
 
-
 **Firmware Size:**
 
 - Same for MQTT mode (compiles to same Serial.printf)
 - +~2KB for ESPHome mode (logger infrastructure)
 
 1# Troubleshooting
-
 
 ### Logs Still Missing Over WiFi
 
@@ -194,6 +185,7 @@ LOG_I("MeterReader", "Read attempt %d/%d", retry, maxRetries);
 
 logger:
   level: DEBUG  # or INFO, VERBOSE, etc.
+
 ```
 
 1. Check component is using LOG_* macros:

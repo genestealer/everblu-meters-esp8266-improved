@@ -28,7 +28,6 @@ This improvement involved streamlining CC1101 register configuration sequences. 
 
 **Changes Made:**
 
-
 - [cc1101.cpp](../src/cc1101.cpp) line 428-429: Modified initial RF config SYNC registers
 - [cc1101.cpp](../src/cc1101.cpp) line 1123-1124: Modified frame sync detection SYNC registers  
 - [cc1101.cpp](../src/cc1101.cpp) line 1239-1240: Modified second frame sync SYNC registers
@@ -56,11 +55,9 @@ All 5 retry attempts failed. The meter never achieved sync detection with the mo
 
 **Testing Date:** January 1, 2026
 
-
 **Changes Made:**
 
 - [utils.cpp](../src/utils.cpp) lines 216-289: Completely refactored serialization function
-
 
 **Implementation Details:**
 
@@ -80,7 +77,6 @@ Meter sync detection failed immediately and consistently across all retries.
 
 **Lesson Learned:** Protocol encoding requires empirical validation - theoretical equivalence is insufficient without hardware testing.
 
-
 **Conclusion:** ❌ **FAILED** - Do not use. Original complex bit-by-bit logic is essential for proper meter communication.
 
 **Revert Command:**
@@ -95,7 +91,6 @@ git checkout HEAD -- src/utils.cpp
 
 **Proposed Change:** Keep data reception at 2400 baud instead of switching to 9600 baud
 
-
 **Hypothesis:** Dredzik observed that the meter transmits at 2400 baud (per spec), suggesting the 4× oversampling (2400→9600 bps) is unnecessary
 
 **Supporting Evidence Found:**
@@ -103,7 +98,6 @@ git checkout HEAD -- src/utils.cpp
 - Official Itron EverBlu documentation states: "Transmission speed: 2,400 baud"
 - Frame format: "1 start bit / No parity / 2 or 2.5 stop bits"
 - Preamble: "0101...0101 at 2400 bits/sec"
-
 
 **Testing Date:** January 1, 2026  
 **Upload Time:** 2026-01-01 13:03:16 UTC
@@ -139,13 +133,11 @@ Pattern repeated across all 5 retry attempts:
 3. **Frequency Offset Tolerance:** Gives decoder buffer to handle frequency drift
 4. **Phase Alignment:** Helps lock to the actual bit boundaries despite jitter
 
-
 **Conclusion:** ❌ **FAILED** - Do not use. The 4× oversampling is necessary for reliable meter communication despite the official 2400 baud specification.
 
 ---
 
 ## Summary: Original Implementation is Optimal
-
 
 ### What Works ✓
 

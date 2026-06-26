@@ -48,7 +48,6 @@ Set the CC1101 radio frequency in MHz.
 
 **Parameters:**
 
-
 - `mhz`: Frequency in MHz (typically around 433.82 MHz for Cyble meters)
 
 **Purpose:**
@@ -60,17 +59,14 @@ Configures the CC1101 transceiver to operate at the specified frequency. Used fo
 
 Initialize the CC1101 radio transceiver.
 
-
 **Parameters:**
 
 - `freq`: Initial operating frequency in MHz
-
 
 **Returns:**
 
 - `true` if initialization succeeded
 - `false` on failure
-
 
 **Purpose:**
 Performs complete initialization of the CC1101 radio including:
@@ -84,11 +80,9 @@ Performs complete initialization of the CC1101 radio including:
 
 #### `struct tmeter_data get_meter_data(void)`
 
-
 Read data from Everblu Cyble water/gas meter.
 
 **Returns:**
-
 
 - `tmeter_data` structure containing all extracted meter data
 
@@ -109,7 +103,6 @@ Performs a complete read cycle:
 
 ### Debug Output Functions
 
-
 #### `void show_in_hex(const uint8_t* buffer, size_t len)`
 
 Display buffer contents in hexadecimal format (multi-line).
@@ -118,7 +111,6 @@ Display buffer contents in hexadecimal format (multi-line).
 
 - `buffer`: Pointer to data buffer
 - `len`: Length of buffer in bytes
-
 
 ---
 
@@ -130,7 +122,6 @@ Display buffer contents as hexadecimal array notation.
 
 - `buffer`: Pointer to data buffer
 - `len`: Length of buffer in bytes
-
 
 ---
 
@@ -152,7 +143,6 @@ Display buffer contents in binary format.
 
 **Parameters:**
 
-
 - `buffer`: Pointer to data buffer
 - `len`: Length of buffer in bytes
 
@@ -171,7 +161,6 @@ Conditional debug output with printf-style formatting.
 
 ---
 
-
 ### RADIAN Protocol Functions
 
 #### `uint16_t crc_kermit(const unsigned char *input_ptr, size_t num_bytes)`
@@ -185,12 +174,10 @@ Calculate Kermit CRC-16 checksum.
 
 **Returns:**
 
-
 - 16-bit CRC checksum value
 
 **Purpose:**
 Calculates CRC-16/KERMIT checksum used in RADIAN protocol for data integrity verification. Must call `init_crc_tab()` before first use.
-
 
 ---
 
@@ -204,11 +191,9 @@ Encode buffer using RADIAN 1:3 encoding scheme.
 - `inputBufferLen`: Length of input buffer in bytes
 - `outputBuffer`: Pointer to output buffer (must be >= inputBufferLen * 3)
 
-
 **Returns:**
 
 - Length of encoded output in bytes
-
 
 **Purpose:**
 Encodes input buffer using proprietary 1:3 encoding required by RADIAN protocol. Output buffer must be at least 3x input buffer size.
@@ -257,7 +242,6 @@ State machine states for meter reading operation.
 
 ### Functions
 
-
 #### `void enterState(SystemState newState)`
 
 Transition to new state.
@@ -271,7 +255,6 @@ Updates current state, records entry timestamp, and logs transition for debuggin
 
 ---
 
-
 #### `bool isScheduledReadingTime()`
 
 Check if current time matches scheduled reading time.
@@ -284,7 +267,6 @@ Check if current time matches scheduled reading time.
 Evaluates whether current time (UTC) matches the configured reading schedule (day of week and exact hour:minute:00).
 
 ---
-
 
 #### `bool isInCooldownPeriod()`
 
@@ -317,7 +299,6 @@ Main state machine handler called from `loop()`. Implements non-blocking meter r
 
 ---
 
-
 ## Frequency Management API
 
 ### Functions
@@ -348,14 +329,12 @@ Retrieves previously saved frequency offset from EEPROM (ESP8266) or Preferences
 
 ---
 
-
 #### `void performFrequencyScan()`
 
 Perform narrow-range frequency scan.
 
 **Purpose:**
 Scans a narrow frequency range (±0.003 MHz around current frequency) with fine step resolution (0.0005 MHz) to find optimal meter frequency. Used for fine-tuning when close to correct frequency. Updates global frequency offset if better frequency is found.
-
 
 ---
 
@@ -376,13 +355,10 @@ Adaptive frequency tracking using FREQEST.
 
 - `freqest`: Frequency offset estimate from CC1101 FREQEST register (-128 to +127)
 
-
 **Purpose:**
 Accumulates frequency offset estimates from successful reads and gradually adjusts radio frequency to track meter drift. Uses statistical averaging (ADAPT_THRESHOLD reads) to avoid over-correction on noise.
 
-
 **Algorithm:**
-
 
 1. Accumulate FREQEST over multiple reads
 2. After threshold reads, calculate average error
@@ -406,9 +382,7 @@ Validate reading schedule string.
 
 - `s`: Schedule string to validate
 
-
 **Returns:**
-
 
 - `true` if schedule is valid
 
@@ -431,7 +405,6 @@ Checks if current reading schedule is valid. If invalid, falls back to safe defa
 
 ---
 
-
 #### `bool isReadingDay(struct tm *ptm)`
 
 Check if today is a scheduled reading day.
@@ -444,10 +417,8 @@ Check if today is a scheduled reading day.
 
 - `true` if today is a reading day according to schedule
 
-
 **Purpose:**
 Evaluates whether the current day (based on tm structure) falls within the configured reading schedule.
-
 
 ---
 
@@ -461,9 +432,7 @@ Convert WiFi RSSI to percentage.
 
 **Parameters:**
 
-
 - `rssi`: WiFi RSSI in dBm (typically -100 to -50)
-
 
 **Returns:**
 
@@ -482,7 +451,6 @@ Convert 433 MHz meter RSSI to percentage.
 
 - `rssi_dbm`: Meter RSSI in dBm (typically -120 to -40)
 
-
 **Returns:**
 
 - Signal strength as percentage (0-100)
@@ -500,7 +468,6 @@ Convert LQI to percentage.
 
 - `lqi`: Link Quality Indicator (0-255, higher is better)
 
-
 **Returns:**
 
 - Link quality as percentage (0-100)
@@ -513,7 +480,6 @@ Converts CC1101 Link Quality Indicator (0-255) to 0-100% scale. LQI represents o
 ## MQTT Publishing API
 
 ### Functions
-
 
 #### `void publishWifiDetails()`
 
@@ -533,7 +499,6 @@ Publishes comprehensive WiFi connection details including:
 ---
 
 #### `void publishMeterSettings()`
-
 
 Publish meter configuration to MQTT.
 

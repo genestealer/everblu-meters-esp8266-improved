@@ -182,12 +182,10 @@ everblu_meter:
 
 ⚠️ **Known Limitation**: The `timezone_offset` parameter is currently **required** for scheduling in your local timezone. The ESPHome time component's `timezone` setting (e.g., `timezone: Australia/Melbourne`) is **not automatically used** by the everblu_meter component.
 
-
 This is a design limitation inherited from the MQTT/standalone version:
 
 - **MQTT/Standalone mode**: Uses NTP which only provides UTC time, so manual offset is necessary
 - **ESPHome mode**: Could leverage ESPHome's timezone-aware time (which handles DST automatically), but currently doesn't
-
 
 **Current Workaround:**
 
@@ -238,7 +236,6 @@ timezone_offset: -420  # US Pacific PDT (UTC-7) - Summer
 ### Finding Your Meter Information
 
 #### Meter Code
-
 
 Look for the full code printed under the barcode on your meter label.
 

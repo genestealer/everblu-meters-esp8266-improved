@@ -8,12 +8,10 @@ Your codebase has been successfully refactored into **independent, reusable modu
 
 ### 1. **Storage Abstraction** (`storage_abstraction.h/cpp`)
 
-
 - **Purpose**: Platform-independent persistent storage
 - **Supports**: ESP8266 (EEPROM) and ESP32 (Preferences)
 - **Use**: Frequency offset storage, configuration persistence
 - **Reusable**: ✅ Works standalone with any project
-
 
 ### 2. **Frequency Manager** (`frequency_manager.h/cpp`)
 
@@ -24,7 +22,6 @@ Your codebase has been successfully refactored into **independent, reusable modu
   - Dependency injection (callbacks) for radio operations
 - **Key**: **No hard dependencies** - uses injected callbacks
 - **Reusable**: ✅ Works with any CC1101 wrapper (Arduino, ESPHome, etc.)
-
 
 ### 3. **Schedule Manager** (`schedule_manager.h/cpp`) ⭐ NEW
 
@@ -55,13 +52,11 @@ Your codebase has been successfully refactored into **independent, reusable modu
 - **Size**: Reduced from ~1944 to ~1770 lines (removed duplicative code)
 - **Focus**: Now focuses on application logic only
 
-
 ## What Changed
 
 ### Removed from main.cpp
 
 **Schedule Code** (~200 lines):
-
 
 - Global variables: `g_readHourUtc`, `g_readHourLocal`, etc.
 - Functions: `validateReadingSchedule()`, `updateResolvedScheduleFromLocal()`, `isReadingDay()`
@@ -160,7 +155,6 @@ Now:
 
 ## Documentation Added
 
-
 1. **REUSABILITY_REFACTORING.md** - Overall architecture and dependency injection pattern
 2. **ESPHOME_INTEGRATION.md** - Complete guide for ESPHome integration (FrequencyManager)
 3. **SCHEDULE_AND_HISTORY_EXTRACTION.md** - Detailed guide for new modules
@@ -203,7 +197,6 @@ All modules compile without errors:
    └──────────┘         └──────────┘
 ```
 
-
 **Key Points**:
 
 - Each module is **independent** with clear API boundaries
@@ -211,11 +204,9 @@ All modules compile without errors:
 - Application layer (main.cpp) orchestrates the modules
 - All modules can be **copied to ESPHome** unchanged
 
-
 ## Files Modified/Created
 
 **Created** (4 new module files):
-
 
 - `src/schedule_manager.h`
 - `src/schedule_manager.cpp`

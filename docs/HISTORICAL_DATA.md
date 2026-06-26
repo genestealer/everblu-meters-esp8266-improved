@@ -10,15 +10,12 @@ This implementation extracts these 13 monthly historical readings and publishes 
 
 ### Meter Payload
 
-
-
 The historical data is located in the meter's response payload at bytes [66-117]:
 
 - **13 consecutive uint32_t values** (4 bytes each, LSB first)
 - Each value represents the **total cumulative volume** at the end of that month
 - Index 0 = oldest month (13 months ago)
 - Index 12 = most recent complete month
-
 
 ### Example from Real Meter Data
 
@@ -43,11 +40,9 @@ Historical readings (bytes 66-117):
 
 ## Home Assistant Integration
 
-
 ### MQTT Topics
 
 #### State Topic
-
 
 - **Topic**: `everblu/cyble/liters`
 - **Value**: Current total volume reading (e.g., `721390`)
@@ -98,7 +93,6 @@ Historical readings (bytes 66-117):
 ```
 
 ### Accessing in Home Assistant
-
 
 #### 1. View in Developer Tools
 
@@ -226,18 +220,14 @@ if (size >= 118) {
 
 ### MQTT Publishing (`src/main.cpp`)
 
-
 After publishing the main liters value, the code constructs and publishes a JSON attributes message containing:
-
 
 - `history`: Array of 13 historical volume readings
 - `monthly_usage`: Calculated consumption for each month (difference between consecutive readings)
 - `current_month_usage`: Usage in the current partial month
 - `months_available`: Always 13
 
-
 ## Limitations and Notes
-
 
 ### No Exact Timestamps
 
@@ -245,16 +235,13 @@ The basic RADIAN protocol **does not provide exact dates** for the historical re
 
 **Assumption**: The values represent end-of-month snapshots. This is based on:
 
-
 1. The meter having 13 values (13 months of history)
 2. The most recent value matching the volume at the start of the current month
 3. Standard utility billing practices (monthly cycles)
 
-
 ### Month Boundary Timing
 
 The exact timing of when the meter captures each monthly snapshot is unknown. It could be:
-
 
 - Calendar month end (last day at midnight)
 - Billing cycle date (e.g., 15th of each month)
@@ -264,7 +251,6 @@ Based on user observation: *"713,744 was around the very start of the current mo
 
 ### First Month Usage
 
-
 The `monthly_usage[0]` is set to `0` because we don't have a baseline reading from before the oldest historical value. To calculate actual usage for that month, you would need 14 months of data.
 
 ### Buffer Size Requirements
@@ -272,7 +258,6 @@ The `monthly_usage[0]` is set to `0` because we don't have a baseline reading fr
 Historical data extraction requires the decoded meter payload to be at least 118 bytes. If a shorter payload is received, `history_available` will be `false` and no attributes will be published.
 
 ## Enhanced Meter Capabilities
-
 
 The Itron EverBlu Cyble Enhanced meter actually stores much more data internally:
 
@@ -291,11 +276,9 @@ However, these enhanced features require **proprietary Itron commands** that are
 
 - **13 monthly historical volumes** (no dates)
 
-
 ## Troubleshooting
 
 ### Attributes Not Appearing
-
 
 1. Verify the meter is transmitting a full payload:
    - Enable debug mode (`debug_out = 1` in `cc1101.cpp`)

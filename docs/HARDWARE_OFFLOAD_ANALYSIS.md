@@ -23,14 +23,11 @@ These requirements mean the core decoding logic MUST remain in software.
 
 #### Issue #1: Serial Framing (The Real Blocker)
 
-
-
 The RADIAN protocol wraps **each data byte** in serial framing bits:
 
 ```
 [Start:0][D0][D1][D2][D3][D4][D5][D6][D7][Stop:1][Stop:1][Stop:1]
 ```
-
 
 This is fundamentally incompatible with CC1101's packet handler, which expects:
 
@@ -45,8 +42,6 @@ The CC1101 packet handler has **no mechanism** to:
 - Validate stop bits after each byte
 - Extract the 8 data bits from the 12-bit serial frame
 - Handle the bit-stuffing this creates
-
-
 
 **Even at native 2.4 kbps without oversampling, the CC1101 cannot decode serial-framed data.**
 
@@ -64,7 +59,6 @@ The CC1101 **does** have its own bit synchronization and clock recovery that wor
 
 **Why?** Because the RADIAN transmitters have:
 
-
 - Loose frequency tolerance (±50 ppm typical)
 - Phase jitter from battery-powered oscillators
 - Variable bit timing across the long frame
@@ -73,14 +67,11 @@ The CC1101's standard bit sync **assumes continuous bit streams**, not serial fr
 
 #### What the CC1101 CAN Do
 
-
 ✅ FSK demodulation (converts RF signal to baseband)
 ✅ RSSI measurement  
 ✅ Sync word detection (but only for the initial preamble sync)
 ✅ FIFO buffering of raw demodulated bits
 ✅ CRC calcuation (on already-decoded data)
-
-
 
 #### What the CC1101 CANNOT Do
 
@@ -93,13 +84,11 @@ The CC1101's standard bit sync **assumes continuous bit streams**, not serial fr
 
 Think of it like this:
 
-
 - **CC1101** = A postal sorting machine that reads continuous address labels
 - **RADIAN serial encoding** = Each letter individually wrapped in bubble wrap
 - The sorting machine can't unwrap individual letters - you need humans (software) to do that
 
 The oversampling is like taking high-speed video of the bubble-wrapped letters so you can carefully track exactly where each piece of bubble wrap starts and ends. Even without the video (oversampling), you'd still need humans to unwrap them - the machine still can't do it.
-
 
 ## Hardware Offloading Opportunities
 
@@ -120,7 +109,6 @@ The oversampling is like taking high-speed video of the bubble-wrapped letters s
 
 **Implementation**:
 
-
 ```cpp
 // In cc1101_init() or receive_radian_frame():
 halRfWriteReg(PKTCTRL0, PKTCTRL0_FIXED_LENGTH | 0x04); // Enable CRC_EN
@@ -132,7 +120,6 @@ halRfWriteReg(PKTCTRL1, 0x08); // Set CRC_AUTOFLUSH
 // Enable status byte append with CRC result:
 halRfWriteReg(PKTCTRL1, 0x04); // Set APPEND_STATUS
 ```
-
 
 **Status Byte Format** (automatically appended to RX FIFO):
 
@@ -155,13 +142,11 @@ The CC1101 CRC must be configured to cover the exact same bytes as the current s
 const uint16_t computed_crc = crc_kermit(&decoded_buffer[1], expected_len - 3);
 ```
 
-
 You'll need to test that the hardware CRC boundaries match this exactly.
 
 ### 2. Automatic Status Appending ✅ (EASY WIN)
 
 **Current Implementation**: Manual register reads after reception
-
 
 ```cpp
 sdata.rssi = halRfReadReg(RSSI_ADDR);
@@ -177,7 +162,6 @@ sdata.freqest = (int8_t)halRfReadReg(FREQEST_ADDR);
 ```cpp
 halRfWriteReg(PKTCTRL1, 0x04); // APPEND_STATUS bit
 ```
-
 
 Then parse from the last 2 bytes of the RX FIFO instead of reading registers.
 
@@ -262,13 +246,12 @@ The CC1101's packet length modes could potentially be used AFTER the 4-bit seria
 
 ### Immediate (Low Risk, High Value)
 
-
 1. ✅ Enable `APPEND_STATUS` to get RSSI/LQI automatically
 2. ✅ Test hardware CRC validation (requires careful testing)
 
 ### Future Consideration
 
-3. ⚠️ Investigate using CC1101's GDO pins for interrupt-driven reception instead of polling `digitalRead(GDO0)`
+1. ⚠️ Investigate using CC1101's GDO pins for interrupt-driven reception instead of polling `digitalRead(GDO0)`
 
 ### Not Recommended
 
@@ -289,14 +272,12 @@ If implementing hardware CC:
 
 If implementing APPEND_STATUS:
 
-
 - [ ] Update frame size calculations (+2 bytes)
 - [ ] Parse RSSI/LQI from frame end
 - [ ] Keep FREQEST manual read (not appended)
 - [ ] Verify RSSI/LQI values match previous implementation
 
 ## Conclusion
-
 
 The RADIAN protocol's **custom serial encoding** (start/stop bits around each byte) is fundamentally incompatible with the CC1101's packet handler, regardless of whether oversampling is used. The serial framing means that **most processing must remain in software**.
 
@@ -307,14 +288,12 @@ The 4x oversampling is a separate optimization that:
 - Provides temporal resolution for start/stop bit detection
 - **Cannot be eliminated** without significant reception degradation
 
-
 ### Feasible Optimizations
 
 1. **Hardware CRC validation** - Offloads ~200 cycles of computation
 2. **Automatic status appending** - Eliminates 3-4 SPI register reads
 
 These changes would provide modest performance improvements (~5-10% reduction in post-reception processing time) but are NOT game-changers. The current software implementation is well-optimized for the protocol's unique requirements.
-
 
 ### What You Already Have
 

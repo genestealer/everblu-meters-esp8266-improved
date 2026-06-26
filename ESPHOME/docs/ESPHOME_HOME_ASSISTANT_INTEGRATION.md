@@ -6,7 +6,6 @@ This guide explains how to access meter data in Home Assistant and set up reliab
 
 The ESPHome component publishes meter data through two primary sensors:
 
-
 - **`volume`** sensor: Current meter reading (numeric value)
 - **`history`** text sensor: JSON containing historical data
 
@@ -79,7 +78,6 @@ template:
 
 First, create an input number to calibrate if needed:
 
-
 **UI Method:**
 
 1. Go to **Settings** → **Devices & Services** → **Helpers**
@@ -90,7 +88,6 @@ First, create an input number to calibrate if needed:
    - **Maximum**: `1000000`
    - **Step**: `1`
    - **Unit**: `L`
-
 
 **YAML Method** (in `configuration.yaml`):
 
@@ -124,7 +121,6 @@ template:
         availability: >
           {{ states('sensor.everblu_meter_volume') not in ['unavailable', 'unknown', 'none'] }}
 ```
-
 
 #### 3. Create Utility Meter Helper
 

@@ -37,12 +37,10 @@ Then recompile and upload. Done! Your entities will keep their original names wi
 
 ### With Prefix Enabled (Default)
 
-
 ```
 everblu_meter (meter 257750) → 257750_everblu_meter_value
 everblu_meter (meter 2777550) → 2777550_everblu_meter_value
 ```
-
 
 ### With Prefix Disabled
 
@@ -55,7 +53,6 @@ All meters → everblu_meter_value
 ## Where to Find It
 
 File: `include/private.h`
-
 
 Look for this section:
 

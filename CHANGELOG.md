@@ -182,6 +182,7 @@ Releases are created manually by tagging commits with version tags matching `v*.
 - Comment typo in SFTX flush operation
 
 ## [v2.1.1] - 2026-02-13
+
 ### Fixed
 
 - Schedule logic bug where "Monday-Sunday" schedule excluded Sunday

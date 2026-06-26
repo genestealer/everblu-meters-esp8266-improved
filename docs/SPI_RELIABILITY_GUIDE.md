@@ -10,7 +10,6 @@ Stack overflow is **highly environment-dependent** - it depends on what else is 
 
 #### Factors That Increase Stack Usage (Makes Corruption More Likely)
 
-
 1. **WiFi Activity**: Active WiFi connection consumes ~1-2KB of stack
    - More connected = higher stack usage
    - Disconnected/poor signal = more retries = more stack
@@ -28,14 +27,12 @@ Stack overflow is **highly environment-dependent** - it depends on what else is 
    - mDNS adds stack overhead
    - More sensors = more stack usage
 
-
 #### Why It Appears Intermittent
 
 - **Works for weeks, then fails**: Stack usage varies with WiFi conditions
 - **Fails during MQTT publish**: Peak stack usage moment
 - **Works with short meter reads, fails with long frames**: 682-byte frame pushes it over edge
 - **Works on one board, fails on identica board**: Slight manufacturing variations in flash
-
 
 #### Classic Symptoms (Seen in Issue #20)
 
@@ -55,7 +52,6 @@ Replaced VLAs with static buffers - **removes variability entirely**. All users 
 
 ## Current Status Analysis
 
-
 **Good News**: Your implementation already has several protective measures in place.
 
 **Current SPI Configuration**:
@@ -65,7 +61,6 @@ Replaced VLAs with static buffers - **removes variability entirely**. All users 
 - Bit order: MSBFIRST (correct)
 - Transaction protection: ✅ Using `beginTransaction()` / `endTransaction()`
 - CS control: ✅ Manual control via `digitalWrite()`
-
 
 ## Potential Corruption Sources & Solutions
 
@@ -84,14 +79,12 @@ void SPIReadBurstReg(uint8_t spi_instr, uint8_t *pArr, uint8_t len)
 
 **Problem (Now Fixed)**:
 
-
 - ESP8266 has limited stack space (~4KB)
 - When reading large frames (682 bytes for RADIAN data), this created 683-byte stack arrays
 - Stack overflow caused memory corruption, crashes, or silent data corruption
 - ESP8266 does NOT detect stack overflows - just silently corrupts memory
 
 **Why This Explains Issue #20's Inconsistent Behavior**:
-
 
 - Stack overflow depends on **total** stack usage at the moment of SPI transfer
 - User A with active WiFi + MQTT publishing = 3KB stack used → VLA pushes over 4KB → **corruption**
@@ -149,7 +142,6 @@ void SPIWriteBurstReg(uint8_t spi_instr, uint8_t *pArr, uint8_t len)
 
 ### 2. ⚠️ **SPI Speed vs. Wire Quality**
 
-
 **Current**: 500 kHz (good baseline)
 
 **Considerations**:
@@ -196,7 +188,6 @@ This prevents conflicts with other SPI devices (like SD cards).
 **Current Implementation**: Polling RXBYTES and reading in chunks
 
 **Risk**: If software is too slow, CC1101's 64-byte FIFO can overflow
-
 
 **Current Protection**:
 
@@ -265,7 +256,6 @@ void SPIReadBurstReg(uint8_t spi_instr, uint8_t *pArr, uint8_t len)
   // ... rest of function
 }
 ```
-
 
 ### 6. ✅ **CS (Chip Select) Timing** (Already Good)
 
@@ -357,7 +347,6 @@ while (isGDO0High())
 
 ### 10. ✅ **Memory Corrupion from Buffer Overruns** (Partially Protected)
 
-
 **Current Protection**: Size checks in various places
 
 **Enhancement**: Add bounds checking to all FIFO operations
@@ -393,8 +382,8 @@ if ((l_total_byte + l_byte_in_rx) > rxBuffer_size) {
 - [ ] **Pull-ups**: GDO0 pin has internal pull-up enabled ✅
 2 [ ] **Breadboard**: If using breadboard, keep layout compact
 3
-### Signal Integrity Tests
 
+### Signal Integrity Tests
 
 1. **Measure SPI clock with oscilloscope/logic analyzer**:
 2  - Should be clean square wave
@@ -419,14 +408,14 @@ if ((l_total_byte + l_byte_in_rx) > rxBuffer_size) {
 
 ### 🟡 **High Priority (Next)**
 
-2. ✅ Add FIFO overflow detection
+1. ✅ Add FIFO overflow detection
 
 2. ✅ Reduce polling delay from 5ms to 2ms
 3. ✅ Add bounds checking on all buffer writes
 
 ### 🟢 **Optional (If Problems Persist)**
 
-5. Try slower SPI speed (250 kHz)
+1. Try slower SPI speed (250 kHz)
 2. Add GDO0 debouncing
 3. Disable WiFi during meter reads
 
@@ -451,7 +440,6 @@ After implementing fixes:
 
 2. **Long-Term Test**: Monitor for 7 days, check error rate
 
-
 3. **CRC Validation**: Log all CRC failures
 
    ```cpp
@@ -475,7 +463,6 @@ After implementing fixes:
    ```
 
 ## Expected Results
-
 
 **After fixing VLAs** ✅:
 

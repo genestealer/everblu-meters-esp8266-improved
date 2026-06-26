@@ -23,13 +23,11 @@ This release adds complete ESPHome integration as an alternative to the standalo
 
 **Core Configuration**:
 
-
 - `meter_year` - Meter manufacture year (0-99)
 - `meter_serial` - Meter serial number
 - `meter_type` - Water or gas meter support
 - `frequency` - RF frequency in MHz (default: 433.82)
 - `auto_scan` - Automatic frequency scanning
-
 
 **Scheduling**:
 
@@ -38,14 +36,12 @@ This release adds complete ESPHome integration as an alternative to the standalo
 - `timezone_offset` - Timezone configuration
 - `auto_align_time` / `auto_align_midpoint` - Time alignment features
 
-
 **Retry Logic**:
 
 - `max_retries` - Maximum read attempts (default: 5)
 - `retry_cooldown` - Cooldown between sessions (default: 1h)
 
 #### Sensors
-
 
 **15+ Available Sensors**:
 
@@ -70,11 +66,9 @@ This release adds complete ESPHome integration as an alternative to the standalo
 
 **Binary Sensors**:
 
-
 - `active_reading` - Reading in progress indicator
 
 #### Documentation
-
 
 **New Documentation Files**:
 
@@ -90,7 +84,6 @@ This release adds complete ESPHome integration as an alternative to the standalo
 - `example-advanced.yaml` - Advanced features and customization
 
 ### Architecture Improvements
-
 
 #### Adapter Pattern Implementation
 
@@ -240,7 +233,6 @@ If you want to switch from standalone MQTT mode to ESPHome:
 1. **Time Sync**: If time component not configured, set `timezone_offset` manually
 2. **Frequency**: If auto-scan doesn't work, manually set `frequency` and disable `auto_scan`
 
-
 ### Future Enhancements
 
 #### Planned Features
@@ -345,7 +337,6 @@ pio run -t upload -e huzzah
 
 ## Changelog
 
-
 ### [2.0.0] - Unreleased
 
 #### Added
@@ -363,7 +354,6 @@ pio run -t upload -e huzzah
 - Conditional compilation for dual-mode support
 
 #### Changed
-
 
 - Reorganized `src/` into logical layers (core, services, adapters)
 - MeterReader now uses dependency injection
