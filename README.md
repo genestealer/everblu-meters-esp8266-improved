@@ -1,6 +1,7 @@
 # Itron EverBlu Cyble Enhanced RF RADIAN Water/Gas Usage Data for MQTT Home Assistant & ESPHome External Component
 
 ## Build & QA
+
 [![ESP8266 Build](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/build-esp8266.yml/badge.svg?branch=main)](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/build-esp8266.yml)
 [![ESP32 Build](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/build-esp32.yml/badge.svg?branch=main)](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/build-esp32.yml)
 [![ESPHome Component](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/esphome-external-component.yml/badge.svg?branch=main)](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/esphome-external-component.yml)
@@ -8,6 +9,7 @@
 [![Code Quality](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/code-quality.yml/badge.svg?branch=main)](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/code-quality.yml)
 
 ## Platforms & Capabilities
+
 [![Made with PlatformIO](https://img.shields.io/badge/Made%20with-PlatformIO-orange?logo=platformio)](https://platformio.org)
 [![ESP8266](https://img.shields.io/badge/ESP-8266-blue?logo=espressif)](https://www.espressif.com/en/products/socs/esp8266)
 [![ESP32](https://img.shields.io/badge/ESP-32-blue?logo=espressif)](https://www.espressif.com/en/products/socs/esp32)
@@ -19,7 +21,6 @@
 [![Release](https://img.shields.io/github/v/release/genestealer/everblu-meters-esp8266-improved?sort=semver)](https://github.com/genestealer/everblu-meters-esp8266-improved/releases)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.md)
 
-#
 Fetch water or gas usage data from Itron EverBlu Cyble Enhanced RF meters using the RADIAN protocol (Sontex, Itron) on 433 MHz with an ESP32/ESP8266 and CC1101 transceiver.
 Integrated with Home Assistant via MQTT AutoDiscovery and ESPHome external component
 
@@ -45,7 +46,9 @@ Integrated with Home Assistant via MQTT AutoDiscovery and ESPHome external compo
 ---
 
 ### **ESPHome** - Release V3.0.0
+
 ESPHome integration is stable and recommended. **Start here for ESPHome:**
+
 - **[ESPHOME/README.md](ESPHOME/README.md)** — ESPHome setup, wiring, and configuration reference
 - **[ESPHOME/ESPHOME_INTEGRATION_GUIDE.md](ESPHOME/ESPHOME_INTEGRATION_GUIDE.md)** — complete step-by-step installation guide
 - Ready-made configs: [water](ESPHOME/example-water-meter.yaml) · [gas](ESPHOME/example-gas-meter-minimal.yaml) · [advanced](ESPHOME/example-advanced.yaml) · [multi-meter](ESPHOME/example-multi-meter.yaml)
@@ -150,6 +153,7 @@ This project supports two integration methods:
 - No MQTT broker required
 
 Examples: use the ready-made ESPHome configs:
+
 - [ESPHOME/example-water-meter.yaml](ESPHOME/example-water-meter.yaml)
 - [ESPHOME/example-gas-meter-minimal.yaml](ESPHOME/example-gas-meter-minimal.yaml)
 - [ESPHOME/example-advanced.yaml](ESPHOME/example-advanced.yaml)
@@ -220,6 +224,7 @@ The conversion uses a configurable **gas volume divisor** that can be set in `in
 ```
 
 **Important:** The correct divisor depends on your meter's pulse weight configuration:
+
 - `100`: 0.01 m³ per unit (typical for modern EverBlu Cyble gas modules)
 - `1000`: 0.001 m³ per unit (0.1 L per unit, less common)
 
@@ -270,8 +275,8 @@ Once your device is running and connected to Wi-Fi, you can update it wirelessly
 
 1. In `platformio.ini`, find your board's `-ota` environment (e.g., `[env:huzzah-ota]`).
 2. **Update the IP address** to match your device's IP:
-   
-```ini
+
+   ```ini
    upload_port = 192.168.2.21  ; Change to your device's IP
    monitor_port = socket://192.168.2.21:23  ; Change to match upload_port
    ```
@@ -323,6 +328,7 @@ Below are the wiring diagrams for common ESP8266 boards and ESP32 DevKit.
 
 Pin wiring for the [Wemos D1 Mini](https://www.wemos.cc/en/latest/d1/index.html), [Adafruit Feather HUZZAH ESP8266](https://learn.adafruit.com/adafruit-feather-huzzah-esp8266/pinouts), and ESP32 DevKit:
 
+<!-- markdownlint-disable MD060 -->
 | **CC1101 Pin** | **Function** | **ESP8266 GPIO** | **Wemos D1 Mini** | **HUZZAH ESP8266** | **ESP32 GPIO** | **ESP32 DevKit** | **Notes**                                           |
 | -------------- | ------------ | ---------------- | ----------------- | ------------------ | -------------- | ---------------- | --------------------------------------------------- |
 | **VCC**        | Power        | 3.3V             | 3V3               | 3V                 | 3.3V           | 3V3              | **Important:** Use 3.3V only!                       |
@@ -333,6 +339,7 @@ Pin wiring for the [Wemos D1 Mini](https://www.wemos.cc/en/latest/d1/index.html)
 | **CSN/CS**     | Chip Select  | GPIO 15          | D8                | #15                | GPIO 5         | SS               | SPI chip select                                     |
 | **GDO0**       | Data Ready   | GPIO 5           | D1                | #5                 | GPIO 4         | GPIO 4           | Digital interrupt pin (configurable in `private.h`) |
 | **GDO2**       | FIFO Threshold (required) | GPIO 4 | D2 | #4 | GPIO 27 | GPIO 27 | Required by default (v3.0.0+). Hardware FIFO threshold signal. Set via `private.h` (`#define GDO2`) / `gdo2_pin` in ESPHome, or opt out with `DISABLE_GDO2_FIFO_MANAGEMENT` / `disable_gdo2_fifo_management: true` |
+<!-- markdownlint-enable MD060 -->
 
 <details>
 <summary>Wiring notes and board-specific quick references (optional)</summary>
@@ -344,7 +351,7 @@ The CC1101 settings used in this project stay within that envelope, but ensure y
 
 #### Quick Reference: Wemos D1 Mini
 
-```
+```text
 CC1101 → Wemos D1 Mini
 VCC    → 3V3
 GND    → G
@@ -358,7 +365,7 @@ GDO2   → D2 (GPIO 4)  ← required by default, set #define GDO2 in private.h (
 
 #### Quick Reference: Adafruit Feather HUZZAH ESP8266
 
-```
+```text
 CC1101 → HUZZAH ESP8266
 VCC    → 3V
 GND    → GND
@@ -372,7 +379,7 @@ GDO2   → #4  (GPIO 4)  ← required by default, set #define GDO2 in private.h 
 
 #### Quick Reference: ESP32 DevKit (esp32dev)
 
-```
+```text
 CC1101 → ESP32 DevKit
 VCC    → 3V3
 GND    → GND
@@ -385,6 +392,7 @@ GDO2   → GPIO 27 (or another free GPIO)  ← required by default, set #define 
 ```
 
 Notes for ESP32
+
 - Use the board’s hardware SPI pins (SCK/MISO/MOSI/SS).
 The defaults are provided by the Arduino core and used automatically by this project.
 - Choose a free GPIO for GDO0 (e.g., 4 or 27) and set `#define GDO0 <pin>` in `include/private.h`.
@@ -409,6 +417,7 @@ To make wiring dead-simple on the HUZZAH, here’s the exact silkscreen text nex
   - Board label: "#5" → CC1101 GDO0  (default; configurable via `private.h`)
 
 Notes
+
 - On the HUZZAH, many pins show both the function and the GPIO number, e.g. "SCK / #14".
 You can use either reference when wiring.
 - Only use the 3V (3.3V) pin to power the CC1101. Do not use 5V.
@@ -427,6 +436,7 @@ This project defaults to using **GPIO #5** for GDO0 on HUZZAH, which is safe and
 You can still use GPIO #0 for simple LED indication in your own code, but avoid wiring CC1101 signals to it.
 
 Also note other ESP8266 boot-strap pins on HUZZAH:
+
 - GPIO #15 (used here as CS/SS) must be LOW at boot (the HUZZAH board provides the correct pull-down).
 Don’t force it HIGH during reset.
 - GPIO #2 should normally be HIGH at boot (not used by this project).
@@ -498,8 +508,9 @@ When running multiple ESP devices on the same MQTT broker, the firmware automati
    - **Tariffs**: Optional, leave blank for simple usage
 
 **Benefits:**
+
 - Historical data preserved when changing platforms (MQTT ↔ ESPHome)
-- Seamless meter serial number changes
+- Meter serial number changes are simple
 - Single point to update if you replace hardware
 - All dashboards and automations reference the stable utility meter entity
 
@@ -530,12 +541,14 @@ Both MQTT and ESPHome modes expose a **history sensor** containing 12 months of 
 ```
 
 **Fields:**
+
 - `history`: Array of 12 monthly readings (oldest to newest) in liters or m³
 - `monthly_usage`: Array of 12 monthly consumption values (first value is the oldest reading, subsequent values are differences)
 - `current_month_usage`: Current month's consumption so far
 - `months_available`: Number of months of data available (typically 12)
 
 **Use Cases:**
+
 - Import historical consumption into Home Assistant on first setup
 - Analyze past usage patterns
 - Compare current usage to previous months
@@ -543,6 +556,7 @@ Both MQTT and ESPHome modes expose a **history sensor** containing 12 months of 
 - Verify meter readings against utility bills
 
 **Accessing the data:**
+
 - **MQTT**: Available in topic `everblu/cyble/{PARSED_SERIAL}/history`
 - **ESPHome**: Available as text sensor `sensor.{device}_history`
 
@@ -570,9 +584,9 @@ Both MQTT and ESPHome modes expose a **history sensor** containing 12 months of 
        - Serial is parsed from the middle section (`SSSSSSS`) and used in topics/entity prefixes
        - Last 3 digits (`NNN`), if present, are ignored by the radio protocol
      - Example:
-       
+
        ```cpp
-// Label text: 23-1875247-234  (with suffix, 12 digits)
+       // Label text: 23-1875247-234  (with suffix, 12 digits)
        #define METER_CODE "23-1875247-234"
 
        // Same meter, without suffix (9 digits — also valid)
@@ -635,6 +649,7 @@ This project uses GitHub Actions for automated building, testing, and code quali
 Every push and pull request triggers builds and quality checks to ensure code quality and compatibility.
 
 The CI workflows include:
+
 - **Build Workflows**: Builds the project for both ESP8266 (huzzah) and ESP32 (esp32dev) platforms to validate that the code compiles successfully
 - **Code Quality**: Runs static analysis using cppcheck and formatting checks with clang-format to identify potential issues and maintain code consistency
 - **Dependency Caching**: Caches dependencies for faster builds
@@ -653,6 +668,7 @@ By default, the schedule is set to `Monday-Friday`.
 You can change this in the `private.h` file by modifying the `DEFAULT_READING_SCHEDULE`.
 
 Available options:
+
 - `"Monday-Friday"`: Queries the meter only on weekdays.
 - `"Monday-Saturday"`: Queries the meter from Monday to Saturday.
 - `"Monday-Sunday"`: Queries the meter every day.
@@ -751,7 +767,7 @@ Ways to find the best frequency:
 
 The effective frequency is printed at startup:
 
-```
+```text
 > Frequency (effective): 433.820000 MHz
 ```
 
@@ -798,6 +814,7 @@ See `ADAPTIVE_FREQUENCY_FEATURES.md` for deeper technical notes.
 ### Corrupted or Invalid Volume Readings
 
 **Symptoms:**
+
 - Volume reads as 0, very small values, or negative numbers
 - Historical data shows impossible decreases
 - Battery showing as 0 months
@@ -810,6 +827,7 @@ Enable hex dump debugging to see the raw 200-byte decoded frame:
 **MQTT:** Set `#define DEBUG_CC1101 1` in `include/private.h`
 
 This outputs detailed byte-by-byte data to help identify:
+
 - Wrong byte offsets for your specific meter variant
 - Regional/manufacturing date differences in data layout
 - Corrupted fields causing parsing errors
@@ -831,21 +849,19 @@ Try the following in order:
   ```powershell
   & "$env:USERPROFILE\.platformio\penv\Scripts\platformio.exe" upgrade
   & "$env:USERPROFILE\.platformio\penv\Scripts\platformio.exe" platform update espressif32
-
-```
+  ```
 
 - If it still fails, install the package into PlatformIO’s embedded Python (use the PlatformIO terminal to ensure the right interpreter is used):
 
   ```powershell
-& "$env:USERPROFILE\.platformio\penv\Scripts\python.exe" -m pip install --disable-pip-version-check --no-warn-script-location intelhex
-```
+  & "$env:USERPROFILE\.platformio\penv\Scripts\python.exe" -m pip install --disable-pip-version-check --no-warn-script-location intelhex
+  ```
 
 - Re-run the ESP32 build explicitly through PlatformIO’s bundled executable:
 
   ```powershell
-& "$env:USERPROFILE\.platformio\penv\Scripts\platformio.exe" run --environment esp32dev
-
-```
+  & "$env:USERPROFILE\.platformio\penv\Scripts\platformio.exe" run --environment esp32dev
+  ```
 
 Notes
 
@@ -868,10 +884,8 @@ You may use an RTL-SDR to measure the required offset and rerun the Frequency Di
 
 > [!TIP]
 > Your meter may be configured to listen for requests only during business hours to conserve energy.
-If you are unable to communicate with the meter, try again during business hours (8:00–16:00), Monday to Friday.
-As a rule of thumb, set up your device during business hours to avoid confusion and unnecessary troubleshooting.
-
-> [!NOTE]
+> If you are unable to communicate with the meter, try again during business hours (8:00–16:00), Monday to Friday.
+> As a rule of thumb, set up your device during business hours to avoid confusion and unnecessary troubleshooting.
 > This is particularly relevant in the UK.
 
 ### Serial Number Starting with 0
@@ -912,10 +926,10 @@ If you regularly read your meter yourself:
 
 This project builds on reverse engineering efforts by:
 
-- La Maison Simon (http://www.lamaisonsimon.fr/)
+- La Maison Simon (<http://www.lamaisonsimon.fr/>)
 - @neutrinus and @psykokwak on GitHub
 
-The original software (and much of the foundational work) was initially developed [here](http://www.lamaisonsimon.fr/wiki/doku.php?id=maison2:compteur_d_eau:compteur_d_eau), later published on GitHub by @neutrinus [here](https://github.com/neutrinus/everblu-meters), and subsequently forked by [psykokwak](https://github.com/psykokwak-com/everblu-meters-esp8266).
+The original software (and much of the foundational work) was initially developed [on the La Maison Simon wiki](http://www.lamaisonsimon.fr/wiki/doku.php?id=maison2:compteur_d_eau:compteur_d_eau), later published on GitHub by @neutrinus [in the everblu-meters repository](https://github.com/neutrinus/everblu-meters), and subsequently forked by [psykokwak](https://github.com/psykokwak-com/everblu-meters-esp8266).
 
 Their original projects did not include an open-source license.
 If you reuse or modify their specific code portions, please review their repositories and respect any stated limitations or intentions.

@@ -2,11 +2,66 @@
 
 Complete ESPHome custom component for reading EverBlu Cyble Enhanced water and gas meters. This integration provides seamless Home Assistant integration without requiring an MQTT broker.
 
+## Table of Contents
+
+- [ESPHome Integration for EverBlu Cyble Enhanced Meters](#esphome-integration-for-everblu-cyble-enhanced-meters)
+  - [Table of Contents](#table-of-contents)
+  - [Troubleshooting](#troubleshooting)
+    - [Corrupted or Invalid Volume Readings](#corrupted-or-invalid-volume-readings)
+    - [No Meter Response](#no-meter-response)
+    - [Signal Quality Issues](#signal-quality-issues)
+  - [Documentation](#documentation)
+    - [For End Users](#for-end-users)
+    - [For Developers](#for-developers)
+  - [Quick Start](#quick-start)
+  - [Breaking Change: SPI Configuration Required](#breaking-change-spi-configuration-required)
+    - [1. Use as External Component](#1-use-as-external-component)
+    - [2. Build and Upload](#2-build-and-upload)
+  - [ESPHome Device Builder (Visual Dashboard)](#esphome-device-builder-visual-dashboard)
+  - [Board-Specific Configuration](#board-specific-configuration)
+    - [Arduino Nano ESP32 (ESP32S3)](#arduino-nano-esp32-esp32s3)
+    - [Other ESP32 Boards](#other-esp32-boards)
+  - [Configuration Reference](#configuration-reference)
+    - [Key Parameters](#key-parameters)
+    - [Schedule Options](#schedule-options)
+    - [Custom Schedule Example](#custom-schedule-example)
+    - [Logging](#logging)
+    - [Timezone Adjustment](#timezone-adjustment)
+  - [Features](#features)
+  - [Example Configurations](#example-configurations)
+  - [Hardware Requirements](#hardware-requirements)
+    - [Wiring (ESP8266 D1 Mini)](#wiring-esp8266-d1-mini)
+    - [Wiring (ESP32)](#wiring-esp32)
+  - [Benefits](#benefits)
+    - [vs. Standalone MQTT Mode](#vs-standalone-mqtt-mode)
+    - [ESPHome Mode Advantages](#esphome-mode-advantages)
+  - [Home Assistant Best Practice: Utility Meter Helper](#home-assistant-best-practice-utility-meter-helper)
+    - [Historical Data from Meter](#historical-data-from-meter)
+  - [Architecture](#architecture)
+  - [Available Sensors](#available-sensors)
+    - [Numeric Sensors](#numeric-sensors)
+    - [Text Sensors](#text-sensors)
+    - [Binary Sensors](#binary-sensors)
+    - [Control Buttons](#control-buttons)
+  - [Common Configuration Patterns](#common-configuration-patterns)
+    - [Water Meter - Basic](#water-meter---basic)
+    - [Gas Meter - Basic](#gas-meter---basic)
+    - [With Full Monitoring](#with-full-monitoring)
+  - [Quick Troubleshooting](#quick-troubleshooting)
+    - [Quick Fixes](#quick-fixes)
+  - [License](#license)
+  - [Credits](#credits)
+  - [Links](#links)
+  - [Development: Code Style \& Formatting](#development-code-style--formatting)
+    - [Running the formatter](#running-the-formatter)
+    - [Linting \& pre-commit](#linting--pre-commit)
+
 ## Troubleshooting
 
 ### Corrupted or Invalid Volume Readings
 
 If you're seeing:
+
 - Volume reading as 0, small values, or negative numbers
 - Historical data showing impossible decreases
 - Battery showing as 0 months
@@ -19,6 +74,7 @@ everblu_meter:
 ```
 
 This will output detailed hex dumps of the decoded frame, helping identify:
+
 - Wrong byte offsets for your meter variant
 - Regional/manufacturing differences in data layout
 - Specific bytes causing parsing errors
@@ -244,6 +300,7 @@ esp32:
 
 ### Key Parameters
 
+<!-- markdownlint-disable MD060 -->
 | Parameter            | Type     | Default       | Required | Description                                                                                                                                                                                                                                  |
 | -------------------- | -------- | ------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `meter_code`         | string   | -             | Yes      | Dashed meter code: `YY-SSSSSSS` or `YY-SSSSSSS-NNN` (suffix optional)                                                                                                                                                                        |
@@ -263,6 +320,7 @@ esp32:
 | `retry_cooldown`     | duration | 1h            | No       | Cooldown time                                                                                                                                                                                                                                |
 | `gas_volume_divisor` | int      | 100           | No       | Gas divisor (100/1000)                                                                                                                                                                                                                       |
 | `debug_cc1101`       | bool     | false         | No       | Enable hex dump for debugging                                                                                                                                                                                                                |
+<!-- markdownlint-enable MD060 -->
 
 ### Schedule Options
 
@@ -406,12 +464,14 @@ If you switch between ESPHome and MQTT, change meter serial numbers, or replace 
    - **Meter type**: Daily/monthly/yearly or none
 
 **Benefits:**
+
 - Preserve history when switching ESPHome ↔ MQTT
 - Seamless meter serial number updates
 - Single point to update for hardware changes
 - Stable entity ID for dashboards and automations
 
 **Example:**
+
 ```yaml
 utility_meter:
   master_water_meter:
@@ -426,6 +486,7 @@ When changing platforms or meters, update only the `source` - your history stays
 The ESPHome component exposes a **history text sensor** containing 12 months of historical readings stored directly in the meter. This data is retrieved from the meter itself and provided in JSON format.
 
 **Example JSON payload:**
+
 ```json
 {
   "history": [605696, 614107, 621401, 630219, 640054, 652789, 667441, 684214, 700917, 712720, 721549, 728836],
@@ -436,12 +497,14 @@ The ESPHome component exposes a **history text sensor** containing 12 months of 
 ```
 
 **Data Structure:**
+
 - `history`: 12 monthly readings (oldest to newest) in L or m³
 - `monthly_usage`: 12 monthly consumption values (first is oldest reading, rest are differences)
 - `current_month_usage`: Current month consumption
 - `months_available`: Months of data (typically 12)
 
 **Use Cases:**
+
 - Bootstrap Home Assistant with 12 months of existing data on first setup
 - Analyze historical consumption patterns
 - Compare current vs. previous month usage
@@ -478,7 +541,7 @@ template:
 
 The component uses a clean adapter pattern to separate platform-specific code from core meter reading logic:
 
-```
+```text
 EverbluMeterComponent (ESPHome)
 ├── ESPHomeConfigProvider    → Configuration from YAML
 ├── ESPHomeTimeProvider      → Time synchronization
@@ -490,6 +553,7 @@ EverbluMeterComponent (ESPHome)
 ```
 
 **Key Benefits**:
+
 - ~95% code shared between ESPHome and standalone modes
 - Clean separation of concerns
 - Easy to test and maintain
@@ -498,6 +562,7 @@ EverbluMeterComponent (ESPHome)
 ## Available Sensors
 
 ### Numeric Sensors
+
 - **volume** - Current meter reading (L or m³)
 - **battery** - Estimated battery life (years)
 - **counter** - Alternative volume counter
@@ -510,6 +575,7 @@ EverbluMeterComponent (ESPHome)
 - **total_attempts** / **successful_reads** / **failed_reads** - Statistics
 
 ### Text Sensors
+
 - **status** - Current meter status (Idle/Reading/Success/Error)
 - **error** - Last error message
 - **radio_state** - Radio state (Init/Scanning/Receiving/Idle)
@@ -522,10 +588,12 @@ EverbluMeterComponent (ESPHome)
 - **reading_time_utc_sensor** - Configured reading time (UTC)
 
 ### Binary Sensors
+
 - **active_reading** - Whether a reading is currently in progress
 - **radio_connected** - CC1101 radio connectivity status
 
 ### Control Buttons
+
 - **request_reading_button** - Trigger a manual reading
 - **frequency_scan_button** - Trigger a frequency scan
 - **reset_frequency_button** - Reset the frequency offset
@@ -533,6 +601,7 @@ EverbluMeterComponent (ESPHome)
 ## Common Configuration Patterns
 
 ### Water Meter - Basic
+
 ```yaml
 everblu_meter:
   meter_code: "21-1234567-000"
@@ -545,6 +614,7 @@ everblu_meter:
 ```
 
 ### Gas Meter - Basic
+
 ```yaml
 everblu_meter:
   meter_code: "22-8765432-000"
@@ -558,6 +628,7 @@ everblu_meter:
 ```
 
 ### With Full Monitoring
+
 ```yaml
 everblu_meter:
   meter_code: "21-1234567-000"
@@ -578,11 +649,12 @@ everblu_meter:
     name: "Reading Active"
 ```
 
-## Troubleshooting
+## Quick Troubleshooting
 
 ### Quick Fixes
 
 **No readings received:**
+
 ```yaml
 everblu_meter:
   auto_scan: true        # Enable frequency scanning
@@ -590,6 +662,7 @@ everblu_meter:
 ```
 
 **Poor signal quality:**
+
 ```yaml
 everblu_meter:
   frequency: 433.85      # Try different frequency
@@ -597,12 +670,14 @@ everblu_meter:
 ```
 
 **Wrong volume reading (gas meters):**
+
 ```yaml
 everblu_meter:
   gas_volume_divisor: 1000  # Try 100 or 1000
 ```
 
 **Incorrect time or timezone:**
+
 ```yaml
 everblu_meter:
   timezone_offset: -5  # Hours from UTC
@@ -621,13 +696,14 @@ Based on the EverBlu Meters ESP8266 project with architectural improvements for 
 ## Links
 
 - **Main Project**: [Main README](../README.md)
-- **GitHub Repository**: https://github.com/yourusername/everblu-meters-esp8266-improved
-- **ESPHome Documentation**: https://esphome.io/
-- **Home Assistant**: https://www.home-assistant.io/
+- **GitHub Repository**: <https://github.com/yourusername/everblu-meters-esp8266-improved>
+- **ESPHome Documentation**: <https://esphome.io/>
+- **Home Assistant**: <https://www.home-assistant.io/>
 
 ---
 
 **Need Help?**
+
 - Start with the [Integration Guide](docs/ESPHOME_INTEGRATION_GUIDE.md)
 - See [Home Assistant Integration](docs/ESPHOME_HOME_ASSISTANT_INTEGRATION.md) for accessing meter data in Home Assistant
 - See the Configuration Reference above for parameters and quick fixes
