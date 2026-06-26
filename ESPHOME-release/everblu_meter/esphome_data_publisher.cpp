@@ -18,6 +18,10 @@ static const char *const TAG_PUB = "everblu_publisher";
 esphome::sensor::Sensor *ESPHomeDataPublisher::frequency_offset_sensor_ = nullptr;
 esphome::sensor::Sensor *ESPHomeDataPublisher::tuned_frequency_sensor_ = nullptr;
 esphome::sensor::Sensor *ESPHomeDataPublisher::frequency_estimate_sensor_ = nullptr;
+// Device-level sensors shared across all meter instances (one radio, one firmware).
+esphome::text_sensor::TextSensor *ESPHomeDataPublisher::radio_state_sensor_ = nullptr;
+esphome::text_sensor::TextSensor *ESPHomeDataPublisher::version_sensor_ = nullptr;
+esphome::binary_sensor::BinarySensor *ESPHomeDataPublisher::radio_connected_sensor_ = nullptr;
 #endif
 
 ESPHomeDataPublisher::ESPHomeDataPublisher()
