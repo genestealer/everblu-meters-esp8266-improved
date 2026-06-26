@@ -718,7 +718,7 @@ code matches what ships in ESPHome core and stays compatible with the upstream r
 - **Formatter:** [`clang-format`](https://clang.llvm.org/docs/ClangFormat.html), configured with a
   verbatim copy of ESPHome's upstream style.
 - **Style file:** [`components/everblu_meter/.clang-format`](components/everblu_meter/.clang-format)
-  — copied from [esphome/esphome `.clang-format`](https://github.com/esphome/esphome/blob/dev/.clang-format).
+  - copied from [esphome/esphome `.clang-format`](https://github.com/esphome/esphome/blob/dev/.clang-format).
   It is placed in the component directory (not the repo root) so it applies **only** to the
   ESPHome component; the portable library under [`src/`](../src) keeps its own house style.
 - **Naming / `this->` / `final` conventions** follow ESPHome's

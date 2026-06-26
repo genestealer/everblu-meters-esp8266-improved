@@ -1,4 +1,4 @@
-# Full-coverage shared configuration — exercises every optional sensor, button,
+# Full-coverage shared configuration - exercises every optional sensor, button,
 # and non-default config parameter so that each code path is compiled at least once.
 # Included by test.*-full.yaml platform files via <<: !include common-full.yaml
 #
@@ -25,7 +25,7 @@ everblu_meter:
   spi_id: ci_spi
   cs_pin: ${cs_pin}
 
-  # Meter identity — code without suffix to exercise that parsing branch
+  # Meter identity - code without suffix to exercise that parsing branch
   meter_code: "19-0039185"
   meter_type: ${meter_type}
   gdo0_pin: ${gdo0_pin}

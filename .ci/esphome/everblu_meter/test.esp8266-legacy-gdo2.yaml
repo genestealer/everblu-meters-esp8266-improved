@@ -51,7 +51,7 @@ everblu_meter:
   meter_code: "22-8765432-100"
   meter_type: ${meter_type}
   gdo0_pin: ${gdo0_pin}
-  # No gdo2_pin — explicitly opting out of hardware FIFO management
+  # No gdo2_pin - explicitly opting out of hardware FIFO management
   disable_gdo2_fifo_management: true
   time_id: ci_time
   reading_schedule: "Monday-Saturday"

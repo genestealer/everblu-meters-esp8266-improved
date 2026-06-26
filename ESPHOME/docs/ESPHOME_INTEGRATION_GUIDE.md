@@ -241,7 +241,7 @@ Look for the full code printed under the barcode on your meter label.
 
 Example label format: `YY-SSSSSSS-NNN`
 
-- Configure `meter_code` exactly as printed, with dashes — the 3-digit suffix is **optional**
+- Configure `meter_code` exactly as printed, with dashes - the 3-digit suffix is **optional**
 - Accepted: `YY-SSSSSSS` (no suffix) or `YY-SSSSSSS-NNN` (with suffix)
 - First 2 digits (`YY`) are parsed as year
 - Middle digits (`SSSSSSS`) are parsed as serial

@@ -1,4 +1,4 @@
-# Minimal shared configuration — just enough to compile the component.
+# Minimal shared configuration - just enough to compile the component.
 # Tests: required params, GDO2 hardware path, water meter defaults.
 # Included by test.*.yaml platform files via <<: !include common.yaml
 #

@@ -2,10 +2,10 @@
 
 |                        |                                                                                                                                                                                                                                             |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Issue**              | [#83](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/83) (TX FIFO — implemented) · [#84](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/84) (RX FIFO + dynamic reconfiguration — implemented) |
+| **Issue**              | [#83](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/83) (TX FIFO - implemented) · [#84](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/84) (RX FIFO + dynamic reconfiguration - implemented) |
 | **Integration target** | Both (ESPHome + MQTT)                                                                                                                                                                                                                       |
 | **Implemented in**     | `feature/gdo2-fifo-threshold` (Part 1) · `feature/gdo2-rx-fifo-threshold` (Parts 2 & 3)                                                                                                                                                     |
-| **Future work branch** | n/a — all parts implemented                                                                                                                                                                                                                 |
+| **Future work branch** | n/a - all parts implemented                                                                                                                                                                                                                 |
 
 The driver configures GDO2 as a FIFO threshold signal, dynamically reconfiguring `IOCFG2` per phase
 (`0x02` for the TX FIFO threshold, `0x01` for the RX FIFO threshold / end-of-packet). The GDO2 pin is
@@ -17,13 +17,13 @@ unnecessary SPI traffic and improving ESPHome task scheduling).
 > **Status summary**
 >
 >
-> - **Part 1 (TX FIFO threshold)** — ✅ implemented in `feature/gdo2-fifo-threshold`
-> - **Part 2 (RX FIFO threshold)** — ✅ implemented in `feature/gdo2-rx-fifo-threshold`
-> - **Part 3 (dynamic IOCFG2 reconfiguration)** — ✅ implemented in `feature/gdo2-rx-fifo-threshold`
+> - **Part 1 (TX FIFO threshold)** - ✅ implemented in `feature/gdo2-fifo-threshold`
+> - **Part 2 (RX FIFO threshold)** - ✅ implemented in `feature/gdo2-rx-fifo-threshold`
+> - **Part 3 (dynamic IOCFG2 reconfiguration)** - ✅ implemented in `feature/gdo2-rx-fifo-threshold`
 
 ---
 
-## Part 1 — TX FIFO Threshold ✅ Implemented
+## Part 1 - TX FIFO Threshold ✅ Implemented
 
 ### Problem
 
@@ -41,7 +41,7 @@ SPIWriteBurstReg(TX_FIFO_ADDR, wupbuffer, 8);
 Two weaknesses:
 
 1. **Stale FIFO level.** `CC1101_status_FIFO_FreeByte` is extracted from the SPI status byte of
-   the *previous* register write — not a real-time read. The actual FIFO level at the moment of
+   the *previous* register write - not a real-time read. The actual FIFO level at the moment of
    the write can be significantly different.
 
 2. **Fixed delay is unreliable in ESPHome.** `delay()` and `yield()` in ESPHome service background
@@ -68,7 +68,7 @@ if (GET_GDO2_PIN() >= 0) {
 
 |                          | Current                                           | With GDO2 TX                                        |
 | ------------------------ | ------------------------------------------------- | --------------------------------------------------- |
-| Refill trigger           | SPI read of `TXBYTES` (stale status byte)         | `digitalRead()` — real-time, ~1 µs                  |
+| Refill trigger           | SPI read of `TXBYTES` (stale status byte)         | `digitalRead()` - real-time, ~1 µs                  |
 | Refill timing            | Fixed `delay(20)` heuristic                       | Event-driven: fires the moment threshold crosses    |
 | Underflow detection      | Reactive: poll `MARCSTATE == 0x16` after the fact | Proactive: refill fires before FIFO empties         |
 | Interrogation frame gate | Dedicated SPI poll loop (`TXBYTES ≤ 25`)          | Same `digitalRead(GDO2) == LOW` if FIFOTHR adjusted |
@@ -81,7 +81,7 @@ if (GET_GDO2_PIN() >= 0) {
 | 9 (implemented)      | `0x49`    | 25 bytes     | ≥ 40                    | Yes                   |
 
 Changing `FIFO_THR` from 7 to 9 shifts the TX threshold from 33 → 25 bytes. When GDO2
-de-asserts, the FIFO has fewer than 25 bytes remaining, guaranteeing at least 40 free bytes —
+de-asserts, the FIFO has fewer than 25 bytes remaining, guaranteeing at least 40 free bytes -
 enough to safely write both the 8-byte WUP buffer *and* the 39-byte interrogation frame using
 the same GDO2 check, eliminating the separate TXBYTES poll loop entirely.
 
@@ -95,16 +95,16 @@ threshold signal.
 
 ---
 
-## Part 2 — RX FIFO Threshold ✅ Implemented
+## Part 2 - RX FIFO Threshold ✅ Implemented
 
 ### Current RX loop behaviour
 
 ```
 cc1101_wait_for_packet(ms)            // outer: delay(1) per iteration, polls GDO0
   └─ cc1101_check_packet_received()
-       ├─ if (GDO0 == HIGH)            // sync word detected — packet started
+       ├─ if (GDO0 == HIGH)            // sync word detected - packet started
        └─ while (GDO0 == HIGH)
-              delay(2)                 // blind wait — may be 20ms+ under ESPHome load
+              delay(2)                 // blind wait - may be 20ms+ under ESPHome load
               halRfReadReg(RXBYTES)    // SPI read every iteration regardless of fill level
               SPIReadBurstReg(...)     // drain whatever is there
 ```
@@ -113,10 +113,10 @@ Two inefficiencies:
 
 1. **Every `delay(2)` produces an unconditional SPI read.** When the FIFO has 0–1 bytes,
    `RXBYTES` is still read. At 2.4 kbps that is roughly one SPI transaction per ~0.6 bytes
-   received — most reads bring back `0x00` and do nothing.
+   received - most reads bring back `0x00` and do nothing.
 
 2. **`delay(2)` in ESPHome is not 2 ms.** It yields to the scheduler, which can service WiFi,
-   mDNS, the API server, OTA, web_server — any of which may take 10–80 ms. The inner loop fires
+   mDNS, the API server, OTA, web_server - any of which may take 10–80 ms. The inner loop fires
    much less often than intended, and during the *wait* phase the firmware is interrupted every
    2 ms by an unnecessary SPI poll rather than being able to yield cleanly.
 
@@ -124,7 +124,7 @@ Two inefficiencies:
 
 At 2.4 kbps the meter injects exactly 1 byte every 3.33 ms. The 64-byte RX FIFO takes ~213 ms
 to fill from empty. Even if `delay(2)` balloons to 20 ms, only ~6 bytes arrive per missed drain.
-A typical meter response packet is ≤ 40 bytes — overflow requires missing ~10 consecutive reads in
+A typical meter response packet is ≤ 40 bytes - overflow requires missing ~10 consecutive reads in
 a row. Overflow happens, but it is a softer constraint than TX underflow, which is why this
 enhancement is lower priority.
 
@@ -143,7 +143,7 @@ Signal `0x01` is the correct choice. It handles two cases that threshold-only ca
   threshold remain when GDO0 goes LOW. GDO2 fires at EOP to collect them regardless.
 
 Signal `0x00` de-asserts only at FIFO-empty, so once HIGH after threshold it stays HIGH during
-draining — useful, but the missing EOP assertion means a short packet could never trigger GDO2
+draining - useful, but the missing EOP assertion means a short packet could never trigger GDO2
 at all. Signal `0x01` guarantees GDO2 fires at least once per received packet.
 
 ### Proposed RX loop with GDO2
@@ -152,7 +152,7 @@ at all. Signal `0x01` guarantees GDO2 fires at least once per received packet.
 while (digitalRead(GET_GDO0_PIN()) == TRUE) {
     if (GET_GDO2_PIN() >= 0) {
         if (digitalRead(GET_GDO2_PIN()) == LOW) {
-            yield();   // below threshold — let ESPHome tasks run, no SPI read needed
+            yield();   // below threshold - let ESPHome tasks run, no SPI read needed
             continue;
         }
         // GDO2 HIGH: threshold reached or EOP → drain now
@@ -172,17 +172,17 @@ in one burst"**.
 
 |                             | Current                                    | With GDO2 RX                          |
 | --------------------------- | ------------------------------------------ | ------------------------------------- |
-| SPI reads during empty FIFO | Every 2 ms regardless                      | Zero — `yield()` until GDO2 fires     |
+| SPI reads during empty FIFO | Every 2 ms regardless                      | Zero - `yield()` until GDO2 fires     |
 | ESPHome task scheduling     | Blocked 2 ms per poll iteration            | Proper `yield()` between batches      |
 | Final sub-threshold drain   | Collected on next 2 ms poll after GDO0 LOW | Guaranteed by EOP assertion of `0x01` |
-| Overflow protection         | `RXBYTES` bit-7 check after the fact       | Unchanged — still the safety net      |
+| Overflow protection         | `RXBYTES` bit-7 check after the fact       | Unchanged - still the safety net      |
 
 ---
 
-## Part 3 — Dynamic GDO2 Reconfiguration ✅ Implemented
+## Part 3 - Dynamic GDO2 Reconfiguration ✅ Implemented
 
 The firmware already reconfigures `MDMCFG2` and `PKTCTRL0` between TX and RX phases. GDO2 follows
-the same pattern — one extra register write per phase transition:
+the same pattern - one extra register write per phase transition:
 
 ```cpp
 // New register defines
@@ -200,7 +200,7 @@ if (GET_GDO2_PIN() >= 0)
 
 ---
 
-## Part 4 — Implementation Scope
+## Part 4 - Implementation Scope
 
 ### Hardware prerequisite (user action)
 
@@ -215,7 +215,7 @@ UART TX/RX. Declare it as `GDO2` in `private.h` (MQTT build) or `gdo2_pin:` in E
 if (GET_GDO2_PIN() >= 0) {
     // GDO2 fast path
 } else {
-    // SPI polling fallback (runs with updated IOCFG2/FIFOTHR register values — see note below)
+    // SPI polling fallback (runs with updated IOCFG2/FIFOTHR register values - see note below)
 }
 ```
 
@@ -243,12 +243,12 @@ if (GET_GDO2_PIN() >= 0) {
 
 - Interrupt-driven refill via `attachInterrupt` on GDO2. SPI writes from ISR context are not safe
   on ESP8266. Polling within the existing TX/RX loops is the correct approach.
-- Temperature sensor mode (GDO0/GDO2 shared with ADC) — irrelevant for this use case.
+- Temperature sensor mode (GDO0/GDO2 shared with ADC) - irrelevant for this use case.
 
 ### Alternatives considered
 
 - Keep `FIFO_THR=7` and gate only the WUP refill on GDO2 (conservative option). Eliminates
   ~95% of underflow risk without touching FIFOTHR. The interrogation frame gate keeps its
   existing `TXBYTES` poll loop.
-- Use the existing `TXBYTES` poll loop with a tighter threshold and shorter delay — rejected
+- Use the existing `TXBYTES` poll loop with a tighter threshold and shorter delay - rejected
   because it still depends on `delay()` which is unreliable under ESPHome scheduler load.

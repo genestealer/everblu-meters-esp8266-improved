@@ -36,7 +36,7 @@ public:
         DefineConfigProvider() = default;
         ~DefineConfigProvider() override = default;
 
-        // Meter identification — parsed at call time from the METER_CODE string.
+        // Meter identification - parsed at call time from the METER_CODE string.
         // METER_CODE format: "YY-SSSSSSS" or "YY-SSSSSSS-NNN".
         uint8_t getMeterYear() const override
         {

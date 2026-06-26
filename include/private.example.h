@@ -166,7 +166,7 @@
 // ESP32 DevKit: GPIO4 or GPIO27
 #define GDO0 5
 
-// CC1101 GDO2 (FIFO threshold signal) pin assignment — ENABLED BY DEFAULT (v3.0.0+)
+// CC1101 GDO2 (FIFO threshold signal) pin assignment - ENABLED BY DEFAULT (v3.0.0+)
 //
 // ⚠️ BREAKING CHANGE (v3.0.0): GDO2 hardware-assisted FIFO management is now the default.
 // You MUST either wire CC1101 GDO2 to a free GPIO and set the pin below, OR explicitly
@@ -174,7 +174,7 @@
 // neither is set (a clear compile-time error is emitted from src/core/cc1101.cpp).
 //
 // When defined, GDO2 is dynamically reconfigured per phase:
-//   TX phase: IOCFG2=0x02 (HIGH when TX FIFO >=25 bytes) — prevents TXFIFO_UNDERFLOW
+//   TX phase: IOCFG2=0x02 (HIGH when TX FIFO >=25 bytes) - prevents TXFIFO_UNDERFLOW
 //   RX phase: IOCFG2=0x01 (HIGH when RX FIFO >=40 bytes OR end-of-packet)
 // The main benefit is TXFIFO_UNDERFLOW prevention during transmit. The RX payload
 // stage runs in infinite-length mode (no end-of-packet), so it always polls RXBYTES

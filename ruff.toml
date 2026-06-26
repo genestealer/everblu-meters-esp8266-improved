@@ -1,4 +1,4 @@
-# Ruff configuration — mirrors ESPHome's upstream Python style so this repo's Python
+# Ruff configuration - mirrors ESPHome's upstream Python style so this repo's Python
 # (the ESPHome component and helper scripts) matches the ESPHome project.
 #
 # Reference: https://github.com/esphome/esphome/blob/dev/pyproject.toml  ([tool.ruff])

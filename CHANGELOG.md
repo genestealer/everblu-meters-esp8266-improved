@@ -6,7 +6,7 @@ Releases are created manually by tagging commits with version tags matching `v*.
 
 ## [v3.0.0] - 2026-06-24
 
-> **⚠️ BREAKING CHANGE** — CC1101 GDO2 hardware-assisted FIFO threshold management is now the **default** mechanism for talking to the radio on **both** the standalone (MQTT) and ESPHome targets. You must wire CC1101 GDO2 to a free GPIO and configure it, **or** explicitly opt out. Existing setups that did not wire GDO2 require migration (see below).
+> **⚠️ BREAKING CHANGE** - CC1101 GDO2 hardware-assisted FIFO threshold management is now the **default** mechanism for talking to the radio on **both** the standalone (MQTT) and ESPHome targets. You must wire CC1101 GDO2 to a free GPIO and configure it, **or** explicitly opt out. Existing setups that did not wire GDO2 require migration (see below).
 >
 > This release also rolls in the previously unreleased v2.4.0 work: the hardware-assisted GDO2 FIFO mechanism (TX + RX) plus reliability, diagnostics, and data-validation improvements. Preserves ESP8266 (Arduino) and ESP32 + ESPHome support.
 
@@ -64,7 +64,7 @@ Releases are created manually by tagging commits with version tags matching `v*.
 
 ### Fixed
 
-- **Frequency offset now persists across power-cycle reboots on ESP8266** ([#96](https://github.com/genestealer/everblu-meters-esp8266-improved/pull/96)): ESPHome assigns preference storage slots by `make_preference()` call order and defaults to RTC memory (wiped on power loss). The previous code created a new preference object inside every `saveFloat`/`loadFloat`, so save and load landed on different slots — the post-save read-back passed but the value was never found again after a reboot. One `ESPPreferenceObject` per key hash is now cached and reused for save/load, with `in_flash=true` so the offset is written to the flash sector and survives a full power cycle. ESP32 (NVS) and the standalone EEPROM path are unaffected.
+- **Frequency offset now persists across power-cycle reboots on ESP8266** ([#96](https://github.com/genestealer/everblu-meters-esp8266-improved/pull/96)): ESPHome assigns preference storage slots by `make_preference()` call order and defaults to RTC memory (wiped on power loss). The previous code created a new preference object inside every `saveFloat`/`loadFloat`, so save and load landed on different slots - the post-save read-back passed but the value was never found again after a reboot. One `ESPPreferenceObject` per key hash is now cached and reused for save/load, with `in_flash=true` so the offset is written to the flash sector and survives a full power cycle. ESP32 (NVS) and the standalone EEPROM path are unaffected.
 - **Restored frequency calibration is now confirmed at boot** ([#96](https://github.com/genestealer/everblu-meters-esp8266-improved/pull/96)): `begin()` distinguishes a genuinely persisted offset (even `0.0`) from "nothing stored" using a NaN sentinel, logs an explicit RESTORED-vs-not-found line, and publishes the restored offset and tuned frequency to Home Assistant at boot so persistence can be verified without waiting for the first read.
 - **ESPHome `clearKey`/`hasKey` are now consistent and flash-safe** ([#96](https://github.com/genestealer/everblu-meters-esp8266-improved/pull/96)): `clearKey()` previously used a fresh `make_preference<float>(hash)` targeting a different slot/length than `saveFloat`/`loadFloat` and omitting `in_flash`, so it could not reliably invalidate the stored offset. It now reuses the cached flash-backed preference object and writes a zeroed magic so a later `loadFloat` fails its magic check and returns the default. Both `clearKey()` and `hasKey()` guard against a null `global_preferences`, treat a zeroed magic as absent, and sync the cleared slot to flash so the clear survives a reboot.
 - **RX frame truncation when GDO2 is wired**: the Stage-2 payload receive loop runs in `PKTCTRL0_INFINITE_LENGTH` mode where the CC1101 never generates an end-of-packet, so GDO2 (`IOCFG2 = 0x01`) only asserted at the 40-byte RX FIFO threshold and the final sub-threshold remainder of each frame was skipped indefinitely. The Stage-2 loop now always polls `RXBYTES` to drain the tail (Stage-1 fixed-length sync loop and TX-side GDO2 logic are unchanged).
@@ -76,7 +76,7 @@ Releases are created manually by tagging commits with version tags matching `v*.
 
 ## [v2.3.0] - 2026-05-15
 
-> **⚠️ BREAKING CHANGE** — This release enforces strict validation of the meter code format. Existing configurations with flexible serial lengths (1–8 digits) **will not validate** without migration. See [Migration Required](#migration-required) below.
+> **⚠️ BREAKING CHANGE** - This release enforces strict validation of the meter code format. Existing configurations with flexible serial lengths (1–8 digits) **will not validate** without migration. See [Migration Required](#migration-required) below.
 
 ### Breaking Changes
 
@@ -117,7 +117,7 @@ Releases are created manually by tagging commits with version tags matching `v*.
 
 ## [v2.2.0] - 2026-04-21
 
-> **⚠️ BREAKING CHANGE** — This release contains a breaking ESPHome configuration schema change due to the explicit SPI integration. Existing `everblu_meter` YAML configurations **will not validate** without migration. See [Migration Required](#migration-required) below.
+> **⚠️ BREAKING CHANGE** - This release contains a breaking ESPHome configuration schema change due to the explicit SPI integration. Existing `everblu_meter` YAML configurations **will not validate** without migration. See [Migration Required](#migration-required) below.
 
 ### Breaking Changes
 

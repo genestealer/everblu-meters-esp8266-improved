@@ -98,9 +98,9 @@ static const uint8_t debug_out = (uint8_t)(DEBUG_CC1101);
 #define IOCFG0_SYNC_WORD_DETECT 0x06 // Asserts when sync word detected, deasserts at end of packet
 
 // FIFOTHR - RX FIFO and TX FIFO Thresholds
-// FIFO_THR=9 (0x49): TX threshold=25 bytes — de-assertion guarantees >=40 free bytes, safely fits both
+// FIFO_THR=9 (0x49): TX threshold=25 bytes - de-assertion guarantees >=40 free bytes, safely fits both
 //                    the 8-byte WUP buffer and the 39-byte interrogation frame with a single GDO2 check.
-//                    RX threshold=40 bytes — GDO2 (IOCFG2=0x01) asserts once the RX FIFO holds >=40 bytes,
+//                    RX threshold=40 bytes - GDO2 (IOCFG2=0x01) asserts once the RX FIFO holds >=40 bytes,
 //                    letting the RX drain loop skip RXBYTES SPI reads until a worthwhile chunk is buffered.
 #define FIFOTHR_FIFO_THR_33_32 0x47 // FIFO_THR=7: TX threshold 33 bytes, RX threshold 33 bytes (legacy)
 #define FIFOTHR_FIFO_THR_25_40 0x49 // FIFO_THR=9: TX threshold 25 bytes, RX threshold 40 bytes
@@ -1427,7 +1427,7 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
 
     // GDO2 fast path (IOCFG2 = RX FIFO threshold / EOP): GDO2 is HIGH only once the
     // RX FIFO holds at least RX_FIFO_THRESHOLD_BYTES. While it is LOW the FIFO is
-    // below threshold, so an RXBYTES SPI read would return little or nothing — skip
+    // below threshold, so an RXBYTES SPI read would return little or nothing - skip
     // it to avoid needless SPI traffic. Exception: the final tail of the frame
     // (< threshold bytes) never raises GDO2 under infinite packet length (there is
     // no end-of-packet), so once we are within one threshold of the expected total
@@ -1650,7 +1650,7 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
             SPIWriteBurstReg(TX_FIFO_ADDR, wupbuffer, 8);
             wup2send--;
           }
-          // else: FIFO still above threshold — skip write this iteration
+          // else: FIFO still above threshold - skip write this iteration
         }
         else
         {
@@ -1675,7 +1675,7 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
       if (GET_GDO2_PIN() >= 0)
       {
         // With FIFOTHR_FIFO_THR_25_40: GDO2 de-asserts (LOW) when FIFO < 25 bytes,
-        // guaranteeing >= 40 free bytes — safely fits the 39-byte frame.
+        // guaranteeing >= 40 free bytes - safely fits the 39-byte frame.
         // See: https://github.com/genestealer/everblu-meters-esp8266-improved/issues/83
         uint8_t wait_count = 0;
         while (digitalRead(GET_GDO2_PIN()) == HIGH && wait_count < 100) // Safety limit ~500ms
@@ -1704,7 +1704,7 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
         {
           uint8_t txbytes_reg = halRfReadReg(TXBYTES_ADDR);
           if (txbytes_reg & 0x80)
-            break; // TXFIFO_UNDERFLOW — marcstate check at loop bottom will abort
+            break; // TXFIFO_UNDERFLOW - marcstate check at loop bottom will abort
           uint8_t num_txbytes = txbytes_reg & 0x7F;
           if (num_txbytes <= 25)
           {
@@ -1735,12 +1735,12 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
 
     // MARCSTATE 0x16 means the TX FIFO has emptied. Once the full wake-up burst
     // and interrogation frame have been clocked out on-air, this is the normal,
-    // expected end of transmission — there is simply no more data left to send,
+    // expected end of transmission - there is simply no more data left to send,
     // so we stop feeding and move on to listen for the meter's reply. This is
     // NOT a code fault. (An unusually early exit here would instead indicate the
     // feeding loop fell behind the 2.4 kbps drain rate, e.g. under heavy
     // background load.)
-    if ((marcstate & 0x1F) == 0x16) // TX FIFO drained — end of transmit burst
+    if ((marcstate & 0x1F) == 0x16) // TX FIFO drained - end of transmit burst
     {
       echo_debug(1, "[CC1101] Wake-up burst sent; TX FIFO drained at tmo=%d (normal end of transmit)\n", tmo);
       break;
@@ -1750,7 +1750,7 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
   // A drained TX FIFO (MARCSTATE 0x16) is the normal end of transmit. The only
   // abnormal case here is the loop hitting its timeout WITHOUT the FIFO ever
   // draining, which points to an SPI/feeding problem rather than anything RF.
-  // Reaching this point says nothing about whether the meter replied — that is
+  // Reaching this point says nothing about whether the meter replied - that is
   // determined below by the ACK/data frames, so any "meter asleep / out of
   // range / run a scan" guidance is deferred until a read actually fails.
   bool tx_fifo_drained = ((marcstate & 0x1F) == 0x16);
@@ -1841,7 +1841,7 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
   }
   else
   {
-    echo_debug(1, "[METER] No data frame received within the timeout window — the meter did not respond.\n");
+    echo_debug(1, "[METER] No data frame received within the timeout window - the meter did not respond.\n");
     echo_debug(1, "[METER] This usually means the meter is asleep (outside its daily listening window), out of range, the signal is too weak, or the configured Year/Serial is incorrect.\n");
     echo_debug(1, "[METER] If this persists, try improving antenna placement or running a frequency scan to recalibrate the radio (see AUTO_SCAN_ENABLED / CLEAR_EEPROM_ON_BOOT).\n");
     echo_debug(debug_out, "[METER] Meter data frame timeout\n");

@@ -122,7 +122,7 @@ def validate_meter_code(value):
     The code printed under the barcode has the format: YY-SSSSSSS-NNN
     Enter the value with dashes. The 3-digit suffix is optional.
       - First 2 digits : year (passed to the radio protocol as meter_year)
-      - Last 3 digits  : suffix / check digits (optional — ignored if present)
+      - Last 3 digits  : suffix / check digits (optional - ignored if present)
       - Middle digits  : serial number (leading zeros accepted; parsed as integer)
 
     Examples:

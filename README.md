@@ -49,8 +49,8 @@ Integrated with Home Assistant via MQTT AutoDiscovery and ESPHome external compo
 
 ESPHome integration is stable and recommended. **Start here for ESPHome:**
 
-- **[ESPHOME/README.md](ESPHOME/README.md)** — ESPHome setup, wiring, and configuration reference
-- **[ESPHOME/ESPHOME_INTEGRATION_GUIDE.md](ESPHOME/ESPHOME_INTEGRATION_GUIDE.md)** — complete step-by-step installation guide
+- **[ESPHOME/README.md](ESPHOME/README.md)** - ESPHome setup, wiring, and configuration reference
+- **[ESPHOME/ESPHOME_INTEGRATION_GUIDE.md](ESPHOME/ESPHOME_INTEGRATION_GUIDE.md)** - complete step-by-step installation guide
 - Ready-made configs: [water](ESPHOME/example-water-meter.yaml) · [gas](ESPHOME/example-gas-meter-minimal.yaml) · [advanced](ESPHOME/example-advanced.yaml) · [multi-meter](ESPHOME/example-multi-meter.yaml)
 
 > [!WARNING]
@@ -97,7 +97,7 @@ Supported meters:
 - MQTT integration for Home Assistant with AutoDiscovery.
 - **Native ESPHome component** for direct integration.
 - Automatic CC1101 frequency calibration with manual fallback.
-- **Hardware-assisted CC1101 FIFO threshold management via GDO2 — enabled by default (v3.0.0+)**: per-phase reconfiguration prevents TX FIFO underflows and reduces unnecessary RX SPI reads. Requires wiring GDO2 to a free GPIO (or explicitly opt out to use legacy SPI polling) — see [Hardware](#hardware) for wiring and the opt-out.
+- **Hardware-assisted CC1101 FIFO threshold management via GDO2 - enabled by default (v3.0.0+)**: per-phase reconfiguration prevents TX FIFO underflows and reduces unnecessary RX SPI reads. Requires wiring GDO2 to a free GPIO (or explicitly opt out to use legacy SPI polling) - see [Hardware](#hardware) for wiring and the opt-out.
 - Wi-Fi diagnostics and OTA updates.
 - Built-in CRC-16/KERMIT verification to discard corrupted RADIAN frames before publishing data.
 - Reading Schedule Configuration: Configure reading days using presets (Monday-Friday, Monday-Saturday, Monday-Sunday) or a specific day (Monday-Sunday).
@@ -321,7 +321,7 @@ Below are the wiring diagrams for common ESP8266 boards and ESP32 DevKit.
 - **Voltage:** The CC1101 operates at **3.3V only**. Do not connect to 5V or you will damage the module.
 - **Hardware SPI:** This project uses the ESP8266/ESP32's hardware SPI interface for reliable, high-speed communication.
 - **GDO0 Pin:** Default is GPIO 5 for ESP8266, GPIO 4 for ESP32. You can change this in your `private.h` file if needed.
-- **GDO2 Pin (required by default, v3.0.0+):** **Breaking change** — the CC1101 GDO2 pin now drives hardware-assisted FIFO threshold management by default. You must wire CC1101 GDO2 to a free MCU GPIO and configure it via `#define GDO2 <pin>` in `private.h` (MQTT firmware) or `gdo2_pin` in YAML (ESPHome). The driver dynamically reconfigures GDO2 per phase: TX (prevents `TXFIFO_UNDERFLOW`) and RX (skips unnecessary SPI reads and improves scheduler efficiency). To keep the legacy SPI-polling behaviour instead, explicitly opt out: define `DISABLE_GDO2_FIFO_MANAGEMENT` in `private.h`, or set `disable_gdo2_fifo_management: true` in ESPHome. The MQTT firmware will not compile, and the ESPHome config will not validate, until you either wire/configure GDO2 or opt out. Use any free GPIO that does not collide with the SPI bus or GDO0. See [docs/GDO2_FIFO_MANAGEMENT.md](docs/GDO2_FIFO_MANAGEMENT.md).
+- **GDO2 Pin (required by default, v3.0.0+):** **Breaking change** - the CC1101 GDO2 pin now drives hardware-assisted FIFO threshold management by default. You must wire CC1101 GDO2 to a free MCU GPIO and configure it via `#define GDO2 <pin>` in `private.h` (MQTT firmware) or `gdo2_pin` in YAML (ESPHome). The driver dynamically reconfigures GDO2 per phase: TX (prevents `TXFIFO_UNDERFLOW`) and RX (skips unnecessary SPI reads and improves scheduler efficiency). To keep the legacy SPI-polling behaviour instead, explicitly opt out: define `DISABLE_GDO2_FIFO_MANAGEMENT` in `private.h`, or set `disable_gdo2_fifo_management: true` in ESPHome. The MQTT firmware will not compile, and the ESPHome config will not validate, until you either wire/configure GDO2 or opt out. Use any free GPIO that does not collide with the SPI bus or GDO0. See [docs/GDO2_FIFO_MANAGEMENT.md](docs/GDO2_FIFO_MANAGEMENT.md).
 - **Distance & Signal Quality:** The RADIAN protocol implementation does not have publicly available CRC checksums for the manufacturer's proprietary encoding, making readings somewhat vulnerable to RF interference. Weak signal (distance > 10+ meters) or electrical interference can cause read failures. **Keep the CC1101 radio within a few meters (~2-5m ideally) of your meter for reliable communication.** If you experience frequent "No ACK frame received" or "No data frame received" failures, try moving the radio closer to the meter to rule out signal strength issues before investigating hardware wiring.
 
 #### Wiring Table
@@ -579,7 +579,7 @@ Both MQTT and ESPHome modes expose a **history sensor** containing 12 months of 
      - Wi-Fi and MQTT credentials. If your MQTT setup does not require a username and password, comment out those lines using `//`.
      - **Meter Code** - Copy the code under the barcode (ignore the manufacturing date):
        - Label format: `YY-SSSSSSS-NNN` (example: `23-1875247-234`)
-       - Set `METER_CODE` to the same value **with dashes** — suffix `-NNN` is optional
+       - Set `METER_CODE` to the same value **with dashes** - suffix `-NNN` is optional
        - Year is parsed from the first 2 digits (`YY`)
        - Serial is parsed from the middle section (`SSSSSSS`) and used in topics/entity prefixes
        - Last 3 digits (`NNN`), if present, are ignored by the radio protocol
@@ -589,7 +589,7 @@ Both MQTT and ESPHome modes expose a **history sensor** containing 12 months of 
        // Label text: 23-1875247-234  (with suffix, 12 digits)
        #define METER_CODE "23-1875247-234"
 
-       // Same meter, without suffix (9 digits — also valid)
+       // Same meter, without suffix (9 digits - also valid)
        #define METER_CODE "23-1875247"
 
        // Label with leading zeros in serial: 23-0123456-234
@@ -903,7 +903,7 @@ However, be mindful of the distance for effective use.
 ## Important: Utility Read Counter Compatibility
 
 > [!IMPORTANT]
-> The meter includes a built-in **read counter** that increments each time it's queried. When your water/gas company performs wireless readings, they expect this counter to match their scheduled read count. **This is not an MQTT or ESP issue** — it's how the RADIAN protocol and meter hardware work.
+> The meter includes a built-in **read counter** that increments each time it's queried. When your water/gas company performs wireless readings, they expect this counter to match their scheduled read count. **This is not an MQTT or ESP issue** - it's how the RADIAN protocol and meter hardware work.
 
 If you regularly read your meter yourself:
 
