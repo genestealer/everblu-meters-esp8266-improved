@@ -67,18 +67,44 @@ public:
     void set_total_attempts_sensor(esphome::sensor::Sensor *sensor) { total_attempts_sensor_ = sensor; }
     void set_successful_reads_sensor(esphome::sensor::Sensor *sensor) { successful_reads_sensor_ = sensor; }
     void set_failed_reads_sensor(esphome::sensor::Sensor *sensor) { failed_reads_sensor_ = sensor; }
-    void set_frequency_offset_sensor(esphome::sensor::Sensor *sensor) { frequency_offset_sensor_ = sensor; }
-    void set_tuned_frequency_sensor(esphome::sensor::Sensor *sensor) { tuned_frequency_sensor_ = sensor; }
-    void set_frequency_estimate_sensor(esphome::sensor::Sensor *sensor) { frequency_estimate_sensor_ = sensor; }
+    // Frequency calibration sensors are GLOBAL (per-radio, not per-meter): the
+    // pointers are static and shared by every everblu_meter instance, so the
+    // single offset is reflected in one sensor regardless of which meter is read.
+    // First non-null registration wins; define these on a single meter in YAML.
+    void set_frequency_offset_sensor(esphome::sensor::Sensor *sensor)
+    {
+        if (sensor != nullptr && frequency_offset_sensor_ == nullptr)
+            frequency_offset_sensor_ = sensor;
+    }
+    void set_tuned_frequency_sensor(esphome::sensor::Sensor *sensor)
+    {
+        if (sensor != nullptr && tuned_frequency_sensor_ == nullptr)
+            tuned_frequency_sensor_ = sensor;
+    }
+    void set_frequency_estimate_sensor(esphome::sensor::Sensor *sensor)
+    {
+        if (sensor != nullptr && frequency_estimate_sensor_ == nullptr)
+            frequency_estimate_sensor_ = sensor;
+    }
     void set_uptime_sensor(esphome::sensor::Sensor *sensor) { uptime_sensor_ = sensor; }
 
     // Text sensors
     void set_status_sensor(esphome::text_sensor::TextSensor *sensor) { status_sensor_ = sensor; }
     void set_error_sensor(esphome::text_sensor::TextSensor *sensor) { error_sensor_ = sensor; }
-    void set_radio_state_sensor(esphome::text_sensor::TextSensor *sensor) { radio_state_sensor_ = sensor; }
+    // CC1101 State reflects the single shared radio - register once (first non-null wins).
+    void set_radio_state_sensor(esphome::text_sensor::TextSensor *sensor)
+    {
+        if (sensor != nullptr && radio_state_sensor_ == nullptr)
+            radio_state_sensor_ = sensor;
+    }
     void set_timestamp_sensor(esphome::text_sensor::TextSensor *sensor) { timestamp_sensor_ = sensor; }
     void set_history_sensor(esphome::text_sensor::TextSensor *sensor) { history_sensor_ = sensor; }
-    void set_version_sensor(esphome::text_sensor::TextSensor *sensor) { version_sensor_ = sensor; }
+    // Firmware Version is device-level - register once (first non-null wins).
+    void set_version_sensor(esphome::text_sensor::TextSensor *sensor)
+    {
+        if (sensor != nullptr && version_sensor_ == nullptr)
+            version_sensor_ = sensor;
+    }
     void set_meter_serial_sensor(esphome::text_sensor::TextSensor *sensor) { meter_serial_sensor_ = sensor; }
     void set_meter_year_sensor(esphome::text_sensor::TextSensor *sensor) { meter_year_sensor_ = sensor; }
     void set_reading_schedule_sensor(esphome::text_sensor::TextSensor *sensor) { reading_schedule_sensor_ = sensor; }
@@ -86,7 +112,12 @@ public:
 
     // Binary sensors
     void set_active_reading_sensor(esphome::binary_sensor::BinarySensor *sensor) { active_reading_sensor_ = sensor; }
-    void set_radio_connected_sensor(esphome::binary_sensor::BinarySensor *sensor) { radio_connected_sensor_ = sensor; }
+    // CC1101 Connected reflects the single shared radio - register once (first non-null wins).
+    void set_radio_connected_sensor(esphome::binary_sensor::BinarySensor *sensor)
+    {
+        if (sensor != nullptr && radio_connected_sensor_ == nullptr)
+            radio_connected_sensor_ = sensor;
+    }
 #endif
 
     // IDataPublisher interface implementation
@@ -129,18 +160,21 @@ private:
     esphome::sensor::Sensor *total_attempts_sensor_{nullptr};
     esphome::sensor::Sensor *successful_reads_sensor_{nullptr};
     esphome::sensor::Sensor *failed_reads_sensor_{nullptr};
-    esphome::sensor::Sensor *frequency_offset_sensor_{nullptr};
-    esphome::sensor::Sensor *tuned_frequency_sensor_{nullptr};
-    esphome::sensor::Sensor *frequency_estimate_sensor_{nullptr};
+    // Global (per-radio) frequency calibration sensors - shared across all instances.
+    static esphome::sensor::Sensor *frequency_offset_sensor_;
+    static esphome::sensor::Sensor *tuned_frequency_sensor_;
+    static esphome::sensor::Sensor *frequency_estimate_sensor_;
     esphome::sensor::Sensor *uptime_sensor_{nullptr};
 
     // Text sensors
     esphome::text_sensor::TextSensor *status_sensor_{nullptr};
     esphome::text_sensor::TextSensor *error_sensor_{nullptr};
-    esphome::text_sensor::TextSensor *radio_state_sensor_{nullptr};
+    // Device-level (shared radio) - static so all meter instances share one entity.
+    static esphome::text_sensor::TextSensor *radio_state_sensor_;
     esphome::text_sensor::TextSensor *timestamp_sensor_{nullptr};
     esphome::text_sensor::TextSensor *history_sensor_{nullptr};
-    esphome::text_sensor::TextSensor *version_sensor_{nullptr};
+    // Device-level (one firmware) - shared across all meter instances.
+    static esphome::text_sensor::TextSensor *version_sensor_;
     esphome::text_sensor::TextSensor *meter_serial_sensor_{nullptr};
     esphome::text_sensor::TextSensor *meter_year_sensor_{nullptr};
     esphome::text_sensor::TextSensor *reading_schedule_sensor_{nullptr};
@@ -148,7 +182,8 @@ private:
 
     // Binary sensors
     esphome::binary_sensor::BinarySensor *active_reading_sensor_{nullptr};
-    esphome::binary_sensor::BinarySensor *radio_connected_sensor_{nullptr};
+    // Device-level (shared radio) - static so all meter instances share one entity.
+    static esphome::binary_sensor::BinarySensor *radio_connected_sensor_;
 #endif
 
     // Helper methods

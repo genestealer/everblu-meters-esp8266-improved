@@ -1639,6 +1639,12 @@ void performFrequencyScan()
 {
   Serial.println("[FREQ] Starting frequency scan...");
   Serial.println("[FREQ] [NOTE] Wi-Fi/MQTT connections may temporarily drop and reconnect while the scan is running. This is expected.");
+
+  // Suppress the verbose per-attempt radio/meter read logging for the whole
+  // scan. Each frequency step performs a full read sequence whose detailed
+  // output is irrelevant noise here; high-level scan progress messages remain.
+  EchoDebugQuietGuard quietGuard;
+
   char topicBuffer[MQTT_TOPIC_BUFFER_SIZE];
   snprintf(topicBuffer, sizeof(topicBuffer), "%s/cc1101_state", mqttBaseTopic);
   mqtt.publish(topicBuffer, "Frequency Scanning", true);
@@ -1720,6 +1726,12 @@ void performFrequencyScan()
 void performWideInitialScan()
 {
   Serial.println("[FREQ] Performing wide initial scan (first boot - no saved offset)...");
+
+  // Suppress the verbose per-attempt radio/meter read logging for the whole
+  // scan. Each frequency step performs a full read sequence whose detailed
+  // output is irrelevant noise here; high-level scan progress messages remain.
+  EchoDebugQuietGuard quietGuard;
+
   char topicBuffer[MQTT_TOPIC_BUFFER_SIZE];
   snprintf(topicBuffer, sizeof(topicBuffer), "%s/cc1101_state", mqttBaseTopic);
   mqtt.publish(topicBuffer, "Initial Frequency Scan", true);

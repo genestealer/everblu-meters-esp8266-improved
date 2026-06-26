@@ -6,6 +6,9 @@
 #include "storage_abstraction.h"
 #include "../core/logging.h"
 
+#include <utility>
+#include <vector>
+
 // Fallback to ESPHome preferences
 #if defined(USE_ESPHOME) || (__has_include("esphome/core/preferences.h"))
 #include "esphome/core/preferences.h"
@@ -15,6 +18,47 @@
 #elif defined(ESP32)
 #include <Preferences.h>
 static Preferences preferences;
+#endif
+
+#ifdef EVERBLU_USE_ESPHOME_PREFS
+namespace
+{
+// Storage layout shared by save and load. Defined once at file scope so the type
+// (and therefore its size) is identical for every access: ESPHome validates a
+// preference by length + CRC, so the struct must never change shape between a
+// save and a later load.
+struct FloatStorage
+{
+    uint16_t magic_number;
+    float data;
+};
+
+// Return a cached ESPPreferenceObject for the given key hash, creating it once.
+//
+// Why caching + in_flash is REQUIRED for values to survive a reboot on ESP8266:
+//  * ESPHome assigns each preference a storage slot in make_preference() CALL
+//    ORDER, not by hash. Creating a fresh object on every save/load would point
+//    save and load at DIFFERENT slots, so a saved value is never found again
+//    after a reboot. (The immediate post-save read-back still passes only
+//    because it reuses the very same object from the save.)
+//  * Default ESP8266 preferences live in RTC memory, which is wiped on a full
+//    power cycle. Passing in_flash=true stores the value in the flash sector so
+//    it survives power loss. The flag is ignored on ESP32 (NVS keys by hash and
+//    already persists correctly).
+esphome::ESPPreferenceObject &getFloatPref(uint32_t hash)
+{
+    static std::vector<std::pair<uint32_t, esphome::ESPPreferenceObject>> cache;
+    for (auto &entry : cache)
+    {
+        if (entry.first == hash)
+        {
+            return entry.second;
+        }
+    }
+    cache.emplace_back(hash, esphome::global_preferences->make_preference<FloatStorage>(hash, true));
+    return cache.back().second;
+}
+} // namespace
 #endif
 
 bool StorageAbstraction::begin()
@@ -47,19 +91,13 @@ bool StorageAbstraction::saveFloat(const char *key, float value, uint16_t magic)
     uint32_t hash = esphome::fnv1_hash(key);
     LOG_D("everblu_meter", "Saving %s (hash: 0x%08X) = %.6f", key, hash, value);
 
-    // Use struct wrapper to ensure proper storage format
-    struct FloatStorage
-    {
-        uint16_t magic_number;
-        float data;
-    };
-
     FloatStorage storage;
     storage.magic_number = magic;
     storage.data = value;
 
-    // Use ESPHome's standard flash-based preferences storage
-    esphome::ESPPreferenceObject pref = esphome::global_preferences->make_preference<FloatStorage>(hash);
+    // Reuse a single cached, flash-backed preference object for this key so the
+    // saved value is written to a stable slot and survives reboots (see getFloatPref).
+    esphome::ESPPreferenceObject &pref = getFloatPref(hash);
     bool success = pref.save(&storage);
 
     if (success)
@@ -166,15 +204,8 @@ float StorageAbstraction::loadFloat(const char *key, float defaultValue, uint16_
     uint32_t hash = esphome::fnv1_hash(key);
     LOG_D("everblu_meter", "Loading %s (hash: 0x%08X)", key, hash);
 
-    // Use struct wrapper matching the save format
-    struct FloatStorage
-    {
-        uint16_t magic_number;
-        float data;
-    };
-
-    // Use ESPHome's standard flash-based preferences storage
-    esphome::ESPPreferenceObject pref = esphome::global_preferences->make_preference<FloatStorage>(hash);
+    // Reuse the same cached, flash-backed preference object as save (see getFloatPref).
+    esphome::ESPPreferenceObject &pref = getFloatPref(hash);
 
     FloatStorage storage;
     storage.magic_number = 0;
@@ -279,10 +310,18 @@ float StorageAbstraction::loadFloat(const char *key, float defaultValue, uint16_
 bool StorageAbstraction::hasKey(const char *key)
 {
 #ifdef EVERBLU_USE_ESPHOME_PREFS
+    if (esphome::global_preferences == nullptr)
+    {
+        return false;
+    }
     uint32_t hash = esphome::fnv1_hash(key);
-    esphome::ESPPreferenceObject pref = esphome::global_preferences->make_preference<float>(hash);
-    float tmp = 0.0f;
-    return pref.load(&tmp);
+    esphome::ESPPreferenceObject &pref = getFloatPref(hash);
+    FloatStorage storage;
+    storage.magic_number = 0;
+    // A successful load is not enough: clearKey() writes a zeroed magic to the
+    // same slot, which still loads successfully. Treat a zeroed magic as absent
+    // so hasKey() stays consistent with clearKey() and the other platforms.
+    return pref.load(&storage) && storage.magic_number != 0;
 
 #elif defined(ESP8266)
     // For ESP8266, check if magic number is valid
@@ -304,10 +343,28 @@ bool StorageAbstraction::hasKey(const char *key)
 bool StorageAbstraction::clearKey(const char *key)
 {
 #ifdef EVERBLU_USE_ESPHOME_PREFS
+    if (esphome::global_preferences == nullptr)
+    {
+        LOG_E("everblu_meter", "Cannot clear %s: global_preferences is null!", key);
+        return false;
+    }
     uint32_t hash = esphome::fnv1_hash(key);
-    esphome::ESPPreferenceObject pref = esphome::global_preferences->make_preference<float>(hash);
-    float zero = 0.0f;
-    return pref.save(&zero);
+    // Reuse the same cached, flash-backed preference object as save/load (see getFloatPref)
+    // so we invalidate the exact slot loadFloat reads from. Write a zeroed magic so a
+    // subsequent loadFloat fails its magic check and returns the caller's default.
+    esphome::ESPPreferenceObject &pref = getFloatPref(hash);
+    FloatStorage storage;
+    storage.magic_number = 0;
+    storage.data = 0.0f;
+    bool success = pref.save(&storage);
+    if (success)
+    {
+        // Mirror saveFloat(): force the cleared slot out to flash and give the
+        // ESP8266 flash write time to complete so the clear survives a reboot.
+        esphome::global_preferences->sync();
+        delay(100);
+    }
+    return success;
 
 #elif defined(ESP8266)
     // Clear by setting magic to 0

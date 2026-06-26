@@ -25,6 +25,9 @@
 
 #include <string.h>
 
+// When true, echo_debug() output is suppressed (see utils.h).
+bool g_echo_debug_quiet = false;
+
 // Consolidated hex display function with optional formatting
 // mode: 0=16 per line with newlines, 1=array format, 2=single line, 3=single line with 'S' separator
 void show_in_hex_formatted(const uint8_t *buffer, size_t len, int mode)
@@ -185,7 +188,7 @@ void printMeterDataSummary(const struct tmeter_data *meter_data, bool isMeterGas
 }
 void echo_debug(bool l_flag, const char *fmt, ...)
 {
-	if (!l_flag)
+	if (!l_flag || g_echo_debug_quiet)
 		return;
 
 	va_list args;
