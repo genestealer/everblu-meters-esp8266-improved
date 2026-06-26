@@ -1706,7 +1706,10 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
             // via TXBYTES before writing, and abort on an existing underflow.
             uint8_t txbytes_reg = halRfReadReg(TXBYTES_ADDR);
             if (txbytes_reg & 0x80)
-              break; // TXFIFO_UNDERFLOW already occurred - loop-bottom marcstate check aborts
+            {
+              marcstate = halRfReadReg(MARCSTATE_ADDR); // refresh so the post-loop abort check/diagnostics are accurate
+              break;                                    // TXFIFO_UNDERFLOW already occurred
+            }
             if ((txbytes_reg & 0x7F) <= 56) // room for the 8-byte WUP buffer
             {
               SPIWriteBurstReg(TX_FIFO_ADDR, wupbuffer, 8);

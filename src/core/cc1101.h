@@ -55,12 +55,15 @@ void cc1101_set_gdo2_pin(int gdo2_pin);
 #endif
 
 /**
- * @brief Number of GDO2 "stuck HIGH" timeouts observed during transmit.
+ * @brief Number of GDO2 FIFO-threshold faults observed (stuck-HIGH timeouts + failed self-test).
  *
- * Lifetime (monotonic) diagnostic counter. The TX interrogation-frame gate waits for
- * GDO2 to indicate the FIFO has drained below threshold; if it never does within the
- * safety window the counter increments. A non-zero, growing value strongly indicates a
- * miswired / wrong-GPIO / disconnected GDO2 rather than an RF or meter problem.
+ * Lifetime (monotonic) diagnostic counter incremented from two sources:
+ *   - the boot-time GDO2 wiring self-test in cc1101_init() when GDO2 does not toggle
+ *     LOW->HIGH across a known empty->filled TX FIFO transition; and
+ *   - the runtime TX interrogation-frame gate, when GDO2 never indicates the FIFO has
+ *     drained below threshold within the safety window.
+ * A non-zero, growing value strongly indicates a miswired / wrong-GPIO / disconnected
+ * GDO2 rather than an RF or meter problem.
  *
  * @return Cumulative count since boot. Always 0 when GDO2 is not configured.
  */
