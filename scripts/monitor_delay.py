@@ -1,18 +1,23 @@
-Import("env")  # type: ignore
-import time
+Import("env")  # type: ignore[name-defined]
 import socket
+import time
 
 _RETRY_TIMEOUT = 0.0
 try:
-    _custom_monitor_connect_delay = env.GetProjectOption("custom_monitor_connect_delay", 0)  # type: ignore
+    _custom_monitor_connect_delay = env.GetProjectOption(
+        "custom_monitor_connect_delay", 0
+    )  # type: ignore[name-defined]
     _RETRY_TIMEOUT = float(_custom_monitor_connect_delay or 0)
 except Exception as exc:  # noqa: BLE001 - broad for robustness in PlatformIO env
     print(
-        "[monitor-delay] Invalid or unavailable 'custom_monitor_connect_delay' value (%r); using default 0.0. Error: %s"
-        % (locals().get("_custom_monitor_connect_delay", None), exc)
+        "[monitor-delay] Invalid or unavailable 'custom_monitor_connect_delay' value ({!r}); using default 0.0. Error: {}".format(
+            locals().get("_custom_monitor_connect_delay", None), exc
+        )
     )
 _RETRY_INTERVAL = 1.0  # seconds between connection attempts
-_INITIAL_DELAY = 3.0   # seconds to wait for ESP to reboot before first connection attempt
+_INITIAL_DELAY = (
+    6.0  # seconds to wait for ESP to reboot before first connection attempt
+)
 
 
 def _wait_for_monitor_ready(*args, **kwargs):
@@ -35,10 +40,12 @@ def _wait_for_monitor_ready(*args, **kwargs):
         return
 
     # Wait for ESP to reboot first
-    print("[monitor-delay] Waiting %.1fs for ESP to reboot..." % _INITIAL_DELAY)
+    print(f"[monitor-delay] Waiting {_INITIAL_DELAY:.1f}s for ESP to reboot...")
     time.sleep(_INITIAL_DELAY)
 
-    print("[monitor-delay] Attempting to connect to %s:%d (timeout: %.0fs)..." % (host, port, _RETRY_TIMEOUT))
+    print(
+        f"[monitor-delay] Attempting to connect to {host}:{port} (timeout: {_RETRY_TIMEOUT:.0f}s)..."
+    )
 
     start_time = time.time()
     attempt = 0
@@ -54,9 +61,11 @@ def _wait_for_monitor_ready(*args, **kwargs):
 
             if result == 0:
                 elapsed = time.time() - start_time
-                print("[monitor-delay] Monitor port ready after %.1fs (attempt %d)" % (elapsed, attempt))
+                print(
+                    f"[monitor-delay] Monitor port ready after {elapsed:.1f}s (attempt {attempt})"
+                )
                 return
-        except (socket.timeout, OSError):
+        except (TimeoutError, OSError):
             # Ignore transient connection errors; retry until overall timeout
             pass
 
@@ -64,8 +73,10 @@ def _wait_for_monitor_ready(*args, **kwargs):
         time.sleep(_RETRY_INTERVAL)
 
     # Timeout reached
-    print("[monitor-delay] Timeout reached after %.0fs, proceeding anyway..." % _RETRY_TIMEOUT)
+    print(
+        f"[monitor-delay] Timeout reached after {_RETRY_TIMEOUT:.0f}s, proceeding anyway..."
+    )
 
 
 # When running `-t upload -t monitor`, this runs after upload and before monitor.
-env.AddPostAction("upload", _wait_for_monitor_ready)  # type: ignore
+env.AddPostAction("upload", _wait_for_monitor_ready)  # type: ignore[name-defined]

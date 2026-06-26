@@ -20,9 +20,29 @@
 #ifndef METER_READER_H
 #define METER_READER_H
 
+#if __has_include("../adapters/config_provider.h")
 #include "../adapters/config_provider.h"
+#elif __has_include("config_provider.h")
+#include "config_provider.h"
+#else
+#error "Missing config_provider.h"
+#endif
+
+#if __has_include("../adapters/time_provider.h")
 #include "../adapters/time_provider.h"
+#elif __has_include("time_provider.h")
+#include "time_provider.h"
+#else
+#error "Missing time_provider.h"
+#endif
+
+#if __has_include("../adapters/data_publisher.h")
 #include "../adapters/data_publisher.h"
+#elif __has_include("data_publisher.h")
+#include "data_publisher.h"
+#else
+#error "Missing data_publisher.h"
+#endif
 #include "../core/cc1101.h"
 #include "frequency_manager.h"
 

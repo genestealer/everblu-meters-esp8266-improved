@@ -38,6 +38,7 @@ everblu_meter:
 ```
 
 Recompile and flash:
+
 ```bash
 esphome run your-config.yaml
 ```
@@ -51,6 +52,7 @@ Edit `include/private.h`:
 ```
 
 Rebuild and upload:
+
 ```bash
 pio run --target upload
 ```
@@ -62,6 +64,7 @@ pio run --target upload
 ### ESPHome Logs
 
 View logs via:
+
 - **ESPHome web interface**: `http://water-meter.local:6052`
 - **Home Assistant**: Developer Tools → Logs
 - **Command line**: `esphome logs your-config.yaml`
@@ -69,6 +72,7 @@ View logs via:
 ### MQTT Logs
 
 View via:
+
 - **Serial monitor**: USB connection to ESP device
 - **WiFi Serial Monitor**: Configure in `private.h` (see [WIFI_SERIAL_MONITOR.md](WIFI_SERIAL_MONITOR.md))
 
@@ -105,19 +109,23 @@ Note: Bytes [18-21]=volume, [31]=battery, [44-45]=wake/sleep, [66-117]=history
 When validation fails, additional debug output shows the problematic bytes:
 
 **Invalid Volume (0 or 0xFFFFFFFF):**
+
 ```
 [ERROR] Parsed volume value is invalid (0x00000000) - discarding frame
+
 [DEBUG] Volume bytes [18-21]: 00 00 00 00
 [DEBUG] First 32 bytes of frame: 7C 11 00 45 20 0A 50 14 ...
 ```
 
 **CRC Mismatch:**
+
 ```
 [ERROR] RADIAN CRC mismatch (computed=0x3A5C frame=0x0000) - discarding frame
 [DEBUG] Frame bytes [0-31]: 7C 11 00 45 20 0A 50 14 ...
 ```
 
 **Historical Data Corruption:**
+
 ```
 [ERROR] Historical volume decreased at index 2 (81920 -> 0) - marking history invalid
 [DEBUG] Historical bytes [74-77]: 00 00 00 00 (index 2)
@@ -161,9 +169,11 @@ Volume = (0x00 << 24) | (0x0B << 16) | (0x01 << 8) | 0xEE
 From your hex dump, extract bytes [18-21]:
 
 **Example from Issue #52:**
+
 ```
 [DEBUG] Volume bytes [18-21]: 00 00 00 00
 ```
+
 This decodes to volume = 0, which is clearly wrong for a meter installed in 2015.
 
 **Expected for 10-year-old meter:**
@@ -174,6 +184,7 @@ Something like `D0 84 07 00` → ~500,000 liters (typical household cumulative u
 If your volume field contains zeros but the meter is working, the actual volume data might be at a different byte position. Look for a plausible uint32 value elsewhere in the first 32 bytes.
 
 **Search Pattern:**
+
 - Look for 4 consecutive bytes that decode to a reasonable consumption value
 - Typical domestic water meter after 10 years: 200,000 to 1,000,000 liters
 - In hex: roughly `0x00030000` to `0x000F0000`
@@ -193,6 +204,7 @@ Different meter variants or manufacturing dates may use different data layouts:
 | Encrypted | Various | Recent | N/A | AES-128 encrypted payload |
 
 **Issue #52 Meter:**
+
 - Model: Itron EverBlu Cyble Enhanced
 - Region: UK
 - Install Year: 2015
@@ -247,7 +259,7 @@ If you discover a different byte layout, please report it to help others:
    - Manufacturing year
    - Region/country
    - Any visible model text
-
+<https://github.com/genestealer/everblu-meters-esp8266-improved/issues>
 2. **Hex Dump:**
    - Full 200-byte hex dump from a working read
    - Multiple samples if possible
@@ -258,7 +270,7 @@ If you discover a different byte layout, please report it to help others:
    - Any other readable data
 
 4. **Where to Report:**
-   - GitHub Issue: https://github.com/genestealer/everblu-meters-esp8266-improved/issues
+   - GitHub Issue: <https://github.com/genestealer/everblu-meters-esp8266-improved/issues>
    - Include [METER-VARIANT] in title
    - Reference this troubleshooting guide
 
@@ -273,25 +285,31 @@ If you've identified the correct byte offsets, you can modify the parsing code:
 File: `ESPHOME-release/everblu_meter/cc1101.cpp` (or `src/core/cc1101.cpp` for MQTT)
 
 **Current volume extraction (line ~815):**
+
 ```cpp
 data.volume = ((uint32_t)decoded_buffer[18]) |
               ((uint32_t)decoded_buffer[19] << 8) |
               ((uint32_t)decoded_buffer[20] << 16) |
               ((uint32_t)decoded_buffer[21] << 24);
+
 ```
 
 **Change byte offsets as needed:**
+
 ```cpp
 // Example: if volume is actually at bytes [22-25]
 data.volume = ((uint32_t)decoded_buffer[22]) |
               ((uint32_t)decoded_buffer[23] << 8) |
               ((uint32_t)decoded_buffer[24] << 16) |
+
               ((uint32_t)decoded_buffer[25] << 24);
 ```
 
 **Similarly for other fields:**
+
 - Battery: `decoded_buffer[31]` → adjust offset
 - Counter: `decoded_buffer[48]` → adjust offset
+
 - Times: `decoded_buffer[44]`, `decoded_buffer[45]` → adjust offsets
 
 ---
@@ -299,32 +317,43 @@ data.volume = ((uint32_t)decoded_buffer[22]) |
 ## Common Patterns
 
 ### Pattern 1: All Zeros
+
 ```
 Volume bytes [18-21]: 00 00 00 00
+
 ```
+
 **Cause:** Wrong byte offset, or meter hasn't transmitted real data
 **Solution:** Check other byte positions for expected volume
 
 ### Pattern 2: All Ones (0xFFFFFFFF)
+
 ```
 Volume bytes [18-21]: FF FF FF FF
+
 ```
+
 **Cause:** Uninitialized memory area, definitely wrong offset
 **Solution:** Volume field is elsewhere in frame
 
 ### Pattern 3: Single Bit Values
+
 ```
 Volume reads as: 1, 2, 4, 8, 16, 32...
 ```
+
 **Cause:** Reading single bits instead of full 32-bit value
 **Solution:** Check bit-shifting logic in volume extraction
 
 ### Pattern 4: Garbage Data But Valid CRC
+
 ```
+
 CRC valid ✅
-Volume: 13 L (clearly wrong)
+Volume: 13 L (clearly wro<https://www.rapidtables.com/convert/number/hex-to-decimal.html>
 Battery: 0 months (impossible)
 ```
+
 **Cause:** CRC validates frame integrity, not semantic correctness. Different meter variant with same protocol but different data layout.
 
 ---
@@ -332,18 +361,21 @@ Battery: 0 months (impossible)
 ## Quick Reference
 
 ### Enable Hex Dump
+
 - **ESPHome**: `debug_cc1101: true` in YAML
 - **MQTT**: `#define DEBUG_CC1101 1` in private.h
 
 ### Key Byte Positions (Standard)
+
 - **Volume**: [18-21] uint32 LSB-first
 - **Battery**: [31] uint8 months
 - **Counter**: [48] uint8
 - **Wake/Sleep**: [44-45] uint8 hours
 
 ### Analysis Tools
+
 - Python script above for systematic search
-- Online hex calculator: https://www.rapidtables.com/convert/number/hex-to-decimal.html
+- Online hex calculator: <https://www.rapidtables.com/convert/number/hex-to-decimal.html>
 - ESPHome logs viewer: `esphome logs config.yaml`
 
 ---

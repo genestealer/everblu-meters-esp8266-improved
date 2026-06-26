@@ -7,12 +7,14 @@ Your codebase has been successfully refactored into **independent, reusable modu
 ## Modules Created
 
 ### 1. **Storage Abstraction** (`storage_abstraction.h/cpp`)
+
 - **Purpose**: Platform-independent persistent storage
 - **Supports**: ESP8266 (EEPROM) and ESP32 (Preferences)
 - **Use**: Frequency offset storage, configuration persistence
 - **Reusable**: ✅ Works standalone with any project
 
 ### 2. **Frequency Manager** (`frequency_manager.h/cpp`)
+
 - **Purpose**: Frequency calibration and optimization for CC1101
 - **Features**:
   - Narrow & wide frequency scanning
@@ -22,24 +24,29 @@ Your codebase has been successfully refactored into **independent, reusable modu
 - **Reusable**: ✅ Works with any CC1101 wrapper (Arduino, ESPHome, etc.)
 
 ### 3. **Schedule Manager** (`schedule_manager.h/cpp`) ⭐ NEW
+
 - **Purpose**: Daily meter reading schedule management
 - **Features**:
   - Three reading patterns (Mon-Fri, Mon-Sat, Daily)
   - UTC ↔ Local timezone conversions
   - Auto-alignment to meter wake windows
   - Schedule validation
+
 - **Reusable**: ✅ Works with any project needing scheduled tasks
 
 ### 4. **Meter History** (`meter_history.h/cpp`) ⭐ NEW
+
 - **Purpose**: Historical meter data processing
 - **Features**:
   - Monthly usage calculations
   - JSON generation for MQTT/Home Assistant
   - Statistics (average, total, current month)
+
   - Formatted serial output
 - **Reusable**: ✅ Works with any meter data structure
 
 ### 5. **Main Application** (`main.cpp`)
+
 - **Purpose**: Arduino application orchestration
 - **Responsibilities**: MQTT, WiFi, Home Assistant integration
 - **Size**: Reduced from ~1944 to ~1770 lines (removed duplicative code)
@@ -50,11 +57,13 @@ Your codebase has been successfully refactored into **independent, reusable modu
 ### Removed from main.cpp
 
 **Schedule Code** (~200 lines):
+
 - Global variables: `g_readHourUtc`, `g_readHourLocal`, etc.
 - Functions: `validateReadingSchedule()`, `updateResolvedScheduleFromLocal()`, `isReadingDay()`
 - → **Replaced by**: ScheduleManager module
 
 **History Processing** (~160 lines):
+
 - Manual JSON buffer building
 - Monthly usage calculation loops
 - History validation logic
@@ -131,6 +140,7 @@ class EverbluMeter : public PollingComponent {
         }
     }
 };
+
 ```
 
 ## Benefits for ESPHome Integration
@@ -138,6 +148,7 @@ class EverbluMeter : public PollingComponent {
 Previously (91JJ fork): Had to rewrite frequency code, schedule code, history code - duplicating 500+ lines
 
 Now:
+
 - Copy 4 files: `storage_abstraction.h/cpp`, `frequency_manager.h/cpp`, `schedule_manager.h/cpp`, `meter_history.h/cpp`
 - Inject 2 callbacks for CC1101
 - Done! All features work
@@ -152,6 +163,7 @@ Now:
 ## Testing
 
 All modules compile without errors:
+
 - ✅ schedule_manager.h/cpp - No errors
 - ✅ meter_history.h/cpp - No errors  
 - ✅ frequency_manager.h/cpp - No errors
@@ -176,6 +188,7 @@ All modules compile without errors:
         └──────────┼──────────┴────────────┘
                    │
         ┌──────────┴──────────┐
+
         │                     │
         ▼                     ▼
    ┌──────────┐         ┌──────────┐
@@ -185,6 +198,7 @@ All modules compile without errors:
 ```
 
 **Key Points**:
+
 - Each module is **independent** with clear API boundaries
 - Modules use **dependency injection** (callbacks) instead of hard dependencies
 - Application layer (main.cpp) orchestrates the modules
@@ -193,19 +207,24 @@ All modules compile without errors:
 ## Files Modified/Created
 
 **Created** (4 new module files):
+
 - `src/schedule_manager.h`
 - `src/schedule_manager.cpp`
+
 - `src/meter_history.h`
 - `src/meter_history.cpp`
 
 **Previously Created** (during earlier refactoring):
+
 - `src/storage_abstraction.h/cpp`
 - `src/frequency_manager.h/cpp`
 
 **Modified**:
+
 - `src/main.cpp` - Updated to use new modules, removed duplicated code
 
 **Documentation** (3 new guides):
+
 - `docs/REUSABILITY_REFACTORING.md`
 - `docs/ESPHOME_INTEGRATION.md`
 - `docs/SCHEDULE_AND_HISTORY_EXTRACTION.md`

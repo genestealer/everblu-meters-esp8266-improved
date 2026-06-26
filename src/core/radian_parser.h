@@ -1,3 +1,17 @@
+/**
+ * @file radian_parser.h
+ * @brief Parsing and CRC validation for RADIAN protocol meter frames
+ *
+ * Decodes and validates RADIAN protocol payloads received from Everblu Cyble
+ * water/gas meters, extracting the primary reading (volume, read counter,
+ * battery, daily wake window) and history availability.
+ *
+ * IMPORTANT LICENSING NOTICE:
+ * The RADIAN protocol implementation shall not be distributed nor used for
+ * commercial products. It is exposed only to demonstrate CC1101 capability to
+ * read water meter indexes. There is no warranty on this software.
+ */
+
 #ifndef RADIAN_PARSER_H
 #define RADIAN_PARSER_H
 

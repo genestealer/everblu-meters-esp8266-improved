@@ -36,7 +36,7 @@ public:
         DefineConfigProvider() = default;
         ~DefineConfigProvider() override = default;
 
-        // Meter identification — parsed at call time from the METER_CODE string.
+        // Meter identification - parsed at call time from the METER_CODE string.
         // METER_CODE format: "YY-SSSSSSS" or "YY-SSSSSSS-NNN".
         uint8_t getMeterYear() const override
         {
@@ -146,7 +146,7 @@ public:
 #ifdef MAX_RETRIES
                 return MAX_RETRIES;
 #else
-                return 10;
+                return 5;
 #endif
         }
 
@@ -219,7 +219,7 @@ public:
         int getTimezoneOffsetMinutes() const override { return 0; }
         bool isAutoAlignReadingTime() const override { return true; }
         bool useAutoAlignMidpoint() const override { return true; }
-        int getMaxRetries() const override { return 10; }
+        int getMaxRetries() const override { return 5; }
         unsigned long getRetryCooldownMs() const override { return 3600000; }
         const char *getWiFiSSID() const override { return ""; }
         const char *getWiFiPassword() const override { return ""; }

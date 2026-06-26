@@ -4,9 +4,79 @@ All notable changes to this project will be documented in this file.
 
 Releases are created manually by tagging commits with version tags matching `v*.*.*` (e.g., `v2.1.0`). Users should build from source and configure `private.h` with their own meter settings.
 
+## [v3.0.0] - 2026-06-24
+
+> **⚠️ BREAKING CHANGE** - CC1101 GDO2 hardware-assisted FIFO threshold management is now the **default** mechanism for talking to the radio on **both** the standalone (MQTT) and ESPHome targets. You must wire CC1101 GDO2 to a free GPIO and configure it, **or** explicitly opt out. Existing setups that did not wire GDO2 require migration (see below).
+>
+> This release also rolls in the previously unreleased v2.4.0 work: the hardware-assisted GDO2 FIFO mechanism (TX + RX) plus reliability, diagnostics, and data-validation improvements. Preserves ESP8266 (Arduino) and ESP32 + ESPHome support.
+
+### Breaking Changes
+
+- **GDO2 is required by default.** The GDO2 hardware FIFO mechanism is now enabled by default instead of being optional:
+  - **MQTT / standalone firmware**: `include/private.h` must define either `GDO2 <pin>` (to enable, recommended) or `DISABLE_GDO2_FIFO_MANAGEMENT` (to opt out and keep legacy SPI polling). If neither is defined, the build fails with a clear compile-time `#error` from `src/core/cc1101.cpp` pointing to the README and `docs/GDO2_FIFO_MANAGEMENT.md`.
+  - **ESPHome component**: `gdo2_pin:` is now required unless `disable_gdo2_fifo_management: true` is set. If neither is provided, configuration validation fails with a descriptive `cv.Invalid` error explaining both options and linking to the docs.
+
+### Migration Required
+
+- **If you want the new (recommended) behaviour**: wire CC1101 GDO2 to a free GPIO that does not collide with the SPI bus or GDO0, then:
+  - MQTT: add `#define GDO2 <pin>` to `include/private.h` (e.g. `#define GDO2 4`).
+  - ESPHome: add `gdo2_pin: <GPIO>` to your `everblu_meter:` block (e.g. `GPIO4` on ESP8266, `GPIO27` on ESP32).
+- **If you cannot/do not want to wire GDO2**: opt out explicitly to keep the prior SPI-polling behaviour:
+  - MQTT: add `#define DISABLE_GDO2_FIFO_MANAGEMENT` to `include/private.h`.
+  - ESPHome: add `disable_gdo2_fifo_management: true` to your `everblu_meter:` block.
+
+### Added
+
+- **Hardware-assisted GDO2 FIFO threshold management** (Issues [#83](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/83), [#84](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/84)): the CC1101 driver uses the GDO2 pin as a hardware FIFO threshold signal on both standalone (MQTT) and ESPHome targets, dynamically reconfiguring `IOCFG2` per phase:
+  - **TX phase** (`IOCFG2 = 0x02`): GDO2 asserts at the TX FIFO threshold and replaces the stale SPI `TXBYTES` status check and fixed `delay()` in the WUP feeding loop and interrogation-frame gate, proactively preventing `TXFIFO_UNDERFLOW` under ESPHome scheduler load.
+  - **RX phase** (`IOCFG2 = 0x01`): GDO2 signals the RX FIFO threshold / end-of-packet, letting the RX drain loop skip unnecessary `RXBYTES` SPI reads while still draining promptly.
+- `gdo2_pin` configuration in the ESPHome Python schema (`__init__.py`) and C++ integration, plus the standalone `GDO2` macro; new `cc1101_set_gdo2_pin()` API and `GET_GDO2_PIN()` accessor so both targets share the same logic.
+- `disable_gdo2_fifo_management` ESPHome option and `DISABLE_GDO2_FIFO_MANAGEMENT` standalone macro to explicitly opt out of the GDO2 mechanism.
+- **Single-day reading schedules**: the reading schedule now accepts a single weekday (e.g. `Monday`) in addition to the `Monday-Friday` / `Monday-Saturday` / `Monday-Sunday` presets, so meters can be read on just one day of the week. (Thanks [@b4dpxl](https://github.com/b4dpxl), [#79](https://github.com/genestealer/everblu-meters-esp8266-improved/pull/79).)
+- **ANSI colour support for the standalone Serial / WiFi serial monitor**: log lines are colourised by level (`LOG_*`) and by leading subsystem tag (e.g. `[METER]`, `[FREQ]`) for easier scanning in the VS Code terminal, PlatformIO monitor, or telnet. ESPHome's own logger is unaffected. Disable at build time with `-D EVERBLU_LOG_COLOR=0`. `platformio.ini` now sets `monitor_filters = direct` so the escape sequences render instead of being rewritten to glyphs.
+- **Wide frequency scan button for ESPHome radio crystal calibration** ([#96](https://github.com/genestealer/everblu-meters-esp8266-improved/pull/96)): a dedicated `wide_frequency_scan_button` runs the wide-band (±100 kHz) coarse + fine sweep (`performFrequencyScan(true)`). Previously ESPHome only exposed the narrow ±30 kHz refine scan, so a CC1101 whose crystal was off by more than 30 kHz could never lock onto the signal, never saved an offset, and appeared broken/per-meter. Wired through `EverbluMeterTriggerButton` codegen and added to all example YAMLs. The standalone (MQTT) build already performs a first-boot wide scan and is unchanged.
+- **Robust ESPHome deploy script** (`scripts/deploy-esphome-to-ha.ps1`, [#97](https://github.com/genestealer/everblu-meters-esp8266-improved/pull/97)): a runnable replacement for the ad-hoc `Remove-Item`/`Copy-Item` deploy notes that clears read-only attributes and uses `robocopy /MIR`, so a partial/aborted copy can no longer leave a broken component on the Home Assistant share.
+- Native unit tests covering RADIAN volume and out-of-range time rejection, plus expanded `schedule_manager` schedule-matching tests.
+- **Developer tooling**: repo-wide linting/formatting via `.clang-format` (ESPHome code style) for C++, `ruff.toml` for Python, and `.yamllint` for YAML; `ESPHOME/format-component.ps1`/`.sh` helper scripts; an expanded pre-commit configuration; and comprehensive ESPHome CI fixtures (`.ci/esphome/*`) exercising all sensors, options, and code paths (including a legacy GDO2 opt-out config).
+
+### Changed
+
+- **Default maximum read retries lowered from 10 to 5** on both the standalone (MQTT) and ESPHome targets ([#98](https://github.com/genestealer/everblu-meters-esp8266-improved/pull/98)). The count remains user-configurable via `MAX_RETRIES` (`include/private.h`) and `max_retries` (ESPHome, range 1–50); examples, docs, and `ESPHOME-release/` were updated accordingly.
+- **Frequency calibration sensors are now global (per-radio)** ([#96](https://github.com/genestealer/everblu-meters-esp8266-improved/pull/96)): `frequency_offset`, `tuned_frequency`, and `frequency_estimate` use static pointers (first-registration wins), so the single radio-wide offset is reflected in one set of Home Assistant entities instead of being duplicated per meter. The frequency offset is a property of the **radio**, so all meters on one CC1101 share the same base frequency.
+- **Device-level sensors are now shared across meters** ([#96](https://github.com/genestealer/everblu-meters-esp8266-improved/pull/96)): `CC1101 Connected`, `CC1101 State`, and `Firmware Version` describe the single shared radio/firmware, so their sensor pointers are now static (first-registration wins) and are declared once in the multi-meter example instead of being duplicated per meter.
+- **Suppressed verbose per-attempt logging during frequency scans** ([#97](https://github.com/genestealer/everblu-meters-esp8266-improved/pull/97)): frequency scans invoke a full meter-read sequence at every step, which flooded the log with irrelevant `[METER]`/`[CC1101]`/`[RX]` detail. A `g_echo_debug_quiet` flag honoured by `echo_debug()`, plus a non-copyable/non-movable `EchoDebugQuietGuard` RAII helper, wraps the wide/narrow scan functions on both the ESPHome and standalone builds; high-level scan progress (`LOG_*`) remains visible.
+- **`ESPHOME/prepare-component-release.ps1` now retries lock-prone file operations** ([#96](https://github.com/genestealer/everblu-meters-esp8266-improved/pull/96)): OneDrive/antivirus can briefly hold handles on `ESPHOME-release/` files; the clear, copy, flatten, include-rewrite, and LF-normalize steps are now wrapped in an `Invoke-WithRetry` helper that waits with an increasing delay before giving up, so the release script and pre-commit hook no longer fail mid-run.
+- `FIFOTHR` changed from `0x47` (TX threshold 33 bytes) to `0x49` (TX threshold 25 bytes), guaranteeing ≥ 40 free bytes so the 8-byte WUP buffer and 39-byte interrogation frame can be written after a single GDO2 check. Applied regardless of GDO2 wiring.
+- **Non-blocking WiFi serial monitor**: all TCP output now flows through a power-of-two ring buffer drained in `loop()`, so a slow or full TCP socket can no longer stall the main loop. Dropped-byte counts are reported to the client on overrun, the buffer is reset on each new client connection, and the welcome banner now includes the ESP8266 reset reason.
+- `include/private.example.h` now enables `#define GDO2 4` by default and documents the `DISABLE_GDO2_FIFO_MANAGEMENT` opt-out.
+- All ESPHome examples (`example-water-meter.yaml`, `example-gas-meter-minimal.yaml`, `example-advanced.yaml`, `example-nano-esp32.yaml`, `example-multi-meter.yaml`) now set `gdo2_pin` by default with safe free-GPIO choices and opt-out notes, and include SPI-bus pin warnings (avoiding GPIO12/13/14 on ESP8266).
+- **Configuration logging**: the ESPHome `dump_config` and the standalone startup banner report whether GDO0/GDO2 are configured and how FIFO threshold detection is performed. `dump_config` reports the GDO2 fallback state as "disabled (legacy SPI polling fallback)" and the standalone banner reports whether GDO2 is enabled, explicitly disabled via `DISABLE_GDO2_FIFO_MANAGEMENT`, or misconfigured.
+- **Meter-read logging clarity** (standalone): each read is now wrapped in `METER READ - START / COMPLETE / FAILED` banner blocks, with the firmware version folded into the START banner (removing the duplicate `[STATUS] Firmware version` line). A successful TX FIFO drain (`MARCSTATE 0x16`) is reported neutrally as the normal end of transmit instead of a false "No response" failure, and the "meter asleep / out of range / wrong Year-Serial" guidance is deferred until both the ACK and data-frame stages actually fail. CRC-failure and frame-timeout messages were reworded to point at RF link quality (antenna/frequency) rather than a code fault, the "First 32 bytes" hex dump is kept on a single line, and a malformed UTC seconds separator (`%02d:%02d/%02d` rendering `16:09/17` instead of `16:09:17`) was corrected at all three time-print sites.
+- **WiFi serial live streaming during frequency scans**: the standalone frequency-scan loops now drain the WiFi serial ring buffer between steps, so remote log output streams live during a scan instead of arriving all at once when it completes.
+- **Repo-wide formatting/style pass**: C++, Python, and YAML sources reformatted to the new `.clang-format`/`ruff`/`yamllint` rules (accounts for the large mechanical churn in `everblu_meter.cpp`/`.h`, `__init__.py`, and others); no behavioural change.
+- **CI workflows** reworked across all nine workflows: added `concurrency` with cancel-in-progress, `paths:` filters so jobs only run on relevant changes, a draft-PR skip guard, and manual `workflow_dispatch`, while retaining continuous per-push PR feedback and `develop` push builds ([#92](https://github.com/genestealer/everblu-meters-esp8266-improved/pull/92), [#94](https://github.com/genestealer/everblu-meters-esp8266-improved/pull/94)).
+- `CONTRIBUTING.md`, README, and `ESPHOME/docs/*` updated, including ESPHome Device Builder compatibility notes and a fix for malformed Markdown list structure in the README configuration/advanced sections ([#87](https://github.com/genestealer/everblu-meters-esp8266-improved/pull/87)).
+- README and `ESPHOME/README.md` updated: GDO2 documented as required-by-default with opt-out instructions, wiring tables marked accordingly, and ESPHome documentation links surfaced prominently near the top of the main README.
+- Standardized file header comments across `src/core/` to the Doxygen `@file`/`@brief` style already used throughout `src/services/` and `src/adapters/`, resolving documentation drift from multiple contributors; added missing headers to `crc_kermit.h`/`.cpp`, `radian_parser.h`/`.cpp`, and `meter_code_parser.h`, and converted plain-comment headers in `cc1101.cpp`, `wifi_serial.h`/`.cpp`, and `version.h`.
+- Added the `docs/GDO2_FIFO_MANAGEMENT.md` design document (TX and RX paths).
+- Regenerated the `ESPHOME-release/` bundle so it reflects the new GDO2 support and standardized headers.
+- Bumped firmware version to `3.0.0`.
+
+### Fixed
+
+- **Frequency offset now persists across power-cycle reboots on ESP8266** ([#96](https://github.com/genestealer/everblu-meters-esp8266-improved/pull/96)): ESPHome assigns preference storage slots by `make_preference()` call order and defaults to RTC memory (wiped on power loss). The previous code created a new preference object inside every `saveFloat`/`loadFloat`, so save and load landed on different slots - the post-save read-back passed but the value was never found again after a reboot. One `ESPPreferenceObject` per key hash is now cached and reused for save/load, with `in_flash=true` so the offset is written to the flash sector and survives a full power cycle. ESP32 (NVS) and the standalone EEPROM path are unaffected.
+- **Restored frequency calibration is now confirmed at boot** ([#96](https://github.com/genestealer/everblu-meters-esp8266-improved/pull/96)): `begin()` distinguishes a genuinely persisted offset (even `0.0`) from "nothing stored" using a NaN sentinel, logs an explicit RESTORED-vs-not-found line, and publishes the restored offset and tuned frequency to Home Assistant at boot so persistence can be verified without waiting for the first read.
+- **ESPHome `clearKey`/`hasKey` are now consistent and flash-safe** ([#96](https://github.com/genestealer/everblu-meters-esp8266-improved/pull/96)): `clearKey()` previously used a fresh `make_preference<float>(hash)` targeting a different slot/length than `saveFloat`/`loadFloat` and omitting `in_flash`, so it could not reliably invalidate the stored offset. It now reuses the cached flash-backed preference object and writes a zeroed magic so a later `loadFloat` fails its magic check and returns the default. Both `clearKey()` and `hasKey()` guard against a null `global_preferences`, treat a zeroed magic as absent, and sync the cleared slot to flash so the clear survives a reboot.
+- **RX frame truncation when GDO2 is wired**: the Stage-2 payload receive loop runs in `PKTCTRL0_INFINITE_LENGTH` mode where the CC1101 never generates an end-of-packet, so GDO2 (`IOCFG2 = 0x01`) only asserted at the 40-byte RX FIFO threshold and the final sub-threshold remainder of each frame was skipped indefinitely. The Stage-2 loop now always polls `RXBYTES` to drain the tail (Stage-1 fixed-length sync loop and TX-side GDO2 logic are unchanged).
+- RADIAN data validation now rejects physically impossible meter volumes (> 1 billion litres), guarding against corrupted decode alignment. (Out-of-range time-value rejection already shipped in v2.3.0.)
+- `meter_reader` now maintains the active reading state throughout the retry sequence (the "Active Reading" sensor and radio state stay asserted across the whole retry sequence and are cleared only on final success or after max retries, instead of flickering idle between attempts).
+- Refresh `MARCSTATE` on a GDO2 underflow break and guard the interrogation-frame write with a FIFO-ready check.
+- **Junk sensor values before the first read** ([#69](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/69)): the ESPHome component now publishes its known-at-boot configuration (meter year/serial, schedule, reading time, frequency, firmware version) and sensible idle placeholders (radio `Idle`, status `Ready`, error `None`, `active_reading` false) at the end of `setup()`, so display lambdas and other components no longer read uninitialised sensor state before Home Assistant connects. Numeric sensors with restored history are left untouched so HA-restored values are not overwritten.
+- Guard against a null `gmtime()` result in the scheduled-read check and standalone time prints to avoid a potential null dereference.
+
 ## [v2.3.0] - 2026-05-15
 
-> **⚠️ BREAKING CHANGE** — This release enforces strict validation of the meter code format. Existing configurations with flexible serial lengths (1–8 digits) **will not validate** without migration. See [Migration Required](#migration-required) below.
+> **⚠️ BREAKING CHANGE** - This release enforces strict validation of the meter code format. Existing configurations with flexible serial lengths (1–8 digits) **will not validate** without migration. See [Migration Required](#migration-required) below.
 
 ### Breaking Changes
 
@@ -34,7 +104,6 @@ Releases are created manually by tagging commits with version tags matching `v*.
 - Added new test case to reject short serials (<7 digits).
 - Removed outdated references to "1 to 8 digits" in comments and documentation.
 
-
 ## [v2.2.1] - 2026-05-07
 
 ### Added
@@ -48,7 +117,7 @@ Releases are created manually by tagging commits with version tags matching `v*.
 
 ## [v2.2.0] - 2026-04-21
 
-> **⚠️ BREAKING CHANGE** — This release contains a breaking ESPHome configuration schema change due to the explicit SPI integration. Existing `everblu_meter` YAML configurations **will not validate** without migration. See [Migration Required](#migration-required) below.
+> **⚠️ BREAKING CHANGE** - This release contains a breaking ESPHome configuration schema change due to the explicit SPI integration. Existing `everblu_meter` YAML configurations **will not validate** without migration. See [Migration Required](#migration-required) below.
 
 ### Breaking Changes
 
@@ -111,7 +180,6 @@ Releases are created manually by tagging commits with version tags matching `v*.
 - CC1101 LQI/FREQEST register reads on buffer overflow (only read when packet completes normally)
 - TX underflow error logging (distinct message vs successful completion)
 - Comment typo in SFTX flush operation
-
 
 ## [v2.1.1] - 2026-02-13
 

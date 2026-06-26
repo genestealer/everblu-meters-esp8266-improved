@@ -1,7 +1,20 @@
+/**
+ * @file radian_parser.cpp
+ * @brief Implementation of RADIAN protocol frame parsing and CRC validation
+ *
+ * Validates the CRC-16/KERMIT trailer of RADIAN frames and decodes the
+ * primary meter reading fields from the decoded payload buffer.
+ */
+
 #include "radian_parser.h"
 #include "crc_kermit.h"
 
 #include <string.h>
+
+// Upper bound on a plausible meter reading. 1 billion litres (1 million m³) is
+// far beyond any meter this protocol is used with, so anything above it
+// indicates corrupted decode alignment rather than real data.
+#define RADIAN_MAX_PLAUSIBLE_VOLUME_LITRES 1000000000UL
 
 uint16_t radian_crc_kermit(const uint8_t *input_ptr, size_t num_bytes)
 {
@@ -56,6 +69,14 @@ bool radian_parse_primary_data(const uint8_t *decoded_buffer, size_t size, struc
                   ((uint32_t)decoded_buffer[21] << 24);
 
     if (out->volume == 0 || out->volume == 0xFFFFFFFFUL)
+    {
+        memset(out, 0, sizeof(*out));
+        return false;
+    }
+
+    // Reject physically impossible volumes (see RADIAN_MAX_PLAUSIBLE_VOLUME_LITRES):
+    // values above this threshold indicate corrupted decode alignment, not real data.
+    if (out->volume > RADIAN_MAX_PLAUSIBLE_VOLUME_LITRES)
     {
         memset(out, 0, sizeof(*out));
         return false;

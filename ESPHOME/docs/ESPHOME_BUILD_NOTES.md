@@ -199,7 +199,7 @@ When ESPHome builds a component:
 
 The component directory structure should be:
 
-```
+```text
 everblu_meter/
 ├── __init__.py              # Configuration schema
 ├── everblu_meter.h          # Component header

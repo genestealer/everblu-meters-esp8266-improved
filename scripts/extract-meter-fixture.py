@@ -21,10 +21,9 @@ Collect MQTT logs with:    pio device monitor --baud 115200 | Tee-Object capture
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 import pathlib
 import re
-from dataclasses import dataclass
-from typing import List
 
 # Matches hex dump offset lines in both formats:
 #   MQTT:     [000-015]: 7C 44 ...
@@ -36,12 +35,13 @@ HEX_BYTE_RE = re.compile(r"\b[0-9A-Fa-f]{2}\b")
 # Strip all leading [...][ groups to expose the bare message.
 _ESPHOME_PREFIX_RE = re.compile(r"^(?:\[[^\]]*\]\s*)+:\s*")
 
+
 def _strip_esphome_prefix(line: str) -> str:
     """Remove an ESPHome-style log prefix while preserving raw MQTT dump lines."""
     if HEX_LINE_RE.match(line):
         return line
     m = _ESPHOME_PREFIX_RE.match(line)
-    return line[m.end():] if m else line
+    return line[m.end() :] if m else line
 
 
 def crc_kermit(data: bytes) -> int:
@@ -80,7 +80,9 @@ def parse_fields(decoded: bytes) -> tuple[int, int, int, int, int, int]:
     history_available = 0
 
     if len(decoded) >= 22:
-        volume = decoded[18] | (decoded[19] << 8) | (decoded[20] << 16) | (decoded[21] << 24)
+        volume = (
+            decoded[18] | (decoded[19] << 8) | (decoded[20] << 16) | (decoded[21] << 24)
+        )
 
     if len(decoded) >= 49:
         battery = decoded[31]
@@ -98,7 +100,7 @@ def validate_crc(decoded: bytes) -> int:
     if len(decoded) < 4:
         return 0
 
-    expected_len = decoded[0] if decoded[0] else len(decoded)
+    expected_len = decoded[0] or len(decoded)
 
     if expected_len > len(decoded):
         missing = expected_len - len(decoded)
@@ -118,9 +120,9 @@ def validate_crc(decoded: bytes) -> int:
     return 1 if computed == received else 0
 
 
-def collect_frames(log_text: str, prefix: str) -> List[ParsedFrame]:
+def collect_frames(log_text: str, prefix: str) -> list[ParsedFrame]:
     lines = log_text.splitlines()
-    frames: List[ParsedFrame] = []
+    frames: list[ParsedFrame] = []
     i = 0
     idx = 1
 
@@ -130,7 +132,7 @@ def collect_frames(log_text: str, prefix: str) -> List[ParsedFrame]:
             continue
 
         i += 1
-        bytes_out: List[int] = []
+        bytes_out: list[int] = []
         while i < len(lines):
             stripped = _strip_esphome_prefix(lines[i].strip())
             m = HEX_LINE_RE.match(stripped)
@@ -141,13 +143,14 @@ def collect_frames(log_text: str, prefix: str) -> List[ParsedFrame]:
                     continue
                 break
             hex_part = m.group(3)
-            for hb in HEX_BYTE_RE.findall(hex_part):
-                bytes_out.append(int(hb, 16))
+            bytes_out.extend(int(hb, 16) for hb in HEX_BYTE_RE.findall(hex_part))
             i += 1
 
         if bytes_out:
             decoded = bytes(bytes_out)
-            volume, battery, counter, time_start, time_end, history_available = parse_fields(decoded)
+            volume, battery, counter, time_start, time_end, history_available = (
+                parse_fields(decoded)
+            )
             crc_valid = validate_crc(decoded)
             name = f"{prefix}_{idx:03d}"
             frames.append(
@@ -177,7 +180,9 @@ def to_fixture_line(frame: ParsedFrame) -> str:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Extract meter fixtures from firmware logs")
+    parser = argparse.ArgumentParser(
+        description="Extract meter fixtures from firmware logs"
+    )
     parser.add_argument(
         "--input",
         required=True,
@@ -223,7 +228,9 @@ def main() -> int:
     mode = "a" if args.append and out_path.exists() else "w"
     with out_path.open(mode, encoding="utf-8") as f:
         if mode == "w":
-            f.write("# fixture_name|decoded_hex|volume|battery|counter|time_start|time_end|history_available|crc_valid\n")
+            f.write(
+                "# fixture_name|decoded_hex|volume|battery|counter|time_start|time_end|history_available|crc_valid\n"
+            )
         for frame in frames:
             f.write(to_fixture_line(frame) + "\n")
 

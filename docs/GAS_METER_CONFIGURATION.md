@@ -17,6 +17,7 @@ This document provides comprehensive information about configuring and using thi
 The EverBlu Cyble Enhanced RF module is used on both water and gas meters. This firmware supports both types seamlessly through the `METER_TYPE` configuration option.
 
 **Key Differences:**
+
 - **Water Meters:** Readings in liters (L)
 - **Gas Meters:** Readings in cubic meters (m³)
 
@@ -29,6 +30,7 @@ The RADIAN protocol transmits consumption data as a 4-byte integer representing 
 ### Step 1: Set Meter Type
 
 In `include/private.h`, set:
+
 ```cpp
 #define METER_TYPE "gas"
 ```
@@ -38,12 +40,15 @@ This configures Home Assistant device class, icons, and unit symbols appropriate
 ### Step 2: Configure Volume Divisor
 
 In `include/private.h`, set the `GAS_VOLUME_DIVISOR`:
+
 ```cpp
 // Default: 100 (0.01 m³ per unit)
 #define GAS_VOLUME_DIVISOR 100
+
 ```
 
 The divisor value depends on your meter's pulse weight configuration:
+
 - **100:** 0.01 m³ per unit (typical for modern gas meters)
 - **1000:** 0.001 m³ per unit (legacy or alternative configuration)
 
@@ -93,11 +98,13 @@ This discovery of the correct divisor was determined through empirical testing w
 ### Testing Different Divisors
 
 **Using divisor 1000 (incorrect):**
+
 - Calculation: 81,415 / 1000 = 81.415 m³
 - Comparison to register: Off by ~744 m³ (implausible)
 - Conclusion: Wrong configuration
 
 **Using divisor 100 (correct):**
+
 - Calculation: 81,415 / 100 = 814.15 m³
 - Comparison to register: Off by ~11 m³ (reasonable)
 - Conclusion: Correct configuration
@@ -107,6 +114,7 @@ This discovery of the correct divisor was determined through empirical testing w
 Through empirical testing with actual EverBlu Cyble gas meters, we discovered that many gas modules are configured with a pulse weight of **0.01 m³ per unit**, not the 0.001 m³ that might be expected from a naive "liters to m³" conversion.
 
 In the observed case presented above:
+
 - Physical meter register: 825,292 m³
 - RADIAN data (raw): 0x00013E07 = 81,415 units
 - Using divisor 1000: 81.415 m³ (incorrect, off by ~744 m³)
@@ -119,6 +127,7 @@ The 0.01 m³/unit configuration proved more plausible through trial and error co
 The ~11 m³ gap between the RADIAN reading (814.15 m³) and the physical register (825.292 m³) is consistent with the assumption that **the EverBlu module was installed after the meter had already accumulated significant consumption**.
 
 **Example timeline:**
+
 - Day 1: Meter installed on customer premises (initial reading: 0 m³)
 - Day N: Meter accumulates 825,292 m³ of consumption
 - Day N+X: EverBlu module retrofitted (starts recording from 814.15 m³ baseline)
@@ -136,6 +145,7 @@ This means the firmware is reading absolute consumption correctly; the differenc
 **Cause:** Incorrect divisor configuration
 
 **Solution:**
+
 1. Verify your meter's pulse weight from the label or manufacturer documentation
 2. Update `GAS_VOLUME_DIVISOR` accordingly:
    - If readings are 10x too high: increase divisor (1000 → ?)
@@ -184,6 +194,7 @@ GAS_VOLUME_DIVISOR = (RADIAN_counter_units / actual_volume_m³)
 ```
 
 **Example:** If your meter uses 0.1 m³ per unit:
+
 - RADIAN counter: 81,415 units
 - Actual volume: 8,141.5 m³
 - Divisor: 81,415 / 8,141.5 ≈ 10

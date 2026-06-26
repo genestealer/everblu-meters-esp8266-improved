@@ -69,9 +69,88 @@
 // ============================================================================
 // Mimics ESPHome log format for consistency
 // Format: [Level][tag] message
-#define LOG_D(tag, format, ...) Serial.printf("[D][%s] " format "\n", tag, ##__VA_ARGS__)
-#define LOG_I(tag, format, ...) Serial.printf("[I][%s] " format "\n", tag, ##__VA_ARGS__)
-#define LOG_W(tag, format, ...) Serial.printf("[W][%s] " format "\n", tag, ##__VA_ARGS__)
-#define LOG_E(tag, format, ...) Serial.printf("[E][%s] " format "\n", tag, ##__VA_ARGS__)
-#define LOG_V(tag, format, ...) Serial.printf("[V][%s] " format "\n", tag, ##__VA_ARGS__)
+//
+// ANSI COLOUR SUPPORT (standalone serial / WiFi monitor only):
+// ------------------------------------------------------------
+// ESPHome already colourises its own logger output, so these colours apply
+// only to the standalone Serial / WiFiSerial monitor (rendered by the VS Code
+// integrated terminal, PlatformIO monitor, telnet, etc.).
+//
+// Colours are keyed off the log level (LOG_* macros) and off the leading
+// subsystem tag for free-form echo_debug() lines (e.g. "[METER]", "[FREQ]").
+//
+// Disable at build time with -D EVERBLU_LOG_COLOR=0 (for example when piping
+// logs to a file or to the fixture-extraction script).
+#include <string.h>
+
+#ifndef EVERBLU_LOG_COLOR
+#define EVERBLU_LOG_COLOR 1
+#endif
+
+#if EVERBLU_LOG_COLOR
+#define EVB_ANSI_RESET "\033[0m"
+#define EVB_ANSI_RED "\033[1;31m"
+#define EVB_ANSI_YELLOW "\033[33m"
+#define EVB_ANSI_GREEN "\033[32m"
+#define EVB_ANSI_CYAN "\033[36m"
+#define EVB_ANSI_BLUE "\033[34m"
+#define EVB_ANSI_MAGENTA "\033[35m"
+#define EVB_ANSI_GRAY "\033[90m"
+#else
+#define EVB_ANSI_RESET ""
+#define EVB_ANSI_RED ""
+#define EVB_ANSI_YELLOW ""
+#define EVB_ANSI_GREEN ""
+#define EVB_ANSI_CYAN ""
+#define EVB_ANSI_BLUE ""
+#define EVB_ANSI_MAGENTA ""
+#define EVB_ANSI_GRAY ""
+#endif
+
+// Returns the ANSI colour for a log line based on its leading "[TAG]" token.
+// Returns an empty string (no colour) when the tag is unknown or absent, which
+// keeps machine-parsed lines such as hex dumps ("[000-015]: ...") clean.
+inline const char *everblu_log_color_for_prefix(const char *msg)
+{
+	if (!msg)
+		return "";
+	while (*msg == ' ')
+		++msg;
+	if (*msg != '[')
+		return "";
+
+	const char *tag = msg + 1;
+	struct EvbTagColor
+	{
+		const char *name;
+		size_t len;
+		const char *color;
+	};
+	static const EvbTagColor kMap[] = {
+		{"ERROR", 5, EVB_ANSI_RED},
+		{"WARNING", 7, EVB_ANSI_YELLOW},
+		{"WARN", 4, EVB_ANSI_YELLOW},
+		{"DEBUG", 5, EVB_ANSI_GRAY},
+		{"METER", 5, EVB_ANSI_CYAN},
+		{"CC1101", 6, EVB_ANSI_GRAY},
+		{"FREQ", 4, EVB_ANSI_MAGENTA},
+		{"MQTT", 4, EVB_ANSI_BLUE},
+		{"TIME", 4, EVB_ANSI_GREEN},
+		{"OTA", 3, EVB_ANSI_GREEN},
+		{"STATUS", 6, EVB_ANSI_GREEN},
+		{"WIFI", 4, EVB_ANSI_BLUE},
+	};
+	for (const EvbTagColor &e : kMap)
+	{
+		if (strncmp(tag, e.name, e.len) == 0 && tag[e.len] == ']')
+			return e.color;
+	}
+	return "";
+}
+
+#define LOG_D(tag, format, ...) Serial.printf(EVB_ANSI_GRAY "[D][%s]" EVB_ANSI_RESET " " format "\n", tag, ##__VA_ARGS__)
+#define LOG_I(tag, format, ...) Serial.printf(EVB_ANSI_GREEN "[I]" EVB_ANSI_RESET "[%s] " format "\n", tag, ##__VA_ARGS__)
+#define LOG_W(tag, format, ...) Serial.printf(EVB_ANSI_YELLOW "[W][%s] " format EVB_ANSI_RESET "\n", tag, ##__VA_ARGS__)
+#define LOG_E(tag, format, ...) Serial.printf(EVB_ANSI_RED "[E][%s] " format EVB_ANSI_RESET "\n", tag, ##__VA_ARGS__)
+#define LOG_V(tag, format, ...) Serial.printf(EVB_ANSI_GRAY "[V][%s] " format EVB_ANSI_RESET "\n", tag, ##__VA_ARGS__)
 #endif

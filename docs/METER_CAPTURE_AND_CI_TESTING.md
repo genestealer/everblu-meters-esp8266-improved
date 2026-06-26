@@ -6,13 +6,13 @@ This guide lets you capture real meter frames on hardware and replay them in Git
 
 Enable CC1101 debug logs in your local firmware config.
 
-**MQTT standalone** — add to `include/private.h`:
+**MQTT standalone** - add to `include/private.h`:
 
 ```c
 #define DEBUG_CC1101 1
 ```
 
-**ESPHome** — add to your device YAML:
+**ESPHome** - add to your device YAML:
 
 ```yaml
 everblu_meter:
@@ -42,7 +42,7 @@ The extractor handles both log formats automatically:
 Run:
 
 ```powershell
-python script/extract-meter-fixture.py --input meter-capture.log --append --name-prefix home
+python scripts/extract-meter-fixture.py --input meter-capture.log --append --name-prefix home
 ```
 
 This appends fixtures to:

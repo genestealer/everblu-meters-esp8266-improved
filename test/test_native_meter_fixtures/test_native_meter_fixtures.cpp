@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cerrno>
+#include <cstring>
 #include <fstream>
 #include <limits>
 #include <sstream>
@@ -190,6 +191,76 @@ void setUp(void) {}
 
 void tearDown(void) {}
 
+// ---------------------------------------------------------------------------
+// Helpers for inline validation tests (no fixture file required)
+// ---------------------------------------------------------------------------
+
+static void make_test_buf(uint8_t *buf, size_t size, uint32_t volume,
+                          uint8_t time_start, uint8_t time_end)
+{
+    memset(buf, 0, size);
+    buf[18] = volume & 0xFFU;
+    buf[19] = (volume >> 8) & 0xFFU;
+    buf[20] = (volume >> 16) & 0xFFU;
+    buf[21] = (volume >> 24) & 0xFFU;
+    buf[31] = 10; // battery_left: valid (not 0xFF)
+    buf[44] = time_start;
+    buf[45] = time_end;
+    buf[48] = 5; // reads_counter: valid (not 0xFF)
+}
+
+void test_radian_parse_primary_volume_rejection(void)
+{
+    uint8_t buf[120];
+    struct radian_primary_data out;
+
+    // volume == 0 must fail
+    make_test_buf(buf, sizeof(buf), 0UL, 6, 18);
+    TEST_ASSERT_FALSE(radian_parse_primary_data(buf, sizeof(buf), &out));
+
+    // volume == 0xFFFFFFFF must fail
+    make_test_buf(buf, sizeof(buf), 0xFFFFFFFFUL, 6, 18);
+    TEST_ASSERT_FALSE(radian_parse_primary_data(buf, sizeof(buf), &out));
+
+    // volume > 1,000,000,000 must fail (physically impossible)
+    make_test_buf(buf, sizeof(buf), 1000000001UL, 6, 18);
+    TEST_ASSERT_FALSE(radian_parse_primary_data(buf, sizeof(buf), &out));
+
+    // volume exactly at the 1B limit must pass
+    make_test_buf(buf, sizeof(buf), 1000000000UL, 6, 18);
+    TEST_ASSERT_TRUE(radian_parse_primary_data(buf, sizeof(buf), &out));
+    TEST_ASSERT_EQUAL_UINT32(1000000000UL, out.volume);
+
+    // normal volume must pass
+    make_test_buf(buf, sizeof(buf), 774431UL, 6, 18);
+    TEST_ASSERT_TRUE(radian_parse_primary_data(buf, sizeof(buf), &out));
+    TEST_ASSERT_EQUAL_UINT32(774431UL, out.volume);
+}
+
+void test_radian_parse_primary_time_rejection(void)
+{
+    uint8_t buf[120];
+    struct radian_primary_data out;
+
+    // time_start out of range: frame must be rejected
+    make_test_buf(buf, sizeof(buf), 774431UL, 128, 6);
+    TEST_ASSERT_FALSE(radian_parse_primary_data(buf, sizeof(buf), &out));
+
+    // time_end out of range: frame must be rejected
+    make_test_buf(buf, sizeof(buf), 774431UL, 6, 255);
+    TEST_ASSERT_FALSE(radian_parse_primary_data(buf, sizeof(buf), &out));
+
+    // both out of range: frame must be rejected
+    make_test_buf(buf, sizeof(buf), 774431UL, 200, 200);
+    TEST_ASSERT_FALSE(radian_parse_primary_data(buf, sizeof(buf), &out));
+
+    // valid time values: frame accepted and values passed through unchanged
+    make_test_buf(buf, sizeof(buf), 774431UL, 6, 18);
+    TEST_ASSERT_TRUE(radian_parse_primary_data(buf, sizeof(buf), &out));
+    TEST_ASSERT_EQUAL_UINT32(6, out.time_start);
+    TEST_ASSERT_EQUAL_UINT32(18, out.time_end);
+}
+
 void test_replay_meter_fixtures(void)
 {
     FixtureLoadResult loaded = load_fixtures();
@@ -244,6 +315,8 @@ int main(int argc, char **argv)
     (void)argv;
 
     UNITY_BEGIN();
+    RUN_TEST(test_radian_parse_primary_volume_rejection);
+    RUN_TEST(test_radian_parse_primary_time_rejection);
     RUN_TEST(test_replay_meter_fixtures);
     return UNITY_END();
 }

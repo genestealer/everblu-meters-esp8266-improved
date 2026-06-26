@@ -47,6 +47,7 @@ Water/gas meter data structure containing current readings and metadata.
 Set the CC1101 radio frequency in MHz.
 
 **Parameters:**
+
 - `mhz`: Frequency in MHz (typically around 433.82 MHz for Cyble meters)
 
 **Purpose:**
@@ -59,14 +60,17 @@ Configures the CC1101 transceiver to operate at the specified frequency. Used fo
 Initialize the CC1101 radio transceiver.
 
 **Parameters:**
+
 - `freq`: Initial operating frequency in MHz
 
 **Returns:**
+
 - `true` if initialization succeeded
 - `false` on failure
 
 **Purpose:**
 Performs complete initialization of the CC1101 radio including:
+
 - SPI communication setup
 - Register configuration for RADIAN protocol
 - Frequency calibration
@@ -79,10 +83,12 @@ Performs complete initialization of the CC1101 radio including:
 Read data from Everblu Cyble water/gas meter.
 
 **Returns:**
+
 - `tmeter_data` structure containing all extracted meter data
 
 **Purpose:**
 Performs a complete read cycle:
+
 1. Transmits RADIAN protocol request frame to meter
 2. Waits for meter response
 3. Decodes received data including current reading and history
@@ -102,6 +108,7 @@ Performs a complete read cycle:
 Display buffer contents in hexadecimal format (multi-line).
 
 **Parameters:**
+
 - `buffer`: Pointer to data buffer
 - `len`: Length of buffer in bytes
 
@@ -112,6 +119,7 @@ Display buffer contents in hexadecimal format (multi-line).
 Display buffer contents as hexadecimal array notation.
 
 **Parameters:**
+
 - `buffer`: Pointer to data buffer
 - `len`: Length of buffer in bytes
 
@@ -122,7 +130,9 @@ Display buffer contents as hexadecimal array notation.
 Display buffer contents in hexadecimal format (single line).
 
 **Parameters:**
+
 - `buffer`: Pointer to data buffer
+
 - `len`: Length of buffer in bytes
 
 ---
@@ -132,6 +142,7 @@ Display buffer contents in hexadecimal format (single line).
 Display buffer contents in binary format.
 
 **Parameters:**
+
 - `buffer`: Pointer to data buffer
 - `len`: Length of buffer in bytes
 
@@ -142,8 +153,10 @@ Display buffer contents in binary format.
 Conditional debug output with printf-style formatting.
 
 **Parameters:**
+
 - `l_flag`: Boolean flag controlling whether to print (true = print)
 - `fmt`: Format string (printf-style)
+
 - `...`: Variable arguments for format string
 
 ---
@@ -155,10 +168,12 @@ Conditional debug output with printf-style formatting.
 Calculate Kermit CRC-16 checksum.
 
 **Parameters:**
+
 - `input_ptr`: Pointer to input data buffer
 - `num_bytes`: Number of bytes to include in CRC calculation
 
 **Returns:**
+
 - 16-bit CRC checksum value
 
 **Purpose:**
@@ -171,11 +186,13 @@ Calculates CRC-16/KERMIT checksum used in RADIAN protocol for data integrity ver
 Encode buffer using RADIAN 1:3 encoding scheme.
 
 **Parameters:**
+
 - `inputBuffer`: Pointer to input data buffer
 - `inputBufferLen`: Length of input buffer in bytes
 - `outputBuffer`: Pointer to output buffer (must be >= inputBufferLen * 3)
 
 **Returns:**
+
 - Length of encoded output in bytes
 
 **Purpose:**
@@ -188,11 +205,13 @@ Encodes input buffer using proprietary 1:3 encoding required by RADIAN protocol.
 Create RADIAN protocol master request frame.
 
 **Parameters:**
+
 - `outputBuffer`: Pointer to output buffer for request frame (must be sufficiently large)
 - `year`: Last 2 digits of meter manufacturing year (e.g., 15 for 2015)
 - `serial`: Meter serial number (32-bit value)
 
 **Returns:**
+
 - Length of generated request frame in bytes
 
 **Purpose:**
@@ -210,6 +229,7 @@ State machine states for meter reading operation.
 
 | State                       | Description                                   |
 | --------------------------- | --------------------------------------------- |
+
 | `STATE_INIT`                | Initial state after boot, transitions to IDLE |
 | `STATE_IDLE`                | Waiting state, checks schedule every 500ms    |
 | `STATE_CHECK_SCHEDULE`      | Evaluates if it's time to read meter          |
@@ -227,6 +247,7 @@ State machine states for meter reading operation.
 Transition to new state.
 
 **Parameters:**
+
 - `newState`: State to transition to
 
 **Purpose:**
@@ -239,6 +260,7 @@ Updates current state, records entry timestamp, and logs transition for debuggin
 Check if current time matches scheduled reading time.
 
 **Returns:**
+
 - `true` if current time is exactly the scheduled reading time
 
 **Purpose:**
@@ -251,6 +273,7 @@ Evaluates whether current time (UTC) matches the configured reading schedule (da
 Check if system is in cooldown period.
 
 **Returns:**
+
 - `true` if currently in cooldown period
 
 **Purpose:**
@@ -263,7 +286,9 @@ After max retries are exhausted, system enters 1-hour cooldown period to avoid h
 Execute state machine logic.
 
 **Purpose:**
+
 Main state machine handler called from `loop()`. Implements non-blocking meter reading with:
+
 - Schedule checking every 500ms
 - Retry logic with exponential backoff
 - 1-hour cooldown after max retries
@@ -283,6 +308,7 @@ Main state machine handler called from `loop()`. Implements non-blocking meter r
 Save frequency offset to persistent storage.
 
 **Parameters:**
+
 - `offset`: Frequency offset in MHz to be added to base frequency
 
 **Purpose:**
@@ -295,6 +321,7 @@ Stores the frequency offset value to EEPROM (ESP8266) or Preferences (ESP32) wit
 Load frequency offset from persistent storage.
 
 **Returns:**
+
 - Frequency offset in MHz, or 0.0 if no valid data found
 
 **Purpose:**
@@ -325,12 +352,14 @@ Performs comprehensive frequency scan over wider range (±0.030 MHz) with coarse
 Adaptive frequency tracking using FREQEST.
 
 **Parameters:**
+
 - `freqest`: Frequency offset estimate from CC1101 FREQEST register (-128 to +127)
 
 **Purpose:**
 Accumulates frequency offset estimates from successful reads and gradually adjusts radio frequency to track meter drift. Uses statistical averaging (ADAPT_THRESHOLD reads) to avoid over-correction on noise.
 
 **Algorithm:**
+
 1. Accumulate FREQEST over multiple reads
 2. After threshold reads, calculate average error
 3. If average > 2 kHz, apply 50% correction to avoid oscillation
@@ -350,12 +379,15 @@ Accumulates frequency offset estimates from successful reads and gradually adjus
 Validate reading schedule string.
 
 **Parameters:**
+
 - `s`: Schedule string to validate
 
 **Returns:**
+
 - `true` if schedule is valid
 
 **Valid Values:**
+
 - `"Monday-Friday"`
 - `"Monday-Saturday"`
 - `"Monday-Sunday"`
@@ -368,6 +400,7 @@ Validate reading schedule string.
 Validate and correct reading schedule.
 
 **Purpose:**
+
 Checks if current reading schedule is valid. If invalid, falls back to safe default ("Monday-Friday") and logs a warning.
 
 ---
@@ -377,9 +410,11 @@ Checks if current reading schedule is valid. If invalid, falls back to safe defa
 Check if today is a scheduled reading day.
 
 **Parameters:**
+
 - `ptm`: Pointer to tm structure with current date/time
 
 **Returns:**
+
 - `true` if today is a reading day according to schedule
 
 **Purpose:**
@@ -396,9 +431,11 @@ Evaluates whether the current day (based on tm structure) falls within the confi
 Convert WiFi RSSI to percentage.
 
 **Parameters:**
+
 - `rssi`: WiFi RSSI in dBm (typically -100 to -50)
 
 **Returns:**
+
 - Signal strength as percentage (0-100)
 
 **Purpose:**
@@ -411,9 +448,11 @@ Maps WiFi RSSI value to 0-100% scale for user-friendly display. Clamps input to 
 Convert 433 MHz meter RSSI to percentage.
 
 **Parameters:**
+
 - `rssi_dbm`: Meter RSSI in dBm (typically -120 to -40)
 
 **Returns:**
+
 - Signal strength as percentage (0-100)
 
 **Purpose:**
@@ -426,9 +465,11 @@ Converts CC1101 RSSI measurement (in dBm) to 0-100% scale. Uses wider range (-12
 Convert LQI to percentage.
 
 **Parameters:**
+
 - `lqi`: Link Quality Indicator (0-255, higher is better)
 
 **Returns:**
+
 - Link quality as percentage (0-100)
 
 **Purpose:**
@@ -446,6 +487,7 @@ Publish WiFi diagnostics to MQTT.
 
 **Purpose:**
 Publishes comprehensive WiFi connection details including:
+
 - SSID and BSSID
 - RSSI (raw and percentage)
 - IP address and MAC address
@@ -462,8 +504,10 @@ Publish meter configuration to MQTT.
 
 **Purpose:**
 Publishes static meter configuration including:
+
 - Meter year and serial number
 - Reading schedule (days of week)
+
 - Reading time (UTC, HH:MM format)
 
 **Note:** Called once during connection establishment.
@@ -476,6 +520,7 @@ MQTT connection established callback.
 
 **Purpose:**
 Called when MQTT connection is successfully established. Performs:
+
 1. NTP time synchronization
 2. Arduino OTA initialization
 3. Home Assistant MQTT Discovery publishing
@@ -495,6 +540,7 @@ Also sets up MQTT callbacks for manual trigger and frequency scan commands.
 Validate configuration parameters.
 
 **Returns:**
+
 - `true` if all validations passed
 - `false` if any parameter is invalid
 
@@ -502,6 +548,7 @@ Validate configuration parameters.
 Performs startup validation of configuration parameters to fail fast on invalid settings.
 
 **Checks:**
+
 - METER_YEAR (must be 0-99)
 - METER_SERIAL (must be non-zero)
 - FREQUENCY (must be 300-500 MHz if defined)

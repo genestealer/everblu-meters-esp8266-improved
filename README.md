@@ -1,6 +1,7 @@
 # Itron EverBlu Cyble Enhanced RF RADIAN Water/Gas Usage Data for MQTT Home Assistant & ESPHome External Component
 
 ## Build & QA
+
 [![ESP8266 Build](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/build-esp8266.yml/badge.svg?branch=main)](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/build-esp8266.yml)
 [![ESP32 Build](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/build-esp32.yml/badge.svg?branch=main)](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/build-esp32.yml)
 [![ESPHome Component](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/esphome-external-component.yml/badge.svg?branch=main)](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/esphome-external-component.yml)
@@ -8,6 +9,7 @@
 [![Code Quality](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/code-quality.yml/badge.svg?branch=main)](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/code-quality.yml)
 
 ## Platforms & Capabilities
+
 [![Made with PlatformIO](https://img.shields.io/badge/Made%20with-PlatformIO-orange?logo=platformio)](https://platformio.org)
 [![ESP8266](https://img.shields.io/badge/ESP-8266-blue?logo=espressif)](https://www.espressif.com/en/products/socs/esp8266)
 [![ESP32](https://img.shields.io/badge/ESP-32-blue?logo=espressif)](https://www.espressif.com/en/products/socs/esp32)
@@ -19,7 +21,6 @@
 [![Release](https://img.shields.io/github/v/release/genestealer/everblu-meters-esp8266-improved?sort=semver)](https://github.com/genestealer/everblu-meters-esp8266-improved/releases)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.md)
 
-#
 Fetch water or gas usage data from Itron EverBlu Cyble Enhanced RF meters using the RADIAN protocol (Sontex, Itron) on 433 MHz with an ESP32/ESP8266 and CC1101 transceiver.
 Integrated with Home Assistant via MQTT AutoDiscovery and ESPHome external component
 
@@ -27,35 +28,39 @@ Integrated with Home Assistant via MQTT AutoDiscovery and ESPHome external compo
 
 ---
 
-### **ESPHome** - Release V2.2.1
-ESPHome integration is now production-ready. For setup and usage, see the ESPHome docs at [ESPHOME/README.md](ESPHOME/README.md)
- - Versioned external component in `ESPHOME-release` with the same 2.2.1 code as the main firmware
- - Tested on ESP8266 and ESP32 with water and gas meters; supports the same sensors and calibration logic
- - YAML stays simple: drop in the component, set `meter_code` and `meter_type`, and go
- - Build with the Arduino framework (set `esp32.framework.type: arduino`; ESP-IDF is not supported for this component)
- - Migration tip: if you move from MQTT firmware, keep the same meter serial values so your topics/entities stay aligned
+## Table of Contents
+
+- [Features](#features)
+- [Integration Options](#integration-options)
+- [Quick Start: First Successful Reading](#quick-start-first-successful-reading)
+- [Hardware](#hardware)
+- [MQTT Integration](#mqtt-integration)
+- [Multiple Devices](#multiple-devices)
+- [Home Assistant Best Practice: Utility Meter Helper](#home-assistant-best-practice-utility-meter-helper)
+- [Configuration](#configuration)
+- [Troubleshooting](#troubleshooting)
+- [Utility Read Counter Compatibility](#important-utility-read-counter-compatibility)
+- [Credits](#credits)
+- [Legal Notice](#legal-notice)
 
 ---
 
+### **ESPHome** - Release V3.0.0
 
-## ⚠️ Important: Utility Read Counter Compatibility
+ESPHome integration is stable and recommended. **Start here for ESPHome:**
 
-The meter includes a built-in **read counter** that increments each time it's queried. When your water/gas company performs wireless readings, they expect this counter to match their scheduled read count. If you regularly read your meter yourself:
+- **[ESPHOME/README.md](ESPHOME/README.md)** - ESPHome setup, wiring, and configuration reference
+- **[ESPHOME/ESPHOME_INTEGRATION_GUIDE.md](ESPHOME/ESPHOME_INTEGRATION_GUIDE.md)** - complete step-by-step installation guide
+- Ready-made configs: [water](ESPHOME/example-water-meter.yaml) · [gas](ESPHOME/example-gas-meter-minimal.yaml) · [advanced](ESPHOME/example-advanced.yaml) · [multi-meter](ESPHOME/example-multi-meter.yaml)
 
-- The counter will be **higher than expected** when the utility reads it
-- Their equipment may flag this discrepancy or refuse to download data
-- They may suspect tampering or out-of-sync equipment
+> [!WARNING]
+> **Breaking change in v3.0.0:** GDO2 hardware FIFO management is now enabled by default. You must wire CC1101 GDO2 and set `gdo2_pin:` (or opt out with `disable_gdo2_fifo_management: true`). See the [Hardware](#hardware) section and [ESPHOME/README.md](ESPHOME/README.md).
 
-**This is not an MQTT or ESP issue** - it's how the RADIAN protocol and meter hardware work.
-
-### Recommended Actions
-
-1. **Record your initial counter value** when you first start using this device (check Home Assistant sensor or MQTT topic `/counter`)
-2. **If the utility reports issues**:
-   - They can still take a **manual reading** from the physical meter display (traditional method)
-   - Or you can **loop the counter** back to the expected value: the read counter wraps at 255 back to 0, so making enough reads before their scheduled visit can "reset" it (automate this in Home Assistant if needed)
-
-**Note:** Most utilities won't notice or care, but it's good to be aware of this if they mention unexpected counter values during their wireless reading attempts.
+- Versioned external component in `ESPHOME-release` with the same 3.0.0 code as the main firmware
+- Tested on ESP8266 and ESP32 with water and gas meters; supports the same sensors and calibration logic
+- YAML stays simple: drop in the component, set `meter_code`, `meter_type`, and `gdo2_pin`, and go
+- Build with the Arduino framework (set `esp32.framework.type: arduino`; ESP-IDF is not supported for this component)
+- Migration tip: if you move from MQTT firmware, keep the same meter serial values so your topics/entities stay aligned
 
 ---
 
@@ -80,7 +85,7 @@ Supported meters:
 - Daily scheduled readings (with configurable reading days).
 - Built-in frame validation (CRC-16/KERMIT) plus signal diagnostics (RSSI/LQI).
 - Automatic CC1101 frequency calibration plus first-boot wide scan.
-
+- Hardware-assisted CC1101 FIFO threshold management via GDO2, **enabled by default (v3.0.0+)** for improved TX/RX reliability (opt out to use legacy SPI polling). See [Hardware](#hardware).
 
 ### Full feature list
 
@@ -90,16 +95,18 @@ Supported meters:
 - Includes RSSI (Radio Signal Strength Indicator), LQI (Link Quality) and Signal Strength for the meter for diagnostics.
 - Time Start and Time End sensors to indicate when the meter wakes and sleeps.
 - MQTT integration for Home Assistant with AutoDiscovery.
-- **Native ESPHome component** for seamless integration.
+- **Native ESPHome component** for direct integration.
 - Automatic CC1101 frequency calibration with manual fallback.
+- **Hardware-assisted CC1101 FIFO threshold management via GDO2 - enabled by default (v3.0.0+)**: per-phase reconfiguration prevents TX FIFO underflows and reduces unnecessary RX SPI reads. Requires wiring GDO2 to a free GPIO (or explicitly opt out to use legacy SPI polling) - see [Hardware](#hardware) for wiring and the opt-out.
 - Wi-Fi diagnostics and OTA updates.
 - Built-in CRC-16/KERMIT verification to discard corrupted RADIAN frames before publishing data.
 - Reading Schedule Configuration: Configure reading days using presets (Monday-Friday, Monday-Saturday, Monday-Sunday) or a specific day (Monday-Sunday).
 - Daily scheduled meter readings.
 
-
-
 ### Advanced Frame Validation
+
+<details>
+<summary>How the firmware validates every frame (5 layers)</summary>
 
 The firmware implements multiple layers of validation to ensure data integrity:
 
@@ -123,7 +130,9 @@ The firmware implements multiple layers of validation to ensure data integrity:
    - LQI (Link Quality Indicator) assessment
    - Frequency error estimation for adaptive tuning
 
-**Result**: You only get data when the firmware is highly confident the reading is genuine and accurate. No false positives, no corrupted values making it into Home Assistant.
+**Result**: Data is only published after passing every check above, so corrupted or partial frames are discarded rather than reported to Home Assistant.
+
+</details>
 
 ---
 
@@ -131,33 +140,34 @@ The firmware implements multiple layers of validation to ensure data integrity:
 
 This project supports two integration methods:
 
-**Important:** The ESPHome component uses the **same proven codebase** as the mature MQTT firmware version. All the core CC1101 radio handling, RADIAN protocol decoding, frequency calibration, and frame validation logic is shared between both implementations. This means you get years of testing and refinement in both integration methods.
+**Note:** The ESPHome component uses the **same core codebase** as the MQTT firmware. The CC1101 radio handling, RADIAN protocol decoding, frequency calibration, and frame validation logic are shared between both implementations.
 
 ### Option 1: ESPHome Component (Recommended)
 
 **Best for**: Users who prefer ESPHome's YAML configuration and native Home Assistant integration.
 
-- ✅ Simple YAML configuration
-- ✅ Native Home Assistant integration
-- ✅ Automatic sensor discovery
-- ✅ All ESPHome features (OTA, logging, etc.)
-- ✅ No MQTT broker required
+- Simple YAML configuration
+- Native Home Assistant integration
+- Automatic sensor discovery
+- All ESPHome features (OTA, logging, etc.)
+- No MQTT broker required
 
 Examples: use the ready-made ESPHome configs:
+
 - [ESPHOME/example-water-meter.yaml](ESPHOME/example-water-meter.yaml)
 - [ESPHOME/example-gas-meter-minimal.yaml](ESPHOME/example-gas-meter-minimal.yaml)
 - [ESPHOME/example-advanced.yaml](ESPHOME/example-advanced.yaml)
 
-📖 **Full documentation**: [ESPHOME/ESPHOME_INTEGRATION_GUIDE.md](ESPHOME/ESPHOME_INTEGRATION_GUIDE.md)
+**Full documentation**: [ESPHOME/ESPHOME_INTEGRATION_GUIDE.md](ESPHOME/ESPHOME_INTEGRATION_GUIDE.md)
 
 ### Option 2: Standalone with MQTT
 
 **Best for**: Users who want direct control, custom builds, or already use MQTT extensively.
 
-- ✅ Full control over firmware
-- ✅ PlatformIO-based development
-- ✅ MQTT AutoDiscovery for Home Assistant
-- ✅ Extensive customization options
+- Full control over firmware
+- PlatformIO-based development
+- MQTT AutoDiscovery for Home Assistant
+- Extensive customization options
 
 **Quick start**: Edit `include/private.h` and build with PlatformIO (see below).
 
@@ -179,7 +189,8 @@ See the Hardware section below for full wiring tables and pictures.
   - `ENABLE_HA_DISCOVERY` - set to `0` to disable Home Assistant discovery topic publishing (`homeassistant/...`) and keep raw MQTT topics only
   - `METER_CODE` (full under-barcode code with dashes)
   - `METER_TYPE` - set to `"water"` (default) or `"gas"` depending on your meter type
-  - `MAX_RETRIES` - maximum reading retry attempts before cooldown (optional, default is 10)
+  - `GDO2` - **required by default (v3.0.0+)**: GPIO connected to CC1101 GDO2 (hardware FIFO management). To opt out and use legacy SPI polling, define `DISABLE_GDO2_FIFO_MANAGEMENT` instead. The firmware will not compile until you do one or the other.
+  - `MAX_RETRIES` - maximum reading retry attempts before cooldown (optional, default is 5)
   - `ADAPTIVE_THRESHOLD` - how many successful reads before adjusting frequency (optional, default is 1 = adjust after each read)
   - `WIFI_SERIAL_MONITOR_ENABLED` - set to `1` to enable WiFi serial monitor for remote debugging (default is `0` for security)
 - `platformio.ini`: select `env:huzzah` (ESP8266 HUZZAH) or `env:esp32dev` (ESP32 DevKit).
@@ -194,6 +205,7 @@ This project supports both **water meters** and **gas meters**. The main differe
 | **Gas**             | Cubic meters (m³)   | `gas`        | `mdi:meter-gas` |
 
 To configure your meter type, set `METER_TYPE` in `include/private.h`:
+
 ```cpp
 #define METER_TYPE "water"  // For water meters
 // OR
@@ -205,16 +217,21 @@ To configure your meter type, set `METER_TYPE` in `include/private.h`:
 For gas meters, this firmware assumes an internal count in liter-equivalents and converts those values to cubic meters (m³) before publishing to Home Assistant. If your gas meter uses a different base unit or scaling, you may need to adjust the meter configuration or conversion logic accordingly.
 
 The conversion uses a configurable **gas volume divisor** that can be set in `include/private.h`:
+
 ```cpp
 // Default: 100 (equivalent to 0.01 m³ per unit)
 #define GAS_VOLUME_DIVISOR 100
 ```
 
 **Important:** The correct divisor depends on your meter's pulse weight configuration:
+
 - `100`: 0.01 m³ per unit (typical for modern EverBlu Cyble gas modules)
 - `1000`: 0.001 m³ per unit (0.1 L per unit, less common)
 
 ##### How We Determined the Correct Divisor
+
+<details>
+<summary>Background: empirical derivation of the 0.01 m³/unit pulse weight</summary>
 
 Through empirical testing with an actual EverBlu Cyble gas meter, we discovered that many gas modules are configured with a pulse weight of **0.01 m³ per unit**, not the 0.001 m³ that might be expected from a naive "liters to cubic meters" conversion.
 
@@ -226,6 +243,8 @@ Through empirical testing with an actual EverBlu Cyble gas meter, we discovered 
 - Using divisor 100: 814.15 m³ (correct, ~11 m³ gap from register)
 
 The gap of ~11 m³ is consistent with the assumption that the EverBlu module was installed after the meter had already recorded some consumption. Without access to the meter's installation records or multiple data points, we cannot definitively confirm the exact pulse weight; however, **0.01 m³/unit proved more plausible through trial and error comparison with the actual mechanical meter register**.
+
+</details>
 
 **If your readings seem incorrect:** Verify your specific meter's pulse weight (often printed on the device label) and adjust `GAS_VOLUME_DIVISOR` accordingly.
 
@@ -256,10 +275,12 @@ Once your device is running and connected to Wi-Fi, you can update it wirelessly
 
 1. In `platformio.ini`, find your board's `-ota` environment (e.g., `[env:huzzah-ota]`).
 2. **Update the IP address** to match your device's IP:
+
    ```ini
    upload_port = 192.168.2.21  ; Change to your device's IP
    monitor_port = socket://192.168.2.21:23  ; Change to match upload_port
    ```
+
 3. **Select the OTA environment** in PlatformIO:
    - For **HUZZAH**: select `env:huzzah-ota`
    - For **D1 Mini**: select `env:d1_mini-ota`
@@ -293,18 +314,21 @@ Below are the wiring diagrams for common ESP8266 boards and ESP32 DevKit.
 - **MOSI (Master Out Slave In)**: GPIO 13
 - **CS/SS (Chip Select)**: GPIO 15
 - **GDO0 (CC1101 Data Ready)**: GPIO 5 (configurable in `private.h`)
+- **GDO2 (CC1101 FIFO Threshold)**: **Required by default (v3.0.0+)**, any free GPIO (e.g. GPIO 4 / D2). Opt out with `DISABLE_GDO2_FIFO_MANAGEMENT` to fall back to SPI polling.
 
 #### Important Notes
 
 - **Voltage:** The CC1101 operates at **3.3V only**. Do not connect to 5V or you will damage the module.
 - **Hardware SPI:** This project uses the ESP8266/ESP32's hardware SPI interface for reliable, high-speed communication.
 - **GDO0 Pin:** Default is GPIO 5 for ESP8266, GPIO 4 for ESP32. You can change this in your `private.h` file if needed.
+- **GDO2 Pin (required by default, v3.0.0+):** **Breaking change** - the CC1101 GDO2 pin now drives hardware-assisted FIFO threshold management by default. You must wire CC1101 GDO2 to a free MCU GPIO and configure it via `#define GDO2 <pin>` in `private.h` (MQTT firmware) or `gdo2_pin` in YAML (ESPHome). The driver dynamically reconfigures GDO2 per phase: TX (prevents `TXFIFO_UNDERFLOW`) and RX (skips unnecessary SPI reads and improves scheduler efficiency). To keep the legacy SPI-polling behaviour instead, explicitly opt out: define `DISABLE_GDO2_FIFO_MANAGEMENT` in `private.h`, or set `disable_gdo2_fifo_management: true` in ESPHome. The MQTT firmware will not compile, and the ESPHome config will not validate, until you either wire/configure GDO2 or opt out. Use any free GPIO that does not collide with the SPI bus or GDO0. See [docs/GDO2_FIFO_MANAGEMENT.md](docs/GDO2_FIFO_MANAGEMENT.md).
 - **Distance & Signal Quality:** The RADIAN protocol implementation does not have publicly available CRC checksums for the manufacturer's proprietary encoding, making readings somewhat vulnerable to RF interference. Weak signal (distance > 10+ meters) or electrical interference can cause read failures. **Keep the CC1101 radio within a few meters (~2-5m ideally) of your meter for reliable communication.** If you experience frequent "No ACK frame received" or "No data frame received" failures, try moving the radio closer to the meter to rule out signal strength issues before investigating hardware wiring.
 
 #### Wiring Table
 
 Pin wiring for the [Wemos D1 Mini](https://www.wemos.cc/en/latest/d1/index.html), [Adafruit Feather HUZZAH ESP8266](https://learn.adafruit.com/adafruit-feather-huzzah-esp8266/pinouts), and ESP32 DevKit:
 
+<!-- markdownlint-disable MD060 -->
 | **CC1101 Pin** | **Function** | **ESP8266 GPIO** | **Wemos D1 Mini** | **HUZZAH ESP8266** | **ESP32 GPIO** | **ESP32 DevKit** | **Notes**                                           |
 | -------------- | ------------ | ---------------- | ----------------- | ------------------ | -------------- | ---------------- | --------------------------------------------------- |
 | **VCC**        | Power        | 3.3V             | 3V3               | 3V                 | 3.3V           | 3V3              | **Important:** Use 3.3V only!                       |
@@ -314,7 +338,8 @@ Pin wiring for the [Wemos D1 Mini](https://www.wemos.cc/en/latest/d1/index.html)
 | **MOSI**       | SPI Data Out | GPIO 13          | D7                | #13                | GPIO 23        | MOSI             | Hardware SPI MOSI                                   |
 | **CSN/CS**     | Chip Select  | GPIO 15          | D8                | #15                | GPIO 5         | SS               | SPI chip select                                     |
 | **GDO0**       | Data Ready   | GPIO 5           | D1                | #5                 | GPIO 4         | GPIO 4           | Digital interrupt pin (configurable in `private.h`) |
-| **GDO2**       | Not used     | -                | -                 | -                  | -              | -                | Leave disconnected (optional)                       |
+| **GDO2**       | FIFO Threshold (required) | GPIO 4 | D2 | #4 | GPIO 27 | GPIO 27 | Required by default (v3.0.0+). Hardware FIFO threshold signal. Set via `private.h` (`#define GDO2`) / `gdo2_pin` in ESPHome, or opt out with `DISABLE_GDO2_FIFO_MANAGEMENT` / `disable_gdo2_fifo_management: true` |
+<!-- markdownlint-enable MD060 -->
 
 <details>
 <summary>Wiring notes and board-specific quick references (optional)</summary>
@@ -326,7 +351,7 @@ The CC1101 settings used in this project stay within that envelope, but ensure y
 
 #### Quick Reference: Wemos D1 Mini
 
-```
+```text
 CC1101 → Wemos D1 Mini
 VCC    → 3V3
 GND    → G
@@ -335,11 +360,12 @@ MISO   → D6 (GPIO 12)
 MOSI   → D7 (GPIO 13)
 CSN    → D8 (GPIO 15)
 GDO0   → D1 (GPIO 5)
+GDO2   → D2 (GPIO 4)  ← required by default, set #define GDO2 in private.h (or opt out)
 ```
 
 #### Quick Reference: Adafruit Feather HUZZAH ESP8266
 
-```
+```text
 CC1101 → HUZZAH ESP8266
 VCC    → 3V
 GND    → GND
@@ -348,11 +374,12 @@ MISO   → #12 (GPIO 12)
 MOSI   → #13 (GPIO 13)
 CSN    → #15 (GPIO 15)
 GDO0   → #5  (GPIO 5)
+GDO2   → #4  (GPIO 4)  ← required by default, set #define GDO2 in private.h (or opt out)
 ```
 
 #### Quick Reference: ESP32 DevKit (esp32dev)
 
-```
+```text
 CC1101 → ESP32 DevKit
 VCC    → 3V3
 GND    → GND
@@ -361,12 +388,15 @@ MISO   → MISO (GPIO 19)
 MOSI   → MOSI (GPIO 23)
 CSN    → SS (GPIO 5 by default on many boards)
 GDO0   → GPIO 4 (or GPIO 27)  ← set this in include/private.h as GDO0
+GDO2   → GPIO 27 (or another free GPIO)  ← required by default, set #define GDO2 in private.h (or opt out)
 ```
 
 Notes for ESP32
+
 - Use the board’s hardware SPI pins (SCK/MISO/MOSI/SS).
 The defaults are provided by the Arduino core and used automatically by this project.
 - Choose a free GPIO for GDO0 (e.g., 4 or 27) and set `#define GDO0 <pin>` in `include/private.h`.
+- Wire GDO2 to another free GPIO and set `#define GDO2 <pin>` to enable hardware FIFO threshold management (required by default since v3.0.0); to keep legacy SPI polling instead, define `DISABLE_GDO2_FIFO_MANAGEMENT`.
 - Power the CC1101 from 3.3V only.
 
 #### Adafruit Feather HUZZAH Silkscreen Labels
@@ -387,6 +417,7 @@ To make wiring dead-simple on the HUZZAH, here’s the exact silkscreen text nex
   - Board label: "#5" → CC1101 GDO0  (default; configurable via `private.h`)
 
 Notes
+
 - On the HUZZAH, many pins show both the function and the GPIO number, e.g. "SCK / #14".
 You can use either reference when wiring.
 - Only use the 3V (3.3V) pin to power the CC1101. Do not use 5V.
@@ -405,6 +436,7 @@ This project defaults to using **GPIO #5** for GDO0 on HUZZAH, which is safe and
 You can still use GPIO #0 for simple LED indication in your own code, but avoid wiring CC1101 signals to it.
 
 Also note other ESP8266 boot-strap pins on HUZZAH:
+
 - GPIO #15 (used here as CS/SS) must be LOW at boot (the HUZZAH board provides the correct pull-down).
 Don’t force it HIGH during reset.
 - GPIO #2 should normally be HIGH at boot (not used by this project).
@@ -476,12 +508,14 @@ When running multiple ESP devices on the same MQTT broker, the firmware automati
    - **Tariffs**: Optional, leave blank for simple usage
 
 **Benefits:**
+
 - Historical data preserved when changing platforms (MQTT ↔ ESPHome)
-- Seamless meter serial number changes
+- Meter serial number changes are simple
 - Single point to update if you replace hardware
 - All dashboards and automations reference the stable utility meter entity
 
 **Example YAML (if configuring manually):**
+
 ```yaml
 utility_meter:
   master_water_meter:
@@ -496,6 +530,7 @@ When you change platforms or meters, simply update the `source` to point to the 
 Both MQTT and ESPHome modes expose a **history sensor** containing 12 months of historical readings stored in the meter itself. This data is retrieved directly from the meter and provided in JSON format.
 
 **Example JSON payload:**
+
 ```json
 {
   "history": [605696, 614107, 621401, 630219, 640054, 652789, 667441, 684214, 700917, 712720, 721549, 728836],
@@ -506,12 +541,14 @@ Both MQTT and ESPHome modes expose a **history sensor** containing 12 months of 
 ```
 
 **Fields:**
+
 - `history`: Array of 12 monthly readings (oldest to newest) in liters or m³
 - `monthly_usage`: Array of 12 monthly consumption values (first value is the oldest reading, subsequent values are differences)
 - `current_month_usage`: Current month's consumption so far
 - `months_available`: Number of months of data available (typically 12)
 
 **Use Cases:**
+
 - Import historical consumption into Home Assistant on first setup
 - Analyze past usage patterns
 - Compare current usage to previous months
@@ -519,6 +556,7 @@ Both MQTT and ESPHome modes expose a **history sensor** containing 12 months of 
 - Verify meter readings against utility bills
 
 **Accessing the data:**
+
 - **MQTT**: Available in topic `everblu/cyble/{PARSED_SERIAL}/history`
 - **ESPHome**: Available as text sensor `sensor.{device}_history`
 
@@ -541,21 +579,23 @@ Both MQTT and ESPHome modes expose a **history sensor** containing 12 months of 
      - Wi-Fi and MQTT credentials. If your MQTT setup does not require a username and password, comment out those lines using `//`.
      - **Meter Code** - Copy the code under the barcode (ignore the manufacturing date):
        - Label format: `YY-SSSSSSS-NNN` (example: `23-1875247-234`)
-       - Set `METER_CODE` to the same value **with dashes** — suffix `-NNN` is optional
+       - Set `METER_CODE` to the same value **with dashes** - suffix `-NNN` is optional
        - Year is parsed from the first 2 digits (`YY`)
        - Serial is parsed from the middle section (`SSSSSSS`) and used in topics/entity prefixes
        - Last 3 digits (`NNN`), if present, are ignored by the radio protocol
      - Example:
+
        ```cpp
        // Label text: 23-1875247-234  (with suffix, 12 digits)
        #define METER_CODE "23-1875247-234"
 
-       // Same meter, without suffix (9 digits — also valid)
+       // Same meter, without suffix (9 digits - also valid)
        #define METER_CODE "23-1875247"
 
        // Label with leading zeros in serial: 23-0123456-234
        #define METER_CODE "23-0123456-234"
        ```
+
      - ![Cyble Meter Label](docs/images/meter_label.jpg)
      - **Wi-Fi PHY Mode**: To enable 802.11g Wi-Fi PHY mode, set `ENABLE_WIFI_PHY_MODE_11G` to `1` in the `private.h` file. By default, it is set to `0` (disabled).
      - Radio debug: control verbose CC1101/RADIAN debug output with `DEBUG_CC1101` in `private.h`.
@@ -609,6 +649,7 @@ This project uses GitHub Actions for automated building, testing, and code quali
 Every push and pull request triggers builds and quality checks to ensure code quality and compatibility.
 
 The CI workflows include:
+
 - **Build Workflows**: Builds the project for both ESP8266 (huzzah) and ESP32 (esp32dev) platforms to validate that the code compiles successfully
 - **Code Quality**: Runs static analysis using cppcheck and formatting checks with clang-format to identify potential issues and maintain code consistency
 - **Dependency Caching**: Caches dependencies for faster builds
@@ -627,12 +668,14 @@ By default, the schedule is set to `Monday-Friday`.
 You can change this in the `private.h` file by modifying the `DEFAULT_READING_SCHEDULE`.
 
 Available options:
+
 - `"Monday-Friday"`: Queries the meter only on weekdays.
 - `"Monday-Saturday"`: Queries the meter from Monday to Saturday.
 - `"Monday-Sunday"`: Queries the meter every day.
 - `"Monday"`, `"Tuesday"`, `"Wednesday"`, `"Thursday"`, `"Friday"`, `"Saturday"`, `"Sunday"`: Queries the meter only on that day.
 
 Example configuration in `private.h`:
+
 ```cpp
 #define DEFAULT_READING_SCHEDULE "Monday-Saturday"
 
@@ -724,7 +767,7 @@ Ways to find the best frequency:
 
 The effective frequency is printed at startup:
 
-```
+```text
 > Frequency (effective): 433.820000 MHz
 ```
 
@@ -768,9 +811,10 @@ See `ADAPTIVE_FREQUENCY_FEATURES.md` for deeper technical notes.
 
 ## Troubleshooting
 
-### 🔴 Corrupted or Invalid Volume Readings
+### Corrupted or Invalid Volume Readings
 
 **Symptoms:**
+
 - Volume reads as 0, very small values, or negative numbers
 - Historical data shows impossible decreases
 - Battery showing as 0 months
@@ -783,11 +827,12 @@ Enable hex dump debugging to see the raw 200-byte decoded frame:
 **MQTT:** Set `#define DEBUG_CC1101 1` in `include/private.h`
 
 This outputs detailed byte-by-byte data to help identify:
+
 - Wrong byte offsets for your specific meter variant
 - Regional/manufacturing date differences in data layout
 - Corrupted fields causing parsing errors
 
-**📖 Complete guide:** [docs/TROUBLESHOOTING_CORRUPTED_READINGS.md](docs/TROUBLESHOOTING_CORRUPTED_READINGS.md)
+**Complete guide:** [docs/TROUBLESHOOTING_CORRUPTED_READINGS.md](docs/TROUBLESHOOTING_CORRUPTED_READINGS.md)
 
 ---
 
@@ -804,19 +849,19 @@ Try the following in order:
   ```powershell
   & "$env:USERPROFILE\.platformio\penv\Scripts\platformio.exe" upgrade
   & "$env:USERPROFILE\.platformio\penv\Scripts\platformio.exe" platform update espressif32
-```
+  ```
 
 - If it still fails, install the package into PlatformIO’s embedded Python (use the PlatformIO terminal to ensure the right interpreter is used):
 
   ```powershell
-& "$env:USERPROFILE\.platformio\penv\Scripts\python.exe" -m pip install --disable-pip-version-check --no-warn-script-location intelhex
-```
+  & "$env:USERPROFILE\.platformio\penv\Scripts\python.exe" -m pip install --disable-pip-version-check --no-warn-script-location intelhex
+  ```
 
 - Re-run the ESP32 build explicitly through PlatformIO’s bundled executable:
 
   ```powershell
-& "$env:USERPROFILE\.platformio\penv\Scripts\platformio.exe" run --environment esp32dev
-```
+  & "$env:USERPROFILE\.platformio\penv\Scripts\platformio.exe" run --environment esp32dev
+  ```
 
 Notes
 
@@ -839,10 +884,8 @@ You may use an RTL-SDR to measure the required offset and rerun the Frequency Di
 
 > [!TIP]
 > Your meter may be configured to listen for requests only during business hours to conserve energy.
-If you are unable to communicate with the meter, try again during business hours (8:00–16:00), Monday to Friday.
-As a rule of thumb, set up your device during business hours to avoid confusion and unnecessary troubleshooting.
-
-> [!NOTE]
+> If you are unable to communicate with the meter, try again during business hours (8:00–16:00), Monday to Friday.
+> As a rule of thumb, set up your device during business hours to avoid confusion and unnecessary troubleshooting.
 > This is particularly relevant in the UK.
 
 ### Serial Number Starting with 0
@@ -857,21 +900,43 @@ However, be mindful of the distance for effective use.
 
 ---
 
+## Important: Utility Read Counter Compatibility
+
+> [!IMPORTANT]
+> The meter includes a built-in **read counter** that increments each time it's queried. When your water/gas company performs wireless readings, they expect this counter to match their scheduled read count. **This is not an MQTT or ESP issue** - it's how the RADIAN protocol and meter hardware work.
+
+If you regularly read your meter yourself:
+
+- The counter will be **higher than expected** when the utility reads it
+- Their equipment may flag this discrepancy or refuse to download data
+- They may suspect tampering or out-of-sync equipment
+
+### Recommended Actions
+
+1. **Record your initial counter value** when you first start using this device (check the Home Assistant sensor or MQTT topic `/counter`).
+2. **If the utility reports issues**:
+   - They can still take a **manual reading** from the physical meter display (traditional method).
+   - Or you can **loop the counter** back to the expected value: the read counter wraps at 255 back to 0, so making enough reads before their scheduled visit can "reset" it (automate this in Home Assistant if needed).
+
+**Note:** Most utilities won't notice or care, but it's good to be aware of this if they mention unexpected counter values during their wireless reading attempts.
+
+---
+
 ## Credits
 
 This project builds on reverse engineering efforts by:
 
-- La Maison Simon (http://www.lamaisonsimon.fr/)
+- La Maison Simon (<http://www.lamaisonsimon.fr/>)
 - @neutrinus and @psykokwak on GitHub
 
-The original software (and much of the foundational work) was initially developed [here](http://www.lamaisonsimon.fr/wiki/doku.php?id=maison2:compteur_d_eau:compteur_d_eau), later published on GitHub by @neutrinus [here](https://github.com/neutrinus/everblu-meters), and subsequently forked by [psykokwak](https://github.com/psykokwak-com/everblu-meters-esp8266).
+The original software (and much of the foundational work) was initially developed [on the La Maison Simon wiki](http://www.lamaisonsimon.fr/wiki/doku.php?id=maison2:compteur_d_eau:compteur_d_eau), later published on GitHub by @neutrinus [in the everblu-meters repository](https://github.com/neutrinus/everblu-meters), and subsequently forked by [psykokwak](https://github.com/psykokwak-com/everblu-meters-esp8266).
 
 Their original projects did not include an open-source license.
 If you reuse or modify their specific code portions, please review their repositories and respect any stated limitations or intentions.
 
 ---
 
-## ⚠️ Legal Notice
+## Legal Notice
 
 **Radio Licensing**: The 433 MHz ISM band is license-exempt in UK/EU for low-power (<10 mW) use under ETSI EN 300-220.
 
@@ -883,7 +948,7 @@ The transmission is technically between the meter and utility.
 **Recommendation**: This project is for **personal use on your own property only**.
 Consider obtaining utility permission. Never use on meters you don't own. Proceed at your own risk.
 
-📄 **For detailed legal analysis, protocol history, and encryption details, see [LEGAL_NOTICE.md](docs/LEGAL_NOTICE.md)**
+**For detailed legal analysis, protocol history, and encryption details, see [LEGAL_NOTICE.md](docs/LEGAL_NOTICE.md)**
 
 ### Community Resources
 

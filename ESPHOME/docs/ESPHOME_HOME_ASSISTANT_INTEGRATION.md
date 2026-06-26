@@ -5,6 +5,7 @@ This guide explains how to access meter data in Home Assistant and set up reliab
 ## Overview
 
 The ESPHome component publishes meter data through two primary sensors:
+
 - **`volume`** sensor: Current meter reading (numeric value)
 - **`history`** text sensor: JSON containing historical data
 
@@ -78,6 +79,7 @@ template:
 First, create an input number to calibrate if needed:
 
 **UI Method:**
+
 1. Go to **Settings** → **Devices & Services** → **Helpers**
 2. Click **+ Create Helper** → **Number**
 3. Configure:
@@ -88,6 +90,7 @@ First, create an input number to calibrate if needed:
    - **Unit**: `L`
 
 **YAML Method** (in `configuration.yaml`):
+
 ```yaml
 input_number:
   water_meter_calibration_offset:
@@ -122,15 +125,18 @@ template:
 #### 3. Create Utility Meter Helper
 
 **UI Method:**
+
 1. Go to **Settings** → **Devices & Services** → **Helpers**
 2. Click **+ Create Helper** → **Utility Meter**
 3. Configure:
    - **Name**: `Water Consumption`
    - **Input sensor**: `sensor.water_meter_calibrated` (or `sensor.everblu_meter_volume`)
+
    - **Meter reset**: Choose your billing cycle (Daily, Weekly, Monthly, Yearly, or Never)
    - **Tariffs**: Leave empty unless you have time-based pricing
 
 **YAML Method** (in `configuration.yaml`):
+
 ```yaml
 utility_meter:
   water_consumption_daily:
@@ -144,11 +150,13 @@ utility_meter:
   water_consumption_yearly:
     source: sensor.water_meter_calibrated
     cycle: yearly
+
 ```
 
 #### 4. Add to Dashboard
 
 The utility meters will appear as sensors:
+
 - `sensor.water_consumption_daily`
 - `sensor.water_consumption_monthly`
 - `sensor.water_consumption_yearly`
@@ -278,12 +286,14 @@ cards:
       - sum
     period:
       calendar:
+
         period: month
 ```
 
 ## Gas Meters
 
 For gas meters, replace:
+
 - `unit_of_measurement: "L"` → `unit_of_measurement: "m³"`
 - `device_class: water` → `device_class: gas`
 
@@ -314,7 +324,7 @@ The same principles and setup process apply.
 ## Benefits Summary
 
 | Without Utility Meter | With Utility Meter |
-|----------------------|-------------------|
+| --- | --- |
 | Data lost if ESP offline | Always available |
 | History lost on hardware change | Continuous history |
 | No consumption cycles | Daily/Weekly/Monthly/Yearly tracking |

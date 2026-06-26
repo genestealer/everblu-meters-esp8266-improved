@@ -1,6 +1,7 @@
 # Feature Implementation Summary: Optional Meter Prefix
 
 ## Issue Reference
+
 **Issue #48:** Make meter number prefix optional
 
 **Problem:** Users running a single meter for an extended period lose their Home Assistant history when entity IDs change due to meter serial prefixes.
@@ -14,11 +15,13 @@
 ### 1. **Configuration Files**
 
 #### `include/private.example.h`
+
 - Added new configuration option: `ENABLE_METER_PREFIX_IN_ENTITY_IDS`
 - Default: `1` (enabled - maintains backward compatibility)
 - Comprehensive documentation in comments
 
 #### `include/private.h`
+
 - Added same configuration option with matching documentation
 - Allows users to easily customize their builds
 
@@ -68,19 +71,25 @@
 ### 3. **Documentation**
 
 #### `docs/METER_PREFIX_CONFIGURATION.md` (NEW)
+
 Comprehensive guide including:
+
 - Problem statement and solution overview
 - Configuration options and default behavior
 - Usage scenarios (single-meter vs multi-meter)
 - What changes when prefix is disabled
 - Migration guide from v1.15
 - Home Assistant integration examples
+
 - Troubleshooting section
+
 - Technical implementation details
 - FAQs
 
 #### `docs/METER_PREFIX_QUICKSTART.md` (NEW)
+
 Quick reference guide for users:
+
 - TL;DR section with immediate solution
 - Default behavior explanation
 - Quick reference table for scenarios
@@ -101,6 +110,7 @@ The feature uses C++ preprocessor conditionals for zero runtime overhead:
   json += "  \"uniq_id\": \"" + String(METER_SERIAL) + "_everblu_meter_value\",\n";
 #else
   // Omit serial prefix for single-meter setup
+
   json += "  \"uniq_id\": \"everblu_meter_value\",\n";
 #endif
 ```
@@ -108,11 +118,13 @@ The feature uses C++ preprocessor conditionals for zero runtime overhead:
 ### Entity ID Examples
 
 **With Prefix Enabled (Default):**
+
 ```
 Meter 257750:
   - 257750_everblu_meter_value
   - 257750_everblu_meter_battery
   - 257750_everblu_meter_counter
+
 
 Meter 2777550:
   - 2777550_everblu_meter_value
@@ -121,6 +133,7 @@ Meter 2777550:
 ```
 
 **With Prefix Disabled:**
+
 ```
 All meters use:
   - everblu_meter_value
@@ -133,6 +146,7 @@ All meters use:
 The `ENABLE_METER_PREFIX_IN_ENTITY_IDS` setting controls whether the meter serial is included in both MQTT topics and Home Assistant entity IDs/discovery paths.
 
 - **Prefix enabled:** MQTT base topic `everblu/cyble/{METER_SERIAL}/*`
+
 - **Prefix disabled:** MQTT base topic `everblu/cyble/*`
 
 Home Assistant entity IDs and discovery message paths follow the same prefix behavior described above.
@@ -142,7 +156,9 @@ Home Assistant entity IDs and discovery message paths follow the same prefix beh
 ## Backward Compatibility
 
 ✅ **Fully backward compatible:**
+
 - Default value is `1` (enabled)
+
 - Existing configurations require NO changes
 - Multi-meter setups work identically to before
 - Compilation time overhead: **ZERO** (compile-time conditionals)
@@ -153,13 +169,16 @@ Home Assistant entity IDs and discovery message paths follow the same prefix beh
 ## Testing Scenarios
 
 ### Scenario 1: Single Meter (Prefix Disabled)
+
 1. Set `ENABLE_METER_PREFIX_IN_ENTITY_IDS = 0`
 2. Compile and upload
 3. Entity IDs appear without serial prefix
+
 4. Existing Home Assistant entities match by ID
 5. Historical data preserved ✓
 
 ### Scenario 2: Multiple Meters (Default Enabled)
+
 1. Leave default `ENABLE_METER_PREFIX_IN_ENTITY_IDS = 1`
 2. Compile and upload to each device
 3. Each meter's entities have unique prefixes
@@ -167,9 +186,12 @@ Home Assistant entity IDs and discovery message paths follow the same prefix beh
 5. Home Assistant distinguishes each meter ✓
 
 ### Scenario 3: Meter Replacement (Prefix Disabled)
+
 1. Replace meter with new one (different serial)
 2. Keep `ENABLE_METER_PREFIX_IN_ENTITY_IDS = 0`
+
 3. New meter publishes to same entity IDs
+
 4. History continuity preserved ✓
 
 ---
@@ -177,23 +199,31 @@ Home Assistant entity IDs and discovery message paths follow the same prefix beh
 ## Build Instructions
 
 ### Standard PlatformIO Build
+
 ```bash
+
 pio run
 ```
 
 ### With Prefix Disabled
+
 1. Edit `include/private.h`:
+
    ```cpp
    #define ENABLE_METER_PREFIX_IN_ENTITY_IDS 0
    ```
+
 2. Build:
+
    ```bash
    pio run
    ```
 
 ### To Reset to Default
+
 ```cpp
 #define ENABLE_METER_PREFIX_IN_ENTITY_IDS 1
+
 pio run
 ```
 
@@ -213,11 +243,14 @@ pio run
 ### Entities Created
 
 **With prefix enabled:**
+
 - Entity domain: `sensor`, `button`, `binary_sensor`
 - Entity ID: `sensor.{METER_SERIAL}_everblu_meter_value`
+
 - Unique ID: `{METER_SERIAL}_everblu_meter_value`
 
 **With prefix disabled:**
+
 - Entity domain: `sensor`, `button`, `binary_sensor`
 - Entity ID: `sensor.everblu_meter_value`
 - Unique ID: `everblu_meter_value`
@@ -225,9 +258,11 @@ pio run
 ### Discovery Topics
 
 **With prefix enabled:**
+
 - Path: `homeassistant/sensor/{METER_SERIAL}_everblu_meter_value/config`
 
 **With prefix disabled:**
+
 - Path: `homeassistant/sensor/everblu_meter_value/config`
 
 ---
@@ -235,6 +270,7 @@ pio run
 ## Technical Details
 
 ### Modified Functions
+
 - `getMeterPrefix()` - NEW helper function
 - `buildDeviceJson()` - Conditional device ID
 - `buildDiscoveryJson()` - Uses getMeterPrefix()
@@ -242,10 +278,12 @@ pio run
 - `publishHADiscovery()` - All discovery messages use getMeterPrefix()
 
 ### Modified Variables
+
 - `mqttBaseTopic` - Conditionally includes meter serial
 - `mqttLwtTopic` - Conditionally includes meter serial
 
 ### New Configuration Keys
+
 - `ENABLE_METER_PREFIX_IN_ENTITY_IDS` in private.h
 
 ---
@@ -264,15 +302,18 @@ pio run
 ## User Actions Required
 
 ### For Single-Meter Users (To Preserve History)
+
 1. Edit `include/private.h`
 2. Change `#define ENABLE_METER_PREFIX_IN_ENTITY_IDS 0`
 3. Recompile with `pio run`
 4. Upload to device
 
 ### For Multi-Meter Users
+
 - **No changes required** - default behavior unchanged
 
 ### For Existing v1.15 Users
+
 - Review the [Migration Guide](METER_PREFIX_CONFIGURATION.md#migration-guide)
 - Apply prefix-disabled setting if running single meter
 

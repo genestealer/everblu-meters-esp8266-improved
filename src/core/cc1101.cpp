@@ -87,13 +87,29 @@ static const uint8_t debug_out = (uint8_t)(DEBUG_CC1101);
 
 /*-------------------------[CC1100 - Register Values]----------------------------*/
 // IOCFG2 - GDO2 Output Pin Configuration
-#define IOCFG2_SERIAL_DATA_OUTPUT 0x0D // GDO2: Serial Data Output
+// GDO2's meaning is switched dynamically per phase: TX feeding uses the TX FIFO
+// threshold signal (0x02); RADIAN frame reception uses the RX FIFO threshold /
+// end-of-packet signal (0x01) so the RX drain loop can skip needless RXBYTES reads.
+#define IOCFG2_SERIAL_DATA_OUTPUT 0x0D // GDO2: Serial Data Output (kept for reference, not used)
+#define IOCFG2_TX_FIFO_THR 0x02        // GDO2: asserts HIGH when TX FIFO >= threshold; de-asserts LOW when below threshold
+#define IOCFG2_RX_FIFO_THR_OR_EOP 0x01 // GDO2: asserts HIGH when RX FIFO >= threshold OR end-of-packet; de-asserts LOW when RX FIFO empty
 
 // IOCFG0 - GDO0 Output Pin Configuration
 #define IOCFG0_SYNC_WORD_DETECT 0x06 // Asserts when sync word detected, deasserts at end of packet
 
 // FIFOTHR - RX FIFO and TX FIFO Thresholds
-#define FIFOTHR_FIFO_THR_33_32 0x47 // RX FIFO threshold: 33 bytes, TX FIFO threshold: 32 bytes
+// FIFO_THR=9 (0x49): TX threshold=25 bytes - de-assertion guarantees >=40 free bytes, safely fits both
+//                    the 8-byte WUP buffer and the 39-byte interrogation frame with a single GDO2 check.
+//                    RX threshold=40 bytes - GDO2 (IOCFG2=0x01) asserts once the RX FIFO holds >=40 bytes,
+//                    letting the RX drain loop skip RXBYTES SPI reads until a worthwhile chunk is buffered.
+#define FIFOTHR_FIFO_THR_33_32 0x47 // FIFO_THR=7: TX threshold 33 bytes, RX threshold 33 bytes (legacy)
+#define FIFOTHR_FIFO_THR_25_40 0x49 // FIFO_THR=9: TX threshold 25 bytes, RX threshold 40 bytes
+
+// RX FIFO threshold in bytes for FIFOTHR_FIFO_THR_25_40 (FIFO_THR=9). The RX drain
+// loop uses this to know when the GDO2 fast-path no longer applies: the final tail
+// of a frame (< this many bytes) never raises GDO2 under infinite packet length
+// (no end-of-packet), so RXBYTES polling must resume to drain it.
+#define RX_FIFO_THRESHOLD_BYTES 40
 
 // SYNC1/SYNC0 - Sync Word Configuration
 #define SYNC1_PATTERN_55 0x55 // Sync word pattern: 0x55 (01010101)
@@ -219,6 +235,7 @@ using CC1101SpiDevice = esphome::spi::SPIDevice<esphome::spi::BIT_ORDER_MSB_FIRS
                                                 esphome::spi::DATA_RATE_1MHZ>;
 static CC1101SpiDevice *_spi_device = nullptr;
 static int _gdo0_pin = -1;
+static int _gdo2_pin = -1;
 
 void cc1101_set_spi_device(void *device)
 {
@@ -231,11 +248,27 @@ void cc1101_set_gdo0_pin(int gdo0_pin)
   _gdo0_pin = gdo0_pin;
 }
 
-// Macro to get GDO0 pin - use variable in ESPHome mode, build flag otherwise
+void cc1101_set_gdo2_pin(int gdo2_pin)
+{
+  _gdo2_pin = gdo2_pin;
+}
+
+// Macros to get GDO pin numbers - use variables in ESPHome mode, build flags otherwise
 #define GET_GDO0_PIN() (_gdo0_pin)
+#define GET_GDO2_PIN() (_gdo2_pin)
 #else
-// Non-ESPHome mode: GDO0 comes from build flag
+// Non-ESPHome mode: GDO0 comes from build flag.
+// GDO2 hardware-assisted FIFO management is ENABLED BY DEFAULT (v3.0.0+, breaking change).
+// Wire CC1101 GDO2 to a free GPIO and add '#define GDO2 <pin>' to include/private.h.
+// To keep the legacy SPI-polling behaviour instead, add '#define DISABLE_GDO2_FIFO_MANAGEMENT'.
 #define GET_GDO0_PIN() (GDO0)
+#if defined(GDO2)
+#define GET_GDO2_PIN() (GDO2)
+#elif defined(DISABLE_GDO2_FIFO_MANAGEMENT)
+#define GET_GDO2_PIN() (-1)
+#else
+#error "BREAKING CHANGE (v3.0.0): CC1101 GDO2 hardware-assisted FIFO management is now enabled by default. Wire CC1101 GDO2 to a free GPIO and add '#define GDO2 <pin>' to include/private.h (see the README Hardware section and docs/GDO2_FIFO_MANAGEMENT.md). To keep the legacy SPI-polling behaviour instead, add '#define DISABLE_GDO2_FIFO_MANAGEMENT' to include/private.h."
+#endif
 #endif
 
 // Change these define according to your ESP8266 board
@@ -527,11 +560,16 @@ void cc1101_configureRF_0(float freq)
   //
   // RF settings for CC1101 - RADIAN protocol (Itron EverBlu)
   //
-  halRfWriteReg(IOCFG2, IOCFG2_SERIAL_DATA_OUTPUT); // GDO2: Serial data output
-  halRfWriteReg(IOCFG0, IOCFG0_SYNC_WORD_DETECT);   // GDO0: Sync word detection
-  halRfWriteReg(FIFOTHR, FIFOTHR_FIFO_THR_33_32);   // FIFO thresholds
-  halRfWriteReg(SYNC1, SYNC1_PATTERN_55);           // Sync word MSB: 0x55
-  halRfWriteReg(SYNC0, SYNC0_PATTERN_00);           // Sync word LSB: 0x00
+  // GDO2: configured here as the TX FIFO threshold signal (IOCFG2_TX_FIFO_THR = 0x02)
+  // for the transmit phase. receive_radian_frame() temporarily switches IOCFG2 to the
+  // RX FIFO threshold / end-of-packet signal (0x01) during reception and the next TX
+  // phase restores 0x02. When GDO2 is not physically wired, the output is unused and
+  // both phases fall back to SPI polling (TXBYTES on TX, RXBYTES on RX).
+  halRfWriteReg(IOCFG2, IOCFG2_TX_FIFO_THR);      // GDO2: TX FIFO at/above threshold
+  halRfWriteReg(IOCFG0, IOCFG0_SYNC_WORD_DETECT); // GDO0: Sync word detection
+  halRfWriteReg(FIFOTHR, FIFOTHR_FIFO_THR_25_40); // FIFO thresholds: TX=25 bytes, RX=40 bytes
+  halRfWriteReg(SYNC1, SYNC1_PATTERN_55);         // Sync word MSB: 0x55
+  halRfWriteReg(SYNC0, SYNC0_PATTERN_00);         // Sync word LSB: 0x00
 
   halRfWriteReg(PKTCTRL1, PKTCTRL1_NO_ADDR_CHECK); // No address check
   halRfWriteReg(PKTCTRL0, PKTCTRL0_FIXED_LENGTH);  // Fixed packet length
@@ -573,6 +611,13 @@ bool cc1101_init(float freq)
 #endif
 
   pinMode(GET_GDO0_PIN(), INPUT_PULLUP);
+
+  // GDO2 is optional; configure as input only when a pin is assigned.
+  if (GET_GDO2_PIN() >= 0)
+  {
+    pinMode(GET_GDO2_PIN(), INPUT);
+    echo_debug(debug_out, "[CC1101] GDO2 pin %d configured as TX FIFO threshold input\n", GET_GDO2_PIN());
+  }
 
   // Initialize SPI transport for CC1101 communication.
   // Standalone builds configure Arduino SPI here at 500 kHz.
@@ -692,9 +737,9 @@ void show_cc1101_registers_settings(void)
 
 uint8_t is_look_like_radian_frame(uint8_t *buffer, size_t len)
 {
-  int i, ret;
+  int ret;
   ret = FALSE;
-  for (i = 0; i < len; i++)
+  for (size_t i = 0; i < len; i++)
   {
     if (buffer[i] == 0xFF)
       ret = TRUE;
@@ -956,7 +1001,7 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
       if (history_ok && data.volume > 0 && num_values > 0)
       {
         uint32_t newest = data.history[num_values - 1];
-        if (newest > data.volume)
+        if (newest > (uint32_t)data.volume)
         {
           uint32_t diff = newest - data.volume;
           // Allow a small tolerance for off-by-one / rounding, but reject
@@ -1251,6 +1296,11 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
     return 0;
   }
   CC1101_CMD(SFRX);
+  // Switch GDO2 to the RX FIFO threshold / end-of-packet signal for this receive
+  // phase (IOCFG2 = 0x01). The Stage 2 drain loop uses it to skip RXBYTES SPI reads
+  // until the FIFO has buffered a worthwhile chunk. The next TX phase restores 0x02.
+  if (GET_GDO2_PIN() >= 0)
+    halRfWriteReg(IOCFG2, IOCFG2_RX_FIFO_THR_OR_EOP);
   halRfWriteReg(MCSM1, MCSM1_CCA_ALWAYS_RX);       // CCA always, RX on exit
   halRfWriteReg(MDMCFG2, MDMCFG2_2FSK_16_16_SYNC); // 2-FSK, 16/16 sync bits
   /* configure to receive beginning of sync pattern */
@@ -1367,12 +1417,27 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
     return 0;
   }
   uint16_t l_expected_bytes = l_radian_frame_size_byte * 4;
+  bool l_use_gdo2 = (GET_GDO2_PIN() >= 0);
   while ((l_total_byte < l_expected_bytes) && (l_tmo < rx_tmo_ms))
   {
     delay(5);
     l_tmo += 5; // wait for some byte received
     if (l_tmo % 50 == 0)
       FEED_WDT(); // Feed watchdog every 50ms during frame receive
+
+    // GDO2 fast path (IOCFG2 = RX FIFO threshold / EOP): GDO2 is HIGH only once the
+    // RX FIFO holds at least RX_FIFO_THRESHOLD_BYTES. While it is LOW the FIFO is
+    // below threshold, so an RXBYTES SPI read would return little or nothing - skip
+    // it to avoid needless SPI traffic. Exception: the final tail of the frame
+    // (< threshold bytes) never raises GDO2 under infinite packet length (there is
+    // no end-of-packet), so once we are within one threshold of the expected total
+    // we must resume RXBYTES polling to drain those last bytes.
+    if (l_use_gdo2 && digitalRead(GET_GDO2_PIN()) == LOW &&
+        (l_expected_bytes - l_total_byte) > RX_FIFO_THRESHOLD_BYTES)
+    {
+      continue; // not enough buffered yet; skip the unnecessary RXBYTES read
+    }
+
     l_byte_in_rx = (halRfReadReg(RXBYTES_ADDR) & RXBYTES_MASK);
     if (l_byte_in_rx)
     {
@@ -1527,6 +1592,11 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
   delay(1);          // Brief settle time after flush
   echo_debug(debug_out, "[CC1101] Pre-TX reset: IDLE + FIFO flush complete\n");
 
+  // Ensure GDO2 signals the TX FIFO threshold for this transmit phase. A previous
+  // receive_radian_frame() call may have left IOCFG2 set to the RX threshold (0x01).
+  if (GET_GDO2_PIN() >= 0)
+    halRfWriteReg(IOCFG2, IOCFG2_TX_FIFO_THR);
+
   halRfWriteReg(MDMCFG2, MDMCFG2_NO_PREAMBLE_SYNC);  // No preamble/sync for WUP
   halRfWriteReg(PKTCTRL0, PKTCTRL0_INFINITE_LENGTH); // Infinite packet length
 
@@ -1569,74 +1639,128 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
     {
       if (wup2send < 0xFF)
       {
-        if (CC1101_status_FIFO_FreeByte <= 10)
-        { // this gives 10+20ms from previous frame : 8*8/2.4k=26.6ms  time to send a wupbuffer
-          delay(20);
-          tmo++;
-          tmo++;
+        if (GET_GDO2_PIN() >= 0)
+        {
+          // GDO2 configured: asserts HIGH when TX FIFO >= 25 bytes (FIFOTHR_FIFO_THR_25_40).
+          // Only refill when GDO2 de-asserts LOW (FIFO below threshold, >= 40 free bytes).
+          // This replaces the stale CC1101_status_FIFO_FreeByte check + fixed delay(20) with
+          // a real-time hardware signal, preventing underflows under ESPHome scheduler load.
+          if (digitalRead(GET_GDO2_PIN()) == LOW)
+          {
+            SPIWriteBurstReg(TX_FIFO_ADDR, wupbuffer, 8);
+            wup2send--;
+          }
+          // else: FIFO still above threshold - skip write this iteration
         }
-        SPIWriteBurstReg(TX_FIFO_ADDR, wupbuffer, 8);
-        wup2send--;
+        else
+        {
+          // Fallback: use SPI status byte FIFO level (may be stale by one transaction).
+          if (CC1101_status_FIFO_FreeByte <= 10)
+          { // this gives 10+20ms from previous frame : 8*8/2.4k=26.6ms  time to send a wupbuffer
+            delay(20);
+            tmo++;
+            tmo++;
+          }
+          SPIWriteBurstReg(TX_FIFO_ADDR, wupbuffer, 8);
+          wup2send--;
+        }
       }
     }
     else
     {
-      // Wait for enough FIFO space for the 39-byte interrogation frame.
-      // Poll TXBYTES register instead of fixed delay(130) to prevent
-      // TXFIFO_UNDERFLOW when FIFO level is low. This commonly occurs in
-      // ESPHome builds where yield()/delay() service heavy background tasks
-      // (WiFi, API server, OTA, logger, mDNS, web_server) causing the FIFO
-      // feeding loop to fall behind the 2.4 kbps TX drain rate.
-      // See: https://github.com/genestealer/everblu-meters-esp8266-improved/issues/58
+      // Wait for TX FIFO to drain enough to fit the 39-byte interrogation frame.
+      // Only write when FIFO space is confirmed; skip and retry the outer TX loop if
+      // the safety limit fires before the FIFO drains (avoids write with no headroom).
+      bool fifo_ready = false;
+      if (GET_GDO2_PIN() >= 0)
       {
+        // With FIFOTHR_FIFO_THR_25_40: GDO2 de-asserts (LOW) when FIFO < 25 bytes,
+        // guaranteeing >= 40 free bytes - safely fits the 39-byte frame.
+        // See: https://github.com/genestealer/everblu-meters-esp8266-improved/issues/83
+        uint8_t wait_count = 0;
+        while (digitalRead(GET_GDO2_PIN()) == HIGH && wait_count < 100) // Safety limit ~500ms
+        {
+          delay(5);
+          wait_count++;
+          if (wait_count % 10 == 0)
+            FEED_WDT();
+        }
+        // Final underflow check: if FIFO underflowed during the wait, abort TX loop.
+        uint8_t txbytes_reg = halRfReadReg(TXBYTES_ADDR);
+        if (txbytes_reg & 0x80)
+        {
+          marcstate = halRfReadReg(MARCSTATE_ADDR); // refresh so tx_aborted check below is accurate
+          break;                                    // TXFIFO_UNDERFLOW already occurred
+        }
+        // Confirm GDO2 is actually LOW (FIFO drained), not merely timed out with FIFO still full.
+        fifo_ready = (digitalRead(GET_GDO2_PIN()) == LOW);
+      }
+      else
+      {
+        // Fallback: poll TXBYTES register until <= 25 bytes remain (39 free bytes).
+        // See: https://github.com/genestealer/everblu-meters-esp8266-improved/issues/58
         uint8_t wait_count = 0;
         while (wait_count < 100) // Safety limit ~500ms
         {
           uint8_t txbytes_reg = halRfReadReg(TXBYTES_ADDR);
           if (txbytes_reg & 0x80)
-            break; // TXFIFO_UNDERFLOW already occurred
+            break; // TXFIFO_UNDERFLOW - marcstate check at loop bottom will abort
           uint8_t num_txbytes = txbytes_reg & 0x7F;
           if (num_txbytes <= 25)
-            break; // 64 - 25 = 39 free bytes available
+          {
+            fifo_ready = true; // 64 - 25 = 39 free bytes confirmed
+            break;
+          }
           delay(5);
           wait_count++;
           if (wait_count % 10 == 0)
             FEED_WDT();
         }
       }
-      SPIWriteBurstReg(TX_FIFO_ADDR, txbuffer, 39);
-      if (debug_out && 0)
+      if (fifo_ready)
       {
-        echo_debug(debug_out, "txbuffer:\n");
-        show_in_hex_array(&txbuffer[0], 39);
+        SPIWriteBurstReg(TX_FIFO_ADDR, txbuffer, 39);
+        if (debug_out && 0)
+        {
+          echo_debug(debug_out, "txbuffer:\n");
+          show_in_hex_array(&txbuffer[0], 39);
+        }
+        wup2send = 0xFF;
       }
-      wup2send = 0xFF;
     }
     delay(10);
     tmo++;
     marcstate = halRfReadReg(MARCSTATE_ADDR); // read out state of cc1100 to be sure in IDLE and TX is finished this update also CC1101_status_state
     // echo_debug(debug_out,"%ifree_byte:0x%02X sts:0x%02X\n",tmo,CC1101_status_FIFO_FreeByte,CC1101_status_state);
 
-    // Detect TXFIFO_UNDERFLOW (MARCSTATE 0x16) early and abort instead of
-    // spinning for the full TX timeout. The FIFO underflowed mid-TX,
-    // so continuing to feed data is pointless.
-    if ((marcstate & 0x1F) == 0x16) // TXFIFO_UNDERFLOW
+    // MARCSTATE 0x16 means the TX FIFO has emptied. Once the full wake-up burst
+    // and interrogation frame have been clocked out on-air, this is the normal,
+    // expected end of transmission - there is simply no more data left to send,
+    // so we stop feeding and move on to listen for the meter's reply. This is
+    // NOT a code fault. (An unusually early exit here would instead indicate the
+    // feeding loop fell behind the 2.4 kbps drain rate, e.g. under heavy
+    // background load.)
+    if ((marcstate & 0x1F) == 0x16) // TX FIFO drained - end of transmit burst
     {
-      echo_debug(1, "[CC1101] TXFIFO_UNDERFLOW detected at tmo=%d, aborting TX loop\n", tmo);
+      echo_debug(1, "[CC1101] Wake-up burst sent; TX FIFO drained at tmo=%d (normal end of transmit)\n", tmo);
       break;
     }
   }
 
-  // Check if TX was aborted due to underflow
-  bool tx_aborted = ((marcstate & 0x1F) == 0x16);
-  if (tx_aborted)
+  // A drained TX FIFO (MARCSTATE 0x16) is the normal end of transmit. The only
+  // abnormal case here is the loop hitting its timeout WITHOUT the FIFO ever
+  // draining, which points to an SPI/feeding problem rather than anything RF.
+  // Reaching this point says nothing about whether the meter replied - that is
+  // determined below by the ACK/data frames, so any "meter asleep / out of
+  // range / run a scan" guidance is deferred until a read actually fails.
+  bool tx_fifo_drained = ((marcstate & 0x1F) == 0x16);
+  if (tx_fifo_drained)
   {
-    echo_debug(1, "[METER] No response during wake-up/interrogation (TXFIFO_UNDERFLOW after %dms, MARCSTATE=0x%02X)\n", tmo * 10, marcstate & 0x1F);
-    echo_debug(1, "[METER] This is expected when meter is asleep, out of range, or Year/Serial is incorrect\n");
+    echo_debug(1, "[METER] Wake-up/interrogation transmitted in %dms (MARCSTATE=0x%02X)\n", tmo * 10, marcstate & 0x1F);
   }
   else
   {
-    echo_debug(1, "[METER] TX complete after %dms (MARCSTATE=0x%02X)\n", tmo * 10, marcstate & 0x1F);
+    echo_debug(1, "[METER] WARNING: TX loop timed out after %dms before the FIFO drained (MARCSTATE=0x%02X); possible SPI/feeding issue\n", tmo * 10, marcstate & 0x1F);
   }
   echo_debug(debug_out, "[CC1101] tmo=%i free_byte:0x%02X sts:0x%02X", tmo, CC1101_status_FIFO_FreeByte, CC1101_status_state);
   CC1101_CMD(SIDLE); // Ensure IDLE before flushing (required by CC1101 datasheet)
@@ -1710,13 +1834,16 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
     }
     else
     {
-      echo_debug(1, "[METER] ERROR: CRC validation failed\n");
+      echo_debug(1, "[METER] CRC check failed: a frame was received but arrived corrupted, so this reading was discarded.\n");
+      echo_debug(1, "[METER] This points to a marginal/noisy RF link (weak signal or a slight frequency offset), not a code fault. Improving antenna placement or running a frequency scan usually fixes it.\n");
       meter_data_size = 0;
     }
   }
   else
   {
-    echo_debug(1, "[METER] No data frame received (timeout)\n");
+    echo_debug(1, "[METER] No data frame received within the timeout window - the meter did not respond.\n");
+    echo_debug(1, "[METER] This usually means the meter is asleep (outside its daily listening window), out of range, the signal is too weak, or the configured Year/Serial is incorrect.\n");
+    echo_debug(1, "[METER] If this persists, try improving antenna placement or running a frequency scan to recalibrate the radio (see AUTO_SCAN_ENABLED / CLEAR_EEPROM_ON_BOOT).\n");
     echo_debug(debug_out, "[METER] Meter data frame timeout\n");
   }
   sdata.rssi = halRfReadReg(RSSI_ADDR);                              // Read RSSI value from CC1101

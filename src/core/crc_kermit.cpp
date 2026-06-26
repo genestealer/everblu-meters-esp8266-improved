@@ -1,3 +1,11 @@
+/**
+ * @file crc_kermit.cpp
+ * @brief Implementation of the CRC-16/KERMIT checksum
+ *
+ * Lazily builds a 256-entry lookup table on first use and computes the
+ * reflected CRC-16/KERMIT checksum used to validate RADIAN protocol frames.
+ */
+
 #include "crc_kermit.h"
 
 static bool crc_tab_init = false;

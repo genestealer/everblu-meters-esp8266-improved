@@ -5,23 +5,36 @@ Reads water/gas meter data from Itron EverBlu Cyble Enhanced meters
 using the RADIAN protocol over 433 MHz with a CC1101 transceiver.
 """
 
-import esphome.codegen as cg
-import esphome.config_validation as cv
+# Pylance/Pyright false positives in this file: ESPHome's config_validation types
+# cv.Optional's `default` parameter as the `Undefined` sentinel, so every concrete
+# default literal is flagged as reportArgumentType. The pin helpers likewise return
+# `Any | None`, which trips the same rule on cg.add(var.set_gdoX_pin(...)). All of
+# these are valid ESPHome usage, so disable just this rule for this file.
+# pyright: reportArgumentType=false
+
 from esphome import pins
-from esphome.components import sensor, text_sensor, binary_sensor, button, time as time_, spi
+import esphome.codegen as cg
+from esphome.components import (
+    binary_sensor,
+    button,
+    sensor,
+    spi,
+    text_sensor,
+    time as time_,
+)
+import esphome.config_validation as cv
 from esphome.const import (
-    CONF_ID,
     CONF_FREQUENCY,
+    CONF_ID,
     CONF_TIME_ID,
-    DEVICE_CLASS_ENERGY,
     DEVICE_CLASS_CONNECTIVITY,
     DEVICE_CLASS_RUNNING,
     DEVICE_CLASS_SIGNAL_STRENGTH,
     DEVICE_CLASS_TIMESTAMP,
-    STATE_CLASS_TOTAL_INCREASING,
     STATE_CLASS_MEASUREMENT,
-    UNIT_PERCENT,
+    STATE_CLASS_TOTAL_INCREASING,
     UNIT_DECIBEL_MILLIWATT,
+    UNIT_PERCENT,
 )
 
 DEPENDENCIES = ["time", "spi"]
@@ -32,8 +45,12 @@ AUTO_LOAD = ["sensor", "text_sensor", "binary_sensor", "button"]
 MULTI_CONF = True
 
 everblu_meter_ns = cg.esphome_ns.namespace("everblu_meter")
-EverbluMeterComponent = everblu_meter_ns.class_("EverbluMeterComponent", cg.PollingComponent)
-EverbluMeterTriggerButton = everblu_meter_ns.class_("EverbluMeterTriggerButton", button.Button)
+EverbluMeterComponent = everblu_meter_ns.class_(
+    "EverbluMeterComponent", cg.PollingComponent
+)
+EverbluMeterTriggerButton = everblu_meter_ns.class_(
+    "EverbluMeterTriggerButton", button.Button
+)
 
 # Configuration keys
 CONF_METER_CODE = "meter_code"
@@ -82,6 +99,7 @@ CONF_TUNED_FREQUENCY = "tuned_frequency"
 CONF_FREQUENCY_ESTIMATE = "frequency_estimate"
 CONF_REQUEST_READING_BUTTON = "request_reading_button"
 CONF_FREQUENCY_SCAN_BUTTON = "frequency_scan_button"
+CONF_WIDE_FREQUENCY_SCAN_BUTTON = "wide_frequency_scan_button"
 CONF_RESET_FREQUENCY_BUTTON = "reset_frequency_button"
 
 # Meter types
@@ -94,6 +112,8 @@ SCHEDULE_MONDAY_SATURDAY = "Monday-Saturday"
 SCHEDULE_MONDAY_SUNDAY = "Monday-Sunday"
 
 CONF_GDO0_PIN = "gdo0_pin"
+CONF_GDO2_PIN = "gdo2_pin"
+CONF_DISABLE_GDO2 = "disable_gdo2_fifo_management"
 
 
 def validate_meter_code(value):
@@ -102,7 +122,7 @@ def validate_meter_code(value):
     The code printed under the barcode has the format: YY-SSSSSSS-NNN
     Enter the value with dashes. The 3-digit suffix is optional.
       - First 2 digits : year (passed to the radio protocol as meter_year)
-      - Last 3 digits  : suffix / check digits (optional — ignored if present)
+      - Last 3 digits  : suffix / check digits (optional - ignored if present)
       - Middle digits  : serial number (leading zeros accepted; parsed as integer)
 
     Examples:
@@ -134,7 +154,9 @@ def validate_meter_code(value):
     if not serial_str.isdigit() or len(serial_str) != 7:
         raise cv.Invalid("meter_code serial section must be exactly 7 digits")
     if suffix_str and (len(suffix_str) != 3 or not suffix_str.isdigit()):
-        raise cv.Invalid("meter_code suffix section must be exactly 3 digits when provided")
+        raise cv.Invalid(
+            "meter_code suffix section must be exactly 3 digits when provided"
+        )
 
     year = int(year_str)
     if not serial_str:
@@ -161,24 +183,38 @@ CONFIG_SCHEMA = (
             cv.GenerateID(): cv.declare_id(EverbluMeterComponent),
             cv.Required(CONF_METER_CODE): validate_meter_code,
             cv.Required(CONF_GDO0_PIN): pins.internal_gpio_input_pin_schema,
+            cv.Optional(CONF_GDO2_PIN): pins.internal_gpio_input_pin_schema,
+            cv.Optional(CONF_DISABLE_GDO2, default=False): cv.boolean,
             cv.Required(CONF_TIME_ID): cv.use_id(time_.RealTimeClock),
             cv.Optional(CONF_METER_TYPE, default=METER_TYPE_WATER): cv.enum(
                 {METER_TYPE_WATER: False, METER_TYPE_GAS: True}
             ),
-            cv.Optional(CONF_GAS_VOLUME_DIVISOR, default=100): cv.int_range(min=1, max=1000),
-            cv.Optional(CONF_FREQUENCY, default=433.82): cv.float_range(min=300.0, max=928.0),
+            cv.Optional(CONF_GAS_VOLUME_DIVISOR, default=100): cv.int_range(
+                min=1, max=1000
+            ),
+            cv.Optional(CONF_FREQUENCY, default=433.82): cv.float_range(
+                min=300.0, max=928.0
+            ),
             cv.Optional(CONF_AUTO_SCAN, default=True): cv.boolean,
-            cv.Optional(CONF_READING_SCHEDULE, default=SCHEDULE_MONDAY_FRIDAY): cv.string,
+            cv.Optional(
+                CONF_READING_SCHEDULE, default=SCHEDULE_MONDAY_FRIDAY
+            ): cv.string,
             cv.Optional(CONF_READ_HOUR, default=10): cv.int_range(min=0, max=23),
             cv.Optional(CONF_READ_MINUTE, default=0): cv.int_range(min=0, max=59),
-            cv.Optional(CONF_TIMEZONE_OFFSET, default=0): cv.int_range(min=-720, max=720),
+            cv.Optional(CONF_TIMEZONE_OFFSET, default=0): cv.int_range(
+                min=-720, max=720
+            ),
             cv.Optional(CONF_AUTO_ALIGN_TIME, default=True): cv.boolean,
             cv.Optional(CONF_AUTO_ALIGN_MIDPOINT, default=True): cv.boolean,
-            cv.Optional(CONF_MAX_RETRIES, default=10): cv.int_range(min=1, max=50),
-            cv.Optional(CONF_RETRY_COOLDOWN, default="1h"): cv.positive_time_period_milliseconds,
+            cv.Optional(CONF_MAX_RETRIES, default=5): cv.int_range(min=1, max=50),
+            cv.Optional(
+                CONF_RETRY_COOLDOWN, default="1h"
+            ): cv.positive_time_period_milliseconds,
             cv.Optional(CONF_INITIAL_READ_ON_BOOT, default=False): cv.boolean,
             cv.Optional(CONF_DEBUG_CC1101, default=False): cv.boolean,
-            cv.Optional(CONF_ADAPTIVE_THRESHOLD, default=1): cv.int_range(min=1, max=100),
+            cv.Optional(CONF_ADAPTIVE_THRESHOLD, default=1): cv.int_range(
+                min=1, max=100
+            ),
             # Sensors
             cv.Optional(CONF_VOLUME): sensor.sensor_schema(
                 state_class=STATE_CLASS_TOTAL_INCREASING,
@@ -310,22 +346,56 @@ CONFIG_SCHEMA = (
                 device_class=DEVICE_CLASS_CONNECTIVITY,
                 entity_category="diagnostic",
             ),
-            cv.Optional(CONF_REQUEST_READING_BUTTON): button.button_schema(EverbluMeterTriggerButton),
+            cv.Optional(CONF_REQUEST_READING_BUTTON): button.button_schema(
+                EverbluMeterTriggerButton
+            ),
             cv.Optional(CONF_FREQUENCY_SCAN_BUTTON): button.button_schema(
                 EverbluMeterTriggerButton,
                 icon="mdi:magnify-scan",
-                entity_category="config"
+                entity_category="config",
+            ),
+            cv.Optional(CONF_WIDE_FREQUENCY_SCAN_BUTTON): button.button_schema(
+                EverbluMeterTriggerButton,
+                icon="mdi:radar",
+                entity_category="config",
             ),
             cv.Optional(CONF_RESET_FREQUENCY_BUTTON): button.button_schema(
-                EverbluMeterTriggerButton,
-                icon="mdi:restore",
-                entity_category="config"
+                EverbluMeterTriggerButton, icon="mdi:restore", entity_category="config"
             ),
         }
     )
     .extend(cv.polling_component_schema("24h"))
     .extend(spi.spi_device_schema(cs_pin_required=True))
 )
+
+
+def validate_gdo2_required(config):
+    """Require gdo2_pin by default (v3.0.0 breaking change) unless explicitly disabled.
+
+    GDO2 hardware-assisted FIFO management is now the default mechanism for talking to
+    the CC1101. Users must wire CC1101 GDO2 to a free GPIO and set ``gdo2_pin:``, or
+    explicitly opt out with ``disable_gdo2_fifo_management: true``.
+    """
+    if not config.get(CONF_DISABLE_GDO2, False) and CONF_GDO2_PIN not in config:
+        raise cv.Invalid(
+            "BREAKING CHANGE (v3.0.0): CC1101 GDO2 hardware-assisted FIFO management is now "
+            "enabled by default and 'gdo2_pin:' is required.\n"
+            "\n"
+            "Fix one of the following ways:\n"
+            "  1. (Recommended) Wire CC1101 GDO2 to a free GPIO and add it to your "
+            "everblu_meter config, e.g.:\n"
+            "         gdo2_pin: GPIO4    # ESP8266 D2 (avoid the SPI bus pins and gdo0_pin)\n"
+            "         gdo2_pin: GPIO27   # ESP32\n"
+            "  2. To keep the legacy SPI-polling behaviour instead, opt out explicitly:\n"
+            "         disable_gdo2_fifo_management: true\n"
+            "\n"
+            "See ESPHOME/README.md (Wiring) and docs/GDO2_FIFO_MANAGEMENT.md for full details.",
+            path=[CONF_GDO2_PIN],
+        )
+    return config
+
+
+CONFIG_SCHEMA = cv.All(CONFIG_SCHEMA, validate_gdo2_required)
 
 
 async def to_code(config):
@@ -340,6 +410,10 @@ async def to_code(config):
     gdo0 = await cg.gpio_pin_expression(config[CONF_GDO0_PIN])
     cg.add(var.set_gdo0_pin(gdo0))
 
+    if CONF_GDO2_PIN in config:
+        gdo2 = await cg.gpio_pin_expression(config[CONF_GDO2_PIN])
+        cg.add(var.set_gdo2_pin(gdo2))
+
     # No custom include paths needed when using flat release layout
 
     # Define flags for conditional compilation in ESPHome environment
@@ -348,7 +422,7 @@ async def to_code(config):
     cg.add_build_flag("-DWIFI_SERIAL_NO_REMAP")  # Don't remap Serial in ESPHome builds
     # Note: ESPHome automatically compiles all .cpp files in component directory
     # No need to explicitly list source files - just ensure main.cpp is excluded from release
-    
+
     # Set basic configuration
     meter_code = config[CONF_METER_CODE]
     cg.add(var.set_meter_code(meter_code["raw"]))
@@ -381,22 +455,30 @@ async def to_code(config):
     if CONF_VOLUME in config:
         volume_cfg = dict(config[CONF_VOLUME])
         if "unit_of_measurement" not in volume_cfg:
-            volume_cfg["unit_of_measurement"] = "m³" if config[CONF_METER_TYPE] == METER_TYPE_GAS else "L"
+            volume_cfg["unit_of_measurement"] = (
+                "m³" if config[CONF_METER_TYPE] == METER_TYPE_GAS else "L"
+            )
         if "device_class" not in volume_cfg:
-            volume_cfg["device_class"] = "gas" if config[CONF_METER_TYPE] == METER_TYPE_GAS else "water"
+            volume_cfg["device_class"] = (
+                "gas" if config[CONF_METER_TYPE] == METER_TYPE_GAS else "water"
+            )
         if "icon" not in volume_cfg:
-            volume_cfg["icon"] = "mdi:gas-cylinder" if config[CONF_METER_TYPE] == METER_TYPE_GAS else "mdi:water"
+            volume_cfg["icon"] = (
+                "mdi:gas-cylinder"
+                if config[CONF_METER_TYPE] == METER_TYPE_GAS
+                else "mdi:water"
+            )
         if "accuracy_decimals" not in volume_cfg:
             volume_cfg["accuracy_decimals"] = 0
         if "state_class" not in volume_cfg:
             volume_cfg["state_class"] = STATE_CLASS_TOTAL_INCREASING
         sens = await sensor.new_sensor(volume_cfg)
         cg.add(var.set_volume_sensor(sens))
-    
+
     if CONF_BATTERY in config:
         sens = await sensor.new_sensor(config[CONF_BATTERY])
         cg.add(var.set_battery_sensor(sens))
-    
+
     if CONF_COUNTER in config:
         counter_cfg = dict(config[CONF_COUNTER])
         if "icon" not in counter_cfg:
@@ -407,51 +489,51 @@ async def to_code(config):
             counter_cfg["state_class"] = STATE_CLASS_TOTAL_INCREASING
         sens = await sensor.new_sensor(counter_cfg)
         cg.add(var.set_counter_sensor(sens))
-    
+
     if CONF_RSSI in config:
         sens = await sensor.new_sensor(config[CONF_RSSI])
         cg.add(var.set_rssi_sensor(sens))
-    
+
     if CONF_RSSI_PERCENTAGE in config:
         sens = await sensor.new_sensor(config[CONF_RSSI_PERCENTAGE])
         cg.add(var.set_rssi_percentage_sensor(sens))
-    
+
     if CONF_LQI in config:
         sens = await sensor.new_sensor(config[CONF_LQI])
         cg.add(var.set_lqi_sensor(sens))
-    
+
     if CONF_LQI_PERCENTAGE in config:
         sens = await sensor.new_sensor(config[CONF_LQI_PERCENTAGE])
         cg.add(var.set_lqi_percentage_sensor(sens))
-    
+
     if CONF_TIME_START in config:
         sens = await text_sensor.new_text_sensor(config[CONF_TIME_START])
         cg.add(var.set_time_start_sensor(sens))
-    
+
     if CONF_TIME_END in config:
         sens = await text_sensor.new_text_sensor(config[CONF_TIME_END])
         cg.add(var.set_time_end_sensor(sens))
-    
+
     if CONF_TOTAL_ATTEMPTS in config:
         sens = await sensor.new_sensor(config[CONF_TOTAL_ATTEMPTS])
         cg.add(var.set_total_attempts_sensor(sens))
-    
+
     if CONF_SUCCESSFUL_READS in config:
         sens = await sensor.new_sensor(config[CONF_SUCCESSFUL_READS])
         cg.add(var.set_successful_reads_sensor(sens))
-    
+
     if CONF_FAILED_READS in config:
         sens = await sensor.new_sensor(config[CONF_FAILED_READS])
         cg.add(var.set_failed_reads_sensor(sens))
-    
+
     if CONF_FREQUENCY_OFFSET in config:
         sens = await sensor.new_sensor(config[CONF_FREQUENCY_OFFSET])
         cg.add(var.set_frequency_offset_sensor(sens))
-    
+
     if CONF_TUNED_FREQUENCY in config:
         sens = await sensor.new_sensor(config[CONF_TUNED_FREQUENCY])
         cg.add(var.set_tuned_frequency_sensor(sens))
-    
+
     if CONF_FREQUENCY_ESTIMATE in config:
         sens = await sensor.new_sensor(config[CONF_FREQUENCY_ESTIMATE])
         cg.add(var.set_frequency_estimate_sensor(sens))
@@ -460,15 +542,15 @@ async def to_code(config):
     if CONF_STATUS in config:
         sens = await text_sensor.new_text_sensor(config[CONF_STATUS])
         cg.add(var.set_status_sensor(sens))
-    
+
     if CONF_ERROR in config:
         sens = await text_sensor.new_text_sensor(config[CONF_ERROR])
         cg.add(var.set_error_sensor(sens))
-    
+
     if CONF_RADIO_STATE in config:
         sens = await text_sensor.new_text_sensor(config[CONF_RADIO_STATE])
         cg.add(var.set_radio_state_sensor(sens))
-    
+
     if CONF_TIMESTAMP in config:
         sens = await text_sensor.new_text_sensor(config[CONF_TIMESTAMP])
         cg.add(var.set_timestamp_sensor(sens))
@@ -496,7 +578,7 @@ async def to_code(config):
     if CONF_READING_TIME_UTC_SENSOR in config:
         sens = await text_sensor.new_text_sensor(config[CONF_READING_TIME_UTC_SENSOR])
         cg.add(var.set_reading_time_utc_sensor(sens))
-    
+
     # Register binary sensors
     if CONF_ACTIVE_READING in config:
         sens = await binary_sensor.new_binary_sensor(config[CONF_ACTIVE_READING])
@@ -510,16 +592,26 @@ async def to_code(config):
         btn = await button.new_button(config[CONF_REQUEST_READING_BUTTON])
         cg.add(btn.set_parent(var))
         cg.add(btn.set_frequency_scan(False))
+        cg.add(btn.set_wide_frequency_scan(False))
         cg.add(btn.set_reset_frequency(False))
 
     if CONF_FREQUENCY_SCAN_BUTTON in config:
         btn = await button.new_button(config[CONF_FREQUENCY_SCAN_BUTTON])
         cg.add(btn.set_parent(var))
         cg.add(btn.set_frequency_scan(True))
+        cg.add(btn.set_wide_frequency_scan(False))
+        cg.add(btn.set_reset_frequency(False))
+
+    if CONF_WIDE_FREQUENCY_SCAN_BUTTON in config:
+        btn = await button.new_button(config[CONF_WIDE_FREQUENCY_SCAN_BUTTON])
+        cg.add(btn.set_parent(var))
+        cg.add(btn.set_frequency_scan(False))
+        cg.add(btn.set_wide_frequency_scan(True))
         cg.add(btn.set_reset_frequency(False))
 
     if CONF_RESET_FREQUENCY_BUTTON in config:
         btn = await button.new_button(config[CONF_RESET_FREQUENCY_BUTTON])
         cg.add(btn.set_parent(var))
         cg.add(btn.set_frequency_scan(False))
+        cg.add(btn.set_wide_frequency_scan(False))
         cg.add(btn.set_reset_frequency(True))

@@ -58,6 +58,10 @@ everblu_meter:
   meter_code: "22-8765432-100"  # Replace with your meter's code
   cs_pin: GPIO15
   gdo0_pin: 4
+  gdo2_pin: 5             # REQUIRED (v3.0.0+): CC1101 GDO2 -> ESP8266 GPIO5, hardware FIFO threshold.
+                          # Avoid SPI bus pins (GPIO12/13/14/15) and gdo0_pin.
+                          # To keep legacy SPI polling instead, remove this line and add:
+                          #   disable_gdo2_fifo_management: true
 
   # REQUIRED: Meter type
   meter_type: gas
@@ -80,6 +84,8 @@ everblu_meter:
     name: "Read Gas Meter Now"
   frequency_scan_button:
     name: "Scan Frequency"
+  wide_frequency_scan_button:
+    name: "Wide Frequency Scan"
   reset_frequency_button:
     name: "Reset Frequency Offset"
 

@@ -1,0 +1,65 @@
+# Legacy-GDO2 path: verifies disable_gdo2_fifo_management: true compiles.
+# This exercises the SPI-polling fallback branch introduced as an opt-out in v3.0.0.
+# No gdo2_pin is needed or set when the feature is disabled.
+substitutions:
+  spi_clk_pin: GPIO14
+  spi_miso_pin: GPIO12
+  spi_mosi_pin: GPIO13
+  cs_pin: GPIO15
+  gdo0_pin: GPIO4
+  meter_type: water
+
+esphome:
+  name: ci-esp8266-legacy-gdo2
+  min_version: 2024.6.0
+
+esp8266:
+  board: d1_mini
+  framework:
+    version: recommended
+
+logger:
+
+api:
+
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: CI-WIFI
+  password: CI-PASSWORD
+
+spi:
+  id: ci_spi
+  clk_pin: ${spi_clk_pin}
+  miso_pin: ${spi_miso_pin}
+  mosi_pin: ${spi_mosi_pin}
+
+time:
+  - platform: sntp
+    id: ci_time
+
+external_components:
+  - source:
+      type: local
+      path: ../../../ESPHOME-release
+    components: [ everblu_meter ]
+
+everblu_meter:
+  spi_id: ci_spi
+  cs_pin: ${cs_pin}
+  meter_code: "22-8765432-100"
+  meter_type: ${meter_type}
+  gdo0_pin: ${gdo0_pin}
+  # No gdo2_pin - explicitly opting out of hardware FIFO management
+  disable_gdo2_fifo_management: true
+  time_id: ci_time
+  reading_schedule: "Monday-Saturday"
+  gas_volume_divisor: 1000
+
+  volume:
+    name: "CI Volume"
+  status:
+    name: "CI Status"
+  radio_connected:
+    name: "CI Radio"

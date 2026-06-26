@@ -2,14 +2,14 @@
 # Run ESPHome compile tests for a component, mirroring official ESPHome CI.
 #
 # Usage:
-#   script/test_build_components                    # tests everblu_meter
-#   script/test_build_components everblu_meter      # explicit component name
+#   scripts/test_build_components                    # tests everblu_meter
+#   scripts/test_build_components everblu_meter      # explicit component name
 #
 # Prerequisites:
 #   pip install esphome
 #
 # The ESPHOME environment variable overrides the esphome binary location:
-#   ESPHOME=/path/to/esphome script/test_build_components
+#   ESPHOME=/path/to/esphome scripts/test_build_components
 
 set -e
 

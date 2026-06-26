@@ -4,6 +4,7 @@ substitutions:
 
   cc1101_cs: "GPIO15"
   cc1101_gdo0: "GPIO5"
+  cc1101_gdo2: "GPIO4"   # REQUIRED (v3.0.0+): free GPIO -> CC1101 GDO2 (hardware FIFO threshold)
   tz_offset_min: "0"
   meter_1_prefix: "Meter 1"
   meter_2_prefix: "Meter 2"
@@ -66,6 +67,9 @@ everblu_meter:
     gdo0_pin:
       number: ${cc1101_gdo0}
       allow_other_uses: true
+    gdo2_pin:               # REQUIRED (v3.0.0+): hardware FIFO threshold (TX+RX, prevents TXFIFO_UNDERFLOW)
+      number: ${cc1101_gdo2}  # free GPIO (not SPI: avoid GPIO12/MISO, GPIO13/MOSI, GPIO14/SCK) and not gdo0_pin
+      allow_other_uses: true  # Required - both meter entries share the same CC1101
     time_id: homeassistant_time
     timezone_offset: ${tz_offset_min}
     read_hour: 11
@@ -73,10 +77,15 @@ everblu_meter:
 
     request_reading_button:
       name: "${meter_1_prefix} Read Meter Now"
+    # Frequency calibration is a property of the shared CC1101 radio, not the meter.
+    # Declare these buttons/sensors on ONE meter only (here, the first). They are
+    # global: any meter's reads/scans update this single set of entities.
     frequency_scan_button:
-      name: "${meter_1_prefix} Scan Frequency"
+      name: "Radio Scan Frequency"
+    wide_frequency_scan_button:
+      name: "Radio Wide Frequency Scan"
     reset_frequency_button:
-      name: "${meter_1_prefix} Reset Frequency Offset"
+      name: "Radio Reset Frequency Offset"
 
     volume:
       name: "${meter_1_prefix} Water Volume"
@@ -99,12 +108,13 @@ everblu_meter:
       name: "${meter_1_prefix} Successful Reads"
     failed_reads:
       name: "${meter_1_prefix} Failed Reads"
+    # Global (per-radio) calibration sensors - declared on this meter only.
     frequency_offset:
-      name: "${meter_1_prefix} Frequency Offset"
+      name: "Radio Frequency Offset"
     tuned_frequency:
-      name: "${meter_1_prefix} Tuned Frequency (MHz)"
+      name: "Radio Tuned Frequency (MHz)"
     frequency_estimate:
-      name: "${meter_1_prefix} Frequency Estimate"
+      name: "Radio Frequency Estimate"
 
     meter_serial_sensor:
       name: "${meter_1_prefix} Meter Serial"
@@ -125,18 +135,18 @@ everblu_meter:
     error:
       name: "${meter_1_prefix} Last Error"
     radio_state:
-      name: "${meter_1_prefix} CC1101 State"
+      name: "CC1101 State"            # device-level (shared radio) - declare on one meter only
     timestamp:
       name: "${meter_1_prefix} Last Reading Time"
     history_json:
       name: "${meter_1_prefix} Meter History (JSON)"
     firmware_version:
-      name: "${meter_1_prefix} Firmware Version"
+      name: "Firmware Version"        # device-level (one firmware) - declare on one meter only
 
     active_reading:
       name: "${meter_1_prefix} Reading Active"
     radio_connected:
-      name: "${meter_1_prefix} CC1101 Connected"
+      name: "CC1101 Connected"        # device-level (shared radio) - declare on one meter only
 
   - id: hot_water_meter
     meter_code: "20-0257751-000"  # year=20, serial=257751 (dashed form, suffix 000 ignored)
@@ -149,6 +159,9 @@ everblu_meter:
     gdo0_pin:
       number: ${cc1101_gdo0}
       allow_other_uses: true
+    gdo2_pin:               # REQUIRED (v3.0.0+): hardware FIFO threshold (TX+RX, prevents TXFIFO_UNDERFLOW)
+      number: ${cc1101_gdo2}  # free GPIO (not SPI: avoid GPIO12/MISO, GPIO13/MOSI, GPIO14/SCK) and not gdo0_pin
+      allow_other_uses: true  # Required - both meter entries share the same CC1101
     time_id: homeassistant_time
     timezone_offset: ${tz_offset_min}
     read_hour: 11
@@ -156,10 +169,8 @@ everblu_meter:
 
     request_reading_button:
       name: "${meter_2_prefix} Read Meter Now"
-    frequency_scan_button:
-      name: "${meter_2_prefix} Scan Frequency"
-    reset_frequency_button:
-      name: "${meter_2_prefix} Reset Frequency Offset"
+    # Frequency calibration buttons/sensors are radio-global and declared on the
+    # first meter only (see cold_water_meter above); they act on the shared CC1101.
 
     volume:
       name: "${meter_2_prefix} Water Volume"
@@ -182,12 +193,6 @@ everblu_meter:
       name: "${meter_2_prefix} Successful Reads"
     failed_reads:
       name: "${meter_2_prefix} Failed Reads"
-    frequency_offset:
-      name: "${meter_2_prefix} Frequency Offset"
-    tuned_frequency:
-      name: "${meter_2_prefix} Tuned Frequency (MHz)"
-    frequency_estimate:
-      name: "${meter_2_prefix} Frequency Estimate"
 
     meter_serial_sensor:
       name: "${meter_2_prefix} Meter Serial"
@@ -207,16 +212,12 @@ everblu_meter:
       name: "${meter_2_prefix} Meter Status"
     error:
       name: "${meter_2_prefix} Last Error"
-    radio_state:
-      name: "${meter_2_prefix} CC1101 State"
     timestamp:
       name: "${meter_2_prefix} Last Reading Time"
     history_json:
       name: "${meter_2_prefix} Meter History (JSON)"
-    firmware_version:
-      name: "${meter_2_prefix} Firmware Version"
 
     active_reading:
       name: "${meter_2_prefix} Reading Active"
-    radio_connected:
-      name: "${meter_2_prefix} CC1101 Connected"
+    # CC1101 State, CC1101 Connected and Firmware Version are device-level (one
+    # shared radio / firmware) and are declared on the first meter only above.

@@ -1,6 +1,7 @@
 # Improvements Summary
 
 ## Overview
+
 This document summarizes the improvements made to the EverBlu Meters ESP8266/ESP32 project to enhance performance, reliability, and diagnostics.
 
 ---
@@ -10,6 +11,7 @@ This document summarizes the improvements made to the EverBlu Meters ESP8266/ESP
 **Problem:** Multiple `delay(50)` calls throughout the code were causing significant delays during MQTT publishing operations, totaling ~500ms+ per update cycle.
 
 **Solution:**
+
 - Reduced all MQTT publish delays from `delay(50)` to `delay(5)` throughout the codebase
 - This reduces total delay overhead by ~90% (from ~500ms to ~50ms)
 - Locations updated:
@@ -27,32 +29,41 @@ This document summarizes the improvements made to the EverBlu Meters ESP8266/ESP
 **New Features:**
 
 ### Success/Failure Metrics
+
 - Added global counters to track:
   - `totalReadAttempts` - Total number of read attempts
   - `successfulReads` - Successfully completed reads
   - `failedReads` - Failed read attempts
+
   - `lastErrorMessage` - Human-readable last error
 
 ### CC1101 State Monitoring
+
 - Real-time CC1101 radio state published to MQTT:
   - "Idle" - Normal standby state
+
   - "Reading" - Actively communicating with meter
   - "Frequency Scanning" - Performing frequency scan
 
 ### Error Messages
+
 - Detailed failure mode reporting:
+
   - Retry count tracking with messages
   - Cooldown period notifications
   - Timeout and communication failures
 
 ### New MQTT Topics
+
 - `everblu/cyble/total_attempts` - Total read attempts counter
+
 - `everblu/cyble/successful_reads` - Successful reads counter
 - `everblu/cyble/failed_reads` - Failed reads counter
 - `everblu/cyble/last_error` - Last error message (text)
 - `everblu/cyble/cc1101_state` - Current CC1101 radio state
 
 ### Home Assistant Integration
+
 - Added MQTT discovery messages for all new diagnostic sensors
 - Sensors automatically appear in Home Assistant with proper device class and icons
 - Diagnostic entities properly categorized for UI organization
@@ -68,24 +79,29 @@ This document summarizes the improvements made to the EverBlu Meters ESP8266/ESP
 **Solution:**
 
 ### Persistent Storage Implementation
+
 - **ESP8266:** Uses EEPROM with magic number validation
 - **ESP32:** Uses Preferences API for non-volatile storage
 - Stores frequency offset in MHz (e.g., +0.005 for +5 kHz)
 - Sanity checking prevents invalid offsets (±0.1 MHz limit)
 
 ### Functions Added
+
 ```cpp
 void saveFrequencyOffset(float offset);  // Save offset to storage
 float loadFrequencyOffset();             // Load offset from storage
+
 void performFrequencyScan();             // Automatic frequency scanning
 ```
 
 ### Automatic Frequency Application
+
 - Offset loaded at startup
 - Applied to CC1101 initialization automatically
 - Logged to serial for verification
 
 ### New MQTT Topic
+
 - `everblu/cyble/frequency_offset` - Current frequency offset in MHz
 
 **Impact:** Improved signal reception, automatic compensation for frequency drift, reduced manual configuration needs.
@@ -97,15 +113,18 @@ void performFrequencyScan();             // Automatic frequency scanning
 **Feature:** Intelligent frequency scanning to find optimal reception frequency automatically.
 
 ### Scan Parameters
+
 - **Range:** ±30 kHz from nominal frequency (±0.03 MHz)
 - **Step Size:** 5 kHz (0.005 MHz) for fine-grained scanning
 - **Total Steps:** 13 frequency points tested
 - **Criterion:** Best RSSI with valid data
 
 ### Scan Process
+
 1. User triggers scan via MQTT or Home Assistant button
 2. System publishes "Frequency Scanning" state
 3. Iterates through frequency range
+
 4. Tests each frequency by attempting meter read
 5. Tracks best RSSI and corresponding frequency
 6. Saves optimal offset to persistent storage
@@ -113,13 +132,16 @@ void performFrequencyScan();             // Automatic frequency scanning
 8. Publishes results to MQTT
 
 ### MQTT Integration
+
 - **Command Topic:** `everblu/cyble/frequency_scan`
   - Payload: `"scan"` to trigger
 - **Home Assistant Button:** "Scan Frequency" automatically created
 - **Status Updates:** Real-time progress via status messages
 
 ### Example Output
+
 ```
+
 > Starting frequency scan...
 > Scanning from 433.790000 to 433.850000 MHz (step: 0.005000 MHz)
 > Better signal at 433.815000 MHz: RSSI=-45 dBm
@@ -134,26 +156,34 @@ void performFrequencyScan();             // Automatic frequency scanning
 ## 5. ✅ Code Quality Improvements
 
 ### Removed Unused Variables
+
 **File:** `cc1101.cpp`
+
 - Removed `RF_Test_u8` (never used)
+
 - Removed `PA_Test[]` array (never used)
 - Kept only necessary variables
 
 **Impact:** Reduced RAM usage, cleaner code, easier maintenance.
 
 ### Consolidated Debug Output Functions
+
 **File:** `utils.cpp`
 
 **Before:** 4 separate functions with duplicated logic
+
 ```cpp
 void show_in_hex(const uint8_t* buffer, size_t len);
 void show_in_hex_array(const uint8_t* buffer, size_t len);
+
 void show_in_hex_one_line(const uint8_t* buffer, size_t len);
 void show_in_hex_one_line_GET(const uint8_t* buffer, size_t len);
 ```
 
 **After:** Single unified function with mode parameter
+
 ```cpp
+
 void show_in_hex_formatted(const uint8_t* buffer, size_t len, int mode);
 // mode: 0=16 per line, 1=array format, 2=single line, 3=GET format
 ```
@@ -167,25 +197,31 @@ void show_in_hex_formatted(const uint8_t* buffer, size_t len, int mode);
 **Added comprehensive comments explaining:**
 
 ### Protocol Overview
+
 - Frequency specifications (433.82 MHz nominal)
 - Modulation type (2-FSK)
 - Data rates (2.4 kbps sync, 9.6 kbps data)
 - Sync patterns and packet structure
 
 ### Communication Sequence
+
 Detailed timeline documentation:
+
 - Wake-up phase (2000ms)
 - Interrogation frame (130ms)
 - Meter response acknowledgement (timing breakdown)
 - Data frame reception (timing breakdown)
 
 ### Data Encoding
+
 - 4-bit-per-bit oversampling explanation
+
 - Serial frame format (start/stop bits)
 - Bit encoding examples
 - Decoding algorithm explanation
 
 ### Key Functions Documented
+
 - `get_meter_data()` - Overall protocol flow
 - `receive_radian_frame()` - Two-stage sync detection
 - `decode_4bitpbit_serial()` - Bit decoding algorithm
@@ -197,6 +233,7 @@ Detailed timeline documentation:
 ## Summary of New Home Assistant Entities
 
 ### Sensors
+
 1. **Total Read Attempts** - Counter of all read attempts
 2. **Successful Reads** - Counter of successful reads
 3. **Failed Reads** - Counter of failed reads
@@ -205,9 +242,11 @@ Detailed timeline documentation:
 6. **Frequency Offset** - Current frequency offset in MHz
 
 ### Buttons
+
 1. **Scan Frequency** - Trigger automatic frequency scan
 
 ### All Entities Auto-Categorized
+
 - Diagnostic sensors appear in "Diagnostic" section
 - Configuration controls in "Configuration" section
 - Proper device association with Water Meter device
@@ -217,12 +256,14 @@ Detailed timeline documentation:
 ## Compilation Results
 
 ### ESP8266 (Huzzah)
+
 - ✅ **Compilation:** SUCCESS
 - **RAM Usage:** 48.0% (39,324 / 81,920 bytes)
 - **Flash Usage:** 37.8% (394,372 / 1,044,464 bytes)
 - **Build Time:** 15.04 seconds
 
 ### ESP32 (esp32dev)
+
 - ✅ **Compilation:** SUCCESS
 - **RAM Usage:** 16.0% (52,416 / 327,680 bytes)
 - **Flash Usage:** 67.7% (887,661 / 1,310,720 bytes)
@@ -235,6 +276,7 @@ Detailed timeline documentation:
 ## Warnings Addressed
 
 Compilation warnings are minor and do not affect functionality:
+
 - Sign comparison warnings (comparing int vs size_t) - common and safe
 - Unused static function declaration - from header file organization
 - Uninitialized variable warning - false positive, variable always initialized before use
@@ -301,6 +343,7 @@ Before deploying to production:
 ## Backward Compatibility
 
 All changes maintain backward compatibility:
+
 - Existing MQTT topics unchanged
 - Legacy debug functions preserved as wrappers
 - Configuration file format unchanged

@@ -18,12 +18,14 @@ LOG_E(tag, format, ...)  // Error level
 ### Mode-Specific Routing
 
 **ESPHome Mode** (`USE_ESPHOME` defined):
+
 - Routes to `ESP_LOGD()`, `ESP_LOGI()`, `ESP_LOGW()`, `ESP_LOGE()`
 - Logs captured by ESPHome logger infrastructure
 - **Visible over WiFi** in ESPHome web interface and Home Assistant
 - Also visible via USB serial
 
 **MQTT Standalone Mode** (`USE_ESPHOME` not defined):
+
 - Routes to `Serial.printf()` with consistent formatting: `[Level][Tag] message`
 - Only visible via USB serial connection
 - Minimal overhead for time-critical operations
@@ -73,6 +75,7 @@ LOG_E("Storage", "Failed to save offset: %f MHz", offset);
 ### Problem: WiFi Logs Were Invisible
 
 **Before:**
+
 ```
 // USB connection
 [15:21:43][METER] Starting meter read...
@@ -84,9 +87,11 @@ LOG_E("Storage", "Failed to save offset: %f MHz", offset);
 [15:21:43][D][button:022]: 'Read Meter Now' Pressed.
 [15:21:43][I][everblu_meter:259]: Manual read requested via button
 // ❌ All meter data logs missing!
+
 ```
 
 **After:**
+
 ```
 // USB and WiFi both show:
 [15:21:43][D][button:022]: 'Read Meter Now' Pressed.
@@ -100,12 +105,15 @@ LOG_E("Storage", "Failed to save offset: %f MHz", offset);
 ### Technical Details
 
 **Direct Serial.print():**
+
 - Writes directly to UART hardware buffer
+
 - Not captured by ESPHome logger
 - Only visible if physically connected via USB
 - Zero overhead for time-critical code
 
 **ESPHome Logger (ESP_LOG* macros):**
+
 - Buffered, networked logging system
 - Transmitted over WiFi to Home Assistant/web interface
 - Can block for 10-3000ms during network transmission
@@ -126,6 +134,7 @@ LOG_E("Storage", "Failed to save offset: %f MHz", offset);
 ### When to Convert
 
 ✅ **Convert to LOG_* macros:**
+
 - Status messages
 - Configuration info
 - Success/failure notifications  
@@ -133,6 +142,7 @@ LOG_E("Storage", "Failed to save offset: %f MHz", offset);
 - Debugging info (non-critical)
 
 ❌ **Keep as Serial.print():**
+
 - Time-critical loops
 - RF transmission/reception
 - SPI communication
@@ -146,6 +156,7 @@ LOG_E("Storage", "Failed to save offset: %f MHz", offset);
 Serial.printf("[MeterReader] Read attempt %d/%d\n", retry, maxRetries);
 
 // After
+
 LOG_I("MeterReader", "Read attempt %d/%d", retry, maxRetries);
 ```
 
@@ -154,31 +165,39 @@ LOG_I("MeterReader", "Read attempt %d/%d", retry, maxRetries);
 ## Build Impact
 
 **Memory Usage:**
+
 - Minimal - macros compile to appropriate backend
 - No runtime overhead in MQTT mode (direct Serial)
 - Slight overhead in ESPHome mode (logger buffer)
 
 **Firmware Size:**
+
 - Same for MQTT mode (compiles to same Serial.printf)
 - +~2KB for ESPHome mode (logger infrastructure)
 
-## Troubleshooting
+1# Troubleshooting
 
 ### Logs Still Missing Over WiFi
 
 1. Verify ESPHome logger level in YAML:
-```yaml
+
+1``yaml
+
 logger:
   level: DEBUG  # or INFO, VERBOSE, etc.
+
 ```
 
-2. Check component is using LOG_* macros:
+1. Check component is using LOG_* macros:
+
 ```bash
+
 grep -r "Serial.print" src/services/  # Should be minimal
 grep -r "LOG_I" src/services/         # Should find many
 ```
 
-3. Ensure `logging.h` is included:
+1. Ensure `logging.h` is included:
+
 ```cpp
 #include "core/logging.h"
 ```
@@ -186,12 +205,13 @@ grep -r "LOG_I" src/services/         # Should find many
 ### Logs Appearing Twice
 
 If you see duplicate logs, check for mixed usage:
+
 ```cpp
 // Wrong - will duplicate
 Serial.println("Starting read");
 LOG_I("Tag", "Starting read");
-
-// Correct - choose one
+<https://esphome.io/components/logger.html>
+// Correct - choos<https://www.arduino.cc/reference/en/language/functions/communication/serial/>
 LOG_I("Tag", "Starting read");
 ```
 
@@ -204,5 +224,5 @@ LOG_I("Tag", "Starting read");
 
 ## References
 
-- ESPHome Logger: https://esphome.io/components/logger.html
-- Arduino Serial: https://www.arduino.cc/reference/en/language/functions/communication/serial/
+- ESPHome Logger: <https://esphome.io/components/logger.html>
+- Arduino Serial: <https://www.arduino.cc/reference/en/language/functions/communication/serial/>

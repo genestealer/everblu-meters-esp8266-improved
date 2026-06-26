@@ -1,0 +1,122 @@
+# Full-coverage shared configuration - exercises every optional sensor, button,
+# and non-default config parameter so that each code path is compiled at least once.
+# Included by test.*-full.yaml platform files via <<: !include common-full.yaml
+#
+# For the minimal baseline see common.yaml.
+# For the GDO2 legacy-polled path see test.*-legacy-gdo2.yaml.
+
+spi:
+  id: ci_spi
+  clk_pin: ${spi_clk_pin}
+  miso_pin: ${spi_miso_pin}
+  mosi_pin: ${spi_mosi_pin}
+
+time:
+  - platform: sntp
+    id: ci_time
+
+external_components:
+  - source:
+      type: local
+      path: ../../../ESPHOME-release
+    components: [ everblu_meter ]
+
+everblu_meter:
+  spi_id: ci_spi
+  cs_pin: ${cs_pin}
+
+  # Meter identity - code without suffix to exercise that parsing branch
+  meter_code: "19-0039185"
+  meter_type: ${meter_type}
+  gdo0_pin: ${gdo0_pin}
+  gdo2_pin: ${gdo2_pin}
+  time_id: ci_time
+
+  # Non-default scheduling / timing options
+  reading_schedule: "Monday-Sunday"
+  read_hour: 8
+  read_minute: 30
+  timezone_offset: 60
+  auto_align_time: false
+  auto_align_midpoint: false
+
+  # Non-default radio options
+  frequency: 433.92
+  auto_scan: false
+
+  # Non-default reliability options
+  max_retries: 5
+  retry_cooldown: 30min
+  adaptive_threshold: 3
+
+  # Non-default boot / debug options
+  initial_read_on_boot: true
+  debug_cc1101: true
+
+  # --- Numeric sensors (all of them) ---
+  volume:
+    name: "CI Volume"
+  battery:
+    name: "CI Battery"
+  counter:
+    name: "CI Counter"
+  rssi:
+    name: "CI RSSI"
+  rssi_percentage:
+    name: "CI RSSI Pct"
+  lqi:
+    name: "CI LQI"
+  lqi_percentage:
+    name: "CI LQI Pct"
+  total_attempts:
+    name: "CI Attempts"
+  successful_reads:
+    name: "CI Reads OK"
+  failed_reads:
+    name: "CI Reads Fail"
+  frequency_offset:
+    name: "CI Freq Offset"
+  tuned_frequency:
+    name: "CI Tuned Freq"
+  frequency_estimate:
+    name: "CI Freq Est"
+
+  # --- Text sensors (all of them) ---
+  status:
+    name: "CI Status"
+  error:
+    name: "CI Error"
+  radio_state:
+    name: "CI Radio State"
+  timestamp:
+    name: "CI Timestamp"
+  time_start:
+    name: "CI Time Start"
+  time_end:
+    name: "CI Time End"
+  history_json:
+    name: "CI History"
+  firmware_version:
+    name: "CI FW Version"
+  meter_serial_sensor:
+    name: "CI Serial"
+  meter_year_sensor:
+    name: "CI Year"
+  reading_schedule_sensor:
+    name: "CI Schedule"
+  reading_time_utc_sensor:
+    name: "CI Read Time"
+
+  # --- Binary sensors (all of them) ---
+  active_reading:
+    name: "CI Active Reading"
+  radio_connected:
+    name: "CI Radio Connected"
+
+  # --- Buttons (all of them) ---
+  request_reading_button:
+    name: "CI Read Now"
+  frequency_scan_button:
+    name: "CI Freq Scan"
+  reset_frequency_button:
+    name: "CI Reset Freq"

@@ -5,6 +5,7 @@
 
 #include "frequency_manager.h"
 #include "logging.h"
+#include "utils.h"
 #include "storage_abstraction.h"
 #if defined(ESP32)
 #include <esp_task_wdt.h>
@@ -76,8 +77,25 @@ float FrequencyManager::begin(float baseFrequency)
     // Initialize storage
     StorageAbstraction::begin();
 
-    // Load stored offset
-    s_storedOffset = loadFrequencyOffset();
+    // Load the persisted offset using a NaN sentinel as the "not found" default so a
+    // genuinely stored value of 0.0 can be distinguished from "nothing saved". This
+    // gives an unambiguous boot-time confirmation of whether calibration survived a reboot.
+    float loaded = StorageAbstraction::loadFloat(STORAGE_KEY, NAN, STORAGE_MAGIC, MIN_OFFSET, MAX_OFFSET);
+    bool persisted = !isnan(loaded);
+    s_storedOffset = persisted ? loaded : 0.0f;
+
+    if (persisted)
+    {
+        LOG_I("everblu_meter",
+              "Frequency calibration RESTORED from storage: offset %.3f kHz (tuned %.6f MHz)",
+              s_storedOffset * 1000.0, s_baseFrequency + s_storedOffset);
+    }
+    else
+    {
+        LOG_W("everblu_meter",
+              "No frequency calibration stored - using default 0.000 kHz "
+              "(run a Wide Frequency Scan to calibrate the radio)");
+    }
 
     LOG_I("everblu_meter", "Initialized: base=%.6f MHz, offset=%.6f MHz",
           s_baseFrequency, s_storedOffset);
@@ -129,6 +147,11 @@ void FrequencyManager::performFrequencyScan(void (*statusCallback)(const char *,
 {
     LOG_I("everblu_meter", "Starting frequency scan...");
     LOG_I("everblu_meter", "[NOTE] Wi-Fi/MQTT connections may temporarily drop and reconnect. This is expected.");
+
+    // Suppress the verbose per-attempt radio/meter read logging for the whole
+    // scan. Each frequency step performs a full read sequence whose detailed
+    // output is irrelevant noise here; high-level scan progress (LOG_*) remains.
+    EchoDebugQuietGuard quietGuard;
 
     // Reset adaptive tracking so the new offset has a chance to stabilize
     resetAdaptiveTracking();
@@ -215,6 +238,11 @@ void FrequencyManager::performFrequencyScan(void (*statusCallback)(const char *,
 void FrequencyManager::performWideInitialScan(void (*statusCallback)(const char *, const char *))
 {
     Serial.println("[FREQ] Performing wide initial scan (first boot - no saved offset)...");
+
+    // Suppress the verbose per-attempt radio/meter read logging for the whole
+    // scan. Each frequency step performs a full read sequence whose detailed
+    // output is irrelevant noise here; high-level scan progress (LOG_*) remains.
+    EchoDebugQuietGuard quietGuard;
 
     // Reset adaptive tracking so the new offset has a chance to stabilize
     resetAdaptiveTracking();

@@ -63,6 +63,10 @@ everblu_meter:
   meter_code: "21-1234567-800"  # Replace with your meter's code
   cs_pin: GPIO15          # CC1101 CS / NSS on ESP8266 Huzzah GPIO15
   gdo0_pin: GPIO5         # GPIO connected to CC1101 GDO0 on ESP8266 Huzzah GPIO5 (D1)
+  gdo2_pin: GPIO4         # REQUIRED (v3.0.0+): CC1101 GDO2 -> ESP8266 GPIO4 (D2), hardware FIFO threshold.
+                          # Avoid SPI bus pins (GPIO12/13/14/15) and gdo0_pin.
+                          # To keep legacy SPI polling instead, remove this line and add:
+                          #   disable_gdo2_fifo_management: true
 
   # Optional: set meter_type to 'gas' for gas meters (defaults to water)
 
@@ -82,11 +86,17 @@ everblu_meter:
   # read_hour: 10        # Hour in UTC (0-23)
   # read_minute: 0       # Minute (0-59)
 
+  # Optional: Read retry behaviour
+  # max_retries: 5       # Read attempts before entering cooldown (default: 5, range 1-50)
+  # retry_cooldown: 1h   # Cooldown after max_retries failed attempts (default: 1h)
+
   # Control buttons
   request_reading_button:
     name: "Read Meter Now"
   frequency_scan_button:
     name: "Scan Frequency"
+  wide_frequency_scan_button:
+    name: "Wide Frequency Scan"
   reset_frequency_button:
     name: "Reset Frequency Offset"
 

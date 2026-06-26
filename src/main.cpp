@@ -302,7 +302,7 @@ const char jsonTemplate[] = "{ "
 
 // Define the default maximum retries if missing from the private.h file
 #ifndef MAX_RETRIES
-#define MAX_RETRIES 10 // Default: 10 retry attempts before cooldown
+#define MAX_RETRIES 5 // Default: 5 retry attempts before cooldown
 #endif
 
 int _retry = 0;
@@ -539,7 +539,10 @@ static const char *wifiStatusToString(wl_status_t st)
 //              Retries up to 10 times if data retrieval fails.
 void onUpdateData()
 {
-  Serial.printf("[STATUS] Firmware version: %s\n", EVERBLU_FW_VERSION);
+  Serial.println("");
+  Serial.println("========================================");
+  Serial.printf("        METER READ - START (fw %s)\n", EVERBLU_FW_VERSION);
+  Serial.println("========================================");
   Serial.printf("[STATUS] Updating data from meter...\n");
   Serial.printf("[STATUS] Retry count: %d\n", _retry);
   Serial.printf("[STATUS] Reading schedule: %s\n", readingSchedule);
@@ -560,7 +563,7 @@ void onUpdateData()
   // Get current UTC time
   time_t tnow = time(nullptr);
   struct tm *ptm = gmtime(&tnow);
-  Serial.printf("[TIME] Current date (UTC): %04d/%02d/%02d %02d:%02d/%02d - %ld\n", ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, (long)tnow);
+  Serial.printf("[TIME] Current date (UTC): %04d/%02d/%02d %02d:%02d:%02d - %ld\n", ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, (long)tnow);
 
   char iso8601[128];
   strftime(iso8601, sizeof iso8601, "%FT%TZ", gmtime(&tnow));
@@ -579,8 +582,10 @@ void onUpdateData()
       snprintf(errorMsg, sizeof(errorMsg), "Retry %d/%d - No data received", _retry, max_retries);
       lastErrorMessage = errorMsg;
       Serial.printf("[STATUS] Scheduling retry in 10 seconds... (next attempt %d/%d)\n", _retry + 1, max_retries);
-      mqtt.publish(String(mqttBaseTopic) + "/active_reading", "false", true);
-      mqtt.publish(String(mqttBaseTopic) + "/cc1101_state", cc1101RadioConnected ? "Idle" : "unavailable", true);
+      // Keep the "Active Reading" sensor true and the radio state as "Reading"
+      // for the whole retry sequence so they don't flip to "Not running"/Idle
+      // between attempts. They are cleared only on final success or after max
+      // retries (see the else branch below).
       mqtt.publish(String(mqttBaseTopic) + "/last_error", lastErrorMessage, true);
       digitalWrite(LED_BUILTIN, HIGH); // Turn off LED
       // Use non-blocking callback instead of recursive call
@@ -607,6 +612,10 @@ void onUpdateData()
       digitalWrite(LED_BUILTIN, HIGH); // Turn off LED
       _retry = 0;                      // Reset retry counter for next scheduled attempt
     }
+    Serial.println("========================================");
+    Serial.println("        METER READ - FAILED");
+    Serial.println("========================================");
+    Serial.println("");
     return;
   }
 
@@ -891,7 +900,10 @@ skip_history_publish:;
   // Reset scheduled read flag for next invocation
   g_isScheduledRead = false;
 
-  Serial.println("[STATUS] Data update complete.\n");
+  Serial.println("========================================");
+  Serial.println("        METER READ - COMPLETE");
+  Serial.println("========================================");
+  Serial.println("");
 }
 
 // Function: onScheduled
@@ -1329,13 +1341,13 @@ void onConnectionEstablished()
   }
 
   struct tm *ptm = gmtime(&tnow);
-  Serial.printf("[TIME] current date (UTC) : %04d/%02d/%02d %02d:%02d/%02d - %ld\n", ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, (long)tnow);
+  Serial.printf("[TIME] current date (UTC) : %04d/%02d/%02d %02d:%02d:%02d - %ld\n", ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, (long)tnow);
   // Print simple offset and derived local time for debugging
   int offsetMin = TIMEZONE_OFFSET_MINUTES;
   time_t tlocal = tnow + (time_t)offsetMin * 60;
   struct tm *plocal = gmtime(&tlocal);
   Serial.printf("[TIME] Configured UTC offset: %+d minutes\n", offsetMin);
-  Serial.printf("[TIME] Current date (UTC+offset): %04d/%02d/%02d %02d:%02d/%02d - %ld\n",
+  Serial.printf("[TIME] Current date (UTC+offset): %04d/%02d/%02d %02d:%02d:%02d - %ld\n",
                 plocal->tm_year + 1900, plocal->tm_mon + 1, plocal->tm_mday,
                 plocal->tm_hour, plocal->tm_min, plocal->tm_sec, (long)tlocal);
 
@@ -1627,6 +1639,12 @@ void performFrequencyScan()
 {
   Serial.println("[FREQ] Starting frequency scan...");
   Serial.println("[FREQ] [NOTE] Wi-Fi/MQTT connections may temporarily drop and reconnect while the scan is running. This is expected.");
+
+  // Suppress the verbose per-attempt radio/meter read logging for the whole
+  // scan. Each frequency step performs a full read sequence whose detailed
+  // output is irrelevant noise here; high-level scan progress messages remain.
+  EchoDebugQuietGuard quietGuard;
+
   char topicBuffer[MQTT_TOPIC_BUFFER_SIZE];
   snprintf(topicBuffer, sizeof(topicBuffer), "%s/cc1101_state", mqttBaseTopic);
   mqtt.publish(topicBuffer, "Frequency Scanning", true);
@@ -1660,6 +1678,11 @@ void performFrequencyScan()
       bestFreq = freq;
       Serial.printf("[FREQ] Better signal at %.6f MHz: RSSI=%d dBm\n", freq, test_data.rssi_dbm);
     }
+
+    // Drain the WiFi serial ring buffer so remote logs stream live during the
+    // scan instead of all arriving at once after it completes. Safe here: the
+    // CC1101 RX phase for this step has already finished.
+    wifiSerialLoop();
   }
 
   // Calculate and save the offset
@@ -1703,6 +1726,12 @@ void performFrequencyScan()
 void performWideInitialScan()
 {
   Serial.println("[FREQ] Performing wide initial scan (first boot - no saved offset)...");
+
+  // Suppress the verbose per-attempt radio/meter read logging for the whole
+  // scan. Each frequency step performs a full read sequence whose detailed
+  // output is irrelevant noise here; high-level scan progress messages remain.
+  EchoDebugQuietGuard quietGuard;
+
   char topicBuffer[MQTT_TOPIC_BUFFER_SIZE];
   snprintf(topicBuffer, sizeof(topicBuffer), "%s/cc1101_state", mqttBaseTopic);
   mqtt.publish(topicBuffer, "Initial Frequency Scan", true);
@@ -1747,6 +1776,10 @@ void performWideInitialScan()
       bestFreq = freq;
       Serial.printf("[FREQ] Found signal at %.6f MHz: RSSI=%d dBm\n", freq, test_data.rssi_dbm);
     }
+
+    // Drain the WiFi serial ring buffer so remote logs stream live during the
+    // scan instead of all arriving at once after it completes.
+    wifiSerialLoop();
   }
 
   if (bestRSSI > -120)
@@ -1780,6 +1813,9 @@ void performWideInitialScan()
         fineBestFreq = freq;
         Serial.printf("[FREQ] Refined signal at %.6f MHz: RSSI=%d dBm\n", freq, test_data.rssi_dbm);
       }
+
+      // Drain the WiFi serial ring buffer so remote logs stream live.
+      wifiSerialLoop();
     }
 
     bestFreq = fineBestFreq;
@@ -1952,6 +1988,14 @@ bool validateConfiguration()
 #else
   Serial.println("[ERROR] GDO0 pin not defined in private.h");
   valid = false;
+#endif
+
+#if defined(GDO2)
+  Serial.printf("✓ GDO2 Pin: GPIO %d (TX/RX FIFO threshold - hardware-assisted underflow prevention)\n", GDO2);
+#else // DISABLE_GDO2_FIFO_MANAGEMENT
+  // src/core/cc1101.cpp emits a compile-time #error when neither GDO2 nor
+  // DISABLE_GDO2_FIFO_MANAGEMENT is defined, so reaching here means the opt-out is set.
+  Serial.println("  GDO2 Pin: disabled via DISABLE_GDO2_FIFO_MANAGEMENT (legacy SPI polling fallback)");
 #endif
 
   // Validate reading schedule

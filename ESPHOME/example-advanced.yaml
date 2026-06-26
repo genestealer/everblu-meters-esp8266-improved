@@ -80,6 +80,11 @@ everblu_meter:
   meter_code: "23-1234567-800"  # Replace with your meter's code
   cs_pin: GPIO5
   gdo0_pin: 4
+  gdo2_pin: 27            # REQUIRED (v3.0.0+): wire CC1101 GDO2 here for hardware FIFO threshold (TX+RX)
+                          # Use any free GPIO (not SPI pins: avoid GPIO18/CLK, GPIO19/MISO, GPIO23/MOSI)
+                          # (not strapping pins: avoid GPIO0, GPIO2, GPIO12; GPIO27 is safe)
+                          # (prevents TXFIFO_UNDERFLOW). To keep legacy SPI polling instead, remove
+                          # this line and add: disable_gdo2_fifo_management: true
   meter_type: water
 
   # Radio configuration - custom frequency
@@ -99,7 +104,7 @@ everblu_meter:
   auto_align_midpoint: false  # Use exact configured time
 
   # Aggressive retry strategy
-  max_retries: 15                    # More attempts
+  max_retries: 15                    # More attempts (default: 5)
   retry_cooldown: 30min              # Shorter cooldown
 
   # Adaptive frequency tracking
@@ -118,6 +123,8 @@ everblu_meter:
     name: "Read Meter Now"
   frequency_scan_button:
     name: "Scan Frequency"
+  wide_frequency_scan_button:
+    name: "Wide Frequency Scan"
   reset_frequency_button:
     name: "Reset Frequency Offset"
 
@@ -127,8 +134,8 @@ everblu_meter:
     name: "Water Volume"
     filters:
       - or:
-        - throttle: 10s          # Limit updates
-        - delta: 0.1             # Only on change
+          - throttle: 10s          # Limit updates
+          - delta: 0.1             # Only on change
 
   counter:
     name: "Read Counter"

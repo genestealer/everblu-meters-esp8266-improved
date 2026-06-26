@@ -1,12 +1,12 @@
 # install-hooks.ps1
-# Installs Git hooks from the hooks/ directory into .git/hooks/
+# Installs Git hooks from the scripts/hooks/ directory into .git/hooks/
 
 $ErrorActionPreference = "Stop"
 $isWindows = ($env:OS -eq 'Windows_NT')
 
 Write-Host "Installing Git hooks..." -ForegroundColor Cyan
 
-$hooks = Get-ChildItem -Path "hooks" -File | Where-Object { $_.Extension -eq "" }
+$hooks = Get-ChildItem -Path "scripts/hooks" -File | Where-Object { $_.Extension -eq "" }
 $gitHooksDir = Join-Path -Path ".git" -ChildPath "hooks"
 
 foreach ($hook in $hooks) {

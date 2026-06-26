@@ -2,15 +2,14 @@ name: Configuration Validation
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, develop]
     paths:
       - platformio.ini
       - include/private.example.h
       - src/**
       - .github/workflows/config-validation.yml
   pull_request:
-    types: [opened, reopened, ready_for_review]
-    branches: [main, master, develop]
+    types: [opened, reopened, synchronize, ready_for_review]
     paths:
       - platformio.ini
       - include/private.example.h

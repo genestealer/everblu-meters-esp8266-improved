@@ -92,7 +92,11 @@ void MeterReader::begin()
     FrequencyManager::setRadioInitCallback(MeterReader::radioInitCallback);
     FrequencyManager::setMeterReadCallback(MeterReader::meterReadCallback);
 
-    // Initialize FrequencyManager with configured frequency
+    // Initialize FrequencyManager with configured frequency.
+    // NOTE: The frequency offset is a property of the RADIO, not the meter. It is held in
+    // FrequencyManager's static state and persisted under a single storage key, so it is shared
+    // by every meter that uses the same CC1101. In multi-meter setups all meters on one radio must
+    // therefore be configured with the same base `frequency` for the shared offset to be valid.
     float frequency = m_config->getFrequency();
     FrequencyManager::begin(frequency);
     FrequencyManager::setAutoScanEnabled(m_config->isAutoScanEnabled());
@@ -134,6 +138,11 @@ void MeterReader::begin()
         char utc_time_buf[8];
         snprintf(utc_time_buf, sizeof(utc_time_buf), "%02d:%02d", utcHour, utcMinute);
         m_publisher->publishMeterSettings(m_config->getMeterYear(), m_config->getMeterSerial(), m_config->getReadingSchedule(), utc_time_buf, m_config->getFrequency());
+
+        // Publish the restored calibration at boot so it is visible in Home Assistant
+        // immediately - this confirms the offset survived the reboot without waiting for a read.
+        m_publisher->publishFrequencyOffset(FrequencyManager::getOffset());
+        m_publisher->publishTunedFrequency(FrequencyManager::getTunedFrequency());
 
         // Publish radio failure state immediately (success state published in republish_initial_states)
         if (!radio_ok)
@@ -255,6 +264,10 @@ bool MeterReader::shouldPerformScheduledRead()
     // Get current local time
     time_t localTime = m_timeProvider->getLocalTime(m_config->getTimezoneOffsetMinutes());
     struct tm *ptm = gmtime(&localTime);
+    if (!ptm)
+    {
+        return false;
+    }
 
     // Check if today is a valid reading day
     bool isDayMatch = isReadingDayForConfiguredSchedule(ptm);
@@ -380,17 +393,19 @@ void MeterReader::handleFailedRead()
 
     if (m_retryCount < m_config->getMaxRetries() - 1)
     {
-        // Schedule retry after delay
+        // Schedule retry after delay.
+        // Keep the "Active Reading" sensor true and the radio state as "Reading"
+        // for the whole retry sequence so they don't flicker running/idle between
+        // attempts. They are cleared only on final success or after max retries.
+        // m_readingInProgress also stays true to keep the sequence atomic (the
+        // retry timer in loop() calls performReading() directly, bypassing the
+        // m_readingInProgress guard).
         m_retryCount++;
         m_nextRetryTime = millis() + RETRY_DELAY_MS;
         m_lastErrorMessage = "No meter response (asleep/out of range/wrong Year/Serial) - retrying";
 
         m_publisher->publishStatusMessage("Retry scheduled");
         m_publisher->publishError(m_lastErrorMessage);
-        m_publisher->publishActiveReading(false);
-        m_publisher->publishRadioState("Idle");
-
-        m_readingInProgress = false;
 
         LOG_I("everblu_meter", "Retry %d/%d scheduled in %lu seconds",
               m_retryCount + 1, m_config->getMaxRetries(), RETRY_DELAY_MS / 1000);
@@ -520,7 +535,7 @@ bool MeterReader::isReadingDayForConfiguredSchedule(const struct tm *ptm) const
         return true;
     }
     // check for single day reading schedule
-    switch(dayOfWeek) 
+    switch(dayOfWeek)
     {
         case 0:
             return strcmp(schedule, "Sunday") == 0;

@@ -16,12 +16,14 @@ These modules are now independent of MQTT and can be reused across projects incl
 **Purpose**: Manages daily meter reading schedules with timezone support
 
 **Key Features**:
+
 - Three reading patterns: "Monday-Friday", "Monday-Saturday", "Monday-Sunday"
 - UTC ↔ Local timezone conversions
 - Auto-alignment to meter wake windows (time_start/time_end)
 - Schedule validation and fallback to safe defaults
 
 **API**:
+
 ```cpp
 // Initialize
 ScheduleManager::begin(schedule, readHourUtc, readMinuteUtc, timezoneOffsetMinutes);
@@ -46,13 +48,16 @@ ScheduleManager::autoAlignToMeterWindow(meterTimeStart, meterTimeEnd, useMidpoin
 **Purpose**: Processes historical meter data and generates JSON representations
 
 **Key Features**:
+
 - Calculates monthly usage from 13-month history
 - Generates JSON for MQTT/Home Assistant
 - Prints formatted serial output
 - Validates history data
+
 - Handles meter resets gracefully
 
 **API**:
+
 ```cpp
 // Validate history
 bool hasData = MeterHistory::isHistoryValid(history);
@@ -78,20 +83,24 @@ MeterHistory::printToSerial(history, currentVolume, "[HISTORY]");
 ## What Was Removed from main.cpp
 
 ### Old Schedule Code (Lines ~130-340)
+
 - **Removed**: `g_readHourUtc`, `g_readMinuteUtc`, `g_readHourLocal`, `g_readMinuteLocal` global variables
 - **Removed**: `validateReadingSchedule()` function
 - **Removed**: `updateResolvedScheduleFromLocal()` function
+
 - **Removed**: `updateResolvedScheduleFromUtc()` function
 - **Removed**: `isReadingDay()` function
 - **Removed**: `readingSchedule` global variable
 
 ### Old History Processing Code (Lines ~550-710)
+
 - **Removed**: Complex JSON building with manual buffer management (~160 lines)
 - **Removed**: Monthly usage calculations (duplicated in MeterHistory now)
 - **Removed**: History validation logic
 - **Removed**: goto label and error handling for buffer overflow
 
 ### Result
+
 - **Lines removed**: ~330 lines from main.cpp
 - **Functionality**: 100% preserved through new modules
 - **Code clarity**: Much improved - main.cpp now focuses on MQTT orchestration only
@@ -103,9 +112,11 @@ MeterHistory::printToSerial(history, currentVolume, "[HISTORY]");
 ### For Arduino Projects (Current Setup)
 
 1. **Initialize ScheduleManager in setup()**
+
    ```cpp
    void setup() {
        // ... other setup code ...
+
 
        ScheduleManager::begin(DEFAULT_READING_SCHEDULE,
                              DEFAULT_READING_HOUR_UTC,
@@ -115,9 +126,11 @@ MeterHistory::printToSerial(history, currentVolume, "[HISTORY]");
    ```
 
 2. **Check if today should read**
+
    ```cpp
    void loop() {
        time_t tnow = time(nullptr);
+
        struct tm *ptm = gmtime(&tnow);
 
        if (ScheduleManager::isReadingDay(ptm)) {
@@ -127,6 +140,7 @@ MeterHistory::printToSerial(history, currentVolume, "[HISTORY]");
    ```
 
 3. **Process history data**
+
    ```cpp
    struct tmeter_data meter_data = get_meter_data();
 
@@ -135,6 +149,7 @@ MeterHistory::printToSerial(history, currentVolume, "[HISTORY]");
        MeterHistory::printToSerial(meter_data.history, meter_data.volume);
 
        // Generate JSON
+
        char json[1024];
        MeterHistory::generateHistoryJson(meter_data.history,
                                         meter_data.volume,
@@ -145,6 +160,7 @@ MeterHistory::printToSerial(history, currentVolume, "[HISTORY]");
    ```
 
 4. **Auto-align reading time to meter window**
+
    ```cpp
    // After successful meter read:
    bool aligned = ScheduleManager::autoAlignToMeterWindow(
@@ -204,6 +220,7 @@ assert(stats.currentMonthUsage == 50);  // 350 - 300
 assert(stats.monthCount == 3);
 
 // Test JSON generation
+
 char json[1024];
 int size = MeterHistory::generateHistoryJson(history, 350, json, sizeof(json));
 assert(size > 0);
@@ -215,24 +232,28 @@ assert(strstr(json, "\"months_available\":3"));
 ## Benefits of This Extraction
 
 ### Separation of Concerns
+
 - ✅ Schedule logic: Independent module
 - ✅ History processing: Independent module
 - ✅ MQTT publishing: Stays in main.cpp (application layer)
 - ✅ Meter communication: Stays in cc1101/everblu_meters (hardware layer)
 
 ### Reusability
+
 - ✅ ScheduleManager works with any project needing daily schedules
 - ✅ MeterHistory works with any meter using 13-month history arrays
 - ✅ Both modules are framework-agnostic (Arduino, ESPHome, ESP-IDF, etc.)
 - ✅ No MQTT or WiFi dependencies - pure data processing
 
 ### Maintainability  
+
 - ✅ Schedule logic is consolidated in one place
 - ✅ History processing is consolidated in one place
 - ✅ main.cpp now focuses solely on MQTT orchestration
 - ✅ Easier to test each module independently
 
 ### Future Extensibility
+
 - ✅ Add new schedule types without touching main.cpp
 - ✅ Add new history processing features (trend analysis, anomaly detection) without touching main.cpp
 - ✅ Use in other projects by copying just 2-4 files

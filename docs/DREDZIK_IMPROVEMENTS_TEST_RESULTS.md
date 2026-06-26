@@ -27,6 +27,7 @@ This improvement involved streamlining CC1101 register configuration sequences. 
 **Testing Date:** January 1, 2026
 
 **Changes Made:**
+
 - [cc1101.cpp](../src/cc1101.cpp) line 428-429: Modified initial RF config SYNC registers
 - [cc1101.cpp](../src/cc1101.cpp) line 1123-1124: Modified frame sync detection SYNC registers  
 - [cc1101.cpp](../src/cc1101.cpp) line 1239-1240: Modified second frame sync SYNC registers
@@ -55,9 +56,11 @@ All 5 retry attempts failed. The meter never achieved sync detection with the mo
 **Testing Date:** January 1, 2026
 
 **Changes Made:**
+
 - [utils.cpp](../src/utils.cpp) lines 216-289: Completely refactored serialization function
 
 **Implementation Details:**
+
 - Original: Explicit start bit (0), data bits, explicit stop bits (1,1)
 - Proposed: Prefix each output byte with `b1110` followed by 4-bit chunks
 
@@ -77,6 +80,7 @@ Meter sync detection failed immediately and consistently across all retries.
 **Conclusion:** ❌ **FAILED** - Do not use. Original complex bit-by-bit logic is essential for proper meter communication.
 
 **Revert Command:**
+
 ```bash
 git checkout HEAD -- src/utils.cpp
 ```
@@ -90,6 +94,7 @@ git checkout HEAD -- src/utils.cpp
 **Hypothesis:** Dredzik observed that the meter transmits at 2400 baud (per spec), suggesting the 4× oversampling (2400→9600 bps) is unnecessary
 
 **Supporting Evidence Found:**
+
 - Official Itron EverBlu documentation states: "Transmission speed: 2,400 baud"
 - Frame format: "1 start bit / No parity / 2 or 2.5 stop bits"
 - Preamble: "0101...0101 at 2400 bits/sec"
@@ -98,6 +103,7 @@ git checkout HEAD -- src/utils.cpp
 **Upload Time:** 2026-01-01 13:03:16 UTC
 
 **Changes Made:**
+
 - [cc1101.cpp](../src/cc1101.cpp) line 1176: Changed `MDMCFG4_RX_BW_58KHZ_9_6KBPS` to `MDMCFG4_RX_BW_58KHZ`
 - Effect: Both sync and data RX remain at 2400 baud (no switch to 9600 baud)
 - Build status: SUCCESS - compiled without errors
@@ -107,12 +113,14 @@ git checkout HEAD -- src/utils.cpp
 ```
 > GDO0 triggered at 63ms
 > First sync pattern received (1 bytes)
+
   rssi=176 lqi=128 F_est=255
 ERROR: Timeout waiting for GDO0 (frame start)
 ERROR: Timeout waiting for meter data frame
 ```
 
 Pattern repeated across all 5 retry attempts:
+
 - ✓ Sync detection works (RADIAN preamble detected)
 - ✗ Frame reception fails (timeout on actual data bytes)
 - Consistent RSSI (-78 dBm ~176) and LQI (128/255) indicate signal is present
@@ -132,11 +140,13 @@ Pattern repeated across all 5 retry attempts:
 ## Summary: Original Implementation is Optimal
 
 ### What Works ✓
+
 - SYNC word: `0x55 0x50` (hardware-specific pattern)
 - Serialization: Complex bit-by-bit logic in `encode2serial_1_3()`
 - Baud rates: 2400 bps sync detection → 9600 bps data reception (4× oversampling)
 
 ### Successful Test History
+
 - **January 1, 2026:** Verified original code successfully reads meter
   - Current volume: 737,233 liters
   - Historical data: 12 months retrieved cleanly

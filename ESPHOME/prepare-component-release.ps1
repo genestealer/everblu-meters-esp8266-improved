@@ -10,6 +10,31 @@ $SRC_DIR = "src"
 $RELEASE_ROOT = "ESPHOME-release"
 $RELEASE_DIR = "$RELEASE_ROOT\everblu_meter"
 
+# Retry helper for file operations that can transiently fail when another process
+# (e.g. OneDrive sync or antivirus) briefly holds a handle on a file. Retries the
+# action a few times with a short, increasing delay so the filesystem has time to
+# release the lock before we give up.
+function Invoke-WithRetry {
+    param(
+        [Parameter(Mandatory = $true)][scriptblock]$Action,
+        [string]$Description = "file operation",
+        [int]$MaxAttempts = 6,
+        [int]$InitialDelayMs = 250
+    )
+    for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+        try {
+            & $Action
+            return
+        }
+        catch {
+            if ($attempt -eq $MaxAttempts) { throw }
+            $delay = $InitialDelayMs * $attempt
+            Write-Host "  Lock on $Description (attempt $attempt/$MaxAttempts); waiting ${delay}ms..." -ForegroundColor DarkYellow
+            Start-Sleep -Milliseconds $delay
+        }
+    }
+}
+
 Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host "EverBlu Meter Component Release Build" -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
@@ -27,7 +52,9 @@ if (!(Test-Path $SRC_DIR) -or !(Test-Path $COMPONENT_DIR)) {
 # Clear any existing release output to ensure a clean package
 if (Test-Path $RELEASE_ROOT) {
     Write-Host "Clearing existing release directory..." -ForegroundColor Yellow
-    Remove-Item -Recurse -Force $RELEASE_ROOT
+    Invoke-WithRetry -Description "clearing release directory" -Action {
+        Remove-Item -Recurse -Force $RELEASE_ROOT
+    }
 }
 
 # Create release directory
@@ -36,14 +63,18 @@ New-Item -ItemType Directory -Force -Path "$RELEASE_DIR" | Out-Null
 
 # Copy component base files
 Write-Host "Copying component files..." -ForegroundColor Green
-Copy-Item "$COMPONENT_DIR\__init__.py" "$RELEASE_DIR\"
-Copy-Item "$COMPONENT_DIR\everblu_meter.h" "$RELEASE_DIR\"
-Copy-Item "$COMPONENT_DIR\everblu_meter.cpp" "$RELEASE_DIR\"
-Copy-Item "$COMPONENT_DIR\README.md" "$RELEASE_DIR\" -ErrorAction SilentlyContinue
+Invoke-WithRetry -Description "copying component files" -Action {
+    Copy-Item -Force "$COMPONENT_DIR\__init__.py" "$RELEASE_DIR\"
+    Copy-Item -Force "$COMPONENT_DIR\everblu_meter.h" "$RELEASE_DIR\"
+    Copy-Item -Force "$COMPONENT_DIR\everblu_meter.cpp" "$RELEASE_DIR\"
+    Copy-Item -Force "$COMPONENT_DIR\README.md" "$RELEASE_DIR\" -ErrorAction SilentlyContinue
+}
 
 # Copy entire src/ directory structure as-is (preserves includes)
 Write-Host "Copying source tree..." -ForegroundColor Green
-Copy-Item -Recurse "$SRC_DIR\*" "$RELEASE_DIR\"
+Invoke-WithRetry -Description "copying source tree" -Action {
+    Copy-Item -Recurse -Force "$SRC_DIR\*" "$RELEASE_DIR\"
+}
 
 # Remove main.cpp (standalone-only entry point, not for ESPHome)
 Write-Host "Removing standalone-only files..." -ForegroundColor Yellow
@@ -55,7 +86,10 @@ Write-Host "Flattening sources into a single folder..." -ForegroundColor Green
 $filesToMove = Get-ChildItem -Path $RELEASE_DIR -Recurse -Include *.h,*.hpp,*.c,*.cpp | Where-Object { $_.DirectoryName -ne (Resolve-Path $RELEASE_DIR) }
 foreach ($f in $filesToMove) {
     $dest = Join-Path $RELEASE_DIR $f.Name
-    Move-Item -Force $f.FullName $dest
+    $src = $f.FullName
+    Invoke-WithRetry -Description "moving $($f.Name)" -Action {
+        Move-Item -Force $src $dest
+    }
 }
 
 # Remove MQTT publisher files (not used in ESPHome)
@@ -72,10 +106,12 @@ Write-Host "Rewriting include paths for flattened layout..." -ForegroundColor Gr
 $allFiles = Get-ChildItem -Path $RELEASE_DIR -Filter *.h | Select-Object -ExpandProperty FullName
 $allFiles += Get-ChildItem -Path $RELEASE_DIR -Filter *.cpp | Select-Object -ExpandProperty FullName
 foreach ($file in $allFiles) {
-    $content = Get-Content $file -Raw
-    # Strip any leading path segments like core/, services/, adapters/, src/, adapters/implementations/
-    $content = $content -replace '#include\s+"(?!esphome/)(?:[^"/]+/)+([^"/]+)"', '#include "$1"'
-    Set-Content -Path $file -Value $content -NoNewline
+    Invoke-WithRetry -Description "rewriting includes in $(Split-Path $file -Leaf)" -Action {
+        $content = Get-Content $file -Raw
+        # Strip any leading path segments like core/, services/, adapters/, src/, adapters/implementations/
+        $content = $content -replace '#include\s+"(?!esphome/)(?:[^"/]+/)+([^"/]+)"', '#include "$1"'
+        Set-Content -Path $file -Value $content -NoNewline
+    }
 }
 
 # Add explicit WARNING and DO_NOT_EDIT markers, then mark files read-only
@@ -107,9 +143,12 @@ Set-Content -Path "$RELEASE_DIR\DO_NOT_EDIT.md" -Value $warningText
 Write-Host "Normalizing line endings to LF..." -ForegroundColor Green
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 Get-ChildItem -Path $RELEASE_ROOT -Recurse -File | ForEach-Object {
-    $raw = [System.IO.File]::ReadAllText($_.FullName)
-    $lf = $raw -replace "`r`n", "`n" -replace "`r", "`n"
-    [System.IO.File]::WriteAllText($_.FullName, $lf, $utf8NoBom)
+    $target = $_.FullName
+    Invoke-WithRetry -Description "normalizing $($_.Name)" -Action {
+        $raw = [System.IO.File]::ReadAllText($target)
+        $lf = $raw -replace "`r`n", "`n" -replace "`r", "`n"
+        [System.IO.File]::WriteAllText($target, $lf, $utf8NoBom)
+    }
 }
 
 attrib +R "$RELEASE_DIR\*" /S /D

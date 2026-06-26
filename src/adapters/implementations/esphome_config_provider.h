@@ -9,7 +9,13 @@
 #ifndef ESPHOME_CONFIG_PROVIDER_H
 #define ESPHOME_CONFIG_PROVIDER_H
 
+#if __has_include("../config_provider.h")
 #include "../config_provider.h"
+#elif __has_include("config_provider.h")
+#include "config_provider.h"
+#else
+#error "Missing config_provider.h (expected ../config_provider.h or config_provider.h)"
+#endif
 
 /**
  * @class ESPHomeConfigProvider
@@ -86,7 +92,7 @@ private:
     bool auto_align_midpoint_{true};
 
     // Retry configuration
-    int max_retries_{10};
+    int max_retries_{5};
     unsigned long retry_cooldown_ms_{3600000}; // 1 hour
 };
 

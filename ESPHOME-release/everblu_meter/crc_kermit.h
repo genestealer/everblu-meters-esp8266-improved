@@ -1,3 +1,11 @@
+/**
+ * @file crc_kermit.h
+ * @brief CRC-16/KERMIT checksum used by the RADIAN meter protocol
+ *
+ * Computes the CRC-16/KERMIT (reflected, init 0x0000) checksum used to
+ * validate RADIAN protocol frames exchanged with Everblu Cyble meters.
+ */
+
 #ifndef CRC_KERMIT_H
 #define CRC_KERMIT_H
 

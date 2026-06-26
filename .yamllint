@@ -1,0 +1,38 @@
+# yamllint configuration for this repository.
+#
+# Pragmatic ruleset aligned with how ESPHome and GitHub Actions YAML is written:
+#  - line length is not enforced (long ESPHome lambdas / URLs are common)
+#  - GitHub Actions `on:` is allowed (yamllint otherwise flags it as a truthy key)
+#  - generated/build output is ignored
+#
+# Tooling is intentionally unpinned: the latest yamllint is used locally
+# (.pre-commit-config.yaml) and in CI (.github/workflows/lint.yml).
+---
+extends: default
+
+rules:
+  line-length: disable
+  document-start: disable
+  comments-indentation: disable
+  # Line-ending style is enforced by git/.gitattributes, not yamllint (avoids
+  # false positives on Windows CRLF working copies).
+  new-lines: disable
+  truthy:
+    # Allow GitHub Actions' `on:` key; still validate truthy *values*.
+    check-keys: false
+  comments:
+    min-spaces-from-content: 1
+  indentation:
+    spaces: consistent
+    indent-sequences: true
+  braces:
+    max-spaces-inside: 1
+  brackets:
+    max-spaces-inside: 1
+
+ignore: |
+  ESPHOME-release/
+  .pio/
+  .venv/
+  .esphome/
+  **/.esphome/

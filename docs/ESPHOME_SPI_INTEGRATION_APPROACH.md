@@ -17,6 +17,7 @@ Instead of adding individual `spi_clk_pin`, `spi_mosi_pin`, `spi_miso_pin` confi
 ## Benefits of This Approach
 
 ### For End Users
+
 - ✅ **Cleaner configuration**: Standard ESPHome SPI syntax that's familiar to users
 - ✅ **Bus sharing**: Can add displays, SD cards, or other SPI devices alongside the CC1101
 - ✅ **Hardware/software SPI selection**: ESPHome can automatically choose the best SPI controller
@@ -24,6 +25,7 @@ Instead of adding individual `spi_clk_pin`, `spi_mosi_pin`, `spi_miso_pin` confi
 - ✅ **Consistent behavior**: Works the same way as other ESPHome SPI components
 
 ### For Developers
+
 - ✅ **Less maintenance**: SPI platform-specific code maintained by ESPHome core team
 - ✅ **Better testing**: Integration tested alongside all other SPI components
 - ✅ **Proper abstraction**: Clean separation between bus configuration and device logic
@@ -81,6 +83,7 @@ everblu_meter:
 ## Technical Implementation
 
 The component now:
+
 1. Inherits from `spi::SPIDevice` template class
 2. References the ESPHome SPI bus via `spi_id`
 3. Uses Arduino SPI library calls (bus already configured by ESPHome)
@@ -99,16 +102,19 @@ The component now:
 If you previously used (or expected) raw pin configuration:
 
 **❌ Old approach (not implemented):**
+
 ```yaml
 everblu_meter:
   spi_clk_pin: 48
   spi_mosi_pin: 38
   spi_miso_pin: 47
   spi_cs_pin: 21
+
   gdo0_pin: 5
 ```
 
 **✅ New approach (ESPHome SPI integration):**
+
 ```yaml
 spi:
   id: main_bus

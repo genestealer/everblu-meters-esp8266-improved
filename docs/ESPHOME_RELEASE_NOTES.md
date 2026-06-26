@@ -22,6 +22,7 @@ This release adds complete ESPHome integration as an alternative to the standalo
 #### Configuration Options
 
 **Core Configuration**:
+
 - `meter_year` - Meter manufacture year (0-99)
 - `meter_serial` - Meter serial number
 - `meter_type` - Water or gas meter support
@@ -29,13 +30,15 @@ This release adds complete ESPHome integration as an alternative to the standalo
 - `auto_scan` - Automatic frequency scanning
 
 **Scheduling**:
+
 - `schedule` - Reading schedule (Monday-Friday, Monday-Saturday, Monday-Sunday)
 - `read_hour` / `read_minute` - Scheduled reading time
 - `timezone_offset` - Timezone configuration
 - `auto_align_time` / `auto_align_midpoint` - Time alignment features
 
 **Retry Logic**:
-- `max_retries` - Maximum read attempts (default: 10)
+
+- `max_retries` - Maximum read attempts (default: 5)
 - `retry_cooldown` - Cooldown between sessions (default: 1h)
 
 #### Sensors
@@ -43,32 +46,40 @@ This release adds complete ESPHome integration as an alternative to the standalo
 **15+ Available Sensors**:
 
 **Numeric Sensors**:
+
 - `volume` - Current volume reading (L or m³)
 - `battery` - Estimated battery life (years)
 - `counter` - Alternative volume counter
 - `rssi` / `rssi_percentage` - Signal strength (dBm / %)
 - `lqi` / `lqi_percentage` - Link quality (raw / %)
+
 - `time_start` / `time_end` - Reading timestamps (ms)
 - `total_attempts` / `successful_reads` / `failed_reads` - Statistics
 
 **Text Sensors**:
+
 - `status` - Current meter status
+
 - `error` - Last error message
 - `radio_state` - Radio state
 - `timestamp` - Last reading time
 
 **Binary Sensors**:
+
 - `active_reading` - Reading in progress indicator
 
 #### Documentation
 
 **New Documentation Files**:
+
 - `ESPHOME/ESPHOME_INTEGRATION_GUIDE.md` - Complete integration guide (500+ lines)
 - `ESPHOME/docs/README.md` - Quick start and configuration reference
 - `ESPHOME/components/everblu_meter/README.md` - Component documentation
 
 **Example Configurations**:
+
 - `example-water-meter.yaml` - Complete water meter configuration
+
 - `example-gas-meter-minimal.yaml` - Minimal gas meter setup
 - `example-advanced.yaml` - Advanced features and customization
 
@@ -77,16 +88,21 @@ This release adds complete ESPHome integration as an alternative to the standalo
 #### Adapter Pattern Implementation
 
 **New Abstraction Layer**:
+
 - `IConfigProvider` - Configuration interface
+
 - `ITimeProvider` - Time synchronization interface
 - `IDataPublisher` - Data publishing interface
 
 **ESPHome Adapters**:
+
 - `ESPHomeConfigProvider` - YAML configuration provider
 - `ESPHomeTimeProvider` - ESPHome time component wrapper
+
 - `ESPHomeDataPublisher` - ESPHome sensor publisher
 
 **Standalone Adapters** (Existing):
+
 - `DefineConfigProvider` - Compile-time configuration
 - `NTPTimeProvider` - NTP time synchronization
 - `MQTTDataPublisher` - MQTT publishing
@@ -94,8 +110,10 @@ This release adds complete ESPHome integration as an alternative to the standalo
 #### Code Organization
 
 **Directory Structure**:
+
 ```
 src/
+
 ├── adapters/
 │   ├── implementations/
 │   │   ├── esphome_*.{h,cpp}    (NEW)
@@ -108,6 +126,7 @@ src/
 ```
 
 **Component Structure**:
+
 ```
 ESPHOME/
 ├── components/
@@ -227,6 +246,7 @@ If you want to switch from standalone MQTT mode to ESPHome:
 #### Community Contributions
 
 We welcome contributions! Areas of interest:
+
 - Additional sensors
 - Custom components
 - Integration blueprints
@@ -305,6 +325,7 @@ cd everblu-meters-esp8266-improved
 
 # Configure
 cp include/private.example.h include/private.h
+
 nano include/private.h
 
 # Build with PlatformIO
@@ -319,32 +340,39 @@ pio run -t upload -e huzzah
 ### [2.0.0] - Unreleased
 
 #### Added
+
 - Native ESPHome custom component
 - ESPHome adapter implementations (Config, Time, Data)
+
 - Python configuration schema with validation
 - 15+ configurable sensors (numeric, text, binary)
 - Comprehensive ESPHome documentation (3 guides)
 - 3 example YAML configurations
 - Architecture based on dependency injection
 - Platform-agnostic meter reader core
+
 - Conditional compilation for dual-mode support
 
 #### Changed
+
 - Reorganized `src/` into logical layers (core, services, adapters)
 - MeterReader now uses dependency injection
 - Configuration, time, and publishing abstracted to interfaces
 - Main README updated with ESPHome information
 
 #### Improved
+
 - Code maintainability through adapter pattern
 - Testability via interface abstractions
 - Extensibility for future platforms
 - Documentation coverage
 
 #### Fixed
+
 - None (new feature release)
 
 #### Deprecated
+
 - None (backward compatible)
 
 ---
