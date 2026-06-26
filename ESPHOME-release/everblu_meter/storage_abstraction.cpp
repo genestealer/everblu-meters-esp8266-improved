@@ -310,10 +310,18 @@ float StorageAbstraction::loadFloat(const char *key, float defaultValue, uint16_
 bool StorageAbstraction::hasKey(const char *key)
 {
 #ifdef EVERBLU_USE_ESPHOME_PREFS
+    if (esphome::global_preferences == nullptr)
+    {
+        return false;
+    }
     uint32_t hash = esphome::fnv1_hash(key);
     esphome::ESPPreferenceObject &pref = getFloatPref(hash);
     FloatStorage storage;
-    return pref.load(&storage);
+    storage.magic_number = 0;
+    // A successful load is not enough: clearKey() writes a zeroed magic to the
+    // same slot, which still loads successfully. Treat a zeroed magic as absent
+    // so hasKey() stays consistent with clearKey() and the other platforms.
+    return pref.load(&storage) && storage.magic_number != 0;
 
 #elif defined(ESP8266)
     // For ESP8266, check if magic number is valid
@@ -335,6 +343,11 @@ bool StorageAbstraction::hasKey(const char *key)
 bool StorageAbstraction::clearKey(const char *key)
 {
 #ifdef EVERBLU_USE_ESPHOME_PREFS
+    if (esphome::global_preferences == nullptr)
+    {
+        LOG_E("everblu_meter", "Cannot clear %s: global_preferences is null!", key);
+        return false;
+    }
     uint32_t hash = esphome::fnv1_hash(key);
     // Reuse the same cached, flash-backed preference object as save/load (see getFloatPref)
     // so we invalidate the exact slot loadFloat reads from. Write a zeroed magic so a
@@ -343,7 +356,15 @@ bool StorageAbstraction::clearKey(const char *key)
     FloatStorage storage;
     storage.magic_number = 0;
     storage.data = 0.0f;
-    return pref.save(&storage);
+    bool success = pref.save(&storage);
+    if (success)
+    {
+        // Mirror saveFloat(): force the cleared slot out to flash and give the
+        // ESP8266 flash write time to complete so the clear survives a reboot.
+        esphome::global_preferences->sync();
+        delay(100);
+    }
+    return success;
 
 #elif defined(ESP8266)
     // Clear by setting magic to 0
