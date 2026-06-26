@@ -275,6 +275,16 @@ void EverbluMeterComponent::loop() {
 
     this->meter_reader_->loop();
   }
+
+  // Publish the GDO2 stuck-timeout diagnostic only when it changes. A rising value
+  // indicates a miswired / disconnected GDO2 rather than an RF/meter problem.
+  if (this->gdo2_timeouts_sensor_ != nullptr) {
+    uint32_t timeouts = cc1101_get_gdo2_timeout_count();
+    if (timeouts != this->last_gdo2_timeouts_published_) {
+      this->last_gdo2_timeouts_published_ = timeouts;
+      this->gdo2_timeouts_sensor_->publish_state(static_cast<float>(timeouts));
+    }
+  }
 }
 
 void EverbluMeterComponent::request_manual_read() {

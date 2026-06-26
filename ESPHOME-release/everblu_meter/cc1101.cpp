@@ -271,6 +271,18 @@ void cc1101_set_gdo2_pin(int gdo2_pin)
 #endif
 #endif
 
+// Diagnostic counter shared by both build targets: number of times the TX
+// interrogation-frame gate waited the full safety limit with GDO2 still HIGH (the FIFO
+// never reported below threshold). A non-zero, growing value almost always means GDO2
+// is miswired / on the wrong GPIO / not connected, rather than an RF/meter problem.
+// Monotonic (lifetime) counter; surfaced via cc1101_get_gdo2_timeout_count() for telemetry.
+static uint32_t _gdo2_stuck_timeouts = 0;
+
+uint32_t cc1101_get_gdo2_timeout_count(void)
+{
+  return _gdo2_stuck_timeouts;
+}
+
 // Change these define according to your ESP8266 board
 #if defined(ESP8266) && !defined(USE_ESPHOME)
 #define SPI_CSK PIN_SPI_SCK
@@ -615,8 +627,13 @@ bool cc1101_init(float freq)
   // GDO2 is optional; configure as input only when a pin is assigned.
   if (GET_GDO2_PIN() >= 0)
   {
-    pinMode(GET_GDO2_PIN(), INPUT);
-    echo_debug(debug_out, "[CC1101] GDO2 pin %d configured as TX FIFO threshold input\n", GET_GDO2_PIN());
+    // Use a pull-up (matching GDO0) so a disconnected/miswired GDO2 reads HIGH. A HIGH
+    // GDO2 means "TX FIFO at/above threshold - do not feed", which makes the fault fail
+    // loudly and quickly via the interrogation-frame gate timeout (see _gdo2_stuck_timeouts)
+    // instead of silently driving the FIFO. ESP8266 has internal pull-ups on every GPIO
+    // except GPIO16; ESP32 supports INPUT_PULLUP on all input-capable pins.
+    pinMode(GET_GDO2_PIN(), INPUT_PULLUP);
+    echo_debug(debug_out, "[CC1101] GDO2 pin %d configured as FIFO threshold input (pull-up)\n", GET_GDO2_PIN());
   }
 
   // Initialize SPI transport for CC1101 communication.
@@ -661,6 +678,42 @@ bool cc1101_init(float freq)
   delay(5);          // Wait for calibration to complete (typically <1ms, but we add margin)
 
   echo_debug(debug_out, "[CC1101] Frequency synthesizer calibrated for %.6f MHz\n", freq);
+
+  // One-time GDO2 wiring self-test. With IOCFG2 in TX-FIFO-threshold mode (0x02, set by
+  // cc1101_configureRF_0) GDO2 must read LOW with an empty TX FIFO and HIGH once the FIFO
+  // is filled past the 25-byte threshold. If it does not toggle across that known
+  // transition, GDO2 is almost certainly miswired / on the wrong GPIO / not connected.
+  // Runs once per boot (skipped on the repeated cc1101_init() calls made by frequency
+  // scans). A failure increments the same diagnostic counter as the runtime stuck-HIGH
+  // detection, so the fault surfaces in telemetry from boot without waiting for a read.
+  if (GET_GDO2_PIN() >= 0)
+  {
+    static bool s_gdo2_selftest_done = false;
+    if (!s_gdo2_selftest_done)
+    {
+      s_gdo2_selftest_done = true;
+      halRfWriteReg(IOCFG2, IOCFG2_TX_FIFO_THR); // ensure GDO2 = TX FIFO threshold signal
+      CC1101_CMD(SFTX);                          // empty TX FIFO -> GDO2 expected LOW
+      delayMicroseconds(50);
+      bool low_when_empty = (digitalRead(GET_GDO2_PIN()) == LOW);
+      uint8_t selftest_buf[40] = {0};            // > 25-byte threshold -> GDO2 expected HIGH
+      SPIWriteBurstReg(TX_FIFO_ADDR, selftest_buf, sizeof(selftest_buf));
+      delayMicroseconds(50);
+      bool high_when_filled = (digitalRead(GET_GDO2_PIN()) == HIGH);
+      CC1101_CMD(SFTX);                          // restore empty FIFO for normal operation
+      if (low_when_empty && high_when_filled)
+      {
+        echo_debug(debug_out, "[CC1101] GDO2 self-test passed (LOW when empty / HIGH when filled)\n");
+      }
+      else
+      {
+        _gdo2_stuck_timeouts++;
+        LOG_W("everblu_meter",
+              "GDO2 self-test FAILED (empty read=%s, filled read=%s; expected LOW then HIGH) - check GDO2 wiring/pin. Reads may fail until fixed; opt out via DISABLE_GDO2_FIFO_MANAGEMENT / disable_gdo2_fifo_management to use legacy SPI polling.",
+              low_when_empty ? "LOW" : "HIGH", high_when_filled ? "HIGH" : "LOW");
+      }
+    }
+  }
 
   // Put radio into RX listening mode so it can receive meter data
   cc1101_rec_mode();
@@ -1647,8 +1700,22 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
           // a real-time hardware signal, preventing underflows under ESPHome scheduler load.
           if (digitalRead(GET_GDO2_PIN()) == LOW)
           {
-            SPIWriteBurstReg(TX_FIFO_ADDR, wupbuffer, 8);
-            wup2send--;
+            // Safety guard: GDO2 LOW should mean the FIFO is below threshold (>= 40 free
+            // bytes). A miswired / stuck-LOW GDO2 would otherwise let this loop write
+            // unconditionally and overflow the 64-byte TX FIFO. Confirm real free space
+            // via TXBYTES before writing, and abort on an existing underflow.
+            uint8_t txbytes_reg = halRfReadReg(TXBYTES_ADDR);
+            if (txbytes_reg & 0x80)
+            {
+              marcstate = halRfReadReg(MARCSTATE_ADDR); // refresh so the post-loop abort check/diagnostics are accurate
+              break;                                    // TXFIFO_UNDERFLOW already occurred
+            }
+            if ((txbytes_reg & 0x7F) <= 56) // room for the 8-byte WUP buffer
+            {
+              SPIWriteBurstReg(TX_FIFO_ADDR, wupbuffer, 8);
+              wup2send--;
+            }
+            // else: GDO2 claims below-threshold but FIFO is nearly full (stuck-LOW miswire) - skip
           }
           // else: FIFO still above threshold - skip write this iteration
         }
@@ -1694,6 +1761,16 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
         }
         // Confirm GDO2 is actually LOW (FIFO drained), not merely timed out with FIFO still full.
         fifo_ready = (digitalRead(GET_GDO2_PIN()) == LOW);
+        if (!fifo_ready && wait_count >= 100)
+        {
+          // GDO2 never went LOW within the safety window. With FIFOTHR_FIFO_THR_25_40 the
+          // FIFO drains in well under 500ms, so a persistent HIGH almost always means GDO2
+          // is miswired / on the wrong GPIO / not connected. Warn loudly and count it so a
+          // wiring fault is not silently misread as "meter asleep / out of range".
+          _gdo2_stuck_timeouts++;
+          echo_debug(1, "[CC1101] WARNING: GDO2 still HIGH after 500ms (TXBYTES=%u, count=%u) - check GDO2 wiring/pin or set the opt-out (DISABLE_GDO2_FIFO_MANAGEMENT / disable_gdo2_fifo_management)\n",
+                     txbytes_reg & 0x7F, _gdo2_stuck_timeouts);
+        }
       }
       else
       {

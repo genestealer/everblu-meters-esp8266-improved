@@ -183,6 +183,10 @@
 //   ESP8266 SPI bus: GPIO12 (D6)=MISO, GPIO13 (D7)=MOSI, GPIO14 (D5)=SCK, GPIO15 (D8)=CS
 // ESP8266 example: GPIO4 (D2) when GDO0 uses GPIO5 (D1), or GPIO5 (D1) when GDO0 uses GPIO4
 // ESP32 example:   GPIO27, GPIO26
+//
+// The pin is configured as INPUT_PULLUP, so a disconnected/miswired GDO2 reads HIGH and
+// fails loudly (watch for a "GDO2 still HIGH - check wiring" warning) instead of floating.
+// Prefer a GPIO with a usable internal pull-up: on ESP8266 every GPIO except GPIO16 has one.
 #define GDO2 4
 //
 // To OPT OUT and keep the legacy SPI-polling behaviour, comment out the #define GDO2 line

@@ -74,6 +74,8 @@ everblu_meter:
     name: "CI Reads OK"
   failed_reads:
     name: "CI Reads Fail"
+  gdo2_timeouts:
+    name: "CI GDO2 Timeouts"
   frequency_offset:
     name: "CI Freq Offset"
   tuned_frequency:

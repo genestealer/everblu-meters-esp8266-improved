@@ -171,6 +171,10 @@ everblu_meter:
   failed_reads:
     name: "Failed Reads"
 
+  # Rising only when GDO2 is miswired/disconnected; stays 0 on healthy wiring
+  gdo2_timeouts:
+    name: "GDO2 Timeouts"
+
   frequency_offset:
     name: "Frequency Offset"
 

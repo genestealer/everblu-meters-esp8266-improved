@@ -94,6 +94,7 @@ CONF_RADIO_CONNECTED = "radio_connected"
 CONF_TOTAL_ATTEMPTS = "total_attempts"
 CONF_SUCCESSFUL_READS = "successful_reads"
 CONF_FAILED_READS = "failed_reads"
+CONF_GDO2_TIMEOUTS = "gdo2_timeouts"
 CONF_FREQUENCY_OFFSET = "frequency_offset"
 CONF_TUNED_FREQUENCY = "tuned_frequency"
 CONF_FREQUENCY_ESTIMATE = "frequency_estimate"
@@ -277,6 +278,12 @@ CONFIG_SCHEMA = (
                 icon="mdi:alert-circle",
                 entity_category="diagnostic",
             ),
+            cv.Optional(CONF_GDO2_TIMEOUTS): sensor.sensor_schema(
+                accuracy_decimals=0,
+                state_class=STATE_CLASS_TOTAL_INCREASING,
+                icon="mdi:pulse",
+                entity_category="diagnostic",
+            ),
             cv.Optional(CONF_FREQUENCY_OFFSET): sensor.sensor_schema(
                 unit_of_measurement="kHz",
                 accuracy_decimals=3,
@@ -374,9 +381,24 @@ def validate_gdo2_required(config):
 
     GDO2 hardware-assisted FIFO management is now the default mechanism for talking to
     the CC1101. Users must wire CC1101 GDO2 to a free GPIO and set ``gdo2_pin:``, or
-    explicitly opt out with ``disable_gdo2_fifo_management: true``.
+    explicitly opt out with ``disable_gdo2_fifo_management: true``. Setting both is
+    contradictory and is rejected so the opt-out can never be silently ignored.
     """
-    if not config.get(CONF_DISABLE_GDO2, False) and CONF_GDO2_PIN not in config:
+    disabled = config.get(CONF_DISABLE_GDO2, False)
+    has_pin = CONF_GDO2_PIN in config
+    if disabled and has_pin:
+        raise cv.Invalid(
+            "'gdo2_pin:' and 'disable_gdo2_fifo_management: true' are mutually exclusive.\n"
+            "\n"
+            "  - To USE GDO2 hardware-assisted FIFO management (recommended): keep "
+            "'gdo2_pin:' and remove 'disable_gdo2_fifo_management'.\n"
+            "  - To keep the legacy SPI-polling behaviour: remove 'gdo2_pin:' and keep "
+            "'disable_gdo2_fifo_management: true'.\n"
+            "\n"
+            "See ESPHOME/README.md (Wiring) and docs/GDO2_FIFO_MANAGEMENT.md for details.",
+            path=[CONF_DISABLE_GDO2],
+        )
+    if not disabled and not has_pin:
         raise cv.Invalid(
             "BREAKING CHANGE (v3.0.0): CC1101 GDO2 hardware-assisted FIFO management is now "
             "enabled by default and 'gdo2_pin:' is required.\n"
@@ -525,6 +547,10 @@ async def to_code(config):
     if CONF_FAILED_READS in config:
         sens = await sensor.new_sensor(config[CONF_FAILED_READS])
         cg.add(var.set_failed_reads_sensor(sens))
+
+    if CONF_GDO2_TIMEOUTS in config:
+        sens = await sensor.new_sensor(config[CONF_GDO2_TIMEOUTS])
+        cg.add(var.set_gdo2_timeouts_sensor(sens))
 
     if CONF_FREQUENCY_OFFSET in config:
         sens = await sensor.new_sensor(config[CONF_FREQUENCY_OFFSET])
