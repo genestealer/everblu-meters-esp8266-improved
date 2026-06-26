@@ -5,6 +5,7 @@
 
 #include "frequency_manager.h"
 #include "../core/logging.h"
+#include "../core/utils.h"
 #include "storage_abstraction.h"
 #if defined(ESP32)
 #include <esp_task_wdt.h>
@@ -147,6 +148,11 @@ void FrequencyManager::performFrequencyScan(void (*statusCallback)(const char *,
     LOG_I("everblu_meter", "Starting frequency scan...");
     LOG_I("everblu_meter", "[NOTE] Wi-Fi/MQTT connections may temporarily drop and reconnect. This is expected.");
 
+    // Suppress the verbose per-attempt radio/meter read logging for the whole
+    // scan. Each frequency step performs a full read sequence whose detailed
+    // output is irrelevant noise here; high-level scan progress (LOG_*) remains.
+    EchoDebugQuietGuard quietGuard;
+
     // Reset adaptive tracking so the new offset has a chance to stabilize
     resetAdaptiveTracking();
 
@@ -232,6 +238,11 @@ void FrequencyManager::performFrequencyScan(void (*statusCallback)(const char *,
 void FrequencyManager::performWideInitialScan(void (*statusCallback)(const char *, const char *))
 {
     Serial.println("[FREQ] Performing wide initial scan (first boot - no saved offset)...");
+
+    // Suppress the verbose per-attempt radio/meter read logging for the whole
+    // scan. Each frequency step performs a full read sequence whose detailed
+    // output is irrelevant noise here; high-level scan progress (LOG_*) remains.
+    EchoDebugQuietGuard quietGuard;
 
     // Reset adaptive tracking so the new offset has a chance to stabilize
     resetAdaptiveTracking();
