@@ -17,6 +17,16 @@ namespace everblu_meter {
 
 static const char *const TAG = "everblu_meter";
 
+// ESPHome asks components to block for at most ~30 ms per loop() (see
+// https://developers.esphome.io/architecture/components/). The CC1101
+// interrogation in meter_reader_->loop() is a multi-second, largely synchronous
+// sequence that exceeds this budget during an active read. The radio code in
+// src/core/cc1101.cpp already feeds the watchdog and yield()s throughout that
+// sequence, so WiFi/API/OTA keep being serviced and watchdog resets are avoided.
+// This threshold is only used to surface a measurement of how long the call
+// actually blocked, so the bounded read window can be quantified (issue #93).
+static const uint32_t LOOP_BLOCK_WARN_MS = 30;
+
 void EverbluMeterTriggerButton::press_action() {
   if (this->parent_ == nullptr) {
     ESP_LOGW(TAG, "Trigger button pressed but parent not set");
@@ -273,7 +283,17 @@ void EverbluMeterComponent::loop() {
       this->meter_reader_->triggerReading(false);
     }
 
+    // Measure how long the radio read path blocks the ESPHome main loop. During an
+    // active CC1101 interrogation this is expected to exceed LOOP_BLOCK_WARN_MS by a
+    // wide margin (multi-second); the call already feeds the watchdog and yields
+    // internally, so this is a diagnostic measurement rather than a hard fault (issue #93).
+    uint32_t loop_start = millis();
     this->meter_reader_->loop();
+    uint32_t loop_elapsed = millis() - loop_start;
+    if (loop_elapsed > LOOP_BLOCK_WARN_MS) {
+      ESP_LOGD(TAG, "meter_reader loop blocked for %lu ms (ESPHome budget %lu ms); expected during an active read",
+               (unsigned long) loop_elapsed, (unsigned long) LOOP_BLOCK_WARN_MS);
+    }
   }
 
   // Publish the GDO2 stuck-timeout diagnostic only when it changes. A rising value
