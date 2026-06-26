@@ -104,6 +104,7 @@ Releases are created manually by tagging commits with version tags matching `v*.
 - Added new test case to reject short serials (<7 digits).
 - Removed outdated references to "1 to 8 digits" in comments and documentation.
 
+## [v2.2.1] - 2026-05-07
 
 ### Added
 
