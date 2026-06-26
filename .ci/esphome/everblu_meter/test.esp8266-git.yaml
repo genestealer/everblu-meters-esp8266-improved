@@ -49,6 +49,7 @@ everblu_meter:
   meter_code: "22-8765432-100"
   meter_type: water
   gdo0_pin: 4
+  gdo2_pin: 5
   time_id: ci_time
 
   volume:
