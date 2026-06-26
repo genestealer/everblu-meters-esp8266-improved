@@ -1,0 +1,36 @@
+# Shared body for the git external_components smoke-test fixtures.
+#
+# Included by BOTH:
+#   - test.esp8266-git.yaml        (source: type git, ref ${git_ref})  - branch push / post-merge
+#   - test.esp8266-git-local.yaml  (source: type local)               - runs on pull requests
+#
+# The two wrappers differ ONLY in their external_components source block.
+# Keeping the meter config here guarantees the git fixture and its local twin
+# can never drift apart - so a breaking change to required options (e.g. the
+# v3.0.0 gdo2_pin requirement) is caught on the PR by the local twin, not only
+# post-merge by the git smoke test.
+
+spi:
+  id: ci_spi
+  clk_pin: GPIO14
+  miso_pin: GPIO12
+  mosi_pin: GPIO13
+
+time:
+  - platform: sntp
+    id: ci_time
+
+everblu_meter:
+  spi_id: ci_spi
+  cs_pin: GPIO15
+  meter_code: "22-8765432-100"
+  meter_type: water
+  gdo0_pin: 4
+  gdo2_pin: 5
+  time_id: ci_time
+
+  volume:
+    name: "CI Volume"
+
+  status:
+    name: "CI Status"
