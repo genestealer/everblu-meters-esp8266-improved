@@ -55,6 +55,18 @@ void cc1101_set_gdo2_pin(int gdo2_pin);
 #endif
 
 /**
+ * @brief Number of GDO2 "stuck HIGH" timeouts observed during transmit.
+ *
+ * Lifetime (monotonic) diagnostic counter. The TX interrogation-frame gate waits for
+ * GDO2 to indicate the FIFO has drained below threshold; if it never does within the
+ * safety window the counter increments. A non-zero, growing value strongly indicates a
+ * miswired / wrong-GPIO / disconnected GDO2 rather than an RF or meter problem.
+ *
+ * @return Cumulative count since boot. Always 0 when GDO2 is not configured.
+ */
+uint32_t cc1101_get_gdo2_timeout_count(void);
+
+/**
  * @struct tmeter_data
  * @brief Meter data structure containing current readings and metadata
  *
