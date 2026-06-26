@@ -139,6 +139,11 @@ void MeterReader::begin()
         snprintf(utc_time_buf, sizeof(utc_time_buf), "%02d:%02d", utcHour, utcMinute);
         m_publisher->publishMeterSettings(m_config->getMeterYear(), m_config->getMeterSerial(), m_config->getReadingSchedule(), utc_time_buf, m_config->getFrequency());
 
+        // Publish the restored calibration at boot so it is visible in Home Assistant
+        // immediately - this confirms the offset survived the reboot without waiting for a read.
+        m_publisher->publishFrequencyOffset(FrequencyManager::getOffset());
+        m_publisher->publishTunedFrequency(FrequencyManager::getTunedFrequency());
+
         // Publish radio failure state immediately (success state published in republish_initial_states)
         if (!radio_ok)
         {

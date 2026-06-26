@@ -76,8 +76,25 @@ float FrequencyManager::begin(float baseFrequency)
     // Initialize storage
     StorageAbstraction::begin();
 
-    // Load stored offset
-    s_storedOffset = loadFrequencyOffset();
+    // Load the persisted offset using a NaN sentinel as the "not found" default so a
+    // genuinely stored value of 0.0 can be distinguished from "nothing saved". This
+    // gives an unambiguous boot-time confirmation of whether calibration survived a reboot.
+    float loaded = StorageAbstraction::loadFloat(STORAGE_KEY, NAN, STORAGE_MAGIC, MIN_OFFSET, MAX_OFFSET);
+    bool persisted = !isnan(loaded);
+    s_storedOffset = persisted ? loaded : 0.0f;
+
+    if (persisted)
+    {
+        LOG_I("everblu_meter",
+              "Frequency calibration RESTORED from storage: offset %.3f kHz (tuned %.6f MHz)",
+              s_storedOffset * 1000.0, s_baseFrequency + s_storedOffset);
+    }
+    else
+    {
+        LOG_W("everblu_meter",
+              "No frequency calibration stored - using default 0.000 kHz "
+              "(run a Wide Frequency Scan to calibrate the radio)");
+    }
 
     LOG_I("everblu_meter", "Initialized: base=%.6f MHz, offset=%.6f MHz",
           s_baseFrequency, s_storedOffset);
