@@ -3,6 +3,8 @@
 This guide explains how to use the EverBlu Cyble Enhanced meter reader with ESPHome, allowing seamless integration with Home Assistant.
 
 > **📖 Quick Navigation**:
+>
+>
 > - [Main Documentation](README.md) - Overview and links to all docs
 > - [Configuration Reference](README.md#configuration-reference) - Quick lookup for common tasks
 > - [Home Assistant Integration](ESPHOME_HOME_ASSISTANT_INTEGRATION.md) - Accessing meter data in Home Assistant
@@ -180,17 +182,23 @@ everblu_meter:
 
 ⚠️ **Known Limitation**: The `timezone_offset` parameter is currently **required** for scheduling in your local timezone. The ESPHome time component's `timezone` setting (e.g., `timezone: Australia/Melbourne`) is **not automatically used** by the everblu_meter component.
 
+
 This is a design limitation inherited from the MQTT/standalone version:
+
 - **MQTT/Standalone mode**: Uses NTP which only provides UTC time, so manual offset is necessary
 - **ESPHome mode**: Could leverage ESPHome's timezone-aware time (which handles DST automatically), but currently doesn't
 
+
 **Current Workaround:**
+
 - You must manually specify `timezone_offset` in **minutes** (not hours)
 - The offset is added to UTC to get your local time
 - Positive values for east of UTC, negative for west
+
 - This is a **static offset** - it doesn't automatically adjust for Daylight Saving Time
 
 Common timezone examples:
+
 ```yaml
 # Examples (timezone_offset in minutes):
 timezone_offset: 660   # Melbourne/Sydney AEDT (UTC+11) - Summer
@@ -231,9 +239,11 @@ timezone_offset: -420  # US Pacific PDT (UTC-7) - Summer
 
 #### Meter Code
 
+
 Look for the full code printed under the barcode on your meter label.
 
 Example label format: `YY-SSSSSSS-NNN`
+
 - Configure `meter_code` exactly as printed, with dashes — the 3-digit suffix is **optional**
 - Accepted: `YY-SSSSSSS` (no suffix) or `YY-SSSSSSS-NNN` (with suffix)
 - First 2 digits (`YY`) are parsed as year
@@ -454,11 +464,13 @@ See [example-advanced.yaml](example-advanced.yaml) for complete configuration.
 everblu_meter:
   # ... other settings ...
   read_hour: 10          # Hour in UTC (0-23)
+
   read_minute: 0
   timezone_offset: 660   # Melbourne AEDT (UTC+11) - value in MINUTES, not hours!
 ```
 
 **Common timezone values (in minutes)**:
+
 - Melbourne/Sydney AEDT (UTC+11): `660` (Summer)
 - Melbourne/Sydney AEST (UTC+10): `600` (Winter)
 - Tokyo (UTC+9): `540`

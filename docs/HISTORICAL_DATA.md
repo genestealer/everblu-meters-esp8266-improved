@@ -9,13 +9,19 @@ This implementation extracts these 13 monthly historical readings and publishes 
 ## Data Structure
 
 ### Meter Payload
+
+
+
 The historical data is located in the meter's response payload at bytes [66-117]:
+
 - **13 consecutive uint32_t values** (4 bytes each, LSB first)
 - Each value represents the **total cumulative volume** at the end of that month
 - Index 0 = oldest month (13 months ago)
 - Index 12 = most recent complete month
 
+
 ### Example from Real Meter Data
+
 ```
 Current reading: 721,390 liters (October 30, 2025)
 
@@ -37,13 +43,17 @@ Historical readings (bytes 66-117):
 
 ## Home Assistant Integration
 
+
 ### MQTT Topics
 
 #### State Topic
+
+
 - **Topic**: `everblu/cyble/liters`
 - **Value**: Current total volume reading (e.g., `721390`)
 
 #### Attributes Topic
+
 - **Topic**: `everblu/cyble/liters_attributes`
 - **Format**: JSON object with historical data
 
@@ -84,14 +94,18 @@ Historical readings (bytes 66-117):
   "current_month_usage": 7646,
   "months_available": 13
 }
+
 ```
 
 ### Accessing in Home Assistant
 
+
 #### 1. View in Developer Tools
+
 Navigate to **Developer Tools > States** and find the `sensor.water_meter_value` entity. The attributes will be displayed in the "Attributes" section.
 
 #### 2. Use in Templates
+
 Access historical data in automations and templates:
 
 ```yaml
@@ -164,6 +178,7 @@ series:
       const now = new Date();
       return monthly.map((usage, i) => {
         const date = new Date(now.getFullYear(), now.getMonth() - (12 - i), 1);
+
         return [date.getTime(), usage];
       });
 ```
@@ -171,6 +186,7 @@ series:
 ## Code Implementation
 
 ### Structure Update (`src/cc1101.h`)
+
 ```cpp
 struct tmeter_data {
   int liters;
@@ -180,6 +196,7 @@ struct tmeter_data {
   int time_end;
   int rssi;
   int rssi_dbm;
+
   int lqi;
   int8_t freqest;
   uint32_t history[13];        // NEW: Monthly historical readings
@@ -188,6 +205,7 @@ struct tmeter_data {
 ```
 
 ### Data Extraction (`src/cc1101.cpp`)
+
 The `parse_meter_report()` function extracts historical data from bytes [66-117] of the decoded meter payload:
 
 ```cpp
@@ -196,7 +214,9 @@ if (size >= 118) {
   data.history_available = true;
   for (int i = 0; i < 13; i++) {
     int offset = 66 + (i * 4);
+
     data.history[i] = ((uint32_t)decoded_buffer[offset]) |
+
                       ((uint32_t)decoded_buffer[offset + 1] << 8) |
                       ((uint32_t)decoded_buffer[offset + 2] << 16) |
                       ((uint32_t)decoded_buffer[offset + 3] << 24);
@@ -205,24 +225,37 @@ if (size >= 118) {
 ```
 
 ### MQTT Publishing (`src/main.cpp`)
+
+
 After publishing the main liters value, the code constructs and publishes a JSON attributes message containing:
+
+
 - `history`: Array of 13 historical volume readings
 - `monthly_usage`: Calculated consumption for each month (difference between consecutive readings)
 - `current_month_usage`: Usage in the current partial month
 - `months_available`: Always 13
 
+
 ## Limitations and Notes
 
+
 ### No Exact Timestamps
+
 The basic RADIAN protocol **does not provide exact dates** for the historical readings. The meter's internal RTC tracks when these snapshots were taken, but this information is not transmitted in the basic query response.
 
 **Assumption**: The values represent end-of-month snapshots. This is based on:
+
+
 1. The meter having 13 values (13 months of history)
 2. The most recent value matching the volume at the start of the current month
 3. Standard utility billing practices (monthly cycles)
 
+
 ### Month Boundary Timing
+
 The exact timing of when the meter captures each monthly snapshot is unknown. It could be:
+
+
 - Calendar month end (last day at midnight)
 - Billing cycle date (e.g., 15th of each month)
 - Rolling 30-day intervals
@@ -230,14 +263,19 @@ The exact timing of when the meter captures each monthly snapshot is unknown. It
 Based on user observation: *"713,744 was around the very start of the current month/reading at the end of the previous month"* - this suggests end-of-month or billing cycle snapshots.
 
 ### First Month Usage
+
+
 The `monthly_usage[0]` is set to `0` because we don't have a baseline reading from before the oldest historical value. To calculate actual usage for that month, you would need 14 months of data.
 
 ### Buffer Size Requirements
+
 Historical data extraction requires the decoded meter payload to be at least 118 bytes. If a shorter payload is received, `history_available` will be `false` and no attributes will be published.
 
 ## Enhanced Meter Capabilities
 
+
 The Itron EverBlu Cyble Enhanced meter actually stores much more data internally:
+
 - **181 consumption intervals** (hourly/daily/weekly/monthly)
 - **Peak flow rates with timestamps**
 - **Alarm logs with start/end times**
@@ -245,15 +283,20 @@ The Itron EverBlu Cyble Enhanced meter actually stores much more data internally
 - **Backflow/leakage history**
 
 However, these enhanced features require **proprietary Itron commands** that are not part of the open-source RADIAN protocol implementation. The basic RADIAN protocol only exposes:
+
 - Current total volume
 - Battery remaining (months)
 - Read counter
 - Wake schedule (hours)
+
 - **13 monthly historical volumes** (no dates)
+
 
 ## Troubleshooting
 
 ### Attributes Not Appearing
+
+
 1. Verify the meter is transmitting a full payload:
    - Enable debug mode (`debug_out = 1` in `cc1101.cpp`)
    - Check serial output for: `> Decoded meter data size = 122`
@@ -268,12 +311,15 @@ However, these enhanced features require **proprietary Itron commands** that are
    - Clear browser cache if Developer Tools doesn't show attributes
 
 ### Incorrect Monthly Values
+
 If the historical values don't make sense:
+
 1. Verify `history[12]` matches your reading from ~30 days ago
 2. Check that `current_month_usage` = `current_liters - history[12]`
 3. Ensure monthly_usage calculations are sequential increases (no decreases unless meter was replaced/reset)
 
 ### JSON Buffer Overflow
+
 The `historyJson` buffer is sized at 800 bytes. For very large meter readings (>999,999,999 liters), the JSON might be truncated. Monitor serial output for warnings.
 
 ## Future Enhancements

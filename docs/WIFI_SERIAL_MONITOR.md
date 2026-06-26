@@ -43,6 +43,7 @@ The TCP port can be customized by defining `WIFI_SERIAL_PORT` before including `
 - **Network Overhead**: Streaming serial output over WiFi adds overhead to the device
 
 Only enable this feature:
+
 - For initial debugging and setup
 - On trusted local networks
 - When actively monitoring/troubleshooting
@@ -51,12 +52,14 @@ Only enable this feature:
 ### Performance Impact
 
 With `WIFI_SERIAL_MONITOR_ENABLED 0` (default):
+
 - No WiFi serial server created
 - No network overhead
 - Minimal memory impact
 - Slightly improved device responsiveness
 
 With `WIFI_SERIAL_MONITOR_ENABLED 1`:
+
 - WiFi serial server running at all times
 - Continuous network output streaming
 - Memory overhead from WiFiServer and WiFiClient objects
@@ -69,11 +72,13 @@ With `WIFI_SERIAL_MONITOR_ENABLED 1`:
 Once your device is connected to WiFi and running, you can connect using any Telnet client:
 
 **Windows (Command Prompt or PowerShell):**
+
 ```
 telnet <device-ip> 23
 ```
 
 **Linux/macOS:**
+
 ```
 telnet <device-ip> 23
 ```
@@ -81,6 +86,7 @@ telnet <device-ip> 23
 **PlatformIO Monitor (automatic):**
 
 For OTA environments (`*-ota`), the `monitor_port` is already configured in `platformio.ini`:
+
 ```
 pio run --target monitor --environment huzzah-ota
 ```
@@ -90,11 +96,13 @@ PlatformIO will automatically connect to the TCP socket instead of USB Serial.
 ### Example Connection
 
 If your device IP is `192.168.2.21`:
+
 ```
 telnet 192.168.2.21 23
 ```
 
 You'll see:
+
 ```
 === WiFi Serial Monitor Connected ===
 [followed by all Serial output]
@@ -141,6 +149,7 @@ You'll see:
 ### USB Serial stops working
 
 This should not happen - USB Serial output is always preserved. If you experience issues:
+
 1. Check USB cable and connection
 2. Verify correct baud rate (115200)
 3. Try resetting the device
@@ -150,4 +159,5 @@ This should not happen - USB Serial output is always preserved. If you experienc
 - **TCP No-Delay**: Nagle algorithm is disabled for lower latency
 - **Buffer Management**: Uses WiFiClient internal buffering (no additional buffers)
 - **Memory Impact**: Minimal - only one WiFiServer and one WiFiClient object
-- **Performance**: Connection handling is non-blocking and designed to minimize impact on the main application loop; however, individual write operations may block when TCP buffers are full or the connection is slow (see note above)
+- **Performance**: Connection handling is non-blocking and designed to minimize impact on the main application loop; however, individual write operations may block when TCP buffers are full or the connection is slow (see not
+e above)

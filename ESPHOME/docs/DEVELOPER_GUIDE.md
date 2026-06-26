@@ -49,6 +49,8 @@ FrequencyManager::setMeterReadCallback(your_meter_read_function);
 ```
 
 This means:
+
+
 - ✅ ESPHome can inject its own CC1101 wrapper methods
 - ✅ Arduino projects can inject raw CC1101 calls
 - ✅ Other frameworks can inject their own implementations
@@ -155,7 +157,9 @@ void YourComponent::loop() {
 
 ## Complete Example: ESPHome Custom Component
 
+
 ### esphome_meter.h
+
 ```cpp
 #pragma once
 
@@ -187,7 +191,9 @@ protected:
 } // namespace esphome
 ```
 
+
 ### esphome_meter.cpp
+
 ```cpp
 #include "esphome_meter.h"
 #include "esphome/core/log.h"
@@ -278,9 +284,11 @@ tmeter_data EverbluMeter::read_meter_data() {
 
 } // namespace everblu_meter
 } // namespace esphome
+
 ```
 
 ### YAML Configuration
+
 ```yaml
 external_components:
   - source: github://yourusername/everblu-esphome
@@ -295,29 +303,38 @@ sensor:
     update_interval: 60s
 ```
 
+
 ## Benefits of This Approach
 
 ### ✅ No Code Duplication
+
+
 - Core frequency logic stays in one place
 - Bug fixes benefit all projects
 - Improvements are portable
 
 ### ✅ Clean Separation
+
+
 - Storage abstraction handles platform differences
 - Frequency manager handles calibration logic
 - Your component handles CC1101 specifics
 
+
 ### ✅ Easy Testing
+
 - Can inject mock functions for unit tests
 - Can test frequency logic without hardware
 - Can validate algorithms independently
 
 ### ✅ Framework Agnostic
+
 - Works with Arduino (current main.cpp)
 - Works with ESPHome (shown above)
 - Works with PlatformIO, ESP-IDF, etc.
 
 ## Migration from 91JJ Fork
+
 
 If you're currently using the 91JJ ESPHome fork:
 
@@ -327,6 +344,8 @@ If you're currently using the 91JJ ESPHome fork:
 4. **Remove old frequency code** - the new modules handle it all
 
 ### Before (91JJ Pattern)
+
+
 ```cpp
 // Had to rewrite everything in cc1101_component
 void CC1101Component::perform_frequency_scan() {
@@ -336,28 +355,36 @@ void CC1101Component::perform_frequency_scan() {
 ```
 
 ### After (New Pattern)
+
 ```cpp
+
 // Reuse existing FrequencyManager
 FrequencyManager::setRadioInitCallback([this](float f) {
     return this->cc1101_init(f);
 });
 FrequencyManager::performFrequencyScan(nullptr);
+
 ```
 
 ## Advanced: Customizing Frequency Behavior
 
 ### Disable Auto-Scan
+
+
 ```cpp
 FrequencyManager::setAutoScanEnabled(false);
 ```
 
 ### Adjust Adaptive Threshold
+
 ```cpp
 // Adapt after 20 reads instead of default 10
 FrequencyManager::setAdaptiveThreshold(20);
 ```
 
 ### Manual Frequency Scan
+
+
 ```cpp
 // With status updates
 auto status = [](const char *state, const char *msg) {
@@ -370,6 +397,8 @@ FrequencyManager::performFrequencyScan(nullptr);
 ```
 
 ### Direct Offset Control
+
+
 ```cpp
 // Get current offset
 float offset = FrequencyManager::getOffset();
@@ -377,24 +406,31 @@ float offset = FrequencyManager::getOffset();
 // Set new offset
 FrequencyManager::setOffset(-0.005f);  // -5 kHz
 
+
 // Save to storage
 FrequencyManager::saveFrequencyOffset(offset);
 ```
 
+
 ## Storage Behavior
 
 The `StorageAbstraction` module automatically handles:
+
 - **ESP8266**: Uses EEPROM with automatic commit
 - **ESP32**: Uses Preferences with namespace "everblu"
 - **Validation**: Magic number (0xABCD) prevents reading garbage
 - **Range checking**: Rejects offsets outside ±100 kHz
 
+
 Storage keys:
+
 - `freq_offset`: Frequency offset in MHz (validated)
 
 ## Testing Your Integration
 
 ### Verify Callbacks Are Set
+
+
 ```cpp
 // FrequencyManager will print errors if callbacks not set
 FrequencyManager::begin(433.82);
@@ -404,15 +440,21 @@ FrequencyManager::begin(433.82);
 ```
 
 ### Test Frequency Scan
+
+
 ```cpp
 // Run a narrow scan (±30 kHz)
+
 FrequencyManager::performFrequencyScan([](const char *s, const char *m) {
     ESP_LOGI(TAG, "Scan: %s - %s", s, m);
 });
+
 ```
 
 ### Test Adaptive Tracking
+
 ```cpp
+
 // After each successful meter read:
 FrequencyManager::adaptiveFrequencyTracking(freqest_register_value);
 // Watch logs for automatic frequency adjustments
@@ -421,17 +463,21 @@ FrequencyManager::adaptiveFrequencyTracking(freqest_register_value);
 ## Troubleshooting
 
 ### "ERROR: Radio init callback not set"
+
 - Call `FrequencyManager::setRadioInitCallback()` **before** `begin()`
 
 ### "ERROR: Meter read callback not set"
+
 - Call `FrequencyManager::setMeterReadCallback()` **before** `begin()`
 
 ### Frequency scans fail
+
 - Verify your `RadioInitCallback` returns `true` on success
 - Check your CC1101 is properly initialized
 - Ensure antenna is connected
 
 ### Adaptive tracking not working
+
 - Verify `freqest` register is being read from CC1101
 - Check `freqest` value is not always 0
 - Increase adaptive threshold if reads are noisy

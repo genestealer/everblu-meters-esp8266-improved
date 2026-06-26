@@ -15,6 +15,8 @@ threshold signal improves both TX FIFO feeding (preventing underflows) and RX FI
 unnecessary SPI traffic and improving ESPHome task scheduling).
 
 > **Status summary**
+>
+>
 > - **Part 1 (TX FIFO threshold)** — ✅ implemented in `feature/gdo2-fifo-threshold`
 > - **Part 2 (RX FIFO threshold)** — ✅ implemented in `feature/gdo2-rx-fifo-threshold`
 > - **Part 3 (dynamic IOCFG2 reconfiguration)** — ✅ implemented in `feature/gdo2-rx-fifo-threshold`

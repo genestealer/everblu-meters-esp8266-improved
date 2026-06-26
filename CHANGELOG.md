@@ -105,8 +105,6 @@ Releases are created manually by tagging commits with version tags matching `v*.
 - Removed outdated references to "1 to 8 digits" in comments and documentation.
 
 
-## [v2.2.1] - 2026-05-07
-
 ### Added
 
 - Added compile-time MQTT option `ENABLE_HA_DISCOVERY` (default `1`) to allow disabling Home Assistant discovery topic publishing (`homeassistant/...`) while keeping raw MQTT telemetry and command topics active (Issue #77).
@@ -182,9 +180,7 @@ Releases are created manually by tagging commits with version tags matching `v*.
 - TX underflow error logging (distinct message vs successful completion)
 - Comment typo in SFTX flush operation
 
-
 ## [v2.1.1] - 2026-02-13
-
 ### Fixed
 
 - Schedule logic bug where "Monday-Sunday" schedule excluded Sunday

@@ -1,6 +1,8 @@
 # Meter Payload Analysis - Decoded Fields
 
 ## Overview
+
+
 This document details the complete analysis of the 122-byte payload returned by the Itron EverBlu Cyble Enhanced water meter via the RADIAN protocol.
 
 ## Complete Payload Map
@@ -40,54 +42,75 @@ This document details the complete analysis of the 122-byte payload returned by 
 
 ## Successfully Decoded Fields
 
+
 ### Currently Exposed to Home Assistant (Before This Update)
+
 1. **Current Volume** [bytes 18-21] - Total liters accumulated since meter installation
 2. **Battery Remaining** [byte 31] - Months until battery replacement needed
 3. **Read Counter** [byte 48] - Number of times meter has been interrogated
 4. **Wake Hour** [byte 44] - Start of daily wake window (0-23)
 5. **Sleep Hour** [byte 45] - End of daily wake window (0-23)
 
+
 ### Newly Decoded (This Update)
+
+
 6. **13 Months Historical Volumes** [bytes 66-117] - Total volume at end of each of the last 13 months
 
 ### Identified But Not Decoded
+
 7. **Meter Model/Serial ASCII** [bytes 32-42] - Device identifier text (e.g., "13329 0AL02")
    - Could be useful as a device identifier
    - Currently not extracted programmatically
 
+
+
 ## Unknown/Undecoded Fields
 
 ### Header/Control Bytes [1-2], [3-17], [22-30], [43], [46-47], [49-53]
+
 These bytes likely contain:
+
 - **CRC checksums** - Protocol integrity verification
+
 - **Frame sequence numbers** - For tracking multiple queries/responses
 - **Protocol version indicators**
 - **Meter status flags** - Error conditions, alarms, etc.
 - **Encryption/authentication data** - Though RADIAN is not known to use encryption
 
 Without official Itron protocol documentation, reverse engineering these fields would require:
+
+
+
 1. Capturing many different meter responses under varying conditions
 2. Comparing payloads from multiple meter models
 3. Analyzing bit patterns for flags/counters
 4. Testing meter in error conditions to see status flag changes
 
 ### Missing Bytes [118-121]
+
 The frame length byte indicates 124 bytes (0x7C), but we only receive 122 bytes. This discrepancy could be:
+
+
 - **CRC bytes** - Checksum at the end (not included in decoded buffer)
 - **Framing overhead** - Start/stop bits that are stripped during 4-bit-per-bit decoding
 - **Padding** - Reserved space for future use
 
 ## Data Not Available via Basic RADIAN Protocol
 
+
 The following information is **stored internally** in the meter but **NOT transmitted** in the basic RADIAN query response:
 
 ### Timestamps
+
 - **Exact dates** for the 13 historical readings (meter knows them, doesn't send them)
 - **Meter's current time** (internal RTC not queryable)
 - **Timestamps for alarm events**
 - **Peak flow occurrence dates**
 
+
 ### Enhanced Historical Data
+
 - **181 consumption intervals** (hourly/daily/weekly/monthly) - only 13 monthly values available
 - **Peak flow rates** with dates (up to 5 values)
 - **Alarm logs** with start/end times (13 months of alarms)
@@ -96,7 +119,9 @@ The following information is **stored internally** in the meter but **NOT transm
 - **Leak detection events**
 - **Tamper detection alarms**
 
+
 ### Configuration Data
+
 - **Meter sizing** (pipe diameter, flow capacity)
 - **Preset billing dates** (up to 4 programmable dates)
 - **Custom alarm thresholds**
@@ -106,7 +131,10 @@ These enhanced features require **proprietary Itron commands** that are not docu
 
 ## Comparison with Reference Implementation
 
+
 The hallard/everblu-meters-pi Raspberry Pi reference implementation decodes the exact same fields:
+
+
 - Current volume (liters)
 - Battery remaining (months)
 - Read counter
@@ -117,11 +145,17 @@ The hallard/everblu-meters-pi Raspberry Pi reference implementation decodes the 
 
 ## Decoding Methodology
 
+
 ### Integer Values (LSB First)
+
+
 All multi-byte integers use **little-endian (LSB first)** encoding:
+
 ```
 Bytes: [low, medium-low, medium-high, high]
 Value = byte[0] + (byte[1] << 8) + (byte[2] << 16) + (byte[3] << 24)
+
+
 
 Example: EE 01 0B 00
 = 0xEE + (0x01 << 8) + (0x0B << 16) + (0x00 << 24)
@@ -130,16 +164,23 @@ Example: EE 01 0B 00
 ```
 
 ### ASCII Text
+
 Bytes [32-42] contain null-terminated ASCII text:
+
+
 ```
 31 33 33 32 39 30 41 4C 30 32 00
 = "13329 0AL02\0"
 ```
 
 ### Reserved Fields
+
+
 The value **0x80** (128 decimal) appears to be used as a "no data" or "unused field" marker:
+
 ```
 Bytes [54-65]: 00 00 80 80 80 80 80 80 80 80 80 80
+
                └─┘ └────────────────────────────┘
               Valid      Reserved/unused
 ```
@@ -147,6 +188,9 @@ Bytes [54-65]: 00 00 80 80 80 80 80 80 80 80 80 80
 ## Implementation Status
 
 ✅ **Fully Implemented and Tested**
+
+
+
 - Current volume extraction
 - Battery remaining
 - Read counter
@@ -154,19 +198,26 @@ Bytes [54-65]: 00 00 80 80 80 80 80 80 80 80 80 80
 - 13 months historical volumes (NEW)
 - JSON attributes for Home Assistant (NEW)
 
+
 ⚠️ **Identified But Not Implemented**
+
 - Meter model/serial ASCII extraction (bytes 32-42)
 - Could be added as a diagnostic sensor if needed
 
 ❌ **Unknown/Not Attempted**
+
 - Header/control bytes interpretation
 - Status flags decoding
+
 - Missing 2 bytes (118-121) investigation
+
 
 ## Recommendations
 
 ### For End Users
+
 The newly decoded **13 months of historical data** provides significant value:
+
 - Track consumption trends over a full year
 - Detect seasonal patterns (higher summer usage)
 - Identify anomalies (sudden increases indicating leaks)
@@ -174,7 +225,9 @@ The newly decoded **13 months of historical data** provides significant value:
 - Monitor current month progress vs. historical average
 
 ### For Future Development
+
 1. **Meter Model Extraction**: Parse bytes 32-42 to create a device identifier sensor
+
 2. **Status Flags**: Analyze unknown bytes for error/alarm flags
 3. **Protocol Documentation**: Contact Itron or reverse engineer enhanced protocol for:
    - Actual timestamps for historical readings
@@ -183,7 +236,9 @@ The newly decoded **13 months of historical data** provides significant value:
    - Alarm history
 
 ### For Researchers
+
 The unknown bytes could be analyzed by:
+
 1. Creating test cases with meters in different states
 2. Comparing payloads from multiple meter models/years
 3. Monitoring byte changes over time (counters, sequence numbers)
@@ -200,6 +255,7 @@ The unknown bytes could be analyzed by:
 ## Changelog
 
 **October 30, 2025** - Historical Data Feature
+
 - ✅ Decoded bytes [66-117] as 13 months of historical volume readings
 - ✅ Added `history[13]` and `history_available` fields to `tmeter_data` structure
 - ✅ Implemented automatic extraction in `parse_meter_report()`
