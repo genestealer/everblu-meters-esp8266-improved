@@ -12,6 +12,15 @@ substitutions:
 esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
+  # Sub-devices: each meter appears as its own device in Home Assistant.
+  # Entities below reference these via `device_id:`. Shared-radio entities
+  # (CC1101 state/connected, firmware, frequency calibration) are left without
+  # a device_id so they stay on the main ${friendly_name} node.
+  devices:
+    - id: water_meter_device_1
+      name: "${meter_1_prefix}"
+    - id: water_meter_device_2
+      name: "${meter_2_prefix}"
 
 esp8266:
   board: huzzah
@@ -56,7 +65,7 @@ spi:
     miso_pin: GPIO12
 
 everblu_meter:
-  - id: cold_water_meter
+  - id: water_meter_1
     meter_code: "20-0257750-000"  # year=20, serial=257750 (dashed form, suffix 000 ignored)
     meter_type: water
     debug_cc1101: true
@@ -77,6 +86,7 @@ everblu_meter:
 
     request_reading_button:
       name: "${meter_1_prefix} Read Meter Now"
+      device_id: water_meter_device_1
     # Frequency calibration is a property of the shared CC1101 radio, not the meter.
     # Declare these buttons/sensors on ONE meter only (here, the first). They are
     # global: any meter's reads/scans update this single set of entities.
@@ -89,25 +99,35 @@ everblu_meter:
 
     volume:
       name: "${meter_1_prefix} Water Volume"
+      device_id: water_meter_device_1
     counter:
       name: "${meter_1_prefix} Read Counter"
+      device_id: water_meter_device_1
     battery:
       name: "${meter_1_prefix} Meter Battery"
+      device_id: water_meter_device_1
     rssi:
       name: "${meter_1_prefix} Meter RSSI"
+      device_id: water_meter_device_1
     rssi_percentage:
       name: "${meter_1_prefix} RSSI Percentage"
+      device_id: water_meter_device_1
     lqi:
       name: "${meter_1_prefix} LQI"
+      device_id: water_meter_device_1
     lqi_percentage:
       name: "${meter_1_prefix} LQI Percentage"
+      device_id: water_meter_device_1
 
     total_attempts:
       name: "${meter_1_prefix} Total Read Attempts"
+      device_id: water_meter_device_1
     successful_reads:
       name: "${meter_1_prefix} Successful Reads"
+      device_id: water_meter_device_1
     failed_reads:
       name: "${meter_1_prefix} Failed Reads"
+      device_id: water_meter_device_1
     # Global (per-radio) calibration sensors - declared on this meter only.
     frequency_offset:
       name: "Radio Frequency Offset"
@@ -118,37 +138,48 @@ everblu_meter:
 
     meter_serial_sensor:
       name: "${meter_1_prefix} Meter Serial"
+      device_id: water_meter_device_1
     meter_year_sensor:
       name: "${meter_1_prefix} Meter Year"
+      device_id: water_meter_device_1
     reading_schedule_sensor:
       name: "${meter_1_prefix} Reading Schedule"
+      device_id: water_meter_device_1
     reading_time_utc_sensor:
       name: "${meter_1_prefix} Reading Time (UTC)"
+      device_id: water_meter_device_1
 
     time_start:
       name: "${meter_1_prefix} Reading Start Time"
+      device_id: water_meter_device_1
     time_end:
       name: "${meter_1_prefix} Reading End Time"
+      device_id: water_meter_device_1
 
     status:
       name: "${meter_1_prefix} Meter Status"
+      device_id: water_meter_device_1
     error:
       name: "${meter_1_prefix} Last Error"
+      device_id: water_meter_device_1
     radio_state:
-      name: "CC1101 State"            # device-level (shared radio) - declare on one meter only
+      name: "CC1101 State"            # device-level (shared radio) - stays on main node
     timestamp:
       name: "${meter_1_prefix} Last Reading Time"
+      device_id: water_meter_device_1
     history_json:
       name: "${meter_1_prefix} Meter History (JSON)"
+      device_id: water_meter_device_1
     firmware_version:
-      name: "Firmware Version"        # device-level (one firmware) - declare on one meter only
+      name: "Firmware Version"        # device-level (one firmware) - stays on main node
 
     active_reading:
       name: "${meter_1_prefix} Reading Active"
+      device_id: water_meter_device_1
     radio_connected:
-      name: "CC1101 Connected"        # device-level (shared radio) - declare on one meter only
+      name: "CC1101 Connected"        # device-level (shared radio) - stays on main node
 
-  - id: hot_water_meter
+  - id: water_meter_2
     meter_code: "20-0257751-000"  # year=20, serial=257751 (dashed form, suffix 000 ignored)
     meter_type: water
     debug_cc1101: true
@@ -169,55 +200,77 @@ everblu_meter:
 
     request_reading_button:
       name: "${meter_2_prefix} Read Meter Now"
+      device_id: water_meter_device_2
     # Frequency calibration buttons/sensors are radio-global and declared on the
-    # first meter only (see cold_water_meter above); they act on the shared CC1101.
+    # first meter only (see water_meter_1 above); they act on the shared CC1101.
 
     volume:
       name: "${meter_2_prefix} Water Volume"
+      device_id: water_meter_device_2
     counter:
       name: "${meter_2_prefix} Read Counter"
+      device_id: water_meter_device_2
     battery:
       name: "${meter_2_prefix} Meter Battery"
+      device_id: water_meter_device_2
     rssi:
       name: "${meter_2_prefix} Meter RSSI"
+      device_id: water_meter_device_2
     rssi_percentage:
       name: "${meter_2_prefix} RSSI Percentage"
+      device_id: water_meter_device_2
     lqi:
       name: "${meter_2_prefix} LQI"
+      device_id: water_meter_device_2
     lqi_percentage:
       name: "${meter_2_prefix} LQI Percentage"
+      device_id: water_meter_device_2
 
     total_attempts:
       name: "${meter_2_prefix} Total Read Attempts"
+      device_id: water_meter_device_2
     successful_reads:
       name: "${meter_2_prefix} Successful Reads"
+      device_id: water_meter_device_2
     failed_reads:
       name: "${meter_2_prefix} Failed Reads"
+      device_id: water_meter_device_2
 
     meter_serial_sensor:
       name: "${meter_2_prefix} Meter Serial"
+      device_id: water_meter_device_2
     meter_year_sensor:
       name: "${meter_2_prefix} Meter Year"
+      device_id: water_meter_device_2
     reading_schedule_sensor:
       name: "${meter_2_prefix} Reading Schedule"
+      device_id: water_meter_device_2
     reading_time_utc_sensor:
       name: "${meter_2_prefix} Reading Time (UTC)"
+      device_id: water_meter_device_2
 
     time_start:
       name: "${meter_2_prefix} Reading Start Time"
+      device_id: water_meter_device_2
     time_end:
       name: "${meter_2_prefix} Reading End Time"
+      device_id: water_meter_device_2
 
     status:
       name: "${meter_2_prefix} Meter Status"
+      device_id: water_meter_device_2
     error:
       name: "${meter_2_prefix} Last Error"
+      device_id: water_meter_device_2
     timestamp:
       name: "${meter_2_prefix} Last Reading Time"
+      device_id: water_meter_device_2
     history_json:
       name: "${meter_2_prefix} Meter History (JSON)"
+      device_id: water_meter_device_2
 
     active_reading:
       name: "${meter_2_prefix} Reading Active"
+      device_id: water_meter_device_2
     # CC1101 State, CC1101 Connected and Firmware Version are device-level (one
     # shared radio / firmware) and are declared on the first meter only above.
