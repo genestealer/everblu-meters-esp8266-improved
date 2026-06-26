@@ -17,14 +17,24 @@ namespace everblu_meter {
 
 static const char *const TAG = "everblu_meter";
 
-// ESPHome asks components to block for at most ~30 ms per loop() (see
-// https://developers.esphome.io/architecture/components/). The CC1101
-// interrogation in meter_reader_->loop() is a multi-second, largely synchronous
-// sequence that exceeds this budget during an active read. The radio code in
-// src/core/cc1101.cpp already feeds the watchdog and yield()s throughout that
-// sequence, so WiFi/API/OTA keep being serviced and watchdog resets are avoided.
-// This threshold is only used to surface a measurement of how long the call
-// actually blocked, so the bounded read window can be quantified (issue #93).
+// ESPHome's documented guidance is that a component's loop() should block for at
+// most ~30 ms (https://developers.esphome.io/architecture/components/); the
+// runtime "took a long time" warning in recent releases fires at ~2550 ms.
+//
+// A CC1101 meter interrogation is an INHERENTLY ATOMIC ~3.3 s RF transaction that
+// cannot be split into sub-budget loop() slices on this single-threaded MCU
+// (investigated in issue #93):
+//   - The mandatory ~2 s wake-up burst must continuously refill the 64-byte TX
+//     FIFO (drains in ~186 ms), so loop() cannot return mid-burst.
+//   - The meter answers ONCE in a fixed, non-retransmitted window immediately
+//     after TX (ACK ~45 ms later); yielding before RX would miss the reply.
+//   - The RX FIFO is 64 bytes and fills in ~53 ms at the oversampled rate, so it
+//     must be drained continuously - it cannot buffer across a yield.
+// The shared radio code in src/core/cc1101.cpp feeds the watchdog and yield()s
+// throughout, so WiFi/API/OTA keep being serviced and no watchdog reset occurs;
+// the only artifacts are a benign loop-time warning and a brief API stall during
+// the infrequent, scheduled read. This threshold is therefore kept only as a
+// low-noise DEBUG diagnostic that surfaces the (expected, bounded) block duration.
 static const uint32_t LOOP_BLOCK_WARN_MS = 30;
 
 void EverbluMeterTriggerButton::press_action() {
