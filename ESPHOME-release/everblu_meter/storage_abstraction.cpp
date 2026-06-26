@@ -336,9 +336,14 @@ bool StorageAbstraction::clearKey(const char *key)
 {
 #ifdef EVERBLU_USE_ESPHOME_PREFS
     uint32_t hash = esphome::fnv1_hash(key);
-    esphome::ESPPreferenceObject pref = esphome::global_preferences->make_preference<float>(hash);
-    float zero = 0.0f;
-    return pref.save(&zero);
+    // Reuse the same cached, flash-backed preference object as save/load (see getFloatPref)
+    // so we invalidate the exact slot loadFloat reads from. Write a zeroed magic so a
+    // subsequent loadFloat fails its magic check and returns the caller's default.
+    esphome::ESPPreferenceObject &pref = getFloatPref(hash);
+    FloatStorage storage;
+    storage.magic_number = 0;
+    storage.data = 0.0f;
+    return pref.save(&storage);
 
 #elif defined(ESP8266)
     // Clear by setting magic to 0
