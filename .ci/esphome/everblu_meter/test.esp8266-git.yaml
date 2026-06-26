@@ -2,8 +2,11 @@
 # Validates the component is consumable via the public GitHub URL (end-user path).
 #
 # Branch-aware: 'ref' defaults to main but the CI workflow overrides it with the
-# branch being pushed (esphome -s git_ref "$GITHUB_REF_NAME"), so a push to
-# develop validates develop's published ESPHOME-release - not main.
+# branch being pushed. Note that -s/--substitution is a GLOBAL ESPHome option, so
+# it must precede the subcommand:
+#   esphome -s git_ref "$GITHUB_REF_NAME" config <file>
+# Placed after the subcommand the override is silently ignored. A push to develop
+# therefore validates develop's published ESPHOME-release - not main.
 #
 # NOTE: this fetches over GitHub, so it tests the LAST PUSHED commit of the
 # branch (ESPHOME-release must be regenerated + committed). It is skipped on

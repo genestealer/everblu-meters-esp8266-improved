@@ -171,13 +171,15 @@ jobs:
       - name: Validate configuration
         env:
           # Only the git smoke test takes a ref override; it follows the pushed branch.
+          # NOTE: -s/--substitution is a GLOBAL ESPHome option and must precede the
+          # subcommand; placed after it, the override is silently ignored.
           REF_ARG: ${{ matrix.id == 'esp8266-git' && format('-s git_ref {0}', github.ref_name) || '' }}
-        run: esphome config ${{ matrix.config }} $REF_ARG
+        run: esphome $REF_ARG config ${{ matrix.config }}
 
       - name: Compile
         env:
           REF_ARG: ${{ matrix.id == 'esp8266-git' && format('-s git_ref {0}', github.ref_name) || '' }}
-        run: esphome compile ${{ matrix.config }} $REF_ARG
+        run: esphome $REF_ARG compile ${{ matrix.config }}
 
       - name: Summary
         if: always()
