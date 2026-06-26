@@ -4,6 +4,8 @@
 > ESPHome loop (`MeterReader::loop`), and whether the CC1101 hardware packet
 > engine could make it non-blocking.
 >
+> **Date:** 2026-06-26
+>
 > **Tracking issue:** [#93 — Investigate non-blocking behavior of the radio read
 > path in the ESPHome loop](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/93)
 >
