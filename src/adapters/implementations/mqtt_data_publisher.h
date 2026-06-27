@@ -80,6 +80,8 @@ public:
     void publishError(const char *) override {}
     void publishStatistics(unsigned long, unsigned long, unsigned long) override {}
     void publishFrequencyOffset(float) override {}
+    void publishTunedFrequency(float) override {}
+    void publishFrequencyEstimate(int8_t) override {}
     void publishUptime(unsigned long, const char *) override {}
     void publishFirmwareVersion(const char *) override {}
     void publishDiscovery() override {}

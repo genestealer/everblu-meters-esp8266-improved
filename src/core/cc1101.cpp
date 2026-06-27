@@ -548,11 +548,10 @@ void setMHZ(float mhz)
       i = 1;
     }
   }
-  if (freq0 > 255)
-  {
-    freq1 += 1;
-    freq0 -= 256;
-  }
+  // No carry handling is needed here: the loop above subtracts a full FREQ1 step
+  // (0.1015625 MHz == 256 FREQ0 LSBs) before freq0 can reach 256, so freq0 always
+  // fits in a single byte. (The former `if (freq0 > 255)` check was dead code -
+  // freq0 is a uint8_t and can never exceed 255.)
 
   /*
   Serial.printf("FREQ2=0x%02X ", freq2);

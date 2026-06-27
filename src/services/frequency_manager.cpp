@@ -133,11 +133,14 @@ void FrequencyManager::saveFrequencyOffset(float offset)
 
 float FrequencyManager::loadFrequencyOffset()
 {
-    float offset = StorageAbstraction::loadFloat(STORAGE_KEY, 0.0, STORAGE_MAGIC, MIN_OFFSET, MAX_OFFSET);
+    // Use a NaN sentinel so a genuinely stored 0.0 offset is distinguishable from
+    // "nothing saved" (mirrors begin()). Returns 0.0 when no value is stored.
+    float offset = StorageAbstraction::loadFloat(STORAGE_KEY, NAN, STORAGE_MAGIC, MIN_OFFSET, MAX_OFFSET);
 
-    if (offset == 0.0)
+    if (isnan(offset))
     {
         LOG_I("everblu_meter", "No valid frequency offset found in storage");
+        return 0.0f;
     }
 
     return offset;
@@ -171,8 +174,11 @@ void FrequencyManager::performFrequencyScan(void (*statusCallback)(const char *,
 
     LOG_I("everblu_meter", "Scanning from %.6f to %.6f MHz (step: %.6f MHz)", scanStart, scanEnd, scanStep);
 
-    for (float freq = scanStart; freq <= scanEnd; freq += scanStep)
+    // Integer step index avoids floating-point accumulation that could drop/add a step.
+    int scanSteps = (int)lround((scanEnd - scanStart) / scanStep) + 1;
+    for (int step = 0; step < scanSteps; step++)
     {
+        float freq = scanStart + (float)step * scanStep;
         feedWatchdog();
 
         // Reinitialize radio with this frequency (via injected callback)
@@ -263,8 +269,11 @@ void FrequencyManager::performWideInitialScan(void (*statusCallback)(const char 
     LOG_I("everblu_meter", "Wide scan from %.6f to %.6f MHz (step: %.6f MHz)", scanStart, scanEnd, scanStep);
     LOG_I("everblu_meter", "This may take 1-2 minutes on first boot...");
 
-    for (float freq = scanStart; freq <= scanEnd; freq += scanStep)
+    // Integer step index avoids floating-point accumulation across the scan.
+    int scanSteps = (int)lround((scanEnd - scanStart) / scanStep) + 1;
+    for (int step = 0; step < scanSteps; step++)
     {
+        float freq = scanStart + (float)step * scanStep;
         feedWatchdog();
 
         // Check if radio initialization succeeds
@@ -303,8 +312,10 @@ void FrequencyManager::performWideInitialScan(void (*statusCallback)(const char 
         int fineBestRSSI = bestRSSI;
         float fineBestFreq = bestFreq;
 
-        for (float freq = fineStart; freq <= fineEnd; freq += fineStep)
+        int fineSteps = (int)lround((fineEnd - fineStart) / fineStep) + 1;
+        for (int step = 0; step < fineSteps; step++)
         {
+            float freq = fineStart + (float)step * fineStep;
             feedWatchdog();
 
             if (!s_radioInitCallback(freq))

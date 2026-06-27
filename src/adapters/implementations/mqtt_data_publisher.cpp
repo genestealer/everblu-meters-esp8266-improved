@@ -91,17 +91,20 @@ void MQTTDataPublisher::publishHistory(const uint32_t *history, bool historyAvai
 
     publish("history_available", "true", true);
 
-    // Build JSON array of historical data
-    String historyJson = "[";
+    // Build JSON array of historical data into a fixed buffer to avoid String
+    // heap fragmentation on ESP8266. 13 uint32_t values (max 10 digits each) plus
+    // separators and brackets fit comfortably within 160 bytes.
+    char historyJson[160];
+    int pos = 0;
+    pos += snprintf(historyJson + pos, sizeof(historyJson) - pos, "[");
     for (int i = 0; i < 13; i++)
     {
-        if (i > 0)
-            historyJson += ",";
-        historyJson += String(history[i]);
+        pos += snprintf(historyJson + pos, sizeof(historyJson) - pos, "%s%lu",
+                        (i > 0 ? "," : ""), (unsigned long)history[i]);
     }
-    historyJson += "]";
+    snprintf(historyJson + pos, sizeof(historyJson) - pos, "]");
 
-    publish("history", historyJson.c_str(), true);
+    publish("history", historyJson, true);
 }
 
 void MQTTDataPublisher::publishWiFiDetails(const char *ip, int rssi, int signalPercent,

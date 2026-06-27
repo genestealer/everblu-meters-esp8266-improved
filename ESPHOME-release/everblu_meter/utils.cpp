@@ -50,7 +50,6 @@ void show_in_hex_formatted(const uint8_t *buffer, size_t len, int mode)
 					line_pos = 0;
 				}
 			}
-			line_pos += snprintf(line_buf + line_pos, sizeof(line_buf) - line_pos, "%02X ", buffer[i]);
 		}
 		else if (mode == 1)
 		{
@@ -64,17 +63,40 @@ void show_in_hex_formatted(const uint8_t *buffer, size_t len, int mode)
 					line_pos = 0;
 				}
 			}
-			line_pos += snprintf(line_buf + line_pos, sizeof(line_buf) - line_pos, "0x%02X, ", buffer[i]);
 		}
-		else if (mode == 2)
+
+		// Each formatted entry is at most 6 chars ("0x%02X, ") plus a null
+		// terminator. Flush the line before it can fill up so that
+		// `sizeof(line_buf) - line_pos` (evaluated in size_t) can never
+		// underflow. This is essential for the single-line modes (2/3) which
+		// do not flush on a 16-byte boundary and could otherwise overrun the
+		// stack buffer for inputs longer than ~85 bytes.
+		if (line_pos > (int)sizeof(line_buf) - 8)
 		{
-			// Single line format
-			line_pos += snprintf(line_buf + line_pos, sizeof(line_buf) - line_pos, "%02X ", buffer[i]);
+			line_buf[line_pos] = '\0';
+			LOG_D("everblu_meter", "%s", line_buf);
+			line_pos = 0;
 		}
-		else if (mode == 3)
+
+		int written = 0;
+		switch (mode)
 		{
-			// Single line with 'S' separator (for GET requests)
-			line_pos += snprintf(line_buf + line_pos, sizeof(line_buf) - line_pos, "%02XS", buffer[i]);
+		case 0: // 16-per-line (newline-separated) - same entry format as mode 2
+		case 2: // Single line format
+			written = snprintf(line_buf + line_pos, sizeof(line_buf) - line_pos, "%02X ", buffer[i]);
+			break;
+		case 1: // Array format
+			written = snprintf(line_buf + line_pos, sizeof(line_buf) - line_pos, "0x%02X, ", buffer[i]);
+			break;
+		case 3: // Single line with 'S' separator (for GET requests)
+			written = snprintf(line_buf + line_pos, sizeof(line_buf) - line_pos, "%02XS", buffer[i]);
+			break;
+		default:
+			break;
+		}
+		if (written > 0)
+		{
+			line_pos += written;
 		}
 	}
 

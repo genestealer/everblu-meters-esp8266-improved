@@ -534,6 +534,69 @@ static const char *wifiStatusToString(wl_status_t st)
   }
 }
 
+// Helper: publish to "<mqttBaseTopic>/<suffix>" using a stack buffer instead of
+// Arduino String concatenation, to avoid heap fragmentation on ESP8266.
+static void publishSub(const char *suffix, const char *payload, bool retained = true)
+{
+  char topic[MQTT_TOPIC_BUFFER_SIZE];
+  snprintf(topic, sizeof(topic), "%s/%s", mqttBaseTopic, suffix);
+  mqtt.publish(topic, payload, retained);
+}
+
+// Build the Home Assistant history-attributes JSON for a reading into `out` and
+// print the history table to the serial log. The output is always null-terminated
+// (best-effort on truncation), so callers never need an early-exit/goto.
+// `num_history` is the count of valid history entries.
+static void buildHistoryAttributesJson(const struct tmeter_data &meter_data, int num_history,
+                                       char *out, size_t outSize)
+{
+  Serial.printf("\n=== HISTORICAL DATA (%d months) ===\n", num_history);
+  Serial.println("[HISTORY] Month  Volume (L)  Usage (L)");
+  Serial.println("[HISTORY] -----  ----------  ---------");
+
+  int pos = 0;
+  if ((int)outSize - pos > 1)
+    pos += snprintf(out + pos, outSize - pos, "{\"history\":[");
+
+  for (int i = 0; i < num_history; i++)
+  {
+    if ((int)outSize - pos > 1)
+      pos += snprintf(out + pos, outSize - pos, "%s%u", (i > 0 ? "," : ""), meter_data.history[i]);
+
+    uint32_t usage = 0;
+    if (i > 0 && meter_data.history[i] > meter_data.history[i - 1])
+      usage = meter_data.history[i] - meter_data.history[i - 1];
+    Serial.printf("[HISTORY]  -%02d   %10u  %9u\n", num_history - i, meter_data.history[i], usage);
+  }
+
+  uint32_t currentMonthUsage = 0;
+  uint32_t currentVolume = static_cast<uint32_t>(meter_data.volume);
+  if (num_history > 0 && currentVolume > meter_data.history[num_history - 1])
+    currentMonthUsage = currentVolume - meter_data.history[num_history - 1];
+  Serial.printf("[HISTORY]   Now  %10u  %9u (current month usage: %u L)\n", currentVolume, currentMonthUsage, currentMonthUsage);
+  Serial.println("===================================\n");
+
+  if ((int)outSize - pos > 1)
+    pos += snprintf(out + pos, outSize - pos, "],\"monthly_usage\":[");
+
+  for (int i = 0; i < num_history; i++)
+  {
+    uint32_t usage = 0;
+    if (i > 0 && meter_data.history[i] > meter_data.history[i - 1])
+      usage = meter_data.history[i] - meter_data.history[i - 1];
+    if ((int)outSize - pos > 1)
+      pos += snprintf(out + pos, outSize - pos, "%s%u", (i > 0 ? "," : ""), usage);
+  }
+
+  if ((int)outSize - pos > 1)
+    pos += snprintf(out + pos, outSize - pos,
+                    "],\"current_month_usage\":%u,\"months_available\":%d}",
+                    currentMonthUsage, num_history);
+
+  if (outSize > 0)
+    out[outSize - 1] = '\0';
+}
+
 // Function: onUpdateData
 // Description: Fetches data from the water and gas meter and publishes it to MQTT topics.
 //              Retries up to 10 times if data retrieval fails.
@@ -555,8 +618,8 @@ void onUpdateData()
   digitalWrite(LED_BUILTIN, LOW); // Turn on LED to indicate activity
 
   // Notify MQTT that active reading has started
-  mqtt.publish(String(mqttBaseTopic) + "/active_reading", "true", true);
-  mqtt.publish(String(mqttBaseTopic) + "/cc1101_state", "Reading", true);
+  publishSub("active_reading", "true", true);
+  publishSub("cc1101_state", "Reading", true);
 
   struct tmeter_data meter_data = get_meter_data(); // Fetch meter data
 
@@ -586,7 +649,7 @@ void onUpdateData()
       // for the whole retry sequence so they don't flip to "Not running"/Idle
       // between attempts. They are cleared only on final success or after max
       // retries (see the else branch below).
-      mqtt.publish(String(mqttBaseTopic) + "/last_error", lastErrorMessage, true);
+      publishSub("last_error", lastErrorMessage, true);
       digitalWrite(LED_BUILTIN, HIGH); // Turn off LED
       // Use non-blocking callback instead of recursive call
       mqtt.executeDelayed(10000, onUpdateData);
@@ -598,17 +661,17 @@ void onUpdateData()
       failedReads++;
       lastErrorMessage = "Max retries reached - cooling down";
       Serial.printf("[ERROR] Max retries (%d) reached. Entering 1-hour cooldown period.\n", max_retries);
-      mqtt.publish(String(mqttBaseTopic) + "/active_reading", "false", true);
-      mqtt.publish(String(mqttBaseTopic) + "/cc1101_state", cc1101RadioConnected ? "Idle" : "unavailable", true);
-      mqtt.publish(String(mqttBaseTopic) + "/status_message", "Failed after max retries, cooling down for 1 hour", true);
-      mqtt.publish(String(mqttBaseTopic) + "/last_error", lastErrorMessage, true);
+      publishSub("active_reading", "false", true);
+      publishSub("cc1101_state", cc1101RadioConnected ? "Idle" : "unavailable", true);
+      publishSub("status_message", "Failed after max retries, cooling down for 1 hour", true);
+      publishSub("last_error", lastErrorMessage, true);
 
       char buffer[16];
       snprintf(buffer, sizeof(buffer), "%lu", failedReads);
-      mqtt.publish(String(mqttBaseTopic) + "/failed_reads", buffer, true);
+      publishSub("failed_reads", buffer, true);
 
       snprintf(buffer, sizeof(buffer), "%lu", totalReadAttempts);
-      mqtt.publish(String(mqttBaseTopic) + "/total_attempts", buffer, true);
+      publishSub("total_attempts", buffer, true);
       digitalWrite(LED_BUILTIN, HIGH); // Turn off LED
       _retry = 0;                      // Reset retry counter for next scheduled attempt
     }
@@ -647,7 +710,7 @@ void onUpdateData()
     // Water meters: publish value in liters
     snprintf(valueBuffer, sizeof(valueBuffer), "%d", meter_data.volume);
   }
-  mqtt.publish(String(mqttBaseTopic) + "/liters", valueBuffer, true);
+  publishSub("liters", valueBuffer, true);
   delay(5);
 
   // Publish historical data as JSON attributes for Home Assistant
@@ -658,7 +721,9 @@ void onUpdateData()
   int num_history = 0;
   if (meter_data.history_available)
   {
-    // Count valid historical values (non-zero)
+    // Count valid historical values. A zero entry marks the end of stored history:
+    // meter volume is a cumulative counter that is never legitimately 0 for an
+    // operational meter, so 0 is used as the "no more data" sentinel.
     for (int i = 0; i < 13; i++)
     {
       if (meter_data.history[i] == 0)
@@ -667,7 +732,7 @@ void onUpdateData()
     }
 
     // If the history block was marked available but contained no
-    // non‑zero entries, treat it as unavailable for this frame.
+    // non-zero entries, treat it as unavailable for this frame.
     if (num_history == 0)
     {
       Serial.println("[WARN] history_available=true but no non-zero history entries found - skipping history publish for this frame");
@@ -677,168 +742,51 @@ void onUpdateData()
 
   if (meter_data.history_available)
   {
-
-    Serial.printf("\n=== HISTORICAL DATA (%d months) ===\n", num_history);
-    Serial.println("[HISTORY] Month  Volume (L)  Usage (L)");
-    Serial.println("[HISTORY] -----  ----------  ---------");
-
-    // Calculate monthly consumption from the historical data
-    // Format: {"history": [oldest_volume, ..., newest_volume], "monthly_usage": [month1_usage, ..., month13_usage]}
-    // The attributes JSON can become relatively large when all 13 history
-    // slots are populated. Use a sufficiently large buffer and carefully
-    // track remaining space to avoid truncation that would yield malformed
-    // JSON on MQTT.
+    // Build the attributes JSON in a stack buffer and publish it once. The helper
+    // always null-terminates (best-effort on truncation), so no early-exit/goto is
+    // required here.
     char historyJson[1024];
-    int pos = 0;
-
-    // Start JSON object
-    int remaining = sizeof(historyJson) - pos;
-    if (remaining <= 1)
-    {
-      Serial.println("[ERROR] historyJson buffer too small before writing header - skipping history publish");
-      // Nothing written, just bail out of history publishing for this frame.
-      return;
-    }
-    pos += snprintf(historyJson + pos, remaining, "{\"history\":[");
-
-    // Add historical volumes and print to serial
-    for (int i = 0; i < num_history; i++)
-    {
-      remaining = sizeof(historyJson) - pos;
-      if (remaining <= 1)
-      {
-        Serial.println("[ERROR] historyJson buffer full while writing history array - truncating");
-        break;
-      }
-      pos += snprintf(historyJson + pos, remaining, "%s%u",
-                      (i > 0 ? "," : ""), meter_data.history[i]);
-
-      // Calculate and display monthly usage
-      uint32_t usage = 0;
-      if (i > 0 && meter_data.history[i] > meter_data.history[i - 1])
-      {
-        usage = meter_data.history[i] - meter_data.history[i - 1];
-      }
-      Serial.printf("[HISTORY]  -%02d   %10u  %9u\n", num_history - i, meter_data.history[i], usage);
-    }
-
-    // Calculate current month usage (difference from most recent historical reading).
-    // Declare these outside of any goto targets to avoid crossing initialisation
-    // when jumping to finalize_history_json.
-    uint32_t currentMonthUsage = 0;
-    uint32_t currentVolume = static_cast<uint32_t>(meter_data.volume);
-    if (num_history > 0 && currentVolume > meter_data.history[num_history - 1])
-    {
-      currentMonthUsage = currentVolume - meter_data.history[num_history - 1];
-    }
-    Serial.printf("[HISTORY]   Now  %10u  %9u (current month usage: %u L)\n", currentVolume, currentMonthUsage, currentMonthUsage);
-    Serial.println("===================================\n");
-
-    // Add monthly usage calculations to JSON
-    remaining = sizeof(historyJson) - pos;
-    if (remaining <= 1)
-    {
-      Serial.println("[ERROR] historyJson buffer full before monthly_usage - truncating");
-      // Close what we have so far and publish best-effort JSON.
-      historyJson[sizeof(historyJson) - 1] = '\0';
-      Serial.printf("[MQTT] Publishing JSON attributes (%d bytes): %s\n\n", strlen(historyJson), historyJson);
-      mqtt.publish(String(mqttBaseTopic) + "/liters_attributes", historyJson, true);
-      delay(5);
-      Serial.printf("[MQTT] Published %d months historical data (current month usage: %u L)\n",
-                    num_history, currentMonthUsage);
-      goto skip_history_publish;
-    }
-    pos += snprintf(historyJson + pos, remaining, "],\"monthly_usage\":[");
-    for (int i = 0; i < num_history; i++)
-    {
-      uint32_t usage;
-      if (i == 0)
-      {
-        // For oldest month, we can't calculate usage without an older baseline
-        usage = 0;
-      }
-      else if (meter_data.history[i] > meter_data.history[i - 1])
-      {
-        // Calculate consumption as difference between consecutive months
-        usage = meter_data.history[i] - meter_data.history[i - 1];
-      }
-      else
-      {
-        usage = 0; // Sanity check - shouldn't go backwards
-      }
-      remaining = sizeof(historyJson) - pos;
-      if (remaining <= 1)
-      {
-        Serial.println("[ERROR] historyJson buffer full while writing monthly_usage - truncating");
-        break;
-      }
-      pos += snprintf(historyJson + pos, remaining, "%s%u",
-                      (i > 0 ? "," : ""), usage);
-    }
-
-    remaining = sizeof(historyJson) - pos;
-    if (remaining <= 1)
-    {
-      Serial.println("[ERROR] historyJson buffer full before tail - truncating");
-      historyJson[sizeof(historyJson) - 1] = '\0';
-      Serial.printf("[MQTT] Publishing JSON attributes (%d bytes): %s\n\n", strlen(historyJson), historyJson);
-      mqtt.publish(String(mqttBaseTopic) + "/liters_attributes", historyJson, true);
-      delay(5);
-      Serial.printf("[MQTT] Published %d months historical data (current month usage: %u L)\n",
-                    num_history, currentMonthUsage);
-      goto skip_history_publish;
-    }
-    pos += snprintf(historyJson + pos, remaining,
-                    "],\"current_month_usage\":%u,\"months_available\":%d}",
-                    currentMonthUsage, num_history);
-
-    // Ensure null termination even if we had to truncate early.
-    historyJson[sizeof(historyJson) - 1] = '\0';
-
-    Serial.printf("[MQTT] Publishing JSON attributes (%d bytes): %s\n\n", strlen(historyJson), historyJson);
-    mqtt.publish(String(mqttBaseTopic) + "/liters_attributes", historyJson, true);
+    buildHistoryAttributesJson(meter_data, num_history, historyJson, sizeof(historyJson));
+    Serial.printf("[MQTT] Publishing JSON attributes (%d bytes): %s\n\n", (int)strlen(historyJson), historyJson);
+    publishSub("liters_attributes", historyJson, true);
     delay(5);
-
-    Serial.printf("[MQTT] Published %d months historical data (current month usage: %u L)\n",
-                  num_history, currentMonthUsage);
+    Serial.printf("[MQTT] Published %d months historical data\n", num_history);
   }
 
-skip_history_publish:;
-
   snprintf(valueBuffer, sizeof(valueBuffer), "%d", meter_data.reads_counter);
-  mqtt.publish(String(mqttBaseTopic) + "/counter", valueBuffer, true);
+  publishSub("counter", valueBuffer, true);
   delay(5);
 
   snprintf(valueBuffer, sizeof(valueBuffer), "%d", meter_data.battery_left);
-  mqtt.publish(String(mqttBaseTopic) + "/battery", valueBuffer, true);
+  publishSub("battery", valueBuffer, true);
   delay(5);
 
   snprintf(valueBuffer, sizeof(valueBuffer), "%d", meter_data.rssi_dbm);
-  mqtt.publish(String(mqttBaseTopic) + "/rssi_dbm", valueBuffer, true);
+  publishSub("rssi_dbm", valueBuffer, true);
   delay(5);
 
   snprintf(valueBuffer, sizeof(valueBuffer), "%d", calculateMeterdBmToPercentage(meter_data.rssi_dbm));
-  mqtt.publish(String(mqttBaseTopic) + "/rssi_percentage", valueBuffer, true);
+  publishSub("rssi_percentage", valueBuffer, true);
   delay(5);
 
   snprintf(valueBuffer, sizeof(valueBuffer), "%d", meter_data.lqi);
-  mqtt.publish(String(mqttBaseTopic) + "/lqi", valueBuffer, true);
+  publishSub("lqi", valueBuffer, true);
   delay(5);
-  mqtt.publish(String(mqttBaseTopic) + "/time_start", timeStartFormatted, true);
+  publishSub("time_start", timeStartFormatted, true);
   delay(5);
-  mqtt.publish(String(mqttBaseTopic) + "/time_end", timeEndFormatted, true);
+  publishSub("time_end", timeEndFormatted, true);
   delay(5);
-  mqtt.publish(String(mqttBaseTopic) + "/timestamp", iso8601, true); // timestamp since epoch in UTC
+  publishSub("timestamp", iso8601, true); // timestamp since epoch in UTC
   delay(5);
 
   snprintf(valueBuffer, sizeof(valueBuffer), "%d", calculateLQIToPercentage(meter_data.lqi));
-  mqtt.publish(String(mqttBaseTopic) + "/lqi_percentage", valueBuffer, true);
+  publishSub("lqi_percentage", valueBuffer, true);
   delay(5);
 
   // Publish all data as a JSON message as well this is redundant but may be useful for some
   char json[512];
-  sprintf(json, jsonTemplate, meter_data.volume, meter_data.reads_counter, meter_data.battery_left, meter_data.rssi, iso8601);
-  mqtt.publish(String(mqttBaseTopic) + "/json", json, true);
+  snprintf(json, sizeof(json), jsonTemplate, meter_data.volume, meter_data.reads_counter, meter_data.battery_left, meter_data.rssi, iso8601);
+  publishSub("json", json, true);
   delay(5);
 
 #if AUTO_ALIGN_READING_TIME
@@ -863,7 +811,7 @@ skip_history_publish:;
       // Publish updated reading_time HH:MM
       char readingTimeFormatted2[6];
       snprintf(readingTimeFormatted2, sizeof(readingTimeFormatted2), "%02d:%02d", g_readHourUtc, g_readMinuteUtc);
-      mqtt.publish(String(mqttBaseTopic) + "/reading_time", readingTimeFormatted2, true);
+      publishSub("reading_time", readingTimeFormatted2, true);
       delay(5);
 
       Serial.printf("[SCHEDULE] Auto-aligned reading time to %02d:%02d local-offset (%02d:%02d UTC) (window %02d-%02d local)\n",
@@ -873,8 +821,8 @@ skip_history_publish:;
 #endif
 
   // Notify MQTT that active reading has ended
-  mqtt.publish(String(mqttBaseTopic) + "/active_reading", "false", true);
-  mqtt.publish(String(mqttBaseTopic) + "/cc1101_state", cc1101RadioConnected ? "Idle" : "unavailable", true);
+  publishSub("active_reading", "false", true);
+  publishSub("cc1101_state", cc1101RadioConnected ? "Idle" : "unavailable", true);
   digitalWrite(LED_BUILTIN, HIGH); // Turn off LED to indicate completion
 
   // Reset retry counter and cooldown on successful read
@@ -887,12 +835,12 @@ skip_history_publish:;
   char metricBuffer[16];
 
   snprintf(metricBuffer, sizeof(metricBuffer), "%lu", successfulReads);
-  mqtt.publish(String(mqttBaseTopic) + "/successful_reads", metricBuffer, true);
+  publishSub("successful_reads", metricBuffer, true);
 
   snprintf(metricBuffer, sizeof(metricBuffer), "%lu", totalReadAttempts);
-  mqtt.publish(String(mqttBaseTopic) + "/total_attempts", metricBuffer, true);
+  publishSub("total_attempts", metricBuffer, true);
 
-  mqtt.publish(String(mqttBaseTopic) + "/last_error", "None", true);
+  publishSub("last_error", "None", true);
 
   // Perform adaptive frequency tracking based on FREQEST register
   adaptiveFrequencyTracking(meter_data.freqest);
@@ -1630,7 +1578,9 @@ float loadFrequencyOffset()
     preferences.end();
   }
 #endif
-  return 0.0;
+  // NAN sentinel = "nothing valid stored", so a genuinely calibrated 0.0 offset
+  // is not mistaken for "not set" by the boot scan logic.
+  return NAN;
 }
 
 // Function: performFrequencyScan
@@ -1662,8 +1612,11 @@ void performFrequencyScan()
 
   Serial.printf("[FREQ] Scanning from %.6f to %.6f MHz (step: %.6f MHz)\n", scanStart, scanEnd, scanStep);
 
-  for (float freq = scanStart; freq <= scanEnd; freq += scanStep)
+  // Integer step index avoids floating-point accumulation that could drop/add a step.
+  int scanSteps = (int)lround((scanEnd - scanStart) / scanStep) + 1;
+  for (int step = 0; step < scanSteps; step++)
   {
+    float freq = scanStart + (float)step * scanStep;
     FEED_WDT(); // Feed watchdog for each frequency step
     // Reinitialize CC1101 with this frequency
     cc1101_init(freq);
@@ -1750,8 +1703,11 @@ void performWideInitialScan()
   Serial.printf("[FREQ] Wide scan from %.6f to %.6f MHz (step: %.6f MHz)\n", scanStart, scanEnd, scanStep);
   Serial.println("[FREQ] This may take 1-2 minutes on first boot...");
 
-  for (float freq = scanStart; freq <= scanEnd; freq += scanStep)
+  // Integer step index avoids floating-point accumulation across the scan.
+  int scanSteps = (int)lround((scanEnd - scanStart) / scanStep) + 1;
+  for (int step = 0; step < scanSteps; step++)
   {
+    float freq = scanStart + (float)step * scanStep;
     FEED_WDT(); // Feed watchdog for each frequency step
 
     // Check if CC1101 radio initialization succeeds before attempting communication
@@ -1792,8 +1748,11 @@ void performWideInitialScan()
     int fineBestRSSI = bestRSSI;
     float fineBestFreq = bestFreq;
 
-    for (float freq = fineStart; freq <= fineEnd; freq += fineStep)
+    // Integer step index avoids floating-point accumulation across the fine scan.
+    int fineSteps = (int)lround((fineEnd - fineStart) / fineStep) + 1;
+    for (int step = 0; step < fineSteps; step++)
     {
+      float freq = fineStart + (float)step * fineStep;
       FEED_WDT(); // Feed watchdog for each frequency step
 
       // Check if CC1101 radio initialization succeeds before attempting communication
@@ -2091,10 +2050,11 @@ void setup()
 #endif
 #endif
 
-  // Load stored frequency offset
-  storedFrequencyOffset = loadFrequencyOffset();
-
-  const bool noStoredOffset = (storedFrequencyOffset == 0.0f);
+  // Load stored frequency offset. loadFrequencyOffset() returns NAN when nothing
+  // is stored, so a genuinely calibrated 0.0 offset is not mistaken for "not set".
+  float loadedOffset = loadFrequencyOffset();
+  const bool noStoredOffset = isnan(loadedOffset);
+  storedFrequencyOffset = noStoredOffset ? 0.0f : loadedOffset;
 
   // If no valid frequency offset found and auto-scan is enabled, perform wide initial scan
   if (noStoredOffset && autoScanEnabled)
@@ -2102,7 +2062,8 @@ void setup()
     Serial.println("[FREQ] No stored frequency offset found. Performing wide initial scan...");
     performWideInitialScan();
     // Reload the frequency offset after scan
-    storedFrequencyOffset = loadFrequencyOffset();
+    float rescanOffset = loadFrequencyOffset();
+    storedFrequencyOffset = isnan(rescanOffset) ? 0.0f : rescanOffset;
   }
   else if (noStoredOffset)
   {
