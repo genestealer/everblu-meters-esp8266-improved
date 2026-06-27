@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 Releases are created manually by tagging commits with version tags matching `v*.*.*` (e.g., `v2.1.0`). Users should build from source and configure `private.h` with their own meter settings.
 
+> **Note:** The firmware version is stored in [`src/core/version.h`](src/core/version.h) (`EVERBLU_FW_VERSION`). Keep it in sync with the latest entry in this changelog and the Git tag.
+
 ## [v3.0.2] - 2026-06-27
 
 Code-review hardening pass. No configuration or wiring changes; correctly-configured setups behave identically to v3.0.1 apart from stricter rejection of corrupt RF frames.
