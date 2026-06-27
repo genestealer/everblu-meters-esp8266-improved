@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 Releases are created manually by tagging commits with version tags matching `v*.*.*` (e.g., `v2.1.0`). Users should build from source and configure `private.h` with their own meter settings.
 
+## [v3.0.2] - 2026-06-27
+
+Code-review hardening pass. No configuration or wiring changes; correctly-configured setups behave identically to v3.0.1 apart from stricter rejection of corrupt RF frames.
+
+### Fixed
+
+- **Stack buffer overflow in hex logging.** `show_in_hex_formatted()` (single-line dump modes used by `show_in_hex_one_line` / `_GET`) accumulated `snprintf` lengths without bound, so a buffer longer than ~85 bytes made `sizeof(buf) - pos` underflow and write past the 256-byte stack buffer. The line buffer is now flushed before it can overflow.
+- **CRC validation accepted truncated frames.** `radian_validate_crc()` returned "valid" without checking the CRC when a frame's declared length exceeded the decoded payload. Such frames (typically truncated/misaligned captures) are now rejected.
+- **Unbounded `sprintf`.** The standalone MQTT `/json` publish now uses `snprintf` into its fixed buffer.
+
+### Changed
+
+- **Frequency-offset "not set" sentinel.** A genuinely calibrated `0.000` MHz offset is no longer indistinguishable from "nothing stored", so it no longer triggers an unnecessary wide scan on every boot (uses a `NaN` sentinel, matching the ESPHome `FrequencyManager` path).
+- **Integer-indexed frequency scan loops** replace `for (float …; f <= end; f += step)` to avoid floating-point accumulation dropping or adding a step.
+- **Reduced ESP8266 heap fragmentation.** Standalone `onUpdateData()` MQTT publishes now go through a stack-buffer `publishSub()` helper, and history JSON is built with `snprintf` instead of Arduino `String`. The history-attributes block was extracted into a helper and the `goto` removed.
+- **Completeness / diagnostics.** The no-MQTT `MQTTDataPublisher` stub now implements every interface method (`publishTunedFrequency` / `publishFrequencyEstimate`); `StorageAbstraction::clearAll()` logs an explicit "not supported on ESPHome" warning instead of silently returning `false`.
+
+### Removed
+
+- **Dead code.** Unused `cc1101_wait_for_packet()`, `cc1101_check_packet_received()`, and `is_look_like_radian_frame()` (no callers in `src/`, not part of the `cc1101.h` public API).
+
 ## [v3.0.1] - 2026-06-26
 
 Non-breaking hardening follow-up to the v3.0.0 GDO2 changes. The default and both opt-out paths are unchanged; correctly-wired setups behave identically to v3.0.0.
