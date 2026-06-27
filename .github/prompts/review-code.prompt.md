@@ -49,6 +49,8 @@ Provide feedback as:
 **✅ Good Practices** - What's done well
 
 For each issue:
+
+
 - Specific line references
 - Clear explanation of the problem
 - Suggested solution with code example
