@@ -57,6 +57,7 @@ CONF_METER_CODE = "meter_code"
 CONF_METER_TYPE = "meter_type"
 CONF_GAS_VOLUME_DIVISOR = "gas_volume_divisor"
 CONF_AUTO_SCAN = "auto_scan"
+CONF_AUTO_SCAN_ON_FAILURE = "auto_scan_on_failure"
 CONF_READING_SCHEDULE = "reading_schedule"
 CONF_READ_HOUR = "read_hour"
 CONF_READ_MINUTE = "read_minute"
@@ -197,6 +198,7 @@ CONFIG_SCHEMA = (
                 min=300.0, max=928.0
             ),
             cv.Optional(CONF_AUTO_SCAN, default=True): cv.boolean,
+            cv.Optional(CONF_AUTO_SCAN_ON_FAILURE, default=True): cv.boolean,
             cv.Optional(
                 CONF_READING_SCHEDULE, default=SCHEDULE_MONDAY_FRIDAY
             ): cv.string,
@@ -454,6 +456,7 @@ async def to_code(config):
     cg.add(var.set_gas_volume_divisor(config[CONF_GAS_VOLUME_DIVISOR]))
     cg.add(var.set_frequency(config[CONF_FREQUENCY]))
     cg.add(var.set_auto_scan(config[CONF_AUTO_SCAN]))
+    cg.add(var.set_auto_scan_on_failure(config[CONF_AUTO_SCAN_ON_FAILURE]))
     cg.add(var.set_reading_schedule(config[CONF_READING_SCHEDULE]))
     cg.add(var.set_read_hour(config[CONF_READ_HOUR]))
     cg.add(var.set_read_minute(config[CONF_READ_MINUTE]))

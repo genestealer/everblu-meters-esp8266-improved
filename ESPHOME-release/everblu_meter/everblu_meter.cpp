@@ -72,6 +72,7 @@ void EverbluMeterComponent::setup() {
   this->config_provider_->setGasVolumeDivisor(this->gas_volume_divisor_);
   this->config_provider_->setFrequency(this->frequency_);
   this->config_provider_->setAutoScanEnabled(this->auto_scan_);
+  this->config_provider_->setAutoScanOnFailureEnabled(this->auto_scan_on_failure_);
   this->config_provider_->setReadingSchedule(this->reading_schedule_.c_str());
   this->config_provider_->setReadHourUTC(this->read_hour_);
   this->config_provider_->setReadMinuteUTC(this->read_minute_);
