@@ -84,9 +84,11 @@ To exercise the decoder against a **genuine** pre-decode RF sample stream (with
 real jitter/noise), drop real captures into
 `test/fixtures/meter_frames/raw_captures.lst`:
 
-1. Build the standalone firmware with `-DDUMP_RAW_RX_FRAME` (and `DEBUG_CC1101`
-   enabled) and capture the serial log of a successful read.
-2. Extract them: `python scripts/extract-meter-fixture.py --input capture.log --raw --append`.
+1. Flash the temporary capture build (adds `-DDUMP_RAW_RX_FRAME` + `DEBUG_CC1101`):
+   `pio run -e huzzah-capture -t upload` (use your board's env as needed).
+2. Capture a successful read: `pio device monitor --baud 115200 | Tee-Object capture.log`.
+3. Extract them: `python scripts/extract-meter-fixture.py --input capture.log --raw --append`.
+4. Replay: `pio test -e native_hal -v`. Re-flash a normal (non-capture) build afterwards.
 
 `test_real_raw_captures` then replays each real frame through the full pipeline.
 With no captures present (as shipped) it passes with a note.
