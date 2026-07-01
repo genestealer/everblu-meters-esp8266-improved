@@ -49,6 +49,30 @@ To generate fixture entries from firmware logs, use:
 python scripts/extract-meter-fixture.py --input meter-capture.log --append --name-prefix capture
 ```
 
+### Native Full-HAL Meter Read Simulation (GitHub CI compatible)
+
+The `test_native_hal_meter_read` suite runs the **real** standalone (MQTT) radio
+and RADIAN protocol firmware (`src/core/cc1101.cpp`, `utils.cpp`, ...) on the host
+and drives a complete `get_meter_data_for_meter()` request/response cycle against a
+**simulated CC1101 chip** mocked at the SPI/GPIO seam.
+
+Unlike the fixture replay (which starts from an already-decoded frame), this test
+exercises the full pipeline: interrogation-frame build, the wake-up/interrogation
+TX FIFO feed loop, two-stage `receive_radian_frame()` reception, the 4x-oversampled
+`decode_4bitpbit_serial()` DSP, CRC validation and `parse_meter_report()`.
+
+- Shim Arduino/SPI headers: `test/native_hal_shim/`
+- Simulated chip + Arduino/SPI HAL: `test/test_native_hal_meter_read/fake_cc1101.*`
+- On-air stream encoder (inverse of the decoder): `test/test_native_hal_meter_read/radian_encode.h`
+
+```bash
+pio test -e native_hal        # run the end-to-end simulation
+pio test -e native_hal -v     # with the simulated read sequence log
+```
+
+It runs on the PlatformIO `native` environment (needs a host `g++`), so it is
+suitable for GitHub Actions.
+
 ### Test Framework
 
 These tests use the [Unity](http://www.throwtheswitch.org/unity) test framework, which is automatically managed by PlatformIO.
