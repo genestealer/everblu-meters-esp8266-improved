@@ -9,6 +9,8 @@ on:
       - platformio.ini
       - test/fixtures/**
       - test/test_native_meter_fixtures/**
+      - test/test_native_hal_meter_read/**
+      - test/native_hal_shim/**
       - .github/workflows/meter-fixture-tests.yml
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
@@ -18,6 +20,8 @@ on:
       - platformio.ini
       - test/fixtures/**
       - test/test_native_meter_fixtures/**
+      - test/test_native_hal_meter_read/**
+      - test/native_hal_shim/**
       - .github/workflows/meter-fixture-tests.yml
   workflow_dispatch:
 
@@ -66,3 +70,7 @@ jobs:
       - name: Run native fixture tests
         run: |
           pio test -e native -v
+
+      - name: Run native full-HAL meter read simulation
+        run: |
+          pio test -e native_hal -v
