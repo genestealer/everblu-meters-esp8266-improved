@@ -120,14 +120,17 @@ def validate_crc(decoded: bytes) -> int:
     return 1 if computed == received else 0
 
 
-def collect_frames(log_text: str, prefix: str) -> list[ParsedFrame]:
-    lines = log_text.splitlines()
-    frames: list[ParsedFrame] = []
-    i = 0
-    idx = 1
+def collect_hex_blocks(log_text: str, header_substring: str) -> list[bytes]:
+    """Collect all hex dump blocks whose header line contains header_substring.
 
+    A block is the sequence of ``[NNN-NNN]: XX XX ...`` offset lines that follow a
+    matching header line, in both raw-Serial and ESPHome logger formats.
+    """
+    lines = log_text.splitlines()
+    blocks: list[bytes] = []
+    i = 0
     while i < len(lines):
-        if "Full hex dump of decoded frame" not in lines[i]:
+        if header_substring not in lines[i]:
             i += 1
             continue
 
@@ -137,37 +140,41 @@ def collect_frames(log_text: str, prefix: str) -> list[ParsedFrame]:
             stripped = _strip_esphome_prefix(lines[i].strip())
             m = HEX_LINE_RE.match(stripped)
             if not m:
-                # Skip header/separator lines before the first hex row (e.g. "Offset : Hex Data")
+                # Skip header/separator lines before the first hex row.
                 if not bytes_out:
                     i += 1
                     continue
                 break
-            hex_part = m.group(3)
-            bytes_out.extend(int(hb, 16) for hb in HEX_BYTE_RE.findall(hex_part))
+            bytes_out.extend(int(hb, 16) for hb in HEX_BYTE_RE.findall(m.group(3)))
             i += 1
 
         if bytes_out:
-            decoded = bytes(bytes_out)
-            volume, battery, counter, time_start, time_end, history_available = (
-                parse_fields(decoded)
-            )
-            crc_valid = validate_crc(decoded)
-            name = f"{prefix}_{idx:03d}"
-            frames.append(
-                ParsedFrame(
-                    name=name,
-                    decoded=decoded,
-                    volume=volume,
-                    battery=battery,
-                    counter=counter,
-                    time_start=time_start,
-                    time_end=time_end,
-                    history_available=history_available,
-                    crc_valid=crc_valid,
-                )
-            )
-            idx += 1
+            blocks.append(bytes(bytes_out))
 
+    return blocks
+
+
+def collect_frames(log_text: str, prefix: str) -> list[ParsedFrame]:
+    frames: list[ParsedFrame] = []
+    for idx, decoded in enumerate(
+        collect_hex_blocks(log_text, "Full hex dump of decoded frame"), start=1
+    ):
+        volume, battery, counter, time_start, time_end, history_available = (
+            parse_fields(decoded)
+        )
+        frames.append(
+            ParsedFrame(
+                name=f"{prefix}_{idx:03d}",
+                decoded=decoded,
+                volume=volume,
+                battery=battery,
+                counter=counter,
+                time_start=time_start,
+                time_end=time_end,
+                history_available=history_available,
+                crc_valid=validate_crc(decoded),
+            )
+        )
     return frames
 
 
@@ -177,6 +184,36 @@ def to_fixture_line(frame: ParsedFrame) -> str:
         f"{frame.name}|{decoded_hex}|{frame.volume}|{frame.battery}|{frame.counter}|"
         f"{frame.time_start}|{frame.time_end}|{frame.history_available}|{frame.crc_valid}"
     )
+
+
+def collect_raw_captures(log_text: str, prefix: str) -> list[str]:
+    """Pair each raw (pre-decode) RX dump with the decoded dump from the same read.
+
+    Requires the firmware built with -DDUMP_RAW_RX_FRAME (raw block) and debug hex
+    output enabled (decoded block, used only to fill the expected meter fields).
+    """
+    raw_blocks = collect_hex_blocks(log_text, "Full hex dump of RAW RX frame")
+    decoded_blocks = collect_hex_blocks(log_text, "Full hex dump of decoded frame")
+    if len(raw_blocks) != len(decoded_blocks):
+        raise SystemExit(
+            "Raw/decoded dump count mismatch "
+            f"({len(raw_blocks)} raw vs {len(decoded_blocks)} decoded); "
+            "capture with both -DDUMP_RAW_RX_FRAME and DEBUG_CC1101 enabled."
+        )
+
+    lines: list[str] = []
+    for idx, (raw, decoded) in enumerate(
+        zip(raw_blocks, decoded_blocks, strict=False), start=1
+    ):
+        volume, battery, counter, time_start, time_end, history_available = (
+            parse_fields(decoded)
+        )
+        raw_hex = " ".join(f"{b:02X}" for b in raw)
+        lines.append(
+            f"{prefix}_{idx:03d}|{raw_hex}|{volume}|{battery}|{counter}|"
+            f"{time_start}|{time_end}|{history_available}"
+        )
+    return lines
 
 
 def main() -> int:
@@ -203,6 +240,14 @@ def main() -> int:
         action="store_true",
         help="Append to existing fixture list instead of overwriting",
     )
+    parser.add_argument(
+        "--raw",
+        action="store_true",
+        help=(
+            "Extract REAL pre-decode raw RX captures (needs firmware built with "
+            "-DDUMP_RAW_RX_FRAME) into raw_captures.lst for the native_hal simulation"
+        ),
+    )
     args = parser.parse_args()
 
     input_path = pathlib.Path(args.input)
@@ -218,6 +263,30 @@ def main() -> int:
         )
 
     log_text = input_path.read_text(encoding="utf-8", errors="ignore")
+
+    if args.raw:
+        raw_lines = collect_raw_captures(log_text, args.name_prefix)
+        if not raw_lines:
+            raise SystemExit(
+                "No raw RX dumps found; build firmware with -DDUMP_RAW_RX_FRAME."
+            )
+        out_path = pathlib.Path(
+            args.output
+            if args.output != "test/fixtures/meter_frames/fixtures.lst"
+            else "test/fixtures/meter_frames/raw_captures.lst"
+        )
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        mode = "a" if args.append and out_path.exists() else "w"
+        with out_path.open(mode, encoding="utf-8") as f:
+            if mode == "w":
+                f.write(
+                    "# capture_name|raw_rx_hex|volume|battery|counter|time_start|time_end|history_available\n"
+                )
+            for line in raw_lines:
+                f.write(line + "\n")
+        print(f"Extracted {len(raw_lines)} raw capture(s) into {out_path}")
+        return 0
+
     frames = collect_frames(log_text, args.name_prefix)
     if not frames:
         raise SystemExit("No decoded frame dumps found in input log")

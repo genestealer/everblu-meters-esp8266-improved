@@ -1871,6 +1871,26 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
       //  show_in_hex_array(rxBuffer, rxBuffer_size);
     }
 
+#ifdef DUMP_RAW_RX_FRAME
+    // Optional raw (pre-decode) RX capture. Enable with -DDUMP_RAW_RX_FRAME to log
+    // the exact 4x-oversampled bytes so a real meter response can be replayed by the
+    // native_hal end-to-end simulation (see test/test_native_hal_meter_read). The
+    // block header is deliberately distinct from the decoded-frame dump so the
+    // fixture extractor can tell them apart. Off by default; no effect otherwise.
+    echo_debug(1, "[CC1101] Full hex dump of RAW RX frame (%d bytes):\n", rxBuffer_size);
+    for (int i = 0; i < rxBuffer_size; i += 16)
+    {
+      char raw_line[128];
+      int raw_pos = 0;
+      int raw_end = (i + 15 < rxBuffer_size - 1) ? i + 15 : rxBuffer_size - 1;
+      raw_pos += snprintf(raw_line + raw_pos, sizeof(raw_line) - raw_pos, "[%03d-%03d]: ", i, raw_end);
+      int raw_max_j = (i + 16 < rxBuffer_size) ? i + 16 : rxBuffer_size;
+      for (int j = i; j < raw_max_j; j++)
+        raw_pos += snprintf(raw_line + raw_pos, sizeof(raw_line) - raw_pos, "%02X ", rxBuffer[j]);
+      echo_debug(1, "%s\n", raw_line);
+    }
+#endif
+
     meter_data_size = decode_4bitpbit_serial(rxBuffer, rxBuffer_size, meter_data);
     // If debug enabled, print the decoded (post-serial-decoding) meter data so we can inspect fields (timestamp etc.)
     echo_debug(1, "[METER] Decoded %d bytes from %d raw bytes\n", meter_data_size, rxBuffer_size);

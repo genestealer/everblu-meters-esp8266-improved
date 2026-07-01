@@ -1,0 +1,21 @@
+# Real pre-decode RX captures for the native_hal full-read simulation.
+#
+# Format (one capture per line):
+#   capture_name|raw_rx_hex|volume|battery|counter|time_start|time_end|history_available
+#
+# - raw_rx_hex is the EXACT oversampled byte stream the CC1101 delivered for a
+#   data frame (the firmware's rxBuffer, pre-decode). Unlike fixtures.lst (which
+#   stores the DECODED frame), this lets the simulation exercise the real
+#   decode_4bitpbit_serial() DSP against genuine RF samples (jitter/noise).
+#
+# How to capture a real frame:
+#   1. Build/flash the standalone firmware with the raw dump enabled, e.g. add
+#      `-DDUMP_RAW_RX_FRAME` to build_flags (and keep DEBUG_CC1101 enabled so the
+#      decoded dump is also logged for the expected fields).
+#   2. Capture the serial log during a successful read:
+#        pio device monitor --baud 115200 | Tee-Object capture.log
+#   3. Extract into this file:
+#        python scripts/extract-meter-fixture.py --input capture.log --raw --append
+#
+# When this file has no data lines (as shipped), test_real_raw_captures passes
+# with a note and the simulation falls back to the synthesized fixture stream.

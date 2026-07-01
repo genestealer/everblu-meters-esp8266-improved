@@ -73,6 +73,24 @@ pio test -e native_hal -v     # with the simulated read sequence log
 It runs on the PlatformIO `native` environment (needs a host `g++`), so it is
 suitable for GitHub Actions.
 
+#### Synthesized vs. real RF data
+
+By default the fake meter's data frame is **synthesized** from the captured
+`home_001` values in `fixtures.lst` (real decoded meter data, re-encoded to the
+on-air 4x-oversampled form by `radian_encode.h`). `test_onair_roundtrip` proves
+that encoding is the exact inverse of the firmware decoder.
+
+To exercise the decoder against a **genuine** pre-decode RF sample stream (with
+real jitter/noise), drop real captures into
+`test/fixtures/meter_frames/raw_captures.lst`:
+
+1. Build the standalone firmware with `-DDUMP_RAW_RX_FRAME` (and `DEBUG_CC1101`
+   enabled) and capture the serial log of a successful read.
+2. Extract them: `python scripts/extract-meter-fixture.py --input capture.log --raw --append`.
+
+`test_real_raw_captures` then replays each real frame through the full pipeline.
+With no captures present (as shipped) it passes with a note.
+
 ### Test Framework
 
 These tests use the [Unity](http://www.throwtheswitch.org/unity) test framework, which is automatically managed by PlatformIO.

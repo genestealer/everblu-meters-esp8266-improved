@@ -1,4 +1,11 @@
-name: Meter Fixture Replay Tests
+name: Native HAL Meter Read Simulation
+
+# Runs the full end-to-end standalone (MQTT-path) meter read on the host: the
+# real src/core radio + RADIAN protocol firmware is driven through a complete
+# get_meter_data_for_meter() request/response cycle against a simulated CC1101
+# chip mocked at the SPI/GPIO seam. No hardware required.
+#
+# See test/test_native_hal_meter_read/ and env:native_hal in platformio.ini.
 
 on:
   push:
@@ -8,8 +15,9 @@ on:
       - include/**
       - platformio.ini
       - test/fixtures/**
-      - test/test_native_meter_fixtures/**
-      - .github/workflows/meter-fixture-tests.yml
+      - test/test_native_hal_meter_read/**
+      - test/native_hal_shim/**
+      - .github/workflows/native-hal-meter-read.yml
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
     paths:
@@ -17,8 +25,9 @@ on:
       - include/**
       - platformio.ini
       - test/fixtures/**
-      - test/test_native_meter_fixtures/**
-      - .github/workflows/meter-fixture-tests.yml
+      - test/test_native_hal_meter_read/**
+      - test/native_hal_shim/**
+      - .github/workflows/native-hal-meter-read.yml
   workflow_dispatch:
 
 concurrency:
@@ -29,10 +38,10 @@ permissions:
   contents: read
 
 jobs:
-  native-fixture-tests:
+  native-hal-meter-read:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    name: Replay Captured Meter Fixtures
+    name: Simulate Full Meter Read (Native HAL)
 
     steps:
       - uses: actions/checkout@v4
@@ -63,6 +72,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install --upgrade platformio
 
-      - name: Run native fixture tests
+      - name: Run native full-HAL meter read simulation
         run: |
-          pio test -e native -v
+          pio test -e native_hal -v
