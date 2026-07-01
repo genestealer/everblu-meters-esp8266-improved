@@ -1285,6 +1285,20 @@ void publishHADiscovery()
   json += "}";
   publishDiscoveryMessage("button", "everblu_meter_freq_scan", json);
 
+  json = "{\n";
+  json += "  \"name\": \"Wide Frequency Scan\",\n";
+  json += "  \"uniq_id\": \"" + getMeterPrefix() + "everblu_meter_wide_freq_scan\",\n";
+  json += "  \"obj_id\": \"" + getMeterPrefix() + "everblu_meter_wide_freq_scan\",\n";
+  json += "  \"ic\": \"mdi:radar\",\n";
+  json += "  \"qos\": 0,\n";
+  json += "  \"avty_t\": \"" + String(mqttBaseTopic) + "/status\",\n";
+  json += "  \"cmd_t\": \"" + String(mqttBaseTopic) + "/wide_frequency_scan\",\n";
+  json += "  \"pl_prs\": \"scan\",\n";
+  json += "  \"ent_cat\": \"config\",\n";
+  json += "  \"dev\": {\n    " + buildDeviceJson() + "\n  }\n";
+  json += "}";
+  publishDiscoveryMessage("button", "everblu_meter_wide_freq_scan", json);
+
   // Binary sensor for active reading
   json = "{\n";
   json += "  \"name\": \"Active Reading\",\n";
@@ -1490,6 +1504,22 @@ void onConnectionEstablished()
 
     Serial.println("Frequency scan command received via MQTT");
     performFrequencyScan(); });
+
+  char wideFreqScanTopic[MQTT_TOPIC_BUFFER_SIZE];
+  snprintf(wideFreqScanTopic, sizeof(wideFreqScanTopic), "%s/wide_frequency_scan", mqttBaseTopic);
+  mqtt.subscribe(wideFreqScanTopic, [](const String &message)
+                 {
+    // Input validation: only accept "scan" command
+    if (message != "scan") {
+      Serial.printf("[WARN] Invalid wide frequency scan command '%s' (expected 'scan')\n", message.c_str());
+      char topicBuffer[MQTT_TOPIC_BUFFER_SIZE];
+      snprintf(topicBuffer, sizeof(topicBuffer), "%s/status_message", mqttBaseTopic);
+      mqtt.publish(topicBuffer, "Invalid scan command", true);
+      return;
+    }
+
+    Serial.println("Wide frequency scan command received via MQTT");
+    performWideInitialScan(); });
 
   // Publish Home Assistant discovery only when enabled in compile-time config.
 #if ENABLE_HA_DISCOVERY

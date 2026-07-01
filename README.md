@@ -625,7 +625,7 @@ Both MQTT and ESPHome modes expose a **history sensor** containing 12 months of 
    - **Keep the device connected to your computer during this process.** The serial monitor will display debug output as the device scans frequencies in the 433 MHz range.
    - **Important**: During the initial scan (first boot with no stored frequency offset), the device performs a wide frequency scan that takes approximately 2 minutes **before** connecting to MQTT. You will see no MQTT/Home Assistant activity during this time - this is normal. Monitor the serial output to see the scan progress. Once the scan completes and the optimal frequency is found, the device will connect to MQTT and publish telemetry data.
    - Once the correct frequency is identified, update the `FREQUENCY` value in `private.h` if needed (the automatic scan stores the offset, so manual adjustment is usually not required).
-   - To re-run the wide scan later, either set `CLEAR_EEPROM_ON_BOOT` to `1` for a single boot cycle or re-enable `AUTO_SCAN_ENABLED`.
+   - To re-run the wide scan later, either set `CLEAR_EEPROM_ON_BOOT` to `1` for a single boot cycle, re-enable `AUTO_SCAN_ENABLED`, or press the **Wide Frequency Scan** button (`mdi:radar`) exposed in Home Assistant to trigger it on demand. A narrower **Scan Frequency** button (`mdi:magnify-scan`) is also available for a quick ±30 kHz recalibration.
    - For best results, perform this step during local business hours when the meter is most likely to transmit. Refer to the "Frequency Adjustment" section below for additional guidance.
 
 5. **Build and Upload**
