@@ -17,5 +17,15 @@
 	"C_Cpp.default.compileCommands": "${workspaceFolder}/compile_commands.json",
 
 	// Optional: suppress noisy error squiggles in editor
-	"C_Cpp.errorSquiggles": "disabled"
+	"C_Cpp.errorSquiggles": "disabled",
+
+	// Use the C/C++ extension (clang-format) to format C/C++ files instead of
+	// Prettier, which does not support C++. Prettier stays the default for the
+	// languages it actually handles (JSON, Markdown, YAML, etc.).
+	"[c]": {
+		"editor.defaultFormatter": "ms-vscode.cpptools"
+	},
+	"[cpp]": {
+		"editor.defaultFormatter": "ms-vscode.cpptools"
+	}
 }

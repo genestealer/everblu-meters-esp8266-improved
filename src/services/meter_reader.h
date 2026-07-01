@@ -194,6 +194,7 @@ private:
     int m_retryCount;
     unsigned long m_lastFailedAttempt;
     unsigned long m_nextRetryTime;
+    bool m_autoScanAfterFailureDone; // Guards the failure-recovery frequency scan to once per failure streak
 
     // Statistics
     unsigned long m_totalReadAttempts;
