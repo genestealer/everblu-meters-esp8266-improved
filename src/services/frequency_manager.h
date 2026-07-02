@@ -160,25 +160,26 @@ public:
     static float loadFrequencyOffset();
 
     /**
-     * @brief Perform narrow-range frequency scan
+     * @brief Perform a Fast frequency scan
      *
-     * Scans ±30 kHz around current frequency in 5 kHz steps to find optimal signal.
-     * Updates stored offset if better frequency is found.
-     * Recommended for periodic recalibration.
+     * Scans ±150 kHz around the base frequency in coarse 10 kHz steps to quickly
+     * locate the meter's signal. Updates stored offset if a better frequency is found.
+     * Covers the same width as the Deep scan but with larger steps for speed.
      *
      * @param statusCallback Optional callback for status updates (can be nullptr)
      */
-    static void performFrequencyScan(void (*statusCallback)(const char *state, const char *message) = nullptr);
+    static void performFastFrequencyScan(void (*statusCallback)(const char *state, const char *message) = nullptr);
 
     /**
-     * @brief Perform wide-range initial frequency scan
+     * @brief Perform a Deep frequency scan
      *
-     * Comprehensive scan over ±100 kHz in 10 kHz steps, followed by fine scan.
-     * Used on first boot when no offset is saved. Takes 1-2 minutes.
+     * Scans the same ±150 kHz width as the Fast scan but in fine 2.5 kHz steps for a
+     * thorough sweep. Slower, but more likely to lock onto a weak/off-frequency meter.
+     * Also used on first boot when no offset is saved.
      *
      * @param statusCallback Optional callback for status updates (can be nullptr)
      */
-    static void performWideInitialScan(void (*statusCallback)(const char *state, const char *message) = nullptr);
+    static void performDeepFrequencyScan(void (*statusCallback)(const char *state, const char *message) = nullptr);
 
     /**
      * @brief Adaptive frequency tracking using FREQEST

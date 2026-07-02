@@ -153,9 +153,9 @@
 // After one successful boot, set back to 0 to retain the stored frequency.
 #define CLEAR_EEPROM_ON_BOOT 0
 
-// Enable wide frequency scan when no stored offset exists
+// Enable Deep frequency scan when no stored offset exists
 //
-// 1 (default): Perform ~2 minute scan before MQTT connection
+// 1 (default): Perform a Deep scan before MQTT connection
 // 0:           Skip scan even if no offset is stored
 //
 // To re-run the scan, set CLEAR_EEPROM_ON_BOOT to 1 or re-enable this.

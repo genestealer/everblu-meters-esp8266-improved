@@ -90,10 +90,10 @@ everblu_meter:
     # Frequency calibration is a property of the shared CC1101 radio, not the meter.
     # Declare these buttons/sensors on ONE meter only (here, the first). They are
     # global: any meter's reads/scans update this single set of entities.
-    frequency_scan_button:
-      name: "Radio Scan Frequency"
-    wide_frequency_scan_button:
-      name: "Radio Wide Frequency Scan"
+    fast_scan_button:
+      name: "Radio Fast Frequency Scan"
+    deep_scan_button:
+      name: "Radio Deep Frequency Scan"
     reset_frequency_button:
       name: "Radio Reset Frequency Offset"
 

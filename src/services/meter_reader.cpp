@@ -438,19 +438,19 @@ void MeterReader::resetRetryState()
     m_nextRetryTime = 0;
 }
 
-void MeterReader::performFrequencyScan(bool wideRange)
+void MeterReader::performFrequencyScan(bool deep)
 {
     activateCallbackContext();
 
-    LOG_I("everblu_meter", "Starting %s frequency scan...", wideRange ? "wide" : "narrow");
+    LOG_I("everblu_meter", "Starting %s frequency scan...", deep ? "Deep" : "Fast");
 
-    if (wideRange)
+    if (deep)
     {
-        FrequencyManager::performWideInitialScan();
+        FrequencyManager::performDeepFrequencyScan();
     }
     else
     {
-        FrequencyManager::performFrequencyScan();
+        FrequencyManager::performFastFrequencyScan();
     }
 
     LOG_I("everblu_meter", "Frequency scan complete");
