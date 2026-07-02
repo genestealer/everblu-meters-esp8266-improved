@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 Releases are created manually by tagging commits with version tags matching `v*.*.*` (e.g., `v2.1.0`). Users should build from source and configure `private.h` with their own meter settings.
 
+## [v3.0.2] - 2026-07-02
+
+### Added
+
+- **Auto frequency scan on failure (optional).** After `MAX_RETRIES` is reached and the device enters cooldown, run a narrow frequency scan once per failure streak to recover from carrier-frequency drift (`AUTO_SCAN_ON_FAILURE_ENABLED` / `auto_scan_on_failure`).
+
 ## [v3.0.1] - 2026-06-26
 
 Non-breaking hardening follow-up to the v3.0.0 GDO2 changes. The default and both opt-out paths are unchanged; correctly-wired setups behave identically to v3.0.0.

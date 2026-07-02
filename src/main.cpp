@@ -129,6 +129,14 @@ static const unsigned long OFFLINE_LED_BLINK_MS = 500UL;
 #define AUTO_SCAN_ENABLED 1
 #endif
 
+// Control whether the firmware automatically runs a frequency scan after a full
+// streak of failed reads (when entering the cooldown period). This helps users
+// who never trigger a manual scan recover from meter carrier-frequency drift.
+// 1 = enabled (default), 0 = disabled
+#ifndef AUTO_SCAN_ON_FAILURE_ENABLED
+#define AUTO_SCAN_ON_FAILURE_ENABLED 1
+#endif
+
 // Resolved reading time (UTC) which may be updated dynamically after a successful read
 // Resolved reading time:
 // - UTC fields: scheduled time in UTC
@@ -168,7 +176,8 @@ bool cc1101RadioConnected = false; // Tracks whether the radio is detected and i
 #define FREQ_OFFSET_ADDR 0
 #define FREQ_OFFSET_MAGIC 0xABCD // Magic number to verify valid data
 float storedFrequencyOffset = 0.0;
-bool autoScanEnabled = (AUTO_SCAN_ENABLED != 0); // Enable automatic scan on first boot if no offset found
+bool autoScanEnabled = (AUTO_SCAN_ENABLED != 0);                     // Enable automatic scan on first boot if no offset found
+bool autoScanOnFailureEnabled = (AUTO_SCAN_ON_FAILURE_ENABLED != 0); // Enable automatic scan after max retries reached
 int successfulReadsBeforeAdapt = 0;              // Track successful reads for adaptive tuning
 float cumulativeFreqError = 0.0;                 // Accumulate FREQEST readings for adaptive adjustment
 
@@ -309,6 +318,7 @@ int _retry = 0;
 const int max_retries = MAX_RETRIES;          // Maximum number of retry attempts (configurable in private.h)
 unsigned long lastFailedAttempt = 0;          // Timestamp of last failed attempt
 const unsigned long RETRY_COOLDOWN = 3600000; // 1 hour cooldown in milliseconds
+bool g_autoScanAfterFailureDone = false;      // Guards the failure-recovery frequency scan to once per failure streak
 
 // Global variable to store the reading schedule (default from private.h)
 const char *readingSchedule = DEFAULT_READING_SCHEDULE;
@@ -611,6 +621,19 @@ void onUpdateData()
       mqtt.publish(String(mqttBaseTopic) + "/total_attempts", buffer, true);
       digitalWrite(LED_BUILTIN, HIGH); // Turn off LED
       _retry = 0;                      // Reset retry counter for next scheduled attempt
+
+      // When the meter cannot be reached after all retries, a drifted carrier
+      // frequency (crystal offset) is a common cause. Automatically run a
+      // frequency scan once per failure streak so users who never trigger a
+      // manual scan still get recalibrated. The guard is reset on the next
+      // successful read so we don't burn power scanning on every cooldown when
+      // the meter is genuinely unreachable (e.g. dead battery).
+      if (autoScanOnFailureEnabled && !g_autoScanAfterFailureDone)
+      {
+        g_autoScanAfterFailureDone = true;
+        Serial.println("[FREQ] Max retries reached - running automatic frequency scan to check for meter offset drift... (disable by setting AUTO_SCAN_ON_FAILURE_ENABLED 0 in private.h)");
+        performFrequencyScan();
+      }
     }
     Serial.println("========================================");
     Serial.println("        METER READ - FAILED");
@@ -880,6 +903,7 @@ skip_history_publish:;
   // Reset retry counter and cooldown on successful read
   _retry = 0;
   lastFailedAttempt = 0;
+  g_autoScanAfterFailureDone = false; // Allow a fresh auto-scan on the next failure streak
   successfulReads++;
   lastErrorMessage = "None";
 
@@ -1671,6 +1695,12 @@ void performFrequencyScan()
 
     // Try to get meter data (with short timeout)
     struct tmeter_data test_data = get_meter_data();
+
+    // Per-step progress so it is visible that every frequency was actually
+    // tried. Without this the scan looks like it "did not run" because a
+    // no-signal sweep produces no other output.
+    Serial.printf("[FREQ] Freq %.6f MHz: RSSI=%d dBm, reads=%d\n",
+                  freq, test_data.rssi_dbm, test_data.reads_counter);
 
     if (test_data.rssi_dbm > bestRSSI && test_data.reads_counter > 0)
     {

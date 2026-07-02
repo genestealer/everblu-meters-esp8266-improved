@@ -1920,7 +1920,7 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
   {
     echo_debug(1, "[METER] No data frame received within the timeout window - the meter did not respond.\n");
     echo_debug(1, "[METER] This usually means the meter is asleep (outside its daily listening window), out of range, the signal is too weak, or the configured Year/Serial is incorrect.\n");
-    echo_debug(1, "[METER] If this persists, try improving antenna placement or running a frequency scan to recalibrate the radio (see AUTO_SCAN_ENABLED / CLEAR_EEPROM_ON_BOOT).\n");
+    echo_debug(1, "[METER] If this persists, try improving antenna placement or running a frequency scan to recalibrate the radio. A scan runs automatically after repeated failures unless disabled (AUTO_SCAN_ON_FAILURE_ENABLED / auto_scan_on_failure); for a full re-scan see AUTO_SCAN_ENABLED / CLEAR_EEPROM_ON_BOOT.\n");
     echo_debug(debug_out, "[METER] Meter data frame timeout\n");
   }
   sdata.rssi = halRfReadReg(RSSI_ADDR);                              // Read RSSI value from CC1101
