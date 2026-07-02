@@ -161,6 +161,18 @@
 // To re-run the scan, set CLEAR_EEPROM_ON_BOOT to 1 or re-enable this.
 #define AUTO_SCAN_ENABLED 0
 
+// Enable automatic frequency scan after repeated read failures
+//
+// When a full streak of read attempts fails (MAX_RETRIES reached) and the
+// firmware enters its cooldown period, automatically run a frequency scan to
+// check for meter carrier-frequency (crystal) drift. This helps users who
+// never trigger a manual scan recover from offset drift. Runs at most once per
+// failure streak (reset after the next successful read).
+//
+// 1 (default): Auto-scan once when entering cooldown after max retries
+// 0:           Never auto-scan on failure (manual scan only)
+#define AUTO_SCAN_ON_FAILURE_ENABLED 1
+
 // CC1101 GDO0 (data-ready) pin assignment
 // ESP8266 (D1 mini / HUZZAH): GPIO5 (D1)
 // ESP32 DevKit: GPIO4 or GPIO27

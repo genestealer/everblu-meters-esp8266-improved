@@ -49,7 +49,7 @@ static void logReadableSummary(const tmeter_data &data, const IConfigProvider *c
 }
 
 MeterReader::MeterReader(IConfigProvider *config, ITimeProvider *timeProvider, IDataPublisher *publisher)
-    : m_config(config), m_timeProvider(timeProvider), m_publisher(publisher), m_initialized(false), m_readingInProgress(false), m_isScheduledRead(false), m_haConnected(false), m_radioConnected(false), m_retryCount(0), m_lastFailedAttempt(0), m_nextRetryTime(0), m_totalReadAttempts(0), m_successfulReads(0), m_failedReads(0), m_lastErrorMessage("None"), m_lastScheduleCheck(0), m_lastStatsPublish(0), m_readHourLocal(10), m_readMinuteLocal(0), m_lastReadDayMatch(false), m_lastReadTimeMatch(false)
+    : m_config(config), m_timeProvider(timeProvider), m_publisher(publisher), m_initialized(false), m_readingInProgress(false), m_isScheduledRead(false), m_haConnected(false), m_radioConnected(false), m_retryCount(0), m_lastFailedAttempt(0), m_nextRetryTime(0), m_autoScanAfterFailureDone(false), m_totalReadAttempts(0), m_successfulReads(0), m_failedReads(0), m_lastErrorMessage("None"), m_lastScheduleCheck(0), m_lastStatsPublish(0), m_readHourLocal(10), m_readMinuteLocal(0), m_lastReadDayMatch(false), m_lastReadTimeMatch(false)
 {
 }
 
@@ -347,6 +347,9 @@ void MeterReader::handleSuccessfulRead(const tmeter_data &data)
     // Reset retry state
     resetRetryState();
 
+    // Allow a fresh failure-recovery frequency scan on the next failure streak
+    m_autoScanAfterFailureDone = false;
+
     // Update statistics
     m_successfulReads++;
     m_lastErrorMessage = "None";
@@ -429,6 +432,20 @@ void MeterReader::handleFailedRead()
 
         unsigned long cooldownSec = m_config->getRetryCooldownMs() / 1000;
         LOG_W("everblu_meter", "Entering cooldown period (%lu seconds)", cooldownSec);
+
+        // When the meter cannot be reached after all retries, a drifted carrier
+        // frequency (crystal offset) is a common cause. Automatically run a
+        // frequency scan once per failure streak so users who never trigger a
+        // manual scan still get recalibrated. The guard is reset on the next
+        // successful read so we don't burn power scanning on every cooldown
+        // when the meter is genuinely unreachable (e.g. dead battery).
+        if (m_config->isAutoScanOnFailureEnabled() && !m_autoScanAfterFailureDone)
+        {
+            m_autoScanAfterFailureDone = true;
+            LOG_W("everblu_meter", "Running automatic frequency scan to check for meter offset drift... (disable with auto_scan_on_failure / AUTO_SCAN_ON_FAILURE_ENABLED)");
+            m_publisher->publishStatusMessage("Auto frequency scan after failed reads");
+            performFrequencyScan(false);
+        }
     }
 }
 

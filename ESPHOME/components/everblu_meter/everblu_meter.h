@@ -88,6 +88,7 @@ class EverbluMeterComponent final : public PollingComponent,
   void set_gas_volume_divisor(int divisor) { this->gas_volume_divisor_ = divisor; }
   void set_frequency(float freq) { this->frequency_ = freq; }
   void set_auto_scan(bool enabled) { this->auto_scan_ = enabled; }
+  void set_auto_scan_on_failure(bool enabled) { this->auto_scan_on_failure_ = enabled; }
   void set_reading_schedule(const std::string &schedule) { this->reading_schedule_ = schedule; }
   void set_read_hour(int hour) { this->read_hour_ = hour; }
   void set_read_minute(int minute) { this->read_minute_ = minute; }
@@ -149,6 +150,7 @@ class EverbluMeterComponent final : public PollingComponent,
   int gas_volume_divisor_{100};
   float frequency_{433.82f};
   bool auto_scan_{true};
+  bool auto_scan_on_failure_{true};
   std::string reading_schedule_{"Monday-Friday"};
   int read_hour_{10};
   int read_minute_{0};

@@ -37,6 +37,7 @@ public:
     // RF configuration
     virtual float getFrequency() const = 0;
     virtual bool isAutoScanEnabled() const = 0;
+    virtual bool isAutoScanOnFailureEnabled() const = 0;
 
     // Scheduling configuration
     virtual const char *getReadingSchedule() const = 0;

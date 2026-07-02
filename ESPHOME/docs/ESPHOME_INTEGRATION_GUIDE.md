@@ -168,6 +168,7 @@ everblu_meter:
 | ----------- | ----- | -------- | ---------------------------------------- |
 | `frequency` | float | `433.82` | RF frequency in MHz (433.0-434.8)        |
 | `auto_scan` | bool  | `true`   | Automatically scan for optimal frequency |
+| `auto_scan_on_failure` | bool | `true` | Automatically run a frequency scan (once) when reads keep failing and the component enters cooldown, to recover from carrier-frequency (crystal) drift |
 
 #### Schedule Configuration
 

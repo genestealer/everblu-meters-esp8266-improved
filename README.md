@@ -191,6 +191,7 @@ See the Hardware section below for full wiring tables and pictures.
   - `METER_TYPE` - set to `"water"` (default) or `"gas"` depending on your meter type
   - `GDO2` - **required by default (v3.0.0+)**: GPIO connected to CC1101 GDO2 (hardware FIFO management). To opt out and use legacy SPI polling, define `DISABLE_GDO2_FIFO_MANAGEMENT` instead. The firmware will not compile until you do one or the other.
   - `MAX_RETRIES` - maximum reading retry attempts before cooldown (optional, default is 5)
+  - `AUTO_SCAN_ON_FAILURE_ENABLED` - set to `1` (default) to automatically run a frequency scan once after `MAX_RETRIES` is reached (recovers from carrier-frequency drift unattended); set to `0` to disable
   - `ADAPTIVE_THRESHOLD` - how many successful reads before adjusting frequency (optional, default is 1 = adjust after each read)
   - `WIFI_SERIAL_MONITOR_ENABLED` - set to `1` to enable WiFi serial monitor for remote debugging (default is `0` for security)
 - `platformio.ini`: select `env:huzzah` (ESP8266 HUZZAH) or `env:esp32dev` (ESP32 DevKit).
@@ -626,6 +627,7 @@ Both MQTT and ESPHome modes expose a **history sensor** containing 12 months of 
    - **Important**: During the initial scan (first boot with no stored frequency offset), the device performs a wide frequency scan that takes approximately 2 minutes **before** connecting to MQTT. You will see no MQTT/Home Assistant activity during this time - this is normal. Monitor the serial output to see the scan progress. Once the scan completes and the optimal frequency is found, the device will connect to MQTT and publish telemetry data.
    - Once the correct frequency is identified, update the `FREQUENCY` value in `private.h` if needed (the automatic scan stores the offset, so manual adjustment is usually not required).
    - To re-run the wide scan later, either set `CLEAR_EEPROM_ON_BOOT` to `1` for a single boot cycle, re-enable `AUTO_SCAN_ENABLED`, or press the **Wide Frequency Scan** button (`mdi:radar`) exposed in Home Assistant to trigger a full ±100 kHz sweep on demand. A narrower **Scan Frequency** button (`mdi:magnify-scan`) is also available for a quick ±30 kHz recalibration.
+   - **Automatic recovery on failure**: Separately from the first-boot scan, when a full streak of read attempts fails (`MAX_RETRIES` reached) and the firmware enters its cooldown period, it automatically runs a frequency scan once to check for meter carrier-frequency (crystal) drift. This is controlled by `AUTO_SCAN_ON_FAILURE_ENABLED` (default `1`) and helps users who never trigger a manual scan recover unattended. It runs at most once per failure streak (reset after the next successful read). Set `#define AUTO_SCAN_ON_FAILURE_ENABLED 0` in `include/private.h` to disable it.
    - For best results, perform this step during local business hours when the meter is most likely to transmit. Refer to the "Frequency Adjustment" section below for additional guidance.
 
 5. **Build and Upload**
