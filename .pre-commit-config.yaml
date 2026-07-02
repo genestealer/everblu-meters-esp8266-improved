@@ -10,7 +10,7 @@ ci:
   autoupdate_schedule: monthly
   skip:
     - markdownlint-cli2  # lint-only; does not block PRs
-    
+
 exclude: |
   (?x)^(
     ESPHOME-release/.*|
