@@ -631,7 +631,7 @@ void onUpdateData()
       {
         g_autoScanAfterFailureDone = true;
         Serial.println("[FREQ] Max retries reached - running automatic frequency scan to check for meter offset drift... (disable by setting AUTO_SCAN_ON_FAILURE_ENABLED 0 in private.h)");
-        performFrequencyScan();
+        performDeepFrequencyScan();
       }
     }
     Serial.println("========================================");
