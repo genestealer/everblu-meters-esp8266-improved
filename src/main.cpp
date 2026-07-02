@@ -572,7 +572,7 @@ void onUpdateData()
   // Get current UTC time
   time_t tnow = time(nullptr);
   struct tm *ptm = gmtime(&tnow);
-  Serial.printf("[TIME] Current date (UTC): %04d/%02d/%02d %02d:%02d:%02d - %ld\n", ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, (long)tnow);
+  Serial.printf("\n[TIME] Current date (UTC): %04d/%02d/%02d %02d:%02d:%02d - %ld\n", ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, (long)tnow);
 
   char iso8601[128];
   strftime(iso8601, sizeof iso8601, "%FT%TZ", gmtime(&tnow));
