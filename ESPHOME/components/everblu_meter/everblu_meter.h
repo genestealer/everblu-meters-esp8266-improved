@@ -115,6 +115,7 @@ class EverbluMeterComponent final : public PollingComponent,
   void set_total_attempts_sensor(sensor::Sensor *sensor) { this->total_attempts_sensor_ = sensor; }
   void set_successful_reads_sensor(sensor::Sensor *sensor) { this->successful_reads_sensor_ = sensor; }
   void set_failed_reads_sensor(sensor::Sensor *sensor) { this->failed_reads_sensor_ = sensor; }
+  void set_gdo2_timeouts_sensor(sensor::Sensor *sensor) { this->gdo2_timeouts_sensor_ = sensor; }
   void set_frequency_offset_sensor(sensor::Sensor *sensor) { this->frequency_offset_sensor_ = sensor; }
   void set_tuned_frequency_sensor(sensor::Sensor *sensor) { this->tuned_frequency_sensor_ = sensor; }
   void set_frequency_estimate_sensor(sensor::Sensor *sensor) { this->frequency_estimate_sensor_ = sensor; }
@@ -184,6 +185,8 @@ class EverbluMeterComponent final : public PollingComponent,
   sensor::Sensor *total_attempts_sensor_{nullptr};
   sensor::Sensor *successful_reads_sensor_{nullptr};
   sensor::Sensor *failed_reads_sensor_{nullptr};
+  sensor::Sensor *gdo2_timeouts_sensor_{nullptr};
+  uint32_t last_gdo2_timeouts_published_{0xFFFFFFFFu};  // sentinel: force first publish
   sensor::Sensor *frequency_offset_sensor_{nullptr};
   sensor::Sensor *tuned_frequency_sensor_{nullptr};
   sensor::Sensor *frequency_estimate_sensor_{nullptr};

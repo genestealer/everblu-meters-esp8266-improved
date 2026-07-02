@@ -17,6 +17,26 @@ namespace everblu_meter {
 
 static const char *const TAG = "everblu_meter";
 
+// ESPHome's documented guidance is that a component's loop() should block for at
+// most ~30 ms (https://developers.esphome.io/architecture/components/); the
+// runtime "took a long time" warning in recent releases fires at ~2550 ms.
+//
+// A CC1101 meter interrogation is an INHERENTLY ATOMIC ~3.3 s RF transaction that
+// cannot be split into sub-budget loop() slices on this single-threaded MCU
+// (investigated in issue #93):
+//   - The mandatory ~2 s wake-up burst must continuously refill the 64-byte TX
+//     FIFO (drains in ~186 ms), so loop() cannot return mid-burst.
+//   - The meter answers ONCE in a fixed, non-retransmitted window immediately
+//     after TX (ACK ~45 ms later); yielding before RX would miss the reply.
+//   - The RX FIFO is 64 bytes and fills in ~53 ms at the oversampled rate, so it
+//     must be drained continuously - it cannot buffer across a yield.
+// The shared radio code in src/core/cc1101.cpp feeds the watchdog and yield()s
+// throughout, so WiFi/API/OTA keep being serviced and no watchdog reset occurs;
+// the only artifacts are a benign loop-time warning and a brief API stall during
+// the infrequent, scheduled read. This threshold is therefore kept only as a
+// low-noise DEBUG diagnostic that surfaces the (expected, bounded) block duration.
+static const uint32_t LOOP_BLOCK_WARN_MS = 30;
+
 void EverbluMeterTriggerButton::press_action() {
   if (this->parent_ == nullptr) {
     ESP_LOGW(TAG, "Trigger button pressed but parent not set");
@@ -273,7 +293,30 @@ void EverbluMeterComponent::loop() {
       this->meter_reader_->triggerReading(false);
     }
 
+    // Measure how long the radio read path blocks the ESPHome main loop. An active
+    // CC1101 interrogation exceeds LOOP_BLOCK_WARN_MS by a wide margin (multi-second),
+    // but lighter periodic work (schedule checks, stats publishing) can also cross it;
+    // the call feeds the watchdog and yields internally, so this is a diagnostic
+    // measurement rather than a hard fault (issue #93).
+    uint32_t loop_start = millis();
     this->meter_reader_->loop();
+    uint32_t loop_elapsed = millis() - loop_start;
+    if (loop_elapsed > LOOP_BLOCK_WARN_MS) {
+      ESP_LOGD(TAG,
+               "meter_reader loop blocked for %lu ms (ESPHome budget %lu ms); multi-second blocks are normal during an "
+               "active RF read",
+               (unsigned long) loop_elapsed, (unsigned long) LOOP_BLOCK_WARN_MS);
+    }
+  }
+
+  // Publish the GDO2 stuck-timeout diagnostic only when it changes. A rising value
+  // indicates a miswired / disconnected GDO2 rather than an RF/meter problem.
+  if (this->gdo2_timeouts_sensor_ != nullptr) {
+    uint32_t timeouts = cc1101_get_gdo2_timeout_count();
+    if (timeouts != this->last_gdo2_timeouts_published_) {
+      this->last_gdo2_timeouts_published_ = timeouts;
+      this->gdo2_timeouts_sensor_->publish_state(static_cast<float>(timeouts));
+    }
   }
 }
 

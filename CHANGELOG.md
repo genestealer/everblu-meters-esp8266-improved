@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 Releases are created manually by tagging commits with version tags matching `v*.*.*` (e.g., `v2.1.0`). Users should build from source and configure `private.h` with their own meter settings.
 
+## [v3.0.1] - 2026-06-26
+
+Non-breaking hardening follow-up to the v3.0.0 GDO2 changes. The default and both opt-out paths are unchanged; correctly-wired setups behave identically to v3.0.0.
+
+### Fixed
+
+- **TX FIFO overflow guard (GDO2 path).** The wake-up FIFO feed loop in `get_meter_data_for_meter()` now verifies real TX free space via `TXBYTES` before writing in GDO2 mode, matching the safety the SPI-polling fallback already had. A miswired / stuck-LOW GDO2 can no longer drive the 64-byte TX FIFO into overflow.
+
+### Added
+
+- **Stuck-GDO2 diagnostics.** When the TX interrogation-frame gate waits the full safety window with GDO2 still HIGH, the driver now logs an explicit "GDO2 still HIGH - check wiring" warning and increments a lifetime counter (`cc1101_get_gdo2_timeout_count()`), so a wiring fault is no longer silently misread as "meter asleep / out of range".
+- **Boot-time GDO2 wiring self-test.** `cc1101_init()` performs a one-time check that GDO2 reads LOW with an empty TX FIFO and HIGH once the FIFO is filled past the threshold. A failed toggle logs a warning and bumps the same diagnostic counter, so a miswired GDO2 is flagged at boot instead of only after the first failed read.
+- **ESPHome `gdo2_timeouts` diagnostic sensor** (optional) exposing that counter to Home Assistant.
+
+### Changed
+
+- **GDO2 input now uses a pull-up** (matching GDO0), so a disconnected/miswired GDO2 reads HIGH and fails loudly via the stuck-HIGH path instead of floating. ESP8266 has internal pull-ups on every GPIO except GPIO16.
+- **ESPHome config validation** now rejects setting both `gdo2_pin:` and `disable_gdo2_fifo_management: true` (previously the opt-out was silently ignored when a pin was also present).
+
 ## [v3.0.0] - 2026-06-24
 
 > **⚠️ BREAKING CHANGE** - CC1101 GDO2 hardware-assisted FIFO threshold management is now the **default** mechanism for talking to the radio on **both** the standalone (MQTT) and ESPHome targets. You must wire CC1101 GDO2 to a free GPIO and configure it, **or** explicitly opt out. Existing setups that did not wire GDO2 require migration (see below).

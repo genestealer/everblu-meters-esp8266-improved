@@ -1,8 +1,16 @@
 # Git external_components smoke test.
 # Validates the component is consumable via the public GitHub URL (end-user path).
-# Targets 'main' branch intentionally - this test is skipped on pull requests
-# (see workflow: if condition) and only runs on push to main/master/develop.
-# Running it on PRs would compile whatever is on main, not the proposed changes.
+#
+# Branch-aware: 'ref' defaults to main but the CI workflow overrides it with the
+# branch being pushed. Note that -s/--substitution is a GLOBAL ESPHome option, so
+# it must precede the subcommand:
+#   esphome -s git_ref "$GITHUB_REF_NAME" config <file>
+# Placed after the subcommand the override is silently ignored. A push to develop
+# therefore validates develop's published ESPHOME-release - not main.
+#
+# NOTE: this fetches over GitHub, so it tests the LAST PUSHED commit of the
+# branch (ESPHOME-release must be regenerated + committed). It is skipped on
+# pull requests; the local twin (test.esp8266-git-local.yaml) covers PRs.
 
 esphome:
   name: ci-esp8266-git
@@ -24,35 +32,16 @@ wifi:
   ssid: CI-WIFI
   password: CI-PASSWORD
 
-time:
-  - platform: sntp
-    id: ci_time
-
-spi:
-  id: ci_spi
-  clk_pin: GPIO14
-  miso_pin: GPIO12
-  mosi_pin: GPIO13
+substitutions:
+  git_ref: main
 
 external_components:
   - source:
       type: git
       url: https://github.com/genestealer/everblu-meters-esp8266-improved
-      ref: main
+      ref: ${git_ref}
       path: ESPHOME-release
     components: [ everblu_meter ]
     refresh: 0s
 
-everblu_meter:
-  spi_id: ci_spi
-  cs_pin: GPIO15
-  meter_code: "22-8765432-100"
-  meter_type: water
-  gdo0_pin: 4
-  time_id: ci_time
-
-  volume:
-    name: "CI Volume"
-
-  status:
-    name: "CI Status"
+<<: !include common-git-source.yaml
