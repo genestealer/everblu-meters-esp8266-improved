@@ -132,9 +132,9 @@ static const unsigned long OFFLINE_LED_BLINK_MS = 500UL;
 // Control whether the firmware automatically runs a frequency scan after a full
 // streak of failed reads (when entering the cooldown period). This helps users
 // who never trigger a manual scan recover from meter carrier-frequency drift.
-// 1 = enabled (default), 0 = disabled
+// 0 = disabled (default), 1 = enabled
 #ifndef AUTO_SCAN_ON_FAILURE_ENABLED
-#define AUTO_SCAN_ON_FAILURE_ENABLED 1
+#define AUTO_SCAN_ON_FAILURE_ENABLED 0
 #endif
 
 // Resolved reading time (UTC) which may be updated dynamically after a successful read

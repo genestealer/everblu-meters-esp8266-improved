@@ -169,9 +169,9 @@
 // never trigger a manual scan recover from offset drift. Runs at most once per
 // failure streak (reset after the next successful read).
 //
-// 1 (default): Auto-scan once when entering cooldown after max retries
-// 0:           Never auto-scan on failure (manual scan only)
-#define AUTO_SCAN_ON_FAILURE_ENABLED 1
+// 0 (default): Never auto-scan on failure (manual scan only)
+// 1:           Auto-scan once when entering cooldown after max retries
+#define AUTO_SCAN_ON_FAILURE_ENABLED 0
 
 // CC1101 GDO0 (data-ready) pin assignment
 // ESP8266 (D1 mini / HUZZAH): GPIO5 (D1)

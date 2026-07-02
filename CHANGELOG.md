@@ -10,6 +10,10 @@ Releases are created manually by tagging commits with version tags matching `v*.
 
 - **Auto frequency scan on failure (optional).** After `MAX_RETRIES` is reached and the device enters cooldown, run a narrow frequency scan once per failure streak to recover from carrier-frequency drift (`AUTO_SCAN_ON_FAILURE_ENABLED` / `auto_scan_on_failure`).
 
+### Changed
+
+- **`AUTO_SCAN_ON_FAILURE_ENABLED` default changed to `0` (off).** The automatic frequency scan after repeated read failures is now opt-in. Previously the scan ran silently on every failure streak, which could cause unexpected Wi-Fi/MQTT disruption (scans block 1–2 minutes). Set `#define AUTO_SCAN_ON_FAILURE_ENABLED 1` in `private.h` to restore the previous behaviour.
+
 ## [v3.0.1] - 2026-06-26
 
 Non-breaking hardening follow-up to the v3.0.0 GDO2 changes. The default and both opt-out paths are unchanged; correctly-wired setups behave identically to v3.0.0.
