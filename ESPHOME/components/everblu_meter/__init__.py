@@ -100,8 +100,8 @@ CONF_FREQUENCY_OFFSET = "frequency_offset"
 CONF_TUNED_FREQUENCY = "tuned_frequency"
 CONF_FREQUENCY_ESTIMATE = "frequency_estimate"
 CONF_REQUEST_READING_BUTTON = "request_reading_button"
-CONF_FREQUENCY_SCAN_BUTTON = "frequency_scan_button"
-CONF_WIDE_FREQUENCY_SCAN_BUTTON = "wide_frequency_scan_button"
+CONF_FAST_SCAN_BUTTON = "fast_scan_button"
+CONF_DEEP_SCAN_BUTTON = "deep_scan_button"
 CONF_RESET_FREQUENCY_BUTTON = "reset_frequency_button"
 
 # Meter types
@@ -358,12 +358,12 @@ CONFIG_SCHEMA = (
             cv.Optional(CONF_REQUEST_READING_BUTTON): button.button_schema(
                 EverbluMeterTriggerButton
             ),
-            cv.Optional(CONF_FREQUENCY_SCAN_BUTTON): button.button_schema(
+            cv.Optional(CONF_FAST_SCAN_BUTTON): button.button_schema(
                 EverbluMeterTriggerButton,
                 icon="mdi:magnify-scan",
                 entity_category="config",
             ),
-            cv.Optional(CONF_WIDE_FREQUENCY_SCAN_BUTTON): button.button_schema(
+            cv.Optional(CONF_DEEP_SCAN_BUTTON): button.button_schema(
                 EverbluMeterTriggerButton,
                 icon="mdi:radar",
                 entity_category="config",
@@ -620,27 +620,27 @@ async def to_code(config):
     if CONF_REQUEST_READING_BUTTON in config:
         btn = await button.new_button(config[CONF_REQUEST_READING_BUTTON])
         cg.add(btn.set_parent(var))
-        cg.add(btn.set_frequency_scan(False))
-        cg.add(btn.set_wide_frequency_scan(False))
+        cg.add(btn.set_fast_scan(False))
+        cg.add(btn.set_deep_scan(False))
         cg.add(btn.set_reset_frequency(False))
 
-    if CONF_FREQUENCY_SCAN_BUTTON in config:
-        btn = await button.new_button(config[CONF_FREQUENCY_SCAN_BUTTON])
+    if CONF_FAST_SCAN_BUTTON in config:
+        btn = await button.new_button(config[CONF_FAST_SCAN_BUTTON])
         cg.add(btn.set_parent(var))
-        cg.add(btn.set_frequency_scan(True))
-        cg.add(btn.set_wide_frequency_scan(False))
+        cg.add(btn.set_fast_scan(True))
+        cg.add(btn.set_deep_scan(False))
         cg.add(btn.set_reset_frequency(False))
 
-    if CONF_WIDE_FREQUENCY_SCAN_BUTTON in config:
-        btn = await button.new_button(config[CONF_WIDE_FREQUENCY_SCAN_BUTTON])
+    if CONF_DEEP_SCAN_BUTTON in config:
+        btn = await button.new_button(config[CONF_DEEP_SCAN_BUTTON])
         cg.add(btn.set_parent(var))
-        cg.add(btn.set_frequency_scan(False))
-        cg.add(btn.set_wide_frequency_scan(True))
+        cg.add(btn.set_fast_scan(False))
+        cg.add(btn.set_deep_scan(True))
         cg.add(btn.set_reset_frequency(False))
 
     if CONF_RESET_FREQUENCY_BUTTON in config:
         btn = await button.new_button(config[CONF_RESET_FREQUENCY_BUTTON])
         cg.add(btn.set_parent(var))
-        cg.add(btn.set_frequency_scan(False))
-        cg.add(btn.set_wide_frequency_scan(False))
+        cg.add(btn.set_fast_scan(False))
+        cg.add(btn.set_deep_scan(False))
         cg.add(btn.set_reset_frequency(True))

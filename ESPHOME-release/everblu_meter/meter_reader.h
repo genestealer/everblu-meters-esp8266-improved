@@ -94,9 +94,9 @@ public:
 
     /**
      * @brief Perform frequency scan
-     * @param wideRange true for wide scan, false for narrow
+     * @param deep true for a Deep scan (fine steps), false for a Fast scan (coarse steps)
      */
-    void performFrequencyScan(bool wideRange);
+    void performFrequencyScan(bool deep);
 
     /**
      * @brief Reset frequency offset to 0

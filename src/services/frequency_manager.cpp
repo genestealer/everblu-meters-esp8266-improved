@@ -94,7 +94,7 @@ float FrequencyManager::begin(float baseFrequency)
     {
         LOG_W("everblu_meter",
               "No frequency calibration stored - using default 0.000 kHz "
-              "(run a Wide Frequency Scan to calibrate the radio)");
+              "(run a Deep Frequency Scan to calibrate the radio)");
     }
 
     LOG_I("everblu_meter", "Initialized: base=%.6f MHz, offset=%.6f MHz",
@@ -143,9 +143,9 @@ float FrequencyManager::loadFrequencyOffset()
     return offset;
 }
 
-void FrequencyManager::performFrequencyScan(void (*statusCallback)(const char *, const char *))
+void FrequencyManager::performFastFrequencyScan(void (*statusCallback)(const char *, const char *))
 {
-    LOG_I("everblu_meter", "Starting frequency scan...");
+    LOG_I("everblu_meter", "Starting Fast frequency scan...");
     LOG_I("everblu_meter", "[NOTE] Wi-Fi/MQTT connections may temporarily drop and reconnect. This is expected.");
 
     // Suppress the verbose per-attempt radio/meter read logging for the whole
@@ -158,18 +158,22 @@ void FrequencyManager::performFrequencyScan(void (*statusCallback)(const char *,
 
     if (statusCallback)
     {
-        statusCallback("Frequency Scanning", "Performing frequency scan");
+        statusCallback("Frequency Scanning", "Performing Fast frequency scan");
     }
 
     float bestFreq = s_baseFrequency;
     int bestRSSI = -120; // Start with very low RSSI
 
-    // Scan range: ±30 kHz in 5 kHz steps (±0.03 MHz in 0.005 MHz steps)
-    float scanStart = s_baseFrequency - 0.03;
-    float scanEnd = s_baseFrequency + 0.03;
-    float scanStep = 0.005;
+    // Fast scan: ±150 kHz around the base frequency in coarse 10 kHz steps.
+    // Same width as the Deep scan, but larger steps for speed.
+    float scanStart = s_baseFrequency - 0.15;
+    float scanEnd = s_baseFrequency + 0.15;
+    float scanStep = 0.010;
 
-    LOG_I("everblu_meter", "Scanning from %.6f to %.6f MHz (step: %.6f MHz)", scanStart, scanEnd, scanStep);
+    int fastStepCount = (int)roundf((scanEnd - scanStart) / scanStep) + 1;
+    int fastEstSecs = fastStepCount * 3; // ~3 s per step (full radio TX+RX cycle)
+    LOG_I("everblu_meter", "Scanning from %.6f to %.6f MHz (%d steps, ~%d s / ~%d min)",
+          scanStart, scanEnd, fastStepCount, fastEstSecs, (fastEstSecs + 30) / 60);
 
     for (float freq = scanStart; freq <= scanEnd; freq += scanStep)
     {
@@ -192,20 +196,18 @@ void FrequencyManager::performFrequencyScan(void (*statusCallback)(const char *,
         }
     }
 
-    // Calculate and save the offset
-    float offset = bestFreq - s_baseFrequency;
-    LOG_I("everblu_meter", "Frequency scan complete. Best frequency: %.6f MHz (offset: %.6f MHz, RSSI: %d dBm)",
-          bestFreq, offset, bestRSSI);
-
     if (bestRSSI > -120)
     {
         // Found a signal - save offset
+        float offset = bestFreq - s_baseFrequency;
+        LOG_I("everblu_meter", "Fast scan complete. Best frequency: %.6f MHz (offset: %.6f MHz, RSSI: %d dBm)",
+              bestFreq, offset, bestRSSI);
         saveFrequencyOffset(offset);
 
         if (statusCallback)
         {
             char msg[128];
-            snprintf(msg, sizeof(msg), "Scan complete: offset %.3f kHz, RSSI %d dBm", offset * 1000.0, bestRSSI);
+            snprintf(msg, sizeof(msg), "Fast scan complete: offset %.3f kHz, RSSI %d dBm", offset * 1000.0, bestRSSI);
             statusCallback("Idle", msg);
         }
 
@@ -220,11 +222,11 @@ void FrequencyManager::performFrequencyScan(void (*statusCallback)(const char *,
     }
     else
     {
-        Serial.println("[FREQ] Frequency scan failed - no valid signal found");
+        LOG_I("everblu_meter", "Fast scan complete - no meter signal found in scan range");
 
         if (statusCallback)
         {
-            statusCallback("Idle", "Frequency scan failed - no signal");
+            statusCallback("Idle", "Fast scan complete - no signal found");
         }
 
         // Restore original frequency with stabilization delay
@@ -235,9 +237,9 @@ void FrequencyManager::performFrequencyScan(void (*statusCallback)(const char *,
     }
 }
 
-void FrequencyManager::performWideInitialScan(void (*statusCallback)(const char *, const char *))
+void FrequencyManager::performDeepFrequencyScan(void (*statusCallback)(const char *, const char *))
 {
-    Serial.println("[FREQ] Performing wide initial scan (first boot - no saved offset)...");
+    Serial.println("[FREQ] Performing Deep frequency scan...");
 
     // Suppress the verbose per-attempt radio/meter read logging for the whole
     // scan. Each frequency step performs a full read sequence whose detailed
@@ -249,19 +251,23 @@ void FrequencyManager::performWideInitialScan(void (*statusCallback)(const char 
 
     if (statusCallback)
     {
-        statusCallback("Initial Frequency Scan", "First boot: scanning for meter frequency");
+        statusCallback("Frequency Scanning", "Performing Deep frequency scan");
     }
 
     float bestFreq = s_baseFrequency;
     int bestRSSI = -120;
 
-    // Wide scan: ±100 kHz in 10 kHz steps for faster initial discovery
-    float scanStart = s_baseFrequency - 0.10;
-    float scanEnd = s_baseFrequency + 0.10;
-    float scanStep = 0.010;
+    // Deep scan: same ±150 kHz width as the Fast scan, but fine 2.5 kHz steps
+    // for a thorough sweep. Slower, but more likely to lock onto a weak or
+    // off-frequency meter.
+    float scanStart = s_baseFrequency - 0.15;
+    float scanEnd = s_baseFrequency + 0.15;
+    float scanStep = 0.0025;
 
-    LOG_I("everblu_meter", "Wide scan from %.6f to %.6f MHz (step: %.6f MHz)", scanStart, scanEnd, scanStep);
-    LOG_I("everblu_meter", "This may take 1-2 minutes on first boot...");
+    int deepStepCount = (int)roundf((scanEnd - scanStart) / scanStep) + 1;
+    int deepEstSecs = deepStepCount * 3; // ~3 s per step (full radio TX+RX cycle)
+    LOG_I("everblu_meter", "Deep scan from %.6f to %.6f MHz (%d steps, ~%d s / ~%d min)",
+          scanStart, scanEnd, deepStepCount, deepEstSecs, (deepEstSecs + 30) / 60);
 
     for (float freq = scanStart; freq <= scanEnd; freq += scanStep)
     {
@@ -270,7 +276,7 @@ void FrequencyManager::performWideInitialScan(void (*statusCallback)(const char 
         // Check if radio initialization succeeds
         if (!s_radioInitCallback(freq))
         {
-            LOG_E("everblu_meter", "Radio not responding - skipping wide initial scan");
+            LOG_E("everblu_meter", "Radio not responding - aborting Deep scan");
             LOG_E("everblu_meter", "Check: 1) Wiring connections 2) 3.3V power supply 3) SPI pins");
 
             if (statusCallback)
@@ -281,7 +287,7 @@ void FrequencyManager::performWideInitialScan(void (*statusCallback)(const char 
             return; // Exit scan
         }
 
-        delay(100); // Longer delay for frequency to settle during wide scan
+        delay(100); // Longer delay for frequency to settle during Deep scan
 
         struct tmeter_data test_data = s_meterReadCallback();
 
@@ -295,41 +301,8 @@ void FrequencyManager::performWideInitialScan(void (*statusCallback)(const char 
 
     if (bestRSSI > -120)
     {
-        // Found a signal - perform fine scan around it
-        LOG_I("everblu_meter", "Performing fine scan around %.6f MHz...", bestFreq);
-        float fineStart = bestFreq - 0.015;
-        float fineEnd = bestFreq + 0.015;
-        float fineStep = 0.003;
-        int fineBestRSSI = bestRSSI;
-        float fineBestFreq = bestFreq;
-
-        for (float freq = fineStart; freq <= fineEnd; freq += fineStep)
-        {
-            feedWatchdog();
-
-            if (!s_radioInitCallback(freq))
-            {
-                LOG_E("everblu_meter", "Radio not responding during fine scan - aborting");
-                break;
-            }
-
-            delay(50);
-
-            struct tmeter_data test_data = s_meterReadCallback();
-
-            if (test_data.rssi_dbm > fineBestRSSI && test_data.reads_counter > 0)
-            {
-                fineBestRSSI = test_data.rssi_dbm;
-                fineBestFreq = freq;
-                LOG_I("everblu_meter", "Refined signal at %.6f MHz: RSSI=%d dBm", freq, test_data.rssi_dbm);
-            }
-        }
-
-        bestFreq = fineBestFreq;
-        bestRSSI = fineBestRSSI;
-
         float offset = bestFreq - s_baseFrequency;
-        LOG_I("everblu_meter", "Initial scan complete! Best frequency: %.6f MHz (offset: %.6f MHz, RSSI: %d dBm)",
+        LOG_I("everblu_meter", "Deep scan complete! Best frequency: %.6f MHz (offset: %.6f MHz, RSSI: %d dBm)",
               bestFreq, offset, bestRSSI);
 
         saveFrequencyOffset(offset);
@@ -337,7 +310,7 @@ void FrequencyManager::performWideInitialScan(void (*statusCallback)(const char 
         if (statusCallback)
         {
             char msg[128];
-            snprintf(msg, sizeof(msg), "Initial scan complete: offset %.3f kHz", offset * 1000.0);
+            snprintf(msg, sizeof(msg), "Deep scan complete: offset %.3f kHz", offset * 1000.0);
             statusCallback("Idle", msg);
         }
 
@@ -349,7 +322,7 @@ void FrequencyManager::performWideInitialScan(void (*statusCallback)(const char 
     }
     else
     {
-        Serial.println("[FREQ] Wide scan failed - no meter signal found!");
+        Serial.println("[FREQ] Deep scan failed - no meter signal found!");
         Serial.println("[FREQ] Please check:");
         Serial.println("[FREQ]  1. Meter is within range (< 50m typically)");
         Serial.println("[FREQ]  2. Antenna is connected to CC1101");
@@ -358,7 +331,7 @@ void FrequencyManager::performWideInitialScan(void (*statusCallback)(const char 
 
         if (statusCallback)
         {
-            statusCallback("Idle", "Initial scan failed - check setup");
+            statusCallback("Idle", "Deep scan failed - check setup");
         }
 
         s_radioInitCallback(s_baseFrequency);
