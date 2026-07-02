@@ -1789,6 +1789,7 @@ void performFastFrequencyScan()
 void performDeepFrequencyScan()
 {
   Serial.println("[FREQ] Performing Deep frequency scan...");
+  Serial.println("[FREQ] [NOTE] Wi-Fi/MQTT connections may temporarily drop and reconnect while the scan is running. This is expected.");
 
   // Suppress the verbose per-attempt radio/meter read logging for the whole
   // scan. Each frequency step performs a full read sequence whose detailed
