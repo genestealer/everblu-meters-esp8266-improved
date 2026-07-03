@@ -39,12 +39,12 @@ bool FrequencyManager::validateCallbacks()
 {
     if (!s_radioInitCallback)
     {
-        Serial.println("[ERROR] Radio init callback not set. Call setRadioInitCallback() first!");
+        TS_PRINTLN("[ERROR] Radio init callback not set. Call setRadioInitCallback() first!");
         return false;
     }
     if (!s_meterReadCallback)
     {
-        Serial.println("[ERROR] Meter read callback not set. Call setMeterReadCallback() first!");
+        TS_PRINTLN("[ERROR] Meter read callback not set. Call setMeterReadCallback() first!");
         return false;
     }
     return true;
@@ -54,13 +54,13 @@ bool FrequencyManager::validateCallbacks()
 void FrequencyManager::setRadioInitCallback(RadioInitCallback callback)
 {
     s_radioInitCallback = callback;
-    Serial.println("[FREQ] FrequencyManager: Radio init callback registered");
+    TS_PRINTLN("[FREQ] FrequencyManager: Radio init callback registered");
 }
 
 void FrequencyManager::setMeterReadCallback(MeterReadCallback callback)
 {
     s_meterReadCallback = callback;
-    Serial.println("[FREQ] FrequencyManager: Meter read callback registered");
+    TS_PRINTLN("[FREQ] FrequencyManager: Meter read callback registered");
 }
 
 float FrequencyManager::begin(float baseFrequency)
@@ -70,7 +70,7 @@ float FrequencyManager::begin(float baseFrequency)
     // Validate callbacks are set
     if (!validateCallbacks())
     {
-        Serial.println("[ERROR] FrequencyManager::begin() failed - callbacks not configured!");
+        TS_PRINTLN("[ERROR] FrequencyManager::begin() failed - callbacks not configured!");
         return 0.0;
     }
 
@@ -145,7 +145,7 @@ float FrequencyManager::loadFrequencyOffset()
 
 void FrequencyManager::performDeepFrequencyScan(float scanRangeMHz, float scanStepMHz, void (*statusCallback)(const char *, const char *))
 {
-    Serial.println("[FREQ] Performing Deep frequency scan...");
+    TS_PRINTLN("[FREQ] Performing Deep frequency scan...");
 
     // Suppress the verbose per-attempt radio/meter read logging for the whole
     // scan. Each frequency step performs a full read sequence whose detailed
@@ -283,12 +283,12 @@ void FrequencyManager::performDeepFrequencyScan(float scanRangeMHz, float scanSt
     }
     else
     {
-        Serial.println("[FREQ] Deep scan failed - no meter signal found!");
-        Serial.println("[FREQ] Please check:");
-        Serial.println("[FREQ]  1. Meter is within range (< 50m typically)");
-        Serial.println("[FREQ]  2. Antenna is connected to CC1101");
-        Serial.println("[FREQ]  3. Meter serial/year are correct");
-        Serial.println("[FREQ]  4. Current time is within meter's wake hours");
+        TS_PRINTLN("[FREQ] Deep scan failed - no meter signal found!");
+        TS_PRINTLN("[FREQ] Please check:");
+        TS_PRINTLN("[FREQ]  1. Meter is within range (< 50m typically)");
+        TS_PRINTLN("[FREQ]  2. Antenna is connected to CC1101");
+        TS_PRINTLN("[FREQ]  3. Meter serial/year are correct");
+        TS_PRINTLN("[FREQ]  4. Current time is within meter's wake hours");
         if (statusCallback) statusCallback("Idle", "Deep scan failed - check setup");
         s_radioInitCallback(s_baseFrequency);
     }

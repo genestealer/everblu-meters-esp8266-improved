@@ -211,12 +211,14 @@ void echo_debug(bool l_flag, const char *fmt, ...)
 	// the VS Code terminal / PlatformIO monitor is easier to scan. The RESET is
 	// emitted before any trailing newline to avoid colouring blank line breaks.
 	const char *col = everblu_log_color_for_prefix(buf);
+	const char *ts = everblu_log_timestamp();
 	if (col[0] != '\0')
 	{
 		size_t len = strlen(buf);
 		bool hasNewline = (len > 0 && buf[len - 1] == '\n');
 		if (hasNewline)
 			buf[len - 1] = '\0';
+		WiFiSerial.print(ts);
 		WiFiSerial.print(col);
 		WiFiSerial.print(buf);
 		WiFiSerial.print(EVB_ANSI_RESET);
@@ -225,6 +227,7 @@ void echo_debug(bool l_flag, const char *fmt, ...)
 	}
 	else
 	{
+		WiFiSerial.print(ts);
 		WiFiSerial.print(buf);
 	}
 #endif

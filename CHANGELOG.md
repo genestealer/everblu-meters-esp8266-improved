@@ -8,6 +8,7 @@ Releases are created manually by tagging commits with version tags matching `v*.
 
 ### Added
 
+- **Timestamps in MQTT serial log output**: all tagged `[TAG] message` log lines in the standalone (MQTT) firmware now carry a `[HH:MM:SS]` UTC timestamp prefix matching the ESPHome log format. Timestamps are emitted from the moment the firmware starts (showing `[00:00:00]` until NTP syncs, then real UTC wall-clock time). Affects `[STATUS]`, `[MQTT]`, `[TIME]`, `[FREQ]`, `[WIFI]`, `[OTA]`, `[HISTORY]`, `[ERROR]`, `[WARN]`, `[SCHEDULE]`, and all other tagged lines. Plain banner/separator lines (`===...`, `METER READ - START`, etc.) are intentionally left without timestamps.
 - **`tuned_frequency` and `frequency_estimate` MQTT sensors**: the standalone (MQTT) build now publishes Home Assistant discovery messages for `Tuned Frequency (MHz)` (unit `MHz`, topic `tuned_frequency`) and `Frequency Estimate` (unit `kHz`, topic `frequency_estimate`), matching the three frequency-calibration sensors already present in the ESPHome component.
 - **`scripts/capture-mqtt-log.ps1`**: convenience script that builds, uploads, and captures a timestamped serial monitor log to `temp/mqtt_<date>.log`.
 

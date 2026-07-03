@@ -142,7 +142,7 @@ bool ScheduleManager::autoAlignToMeterWindow(int meterTimeStartHour, int meterTi
 
     if (window == 0)
     {
-        Serial.println("[SCHEDULE] [WARN] Cannot auto-align: meter window is invalid (0 hours)");
+        TS_PRINTLN("[SCHEDULE] [WARN] Cannot auto-align: meter window is invalid (0 hours)");
         return false;
     }
 

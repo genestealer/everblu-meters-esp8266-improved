@@ -81,7 +81,9 @@
 //
 // Disable at build time with -D EVERBLU_LOG_COLOR=0 (for example when piping
 // logs to a file or to the fixture-extraction script).
+#include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 #ifndef EVERBLU_LOG_COLOR
 #define EVERBLU_LOG_COLOR 1
@@ -148,9 +150,27 @@ inline const char *everblu_log_color_for_prefix(const char *msg)
 	return "";
 }
 
-#define LOG_D(tag, format, ...) Serial.printf(EVB_ANSI_GRAY "[D][%s]" EVB_ANSI_RESET " " format "\n", tag, ##__VA_ARGS__)
-#define LOG_I(tag, format, ...) Serial.printf(EVB_ANSI_GREEN "[I]" EVB_ANSI_RESET "[%s] " format "\n", tag, ##__VA_ARGS__)
-#define LOG_W(tag, format, ...) Serial.printf(EVB_ANSI_YELLOW "[W][%s] " format EVB_ANSI_RESET "\n", tag, ##__VA_ARGS__)
-#define LOG_E(tag, format, ...) Serial.printf(EVB_ANSI_RED "[E][%s] " format EVB_ANSI_RESET "\n", tag, ##__VA_ARGS__)
-#define LOG_V(tag, format, ...) Serial.printf(EVB_ANSI_GRAY "[V][%s] " format EVB_ANSI_RESET "\n", tag, ##__VA_ARGS__)
+// Returns a formatted UTC timestamp string "[HH:MM:SS]" for serial log lines.
+// Uses a static buffer (safe on single-threaded ESP8266/ESP32).
+// Before NTP sync, time() returns 0 so the output is "[00:00:00]".
+inline const char *everblu_log_timestamp()
+{
+	static char buf[12]; // "[HH:MM:SS]\0"
+	time_t now = time(nullptr);
+	struct tm *t = gmtime(&now);
+	snprintf(buf, sizeof(buf), "[%02d:%02d:%02d]", t->tm_hour, t->tm_min, t->tm_sec);
+	return buf;
+}
+
+// Timestamped Serial output helpers for tagged log lines (MQTT mode only).
+// Use TS_PRINTLN / TS_PRINTF in place of direct Serial.println / Serial.printf
+// for lines that carry a [TAG] prefix, so the output matches ESPHome log style.
+#define TS_PRINTLN(msg) do { Serial.print(everblu_log_timestamp()); Serial.println(msg); } while (0)
+#define TS_PRINTF(fmt, ...) do { Serial.print(everblu_log_timestamp()); Serial.printf(fmt, ##__VA_ARGS__); } while (0)
+
+#define LOG_D(tag, format, ...) Serial.printf("%s" EVB_ANSI_GRAY "[D][%s]" EVB_ANSI_RESET " " format "\n", everblu_log_timestamp(), tag, ##__VA_ARGS__)
+#define LOG_I(tag, format, ...) Serial.printf("%s" EVB_ANSI_GREEN "[I]" EVB_ANSI_RESET "[%s] " format "\n", everblu_log_timestamp(), tag, ##__VA_ARGS__)
+#define LOG_W(tag, format, ...) Serial.printf("%s" EVB_ANSI_YELLOW "[W][%s] " format EVB_ANSI_RESET "\n", everblu_log_timestamp(), tag, ##__VA_ARGS__)
+#define LOG_E(tag, format, ...) Serial.printf("%s" EVB_ANSI_RED "[E][%s] " format EVB_ANSI_RESET "\n", everblu_log_timestamp(), tag, ##__VA_ARGS__)
+#define LOG_V(tag, format, ...) Serial.printf("%s" EVB_ANSI_GRAY "[V][%s] " format EVB_ANSI_RESET "\n", everblu_log_timestamp(), tag, ##__VA_ARGS__)
 #endif
