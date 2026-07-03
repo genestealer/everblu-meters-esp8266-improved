@@ -160,21 +160,10 @@ public:
     static float loadFrequencyOffset();
 
     /**
-     * @brief Perform a Fast frequency scan
-     *
-     * Scans ±150 kHz around the base frequency in coarse 10 kHz steps to quickly
-     * locate the meter's signal. Updates stored offset if a better frequency is found.
-     * Covers the same width as the Deep scan but with larger steps for speed.
-     *
-     * @param statusCallback Optional callback for status updates (can be nullptr)
-     */
-    static void performFastFrequencyScan(void (*statusCallback)(const char *state, const char *message) = nullptr);
-
-    /**
      * @brief Perform a Deep frequency scan
      *
-     * Scans the same ±150 kHz width as the Fast scan but in fine 2.5 kHz steps for a
-     * thorough sweep. Slower, but more likely to lock onto a weak/off-frequency meter.
+     * Scans +-150 kHz (default) around the base frequency in fine 2.5 kHz steps for a
+     * thorough sweep. Maps the response window then zooms to the exact carrier centre.
      * Also used on first boot when no offset is saved.
      *
      * @param scanRangeMHz Half-width of scan in MHz. Default 0.150 (±150 kHz full sweep).

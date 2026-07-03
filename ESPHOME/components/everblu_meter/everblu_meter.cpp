@@ -45,8 +45,6 @@ void EverbluMeterTriggerButton::press_action() {
 
   if (this->is_deep_scan_) {
     this->parent_->request_deep_scan();
-  } else if (this->is_fast_scan_) {
-    this->parent_->request_fast_scan();
   } else if (this->is_reset_frequency_) {
     this->parent_->request_reset_frequency();
   } else {
@@ -332,17 +330,6 @@ void EverbluMeterComponent::request_manual_read() {
   this->meter_reader_->triggerReading(false);
 }
 
-void EverbluMeterComponent::request_fast_scan() {
-  if (this->meter_reader_ == nullptr) {
-    ESP_LOGW(TAG, "Fast scan ignored: meter reader not ready");
-    return;
-  }
-
-  ESP_LOGI(TAG, "Fast scan requested via button");
-  this->apply_radio_context();
-  this->meter_reader_->performFrequencyScan(false);
-}
-
 void EverbluMeterComponent::request_deep_scan() {
   if (this->meter_reader_ == nullptr) {
     ESP_LOGW(TAG, "Deep scan ignored: meter reader not ready");
@@ -351,7 +338,7 @@ void EverbluMeterComponent::request_deep_scan() {
 
   ESP_LOGI(TAG, "Deep scan requested via button");
   this->apply_radio_context();
-  this->meter_reader_->performFrequencyScan(true);
+  this->meter_reader_->performFrequencyScan();
 }
 
 void EverbluMeterComponent::request_reset_frequency() {

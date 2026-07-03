@@ -219,20 +219,10 @@ void saveFrequencyOffset(float offset);
 float loadFrequencyOffset();
 
 /**
- * @brief Perform a Fast frequency scan
- *
- * Scans ±150 kHz around the base frequency in coarse 10 kHz steps to quickly
- * locate the meter's signal. Same width as the Deep scan, but larger steps for speed.
- *
- * Updates global frequency offset if better frequency is found.
- */
-void performFastFrequencyScan();
-
-/**
  * @brief Perform a Deep frequency scan
  *
- * Scans the same ±150 kHz width as the Fast scan but in fine 2.5 kHz steps for a
- * thorough sweep. Slower, but more likely to lock onto a weak/off-frequency meter.
+ * Scans +-150 kHz (default) around the configured frequency in fine 2.5 kHz steps,
+ * mapping the response window then zooming to the exact carrier centre.
  * Also used on first boot when no stored offset exists.
  *
  * Saves discovered offset to persistent storage on success.
@@ -1297,20 +1287,6 @@ void publishHADiscovery()
   publishDiscoveryMessage("button", "everblu_meter_restart", json);
 
   json = "{\n";
-  json += "  \"name\": \"Fast Frequency Scan\",\n";
-  json += "  \"uniq_id\": \"" + getMeterPrefix() + "everblu_meter_fast_scan\",\n";
-  json += "  \"obj_id\": \"" + getMeterPrefix() + "everblu_meter_fast_scan\",\n";
-  json += "  \"ic\": \"mdi:magnify-scan\",\n";
-  json += "  \"qos\": 0,\n";
-  json += "  \"avty_t\": \"" + String(mqttBaseTopic) + "/status\",\n";
-  json += "  \"cmd_t\": \"" + String(mqttBaseTopic) + "/fast_scan\",\n";
-  json += "  \"pl_prs\": \"scan\",\n";
-  json += "  \"ent_cat\": \"config\",\n";
-  json += "  \"dev\": {\n    " + buildDeviceJson() + "\n  }\n";
-  json += "}";
-  publishDiscoveryMessage("button", "everblu_meter_fast_scan", json);
-
-  json = "{\n";
   json += "  \"name\": \"Deep Frequency Scan\",\n";
   json += "  \"uniq_id\": \"" + getMeterPrefix() + "everblu_meter_deep_scan\",\n";
   json += "  \"obj_id\": \"" + getMeterPrefix() + "everblu_meter_deep_scan\",\n";
@@ -1514,22 +1490,6 @@ void onConnectionEstablished()
                    ESP.restart(); // Restart the ESP device
                  });
 
-  char freqScanTopic[80];
-  snprintf(freqScanTopic, sizeof(freqScanTopic), "%s/fast_scan", mqttBaseTopic);
-  mqtt.subscribe(freqScanTopic, [](const String &message)
-                 {
-    // Input validation: only accept "scan" command
-    if (message != "scan") {
-      Serial.printf("[WARN] Invalid fast scan command '%s' (expected 'scan')\n", message.c_str());
-      char topicBuffer[MQTT_TOPIC_BUFFER_SIZE];
-      snprintf(topicBuffer, sizeof(topicBuffer), "%s/status_message", mqttBaseTopic);
-      mqtt.publish(topicBuffer, "Invalid scan command", true);
-      return;
-    }
-
-    Serial.println("Fast frequency scan command received via MQTT");
-    performFastFrequencyScan(); });
-
   char wideFreqScanTopic[MQTT_TOPIC_BUFFER_SIZE];
   snprintf(wideFreqScanTopic, sizeof(wideFreqScanTopic), "%s/deep_scan", mqttBaseTopic);
   mqtt.subscribe(wideFreqScanTopic, [](const String &message)
@@ -1688,105 +1648,9 @@ float loadFrequencyOffset()
   return 0.0;
 }
 
-// Function: performFastFrequencyScan
-// Description: Scans ±150 kHz in coarse 10 kHz steps to quickly find the best signal and update the offset
-void performFastFrequencyScan()
-{
-  Serial.println("[FREQ] Starting Fast frequency scan...");
-  Serial.println("[FREQ] [NOTE] Wi-Fi/MQTT connections may temporarily drop and reconnect while the scan is running. This is expected.");
-
-  // Suppress the verbose per-attempt radio/meter read logging for the whole
-  // scan. Each frequency step performs a full read sequence whose detailed
-  // output is irrelevant noise here; high-level scan progress messages remain.
-  EchoDebugQuietGuard quietGuard;
-
-  char topicBuffer[MQTT_TOPIC_BUFFER_SIZE];
-  snprintf(topicBuffer, sizeof(topicBuffer), "%s/cc1101_state", mqttBaseTopic);
-  mqtt.publish(topicBuffer, "Frequency Scanning", true);
-  snprintf(topicBuffer, sizeof(topicBuffer), "%s/status_message", mqttBaseTopic);
-  mqtt.publish(topicBuffer, "Performing Fast frequency scan", true);
-
-  float baseFreq = FREQUENCY;
-  float bestFreq = baseFreq;
-  int bestRSSI = -120; // Start with very low RSSI
-
-  // Fast scan: ±150 kHz around the base frequency in coarse 10 kHz steps.
-  // Same width as the Deep scan, but larger steps for speed.
-  float scanStart = baseFreq - 0.15;
-  float scanEnd = baseFreq + 0.15;
-  float scanStep = 0.010;
-
-  int fastStepCount = (int)roundf((scanEnd - scanStart) / scanStep) + 1;
-  int fastEstSecs = fastStepCount * 3; // ~3 s per step (full radio TX+RX cycle)
-  Serial.printf("[FREQ] Scanning from %.6f to %.6f MHz (%d steps, ~%d s / ~%d min)\n",
-                scanStart, scanEnd, fastStepCount, fastEstSecs, (fastEstSecs + 30) / 60);
-
-  for (float freq = scanStart; freq <= scanEnd; freq += scanStep)
-  {
-    FEED_WDT(); // Feed watchdog for each frequency step
-    // Reinitialize CC1101 with this frequency
-    cc1101_init(freq);
-    delay(50); // Allow time for frequency to settle
-
-    // Try to get meter data (with short timeout)
-    struct tmeter_data test_data = get_meter_data();
-
-    // Per-step progress so it is visible that every frequency was actually
-    // tried. Without this the scan looks like it "did not run" because a
-    // no-signal sweep produces no other output.
-    Serial.printf("[FREQ] Freq %.6f MHz: RSSI=%d dBm, reads=%d\n",
-                  freq, test_data.rssi_dbm, test_data.reads_counter);
-
-    if (test_data.rssi_dbm > bestRSSI && test_data.reads_counter > 0)
-    {
-      bestRSSI = test_data.rssi_dbm;
-      bestFreq = freq;
-      Serial.printf("[FREQ] Better signal at %.6f MHz: RSSI=%d dBm\n", freq, test_data.rssi_dbm);
-    }
-
-    // Drain the WiFi serial ring buffer so remote logs stream live during the
-    // scan instead of all arriving at once after it completes. Safe here: the
-    // CC1101 RX phase for this step has already finished.
-    wifiSerialLoop();
-  }
-
-  if (bestRSSI > -120)
-  { // Only save if we found something
-    float offset = bestFreq - baseFreq;
-    Serial.printf("[FREQ] Fast scan complete. Best frequency: %.6f MHz (offset: %.6f MHz, RSSI: %d dBm)\n",
-                  bestFreq, offset, bestRSSI);
-
-    saveFrequencyOffset(offset);
-
-    char freqBuffer[16];
-    snprintf(freqBuffer, sizeof(freqBuffer), "%.3f", offset * 1000.0); // Convert MHz to kHz
-    snprintf(topicBuffer, sizeof(topicBuffer), "%s/frequency_offset", mqttBaseTopic);
-    mqtt.publish(topicBuffer, freqBuffer, true);
-
-    char statusMsg[128];
-    snprintf(statusMsg, sizeof(statusMsg), "Fast scan complete: offset %.3f kHz, RSSI %d dBm", offset * 1000.0, bestRSSI);
-    snprintf(topicBuffer, sizeof(topicBuffer), "%s/status_message", mqttBaseTopic);
-    mqtt.publish(topicBuffer, statusMsg, true);
-
-    // Reinitialize with the best frequency
-    cc1101_init(bestFreq);
-  }
-  else
-  {
-    Serial.println("[FREQ] Fast scan complete - no meter signal found in scan range");
-    snprintf(topicBuffer, sizeof(topicBuffer), "%s/status_message", mqttBaseTopic);
-    mqtt.publish(topicBuffer, "Fast scan complete - no signal found", true);
-    // Restore original frequency
-    cc1101_init(baseFreq + storedFrequencyOffset);
-  }
-
-  snprintf(topicBuffer, sizeof(topicBuffer), "%s/cc1101_state", mqttBaseTopic);
-  mqtt.publish(topicBuffer, cc1101RadioConnected ? "Idle" : "Not Connected", true);
-}
-
 // Function: performDeepFrequencyScan
 // Description: Performs a thorough sweep across ±150 kHz around the configured frequency in fine
-//              2.5 kHz steps. Same width as the Fast scan, but smaller steps for weak/off-frequency meters.
+//              2.5 kHz steps, mapping the response window then zooming to the exact carrier centre.
 //              Also used on first boot to find the meter frequency automatically.
 void performDeepFrequencyScan(float scanRangeMHz, float scanStepMHz)
 {

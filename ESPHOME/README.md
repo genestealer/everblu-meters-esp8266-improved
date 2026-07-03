@@ -596,8 +596,7 @@ EverbluMeterComponent (ESPHome)
 ### Control Buttons
 
 - **request_reading_button** - Trigger a manual reading
-- **fast_scan_button** - Trigger a Fast frequency scan (±150 kHz, coarse 10 kHz steps)
-- **deep_scan_button** - Trigger a Deep frequency scan (±150 kHz, fine 2.5 kHz steps)
+- **deep_scan_button** - Trigger a Deep frequency scan (±150 kHz, fine 2.5 kHz steps, maps the response window then zooms to the carrier centre)
 - **reset_frequency_button** - Reset the frequency offset
 
 ## Common Configuration Patterns

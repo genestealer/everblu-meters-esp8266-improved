@@ -118,8 +118,6 @@ everblu_meter:
   # --- Buttons (all of them) ---
   request_reading_button:
     name: "CI Read Now"
-  fast_scan_button:
-    name: "CI Fast Scan"
   deep_scan_button:
     name: "CI Deep Scan"
   reset_frequency_button:

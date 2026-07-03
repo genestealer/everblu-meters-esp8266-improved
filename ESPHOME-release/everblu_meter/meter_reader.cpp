@@ -458,20 +458,13 @@ void MeterReader::resetRetryState()
     m_nextRetryTime = 0;
 }
 
-void MeterReader::performFrequencyScan(bool deep)
+void MeterReader::performFrequencyScan()
 {
     activateCallbackContext();
 
-    LOG_I("everblu_meter", "Starting %s frequency scan...", deep ? "Deep" : "Fast");
+    LOG_I("everblu_meter", "Starting frequency scan...");
 
-    if (deep)
-    {
-        FrequencyManager::performDeepFrequencyScan();
-    }
-    else
-    {
-        FrequencyManager::performFastFrequencyScan();
-    }
+    FrequencyManager::performDeepFrequencyScan();
 
     LOG_I("everblu_meter", "Frequency scan complete");
 

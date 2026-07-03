@@ -129,7 +129,16 @@ static const uint8_t debug_out = (uint8_t)(DEBUG_CC1101);
 #define FSCTRL1_FREQ_IF 0x08 // Intermediate frequency
 
 // MDMCFG4 - Modem Configuration
-#define MDMCFG4_RX_BW_58KHZ 0xF6         // RX filter bandwidth = 58 kHz, 2.4 kbps
+// RX filter bandwidth = Fxosc / (8 * (4 + CHANBW_M) * 2^CHANBW_E).
+// 0x66: CHANBW_E=1, CHANBW_M=2, DRATE_E=6 -> BW = 26000/(8*6*2) = 270.8 kHz.
+// The wide 270 kHz filter lets the CC1101's own frequency-offset compensation
+// (see FOCCFG, +-BW/4 = +-67.7 kHz) absorb even a badly out-of-spec reference
+// crystal (~150 ppm) so the radio locks at the nominal 433.82 MHz carrier
+// without any software frequency scanning. The RADIAN signal itself is only
+// ~15 kHz wide (2.4 kbps, 5.157 kHz deviation), so the extra bandwidth costs
+// ~6.7 dB of noise floor - negligible against the typical >20 dB link margin.
+#define MDMCFG4_RX_BW_270KHZ 0x66        // RX filter bandwidth = 270 kHz, 2.4 kbps
+#define MDMCFG4_RX_BW_58KHZ 0xF6         // RX filter bandwidth = 58 kHz, 2.4 kbps (legacy narrow)
 #define MDMCFG4_RX_BW_58KHZ_9_6KBPS 0xF8 // RX filter bandwidth = 58 kHz, 9.6 kbps (4x oversampling)
 
 // MDMCFG3 - Modem Configuration (Data Rate)
@@ -156,7 +165,11 @@ static const uint8_t debug_out = (uint8_t)(DEBUG_CC1101);
 #define MCSM0_FS_AUTOCAL_IDLE_TO_RXTX 0x18 // Auto-calibrate from IDLE to RX/TX
 
 // FOCCFG - Frequency Offset Compensation
-#define FOCCFG_FOC_4K_2K 0x1D // FOC enabled, 4K before sync, K/2 after sync
+// 0x1E: FOC enabled, 4K before sync, K/2 after sync, FOC_LIMIT = +-BW/4.
+// With the 270 kHz RX bandwidth this gives +-67.7 kHz of automatic carrier
+// offset correction (~+-156 ppm at 433 MHz), enough to lock onto the meter at
+// the nominal frequency even with a significantly off-spec reference crystal.
+#define FOCCFG_FOC_4K_2K 0x1E // FOC enabled, 4K before sync, K/2 after sync, FOC_LIMIT = +-BW/4
 
 // BSCFG - Bit Synchronization Configuration
 #define BSCFG_BS_PRE_KI_2 0x1C // Bit sync configuration
@@ -589,7 +602,7 @@ void cc1101_configureRF_0(float freq)
 
   setMHZ(freq); // Configure frequency using helper function
 
-  halRfWriteReg(MDMCFG4, MDMCFG4_RX_BW_58KHZ);         // RX bandwidth: 58 kHz
+  halRfWriteReg(MDMCFG4, MDMCFG4_RX_BW_270KHZ);        // RX bandwidth: 270 kHz
   halRfWriteReg(MDMCFG3, MDMCFG3_DRATE_2_4KBPS);       // Data rate: 2.4 kbps
   halRfWriteReg(MDMCFG2, MDMCFG2_2FSK_16_16_SYNC);     // 2-FSK, 16/16 sync bits
   halRfWriteReg(MDMCFG1, MDMCFG1_NUM_PREAMBLE_2);      // Preamble: 2 bytes

@@ -140,7 +140,13 @@
 // ============================================================================
 
 // Optional: manually set meter centre frequency (MHz)
-// Defaults to 433.82 MHz if not defined
+// Defaults to 433.82 MHz if not defined.
+//
+// Most users should leave this at the default. The CC1101 RX bandwidth is 270 kHz
+// with ±67.7 kHz of automatic frequency-offset compensation, so the radio locks
+// onto the meter at the nominal 433.82 MHz carrier even with a significantly
+// off-spec reference crystal - no frequency scan is normally required. Only set
+// this (or run a Deep scan) if reads consistently fail due to extreme drift.
 // #define FREQUENCY                 433.820000
 
 // Optional: clear EEPROM on next boot to force frequency rediscovery

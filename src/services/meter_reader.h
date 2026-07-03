@@ -93,10 +93,9 @@ public:
     void triggerReading(bool isScheduled);
 
     /**
-     * @brief Perform frequency scan
-     * @param deep true for a Deep scan (fine steps), false for a Fast scan (coarse steps)
+     * @brief Perform a Deep frequency scan (window-map + zoom) to recalibrate the carrier offset
      */
-    void performFrequencyScan(bool deep);
+    void performFrequencyScan();
 
     /**
      * @brief Reset frequency offset to 0

@@ -82,8 +82,6 @@ everblu_meter:
   # Control button (optional but handy)
   request_reading_button:
     name: "Read Gas Meter Now"
-  fast_scan_button:
-    name: "Fast Frequency Scan"
   deep_scan_button:
     name: "Deep Frequency Scan"
   reset_frequency_button:
