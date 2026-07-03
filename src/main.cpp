@@ -1886,7 +1886,12 @@ void performDeepFrequencyScan(float scanRangeMHz, float scanStepMHz)
     // all zoom steps miss (FREQEST adaptive tracking will then refine further).
     float zoomStart = firstHitFreq - scanStep;
     float zoomEnd   = lastHitFreq  + scanStep;
-    float zoomStep  = scanStep * 0.25f;
+    // CC1101 minimum frequency step = Fxosc / 2^16 = 26 MHz / 65536 ≈ 397 Hz.
+    // Steps finer than this round to the same register value, silently retesting
+    // the same physical frequency. Clamp to at least 1 register step.
+    const float CC1101_MIN_STEP_MHZ = 26.0f / 65536.0f / 1000.0f; // ~0.000397 MHz
+    float zoomStep = scanStep * 0.25f;
+    if (zoomStep < CC1101_MIN_STEP_MHZ) zoomStep = CC1101_MIN_STEP_MHZ;
 
     int zoomStepCount = (int)roundf((zoomEnd - zoomStart) / zoomStep) + 1;
     Serial.printf("[FREQ] Zoom pass: %.6f - %.6f MHz (%d steps, %.2f kHz each)\n",
