@@ -155,10 +155,17 @@ inline const char *everblu_log_color_for_prefix(const char *msg)
 // Before NTP sync, time() returns 0 so the output is "[00:00:00]".
 inline const char *everblu_log_timestamp()
 {
-	static char buf[12]; // "[HH:MM:SS]\0"
+	static char buf[16]; // "[boot+XXXXs]" or "[HH:MM:SS]" + null
 	time_t now = time(nullptr);
-	struct tm *t = gmtime(&now);
-	snprintf(buf, sizeof(buf), "[%02d:%02d:%02d]", t->tm_hour, t->tm_min, t->tm_sec);
+	if (now < 1577836800L) // before 2020-01-01 → not yet NTP-synced; show boot uptime
+	{
+		snprintf(buf, sizeof(buf), "[boot+%lus]", (unsigned long)now);
+	}
+	else
+	{
+		struct tm *t = gmtime(&now);
+		snprintf(buf, sizeof(buf), "[%02d:%02d:%02d]", t->tm_hour, t->tm_min, t->tm_sec);
+	}
 	return buf;
 }
 
