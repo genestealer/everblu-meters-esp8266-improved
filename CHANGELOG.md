@@ -22,6 +22,7 @@ Releases are created manually by tagging commits with version tags matching `v*.
 
 ### Fixed
 
+- **Radio-state hang in `cc1101_rec_mode()`**: the wait loop that spins until the CC1101 reports an RX MARCSTATE (`0x0D`/`0x0E`/`0x0F`) had no timeout. If the radio wedged in a stuck state (e.g. `0x11` RXFIFO_OVERFLOW) it would spin forever while feeding the watchdog — hanging the whole firmware with the activity LED on and no reboot or further logs. The loop is now bounded: on timeout it flushes the RX FIFO (`SFRX`) and re-strobes RX once to recover, and if that still fails it returns so the caller's GDO0 wait times out gracefully.
 - **`frequency_estimate` was incorrectly published to `frequency_offset`** in the MQTT `publishMeterReading()` path. The raw CC1101 `FREQEST` register value is now routed to the correct `frequency_estimate` topic (converted to kHz), and no longer overwrites the true offset value published by `publishFrequencyOffset()`.
 
 ## [v3.0.2] - 2026-07-02

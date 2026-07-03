@@ -752,13 +752,40 @@ int8_t cc1100_rssi_convert2dbm(uint8_t Rssi_dec)
 void cc1101_rec_mode(void)
 {
   uint8_t marcstate;
-  CC1101_CMD(SIDLE);                                                        // sets to idle first. must be in
-  CC1101_CMD(SRX);                                                          // writes receive strobe (receive mode)
-  marcstate = 0xFF;                                                         // set unknown/dummy state value
+  CC1101_CMD(SIDLE);       // sets to idle first. must be in
+  CC1101_CMD(SRX);         // writes receive strobe (receive mode)
+  marcstate = 0xFF;        // set unknown/dummy state value
+  // Bounded wait for the radio to reach an RX state (0x0D/0x0E/0x0F).
+  // Without a timeout a wedged radio state (e.g. 0x11 RXFIFO_OVERFLOW) would
+  // spin here forever while feeding the watchdog - hanging the whole firmware
+  // with no reboot. Cap the wait and attempt a FIFO flush + re-strobe to
+  // recover; if that still fails, return so the caller's GDO0 wait times out
+  // gracefully instead of hanging.
+  uint16_t spin = 0;
+  const uint16_t kMaxSpin = 20000; // ~50-100ms of tight SPI polling
+  bool recovered_once = false;
   while ((marcstate != 0x0D) && (marcstate != 0x0E) && (marcstate != 0x0F)) // 0x0D = RX
   {
     marcstate = halRfReadReg(MARCSTATE_ADDR); // read out state of cc1100 to be sure in RX
     FEED_WDT();                               // Avoid soft WDT while waiting for RX state
+    if (++spin >= kMaxSpin)
+    {
+      if (!recovered_once)
+      {
+        // First timeout: try to unwedge the radio (flush RX FIFO, re-strobe RX).
+        recovered_once = true;
+        spin = 0;
+        echo_debug(1, "[CC1101] WARNING: radio stuck in state 0x%02X while entering RX - flushing and retrying\n", marcstate & 0x1F);
+        CC1101_CMD(SIDLE);
+        CC1101_CMD(SFRX); // flush RX FIFO (clears RXFIFO_OVERFLOW)
+        CC1101_CMD(SRX);
+        marcstate = 0xFF;
+        continue;
+      }
+      // Second timeout: give up so the caller can fail this read gracefully.
+      echo_debug(1, "[CC1101] ERROR: radio failed to enter RX (last state 0x%02X) - aborting receive\n", marcstate & 0x1F);
+      return;
+    }
   }
 }
 
