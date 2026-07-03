@@ -8,6 +8,7 @@ Releases are created manually by tagging commits with version tags matching `v*.
 
 ### Added
 
+- **`AUTO_SCAN_ON_FAILURE_ENABLED`** (both builds, opt-in, default `0`): when `MAX_RETRIES` is reached and the firmware enters cooldown, optionally run a narrow ±20 kHz / 1 kHz Deep scan once per failure streak to recalibrate the carrier-frequency offset. Set `#define AUTO_SCAN_ON_FAILURE_ENABLED 1` in `private.h` or `auto_scan_on_failure: true` in ESPHome YAML to enable. Disabled by default to avoid unexpected Wi-Fi/MQTT disruption during the scan.
 - **`tuned_frequency` and `frequency_estimate` MQTT sensors**: the standalone (MQTT) build now publishes Home Assistant discovery messages for `Tuned Frequency (MHz)` (unit `MHz`, topic `tuned_frequency`) and `Frequency Estimate` (unit `kHz`, topic `frequency_estimate`), matching the equivalent sensors already present in the ESPHome component.
 - **`scripts/capture-mqtt-log.ps1`**: convenience script that builds, flashes, and captures a timestamped serial monitor log to `temp/mqtt_<date>.log`.
 - **`docs/FREQUENCY_CALIBRATION_SYSTEM.md`**: design reference covering the CC1101 bandwidth/FOC register changes, two-phase scan algorithm, FREQEST adaptive tracking loop, CC1101 hardware frequency-resolution boundary, and Fast-scan removal rationale.
@@ -30,16 +31,6 @@ Releases are created manually by tagging commits with version tags matching `v*.
 ### Removed
 
 - **Fast frequency scan** (both builds). It was redundant — the two-phase Deep scan does a coarse window-mapping pass followed by a fine zoom, making the old coarse-only Fast scan unnecessary. Removed: `performFastFrequencyScan()`, the `fast_scan` MQTT command and Home Assistant button, and the ESPHome `fast_scan_button` config option. Use the Deep scan (`deep_scan` MQTT topic / `deep_scan_button`) instead.
-
-## [v3.0.2] - 2026-07-02
-
-### Added
-
-- **Auto frequency scan on failure (optional).** After `MAX_RETRIES` is reached and the device enters cooldown, run a narrow frequency scan once per failure streak to recover from carrier-frequency drift (`AUTO_SCAN_ON_FAILURE_ENABLED` / `auto_scan_on_failure`).
-
-### Changed
-
-- **`AUTO_SCAN_ON_FAILURE_ENABLED` default changed to `0` (off).** The automatic frequency scan after repeated read failures is now opt-in. Previously the scan ran silently on every failure streak, which could cause unexpected Wi-Fi/MQTT disruption (scans block 1–2 minutes). Set `#define AUTO_SCAN_ON_FAILURE_ENABLED 1` in `private.h` to restore the previous behaviour.
 
 ## [v3.0.1] - 2026-06-26
 
