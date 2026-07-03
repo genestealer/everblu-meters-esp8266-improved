@@ -813,6 +813,26 @@ See `ADAPTIVE_FREQUENCY_FEATURES.md` for deeper technical notes.
 
 ## Troubleshooting
 
+### Meter reads fail — near-field RF saturation (device too close to meter)
+
+**Symptoms:**
+
+- Log shows `*** NEAR-FIELD SATURATION DETECTED (RSSI=−31 dBm) ***`
+- RSSI is very high (> −50 dBm), often a flat plateau across a wide frequency band
+- Data frames ARE received (hex dumps with the correct `7C 11 00 45 20 0A` header visible in logs)
+- Every frame fails CRC despite a strong signal
+- Running a frequency scan shows a flat −31 dBm plateau across ~40 kHz rather than a single peaked response
+
+**Cause:**
+
+The CC1101's front-end amplifier has a limited input range. When the device is placed immediately next to the meter the received signal exceeds that range, the input stage clips, and the demodulated bit stream is corrupted. This produces CRC failures even with an excellent RSSI reading. It is the **opposite** of a weak-signal problem.
+
+**Solution:**
+
+Move the device at least **1–2 m away** from the meter. At normal installation distance the RSSI should be around −60 to −85 dBm, well within the linear range. If the device must be mounted close to the meter, a firmware option to engage the CC1101 front-end attenuator (6/12/18 dB) is planned — see [issue #109](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/109).
+
+---
+
 ### Corrupted or Invalid Volume Readings
 
 **Symptoms:**

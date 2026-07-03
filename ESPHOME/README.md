@@ -90,7 +90,8 @@ This will output detailed hex dumps of the decoded frame, helping identify:
 
 ### Signal Quality Issues
 
-- **Low RSSI (<-90 dBm)**: Move ESP closer or improve antenna
+- **Low RSSI (< −90 dBm)**: Move ESP closer or improve antenna
+- **Very high RSSI (> −50 dBm) + CRC failures**: Near-field saturation — the signal is **too strong**. Move the device at least 1–2 m away from the meter. When the device is too close, the CC1101 front-end clips and every frame fails CRC even though RSSI looks excellent. The log will show `*** NEAR-FIELD SATURATION DETECTED ***` to confirm this.
 - **Enable auto_scan**: `auto_scan: true` (helps with frequency drift)
 - **Try different times**: Signal quality varies by time of day
 

@@ -1917,6 +1917,9 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
     }
 
     echo_debug(1, "[METER] Validating CRC...\n");
+    // Read RSSI now while the channel is still active so we can use it to
+    // diagnose the cause of a CRC failure (saturation vs. weak signal).
+    int8_t frame_rssi_dbm = cc1100_rssi_convert2dbm(halRfReadReg(RSSI_ADDR));
     if (validate_radian_crc(meter_data, meter_data_size))
     {
       echo_debug(1, "[METER] CRC valid - parsing meter data\n");
@@ -1925,7 +1928,20 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
     else
     {
       echo_debug(1, "[METER] CRC check failed: a frame was received but arrived corrupted, so this reading was discarded.\n");
-      echo_debug(1, "[METER] This points to a marginal/noisy RF link (weak signal or a slight frequency offset), not a code fault. Improving antenna placement or running a frequency scan usually fixes it.\n");
+      if (frame_rssi_dbm > -50)
+      {
+        // Very strong signal: near-field RF saturation is the likely cause.
+        // The CC1101 front-end clips when the input exceeds its linear range,
+        // producing frames that look valid (correct header bytes) but fail CRC.
+        // This is the OPPOSITE of a weak-signal problem.
+        echo_debug(1, "[METER] *** NEAR-FIELD SATURATION DETECTED (RSSI=%d dBm) ***\n", frame_rssi_dbm);
+        echo_debug(1, "[METER] The signal is too STRONG, not too weak. Move the device at least 1-2 m away from the meter.\n");
+        echo_debug(1, "[METER] If the device must be mounted close to the meter, see RX_ATTENUATION_DB in private.h (once implemented, issue #109).\n");
+      }
+      else
+      {
+        echo_debug(1, "[METER] This points to a marginal/noisy RF link (weak signal or a slight frequency offset), not a code fault. Improving antenna placement or running a frequency scan usually fixes it.\n");
+      }
       meter_data_size = 0;
     }
   }
