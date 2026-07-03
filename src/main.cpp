@@ -237,7 +237,7 @@ void performFastFrequencyScan();
  *
  * Saves discovered offset to persistent storage on success.
  */
-void performDeepFrequencyScan();
+void performDeepFrequencyScan(float scanRangeMHz = 0.150f, float scanStepMHz = 0.0025f);
 
 // ============================================================================
 // Frequency Management Implementation
@@ -590,7 +590,7 @@ void onUpdateData()
       static char errorMsg[64];
       snprintf(errorMsg, sizeof(errorMsg), "Retry %d/%d - No data received", _retry, max_retries);
       lastErrorMessage = errorMsg;
-      Serial.printf("[STATUS] Scheduling retry in 10 seconds... (next attempt %d/%d)\n", _retry + 1, max_retries);
+      Serial.printf("[STATUS] Scheduling retry in 5 seconds... (next attempt %d/%d)\n", _retry + 1, max_retries);
       // Keep the "Active Reading" sensor true and the radio state as "Reading"
       // for the whole retry sequence so they don't flip to "Not running"/Idle
       // between attempts. They are cleared only on final success or after max
@@ -598,7 +598,7 @@ void onUpdateData()
       mqtt.publish(String(mqttBaseTopic) + "/last_error", lastErrorMessage, true);
       digitalWrite(LED_BUILTIN, HIGH); // Turn off LED
       // Use non-blocking callback instead of recursive call
-      mqtt.executeDelayed(10000, onUpdateData);
+      mqtt.executeDelayed(5000, onUpdateData);
     }
     else
     {
@@ -630,8 +630,8 @@ void onUpdateData()
       if (autoScanOnFailureEnabled && !g_autoScanAfterFailureDone)
       {
         g_autoScanAfterFailureDone = true;
-        Serial.println("[FREQ] Max retries reached - running automatic frequency scan to check for meter offset drift... (disable by setting AUTO_SCAN_ON_FAILURE_ENABLED 0 in private.h)");
-        performDeepFrequencyScan();
+        Serial.println("[FREQ] Max retries reached - running narrow frequency scan (±20 kHz) to re-tune after drift... (disable: AUTO_SCAN_ON_FAILURE_ENABLED 0 in private.h)");
+        performDeepFrequencyScan(0.020f, 0.001f); // ±20 kHz, 1 kHz steps, ~41 steps, ~2 min
       }
     }
     Serial.println("========================================");
@@ -1278,7 +1278,9 @@ void publishHADiscovery()
   publishDiscoveryMessage("sensor", "everblu_meter_failed_reads", buildDiscoveryJson("Failed Reads", "failed_reads", "mdi:alert-circle", nullptr, nullptr, "total_increasing", "diagnostic"));
   publishDiscoveryMessage("sensor", "everblu_meter_last_error", buildDiscoveryJson("Last Error", "last_error", "mdi:alert", nullptr, nullptr, nullptr, "diagnostic"));
   publishDiscoveryMessage("sensor", "everblu_meter_cc1101_state", buildDiscoveryJson("CC1101 State", "cc1101_state", "mdi:radio-tower", nullptr, nullptr, nullptr, "diagnostic"));
-  publishDiscoveryMessage("sensor", "everblu_meter_freq_offset", buildDiscoveryJson("Frequency Offset", "frequency_offset", "mdi:sine-wave", "kHz", nullptr, nullptr, "diagnostic"));
+  publishDiscoveryMessage("sensor", "everblu_meter_freq_offset", buildDiscoveryJson("Frequency Offset", "frequency_offset", "mdi:sine-wave", "kHz", nullptr, "measurement", "diagnostic"));
+  publishDiscoveryMessage("sensor", "everblu_meter_tuned_frequency", buildDiscoveryJson("Tuned Frequency (MHz)", "tuned_frequency", "mdi:radio-tower", "MHz", nullptr, "measurement", "diagnostic"));
+  publishDiscoveryMessage("sensor", "everblu_meter_freq_estimate", buildDiscoveryJson("Frequency Estimate", "frequency_estimate", "mdi:sine-wave", "kHz", nullptr, "measurement", "diagnostic"));
 
   // Buttons
   json = "{\n";
@@ -1786,7 +1788,7 @@ void performFastFrequencyScan()
 // Description: Performs a thorough sweep across ±150 kHz around the configured frequency in fine
 //              2.5 kHz steps. Same width as the Fast scan, but smaller steps for weak/off-frequency meters.
 //              Also used on first boot to find the meter frequency automatically.
-void performDeepFrequencyScan()
+void performDeepFrequencyScan(float scanRangeMHz, float scanStepMHz)
 {
   Serial.println("[FREQ] Performing Deep frequency scan...");
   Serial.println("[FREQ] [NOTE] Wi-Fi/MQTT connections may temporarily drop and reconnect while the scan is running. This is expected.");
@@ -1803,15 +1805,17 @@ void performDeepFrequencyScan()
   mqtt.publish(topicBuffer, "Performing Deep frequency scan", true);
 
   float baseFreq = FREQUENCY;
-  float bestFreq = baseFreq;
-  int bestRSSI = -120;
+  // Phase 1: window discovery — continue past first hit until MISS_TOLERANCE
+  // consecutive misses, mapping start and end of the carrier response band.
+  float firstHitFreq = -1.0f;
+  float lastHitFreq  = -1.0f;
+  int   bestRSSI = -120;
+  int   consecutiveMisses = 0;
+  const int MISS_TOLERANCE = 5;
 
-  // Deep scan: same ±150 kHz width as the Fast scan, but fine 2.5 kHz steps
-  // for a thorough sweep. Slower, but more likely to lock onto a weak or
-  // off-frequency meter.
-  float scanStart = baseFreq - 0.15;
-  float scanEnd = baseFreq + 0.15;
-  float scanStep = 0.0025;
+  float scanStart = baseFreq - scanRangeMHz;
+  float scanEnd = baseFreq + scanRangeMHz;
+  float scanStep = scanStepMHz;
 
   int deepStepCount = (int)roundf((scanEnd - scanStart) / scanStep) + 1;
   int deepEstSecs = deepStepCount * 3; // ~3 s per step (full radio TX+RX cycle)
@@ -1840,11 +1844,25 @@ void performDeepFrequencyScan()
 
     Serial.printf("[FREQ] Freq %.6f MHz: RSSI=%d dBm, reads=%d\n", freq, test_data.rssi_dbm, test_data.reads_counter);
 
-    if (test_data.rssi_dbm > bestRSSI && test_data.reads_counter > 0)
+    if (test_data.reads_counter > 0)
     {
-      bestRSSI = test_data.rssi_dbm;
-      bestFreq = freq;
-      Serial.printf("[FREQ] Found signal at %.6f MHz: RSSI=%d dBm\n", freq, test_data.rssi_dbm);
+      if (firstHitFreq < 0.0f)
+      {
+        firstHitFreq = freq;
+        Serial.printf("[FREQ] Window start: %.6f MHz\n", freq);
+      }
+      lastHitFreq = freq;
+      if (test_data.rssi_dbm > bestRSSI) bestRSSI = test_data.rssi_dbm;
+      consecutiveMisses = 0;
+    }
+    else if (firstHitFreq >= 0.0f)
+    {
+      if (++consecutiveMisses >= MISS_TOLERANCE)
+      {
+        Serial.printf("[FREQ] Window end: %.6f MHz (%d consecutive misses after last hit)\n",
+                      lastHitFreq, consecutiveMisses);
+        break;
+      }
     }
 
     // Drain the WiFi serial ring buffer so remote logs stream live during the
@@ -1852,8 +1870,46 @@ void performDeepFrequencyScan()
     wifiSerialLoop();
   }
 
-  if (bestRSSI > -120)
+  if (firstHitFreq >= 0.0f)
   {
+    float windowMidFreq = (firstHitFreq + lastHitFreq) * 0.5f;
+    float windowWidthKHz = (lastHitFreq - firstHitFreq) * 1000.0f;
+    Serial.printf("[FREQ] Window: %.6f - %.6f MHz (%.2f kHz wide), midpoint %.6f MHz\n",
+                  firstHitFreq, lastHitFreq, windowWidthKHz, windowMidFreq);
+
+    float bestFreq = windowMidFreq;
+
+    // Phase 2: zoom scan across the full discovered window with 4x finer steps.
+    // Always runs — even when Phase 1 found only a single point, that hit may be
+    // on the edge of the response band; finer steps can locate the true centre.
+    // Falls back to windowMidFreq (= firstHitFreq for single-point windows) if
+    // all zoom steps miss (FREQEST adaptive tracking will then refine further).
+    float zoomStart = firstHitFreq - scanStep;
+    float zoomEnd   = lastHitFreq  + scanStep;
+    float zoomStep  = scanStep * 0.25f;
+
+    int zoomStepCount = (int)roundf((zoomEnd - zoomStart) / zoomStep) + 1;
+    Serial.printf("[FREQ] Zoom pass: %.6f - %.6f MHz (%d steps, %.2f kHz each)\n",
+                  zoomStart, zoomEnd, zoomStepCount, zoomStep * 1000.0f);
+
+    for (float zfreq = zoomStart; zfreq <= zoomEnd + zoomStep * 0.5f; zfreq += zoomStep)
+    {
+      FEED_WDT();
+      if (!cc1101_init(zfreq)) break;
+      delay(50);
+      struct tmeter_data zdata = get_meter_data();
+      Serial.printf("[FREQ] Zoom %.6f MHz: RSSI=%d dBm, reads=%d\n",
+                    zfreq, zdata.rssi_dbm, zdata.reads_counter);
+      if (zdata.reads_counter > 0)
+      {
+        bestFreq = zfreq;
+        bestRSSI = zdata.rssi_dbm;
+        Serial.printf("[FREQ] Zoom locked at %.6f MHz: RSSI=%d dBm\n", zfreq, zdata.rssi_dbm);
+        break;
+      }
+      wifiSerialLoop();
+    }
+
     float offset = bestFreq - baseFreq;
     Serial.printf("[FREQ] Deep scan complete! Best frequency: %.6f MHz (offset: %.6f MHz, RSSI: %d dBm)\n",
                   bestFreq, offset, bestRSSI);

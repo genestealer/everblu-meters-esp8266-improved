@@ -177,9 +177,16 @@ public:
      * thorough sweep. Slower, but more likely to lock onto a weak/off-frequency meter.
      * Also used on first boot when no offset is saved.
      *
+     * @param scanRangeMHz Half-width of scan in MHz. Default 0.150 (±150 kHz full sweep).
+     *                    Pass 0.020 for a narrow ±20 kHz re-tune after a drift failure.
+     * @param scanStepMHz Step size in MHz. Default 0.0025 (2.5 kHz).
+     *                    Pass 0.001 for 1 kHz steps in a narrow scan.
      * @param statusCallback Optional callback for status updates (can be nullptr)
      */
-    static void performDeepFrequencyScan(void (*statusCallback)(const char *state, const char *message) = nullptr);
+    static void performDeepFrequencyScan(
+        float scanRangeMHz = 0.150f,
+        float scanStepMHz = 0.0025f,
+        void (*statusCallback)(const char *state, const char *message) = nullptr);
 
     /**
      * @brief Adaptive frequency tracking using FREQEST

@@ -444,7 +444,10 @@ void MeterReader::handleFailedRead()
             m_autoScanAfterFailureDone = true;
             LOG_W("everblu_meter", "Running automatic frequency scan to check for meter offset drift... (disable with auto_scan_on_failure / AUTO_SCAN_ON_FAILURE_ENABLED)");
             m_publisher->publishStatusMessage("Auto frequency scan after failed reads");
-            performFrequencyScan(false);
+            // Narrow ±20 kHz / 1 kHz scan: fast re-tune after drift failure.
+            // The full ±150 kHz deep scan is reserved for manual commands and
+            // first-boot with no stored offset (both called via performFrequencyScan).
+            FrequencyManager::performDeepFrequencyScan(0.020f, 0.001f);
         }
     }
 }

@@ -76,9 +76,8 @@ void MQTTDataPublisher::publishMeterReading(const tmeter_data &data, const char 
     // Publish timestamp
     publish("last_update", timestamp, true);
 
-    // Publish frequency offset
-    snprintf(buffer, sizeof(buffer), "%d", data.freqest);
-    publish("frequency_offset", buffer, true);
+    // Publish frequency estimate from CC1101 (raw FREQEST register → kHz)
+    publishFrequencyEstimate(data.freqest);
 }
 
 void MQTTDataPublisher::publishHistory(const uint32_t *history, bool historyAvailable)

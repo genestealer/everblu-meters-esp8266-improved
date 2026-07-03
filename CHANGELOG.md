@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 Releases are created manually by tagging commits with version tags matching `v*.*.*` (e.g., `v2.1.0`). Users should build from source and configure `private.h` with their own meter settings.
 
+## [Unreleased]
+
+### Added
+
+- **`tuned_frequency` and `frequency_estimate` MQTT sensors**: the standalone (MQTT) build now publishes Home Assistant discovery messages for `Tuned Frequency (MHz)` (unit `MHz`, topic `tuned_frequency`) and `Frequency Estimate` (unit `kHz`, topic `frequency_estimate`), matching the three frequency-calibration sensors already present in the ESPHome component.
+- **`scripts/capture-mqtt-log.ps1`**: convenience script that builds, uploads, and captures a timestamped serial monitor log to `temp/mqtt_<date>.log`.
+
+### Changed
+
+- **Two-phase deep frequency scan algorithm** (MQTT and ESPHome builds):
+  - **Phase 1 — window mapping**: scans at the configured step size and continues past the first successful decode (`reads_counter > 0`) until `MISS_TOLERANCE` (5) consecutive misses, recording `firstHitFreq` and `lastHitFreq`. Exits as soon as the window closes — no longer scans to end of range unnecessarily.
+  - **Phase 2 — zoom**: always runs. Re-scans `firstHitFreq − step` to `lastHitFreq + step` with 4× finer steps to locate the exact carrier centre. Falls back to the window midpoint if all zoom steps miss (FREQEST adaptive tracking refines further on the next successful read). Single-point windows still trigger the zoom — the coarse hit may be at the band edge.
+- **`performDeepFrequencyScan()` parameterised** with `scanRangeMHz` (default `0.150`) and `scanStepMHz` (default `0.0025`); existing callers are unaffected by the defaults.
+- **Auto-scan-on-failure uses a narrow ±20 kHz / 1 kHz scan** (~41 steps, ~30 s) instead of the full ±150 kHz / 2.5 kHz sweep (~121 steps, ~6 min). When `MAX_RETRIES` is reached the radio is already close to the carrier; a wide sweep wastes time. Manual "Deep Scan" MQTT command and startup scans retain the full ±150 kHz range.
+
+### Fixed
+
+- **`frequency_estimate` was incorrectly published to `frequency_offset`** in the MQTT `publishMeterReading()` path. The raw CC1101 `FREQEST` register value is now routed to the correct `frequency_estimate` topic (converted to kHz), and no longer overwrites the true offset value published by `publishFrequencyOffset()`.
+
 ## [v3.0.2] - 2026-07-02
 
 ### Added
