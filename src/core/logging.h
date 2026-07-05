@@ -60,6 +60,14 @@
 #define LOG_E(tag, format, ...) ESP_LOGE(tag, format, ##__VA_ARGS__)
 #define LOG_V(tag, format, ...) ESP_LOGV(tag, format, ##__VA_ARGS__)
 
+// TS_PRINTLN / TS_PRINTF are the timestamped Serial helpers used by MQTT-mode
+// code. Some files are shared with the ESPHome build (e.g. frequency_manager.cpp,
+// schedule_manager.cpp), so provide ESPHome-mode equivalents that route through
+// the ESPHome logger. Without these the shared files fail to compile in ESPHome
+// mode. ESPHome supplies its own timestamp/level prefix and trailing newline.
+#define TS_PRINTLN(msg) ESP_LOGI("everblu_meter", "%s", msg)
+#define TS_PRINTF(fmt, ...) ESP_LOGI("everblu_meter", fmt, ##__VA_ARGS__)
+
 // Component TAG should be defined as: static const char *const TAG = "everblu_meter";
 // This ensures all logs appear under the "everblu_meter" component in ESPHome logs
 
