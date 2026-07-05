@@ -46,19 +46,6 @@
 #include <EspMQTTClient.h> // MQTT client library
 #include <math.h>          // For floor/ceil during scan alignment
 
-// Cross-platform watchdog feed helper
-static inline void FEED_WDT()
-{
-#if defined(ESP8266)
-  ESP.wdtFeed();
-#elif defined(ESP32)
-  esp_task_wdt_reset();
-  yield();
-#else
-  (void)0;
-#endif
-}
-
 // Define the LED_BUILTIN pin if missing
 #ifndef LED_BUILTIN
 #define LED_BUILTIN 2 // Change this pin if needed
