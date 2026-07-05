@@ -1660,6 +1660,9 @@ void performDeepFrequencyScan(float scanRangeMHz, float scanStepMHz)
   mqtt.publish(topicBuffer, "Performing Deep frequency scan", true);
 
   float baseFreq = FREQUENCY;
+  // Snapshot the current known-good offset so the quality guard can avoid
+  // regressing a good calibration (issue #104).
+  float previousOffset = storedFrequencyOffset;
   // Phase 1: window discovery — continue past first hit until MISS_TOLERANCE
   // consecutive misses, mapping start and end of the carrier response band.
   float firstHitFreq = -1.0f;
@@ -1771,22 +1774,84 @@ void performDeepFrequencyScan(float scanRangeMHz, float scanStepMHz)
     }
 
     float offset = bestFreq - baseFreq;
-    TS_PRINTF("[FREQ] Deep scan complete! Best frequency: %.6f MHz (offset: %.6f MHz, RSSI: %d dBm)\n",
+    TS_PRINTF("[FREQ] Deep scan candidate: %.6f MHz (offset: %.6f MHz, RSSI: %d dBm)\n",
                   bestFreq, offset, bestRSSI);
 
-    saveFrequencyOffset(offset);
+    // Post-lock verification + quality guard (issue #104): rank candidates by
+    // demodulation quality (smallest |FREQEST|), not RSSI, and never overwrite an
+    // existing known-good offset with a worse one. A strong RSSI at a frequency
+    // tens of kHz off the true carrier can still yield corrupted (CRC-failing)
+    // bits, so RSSI alone is an unreliable ranking signal.
+    cc1101_init(bestFreq);
+    delay(100);
+    struct tmeter_data candVerify = get_meter_data();
+    bool candDecoded = candVerify.reads_counter > 0;
+    int  candQuality = abs((int)candVerify.freqest); // smaller = better centred
+    TS_PRINTF("[FREQ] Verify candidate %.6f MHz: reads=%d, |FREQEST|=%d\n",
+                  bestFreq, candVerify.reads_counter, candQuality);
+
+    bool acceptCandidate;
+    if (previousOffset == 0.0f)
+    {
+      // No prior calibration to protect: persist the scan result as-is.
+      acceptCandidate = true;
+    }
+    else if (!candDecoded)
+    {
+      // Candidate failed post-lock verification: keep the known-good offset.
+      acceptCandidate = false;
+      TS_PRINTF("[FREQ] Candidate %.6f MHz did not verify (no decode) - keeping stored offset %.3f kHz\n",
+                    bestFreq, previousOffset * 1000.0);
+    }
+    else
+    {
+      // Both candidate and stored offset decode: keep the better-centred one.
+      cc1101_init(baseFreq + previousOffset);
+      delay(100);
+      struct tmeter_data prevVerify = get_meter_data();
+      bool prevDecoded = prevVerify.reads_counter > 0;
+      int  prevQuality = abs((int)prevVerify.freqest);
+      TS_PRINTF("[FREQ] Verify stored %.6f MHz: reads=%d, |FREQEST|=%d\n",
+                    baseFreq + previousOffset, prevVerify.reads_counter, prevQuality);
+      if (!prevDecoded)
+      {
+        acceptCandidate = true; // stored offset no longer decodes
+      }
+      else
+      {
+        acceptCandidate = candQuality < prevQuality; // strictly better only
+      }
+      if (!acceptCandidate)
+      {
+        TS_PRINTF("[FREQ] Stored offset %.3f kHz (|FREQEST|=%d) is as good or better than candidate "
+                      "%.3f kHz (|FREQEST|=%d) - keeping stored offset\n",
+                      previousOffset * 1000.0, prevQuality, offset * 1000.0, candQuality);
+      }
+    }
+
+    if (acceptCandidate)
+    {
+      saveFrequencyOffset(offset);
+      TS_PRINTF("[FREQ] Deep scan complete! Saved offset %.3f kHz (tuned %.6f MHz)\n",
+                    offset * 1000.0, bestFreq);
+    }
+    else
+    {
+      TS_PRINTF("[FREQ] Deep scan complete - retained existing offset %.3f kHz\n",
+                    storedFrequencyOffset * 1000.0);
+    }
 
     char freqBuffer[16];
-    snprintf(freqBuffer, sizeof(freqBuffer), "%.3f", offset * 1000.0); // Convert MHz to kHz
+    snprintf(freqBuffer, sizeof(freqBuffer), "%.3f", storedFrequencyOffset * 1000.0); // Convert MHz to kHz
     snprintf(topicBuffer, sizeof(topicBuffer), "%s/frequency_offset", mqttBaseTopic);
     mqtt.publish(topicBuffer, freqBuffer, true);
 
     char statusMsg[128];
-    snprintf(statusMsg, sizeof(statusMsg), "Deep scan complete: offset %.3f kHz", offset * 1000.0);
+    snprintf(statusMsg, sizeof(statusMsg), "Deep scan complete: offset %.3f kHz", storedFrequencyOffset * 1000.0);
     snprintf(topicBuffer, sizeof(topicBuffer), "%s/status_message", mqttBaseTopic);
     mqtt.publish(topicBuffer, statusMsg, true);
 
-    cc1101_init(bestFreq);
+    cc1101_init(baseFreq + storedFrequencyOffset);
   }
   else
   {

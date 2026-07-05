@@ -155,6 +155,10 @@ void FrequencyManager::performDeepFrequencyScan(float scanRangeMHz, float scanSt
     // Reset adaptive tracking so the new offset has a chance to stabilize
     resetAdaptiveTracking();
 
+    // Snapshot the current known-good offset so the quality guard can avoid
+    // regressing a good calibration (issue #104).
+    float previousOffset = s_storedOffset;
+
     if (statusCallback)
     {
         statusCallback("Frequency Scanning", "Performing Deep frequency scan");
@@ -264,15 +268,81 @@ void FrequencyManager::performDeepFrequencyScan(float scanRangeMHz, float scanSt
         }
 
         float offset = bestFreq - s_baseFrequency;
-        LOG_I("everblu_meter", "Deep scan complete! Best frequency: %.6f MHz (offset: %.6f MHz, RSSI: %d dBm)",
+        LOG_I("everblu_meter", "Deep scan candidate: %.6f MHz (offset: %.6f MHz, RSSI: %d dBm)",
               bestFreq, offset, bestRSSI);
 
-        saveFrequencyOffset(offset);
+        // Post-lock verification + quality guard (issue #104): rank candidates by
+        // demodulation quality (smallest |FREQEST|), not RSSI, and never overwrite
+        // an existing known-good offset with a worse one. A strong RSSI at a
+        // frequency tens of kHz off the true carrier can still yield corrupted
+        // (CRC-failing) bits, so RSSI alone is an unreliable ranking signal.
+        s_radioInitCallback(bestFreq);
+        delay(100);
+        struct tmeter_data candVerify = s_meterReadCallback();
+        bool candDecoded = candVerify.reads_counter > 0;
+        int  candQuality = abs((int)candVerify.freqest); // smaller = better centred
+        LOG_I("everblu_meter", "Verify candidate %.6f MHz: reads=%d, |FREQEST|=%d",
+              bestFreq, candVerify.reads_counter, candQuality);
+
+        bool acceptCandidate;
+        if (previousOffset == 0.0f)
+        {
+            // No prior calibration to protect: persist the scan result as-is.
+            acceptCandidate = true;
+        }
+        else if (!candDecoded)
+        {
+            // Candidate failed post-lock verification: keep the known-good offset.
+            acceptCandidate = false;
+            LOG_W("everblu_meter",
+                  "Candidate %.6f MHz did not verify (no decode) - keeping stored offset %.3f kHz",
+                  bestFreq, previousOffset * 1000.0);
+        }
+        else
+        {
+            // Both candidate and stored offset decode: keep the better-centred one.
+            s_radioInitCallback(s_baseFrequency + previousOffset);
+            delay(100);
+            struct tmeter_data prevVerify = s_meterReadCallback();
+            bool prevDecoded = prevVerify.reads_counter > 0;
+            int  prevQuality = abs((int)prevVerify.freqest);
+            LOG_I("everblu_meter", "Verify stored %.6f MHz: reads=%d, |FREQEST|=%d",
+                  s_baseFrequency + previousOffset, prevVerify.reads_counter, prevQuality);
+
+            if (!prevDecoded)
+            {
+                acceptCandidate = true; // stored offset no longer decodes
+            }
+            else
+            {
+                acceptCandidate = candQuality < prevQuality; // strictly better only
+            }
+
+            if (!acceptCandidate)
+            {
+                LOG_I("everblu_meter",
+                      "Stored offset %.3f kHz (|FREQEST|=%d) is as good or better than candidate "
+                      "%.3f kHz (|FREQEST|=%d) - keeping stored offset",
+                      previousOffset * 1000.0, prevQuality, offset * 1000.0, candQuality);
+            }
+        }
+
+        if (acceptCandidate)
+        {
+            saveFrequencyOffset(offset);
+            LOG_I("everblu_meter", "Deep scan complete! Saved offset %.3f kHz (tuned %.6f MHz)",
+                  offset * 1000.0, bestFreq);
+        }
+        else
+        {
+            LOG_I("everblu_meter", "Deep scan complete - retained existing offset %.3f kHz",
+                  s_storedOffset * 1000.0);
+        }
 
         if (statusCallback)
         {
             char msg[128];
-            snprintf(msg, sizeof(msg), "Deep scan complete: offset %.3f kHz", offset * 1000.0);
+            snprintf(msg, sizeof(msg), "Deep scan complete: offset %.3f kHz", s_storedOffset * 1000.0);
             statusCallback("Idle", msg);
         }
 
