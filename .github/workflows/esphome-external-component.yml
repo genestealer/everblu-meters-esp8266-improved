@@ -9,6 +9,15 @@ on:
       - ESPHOME/example-*.yaml
       - ESPHOME/README.md
       - .github/workflows/esphome-external-component.yml
+      # Shared source: the ESPHome component compiles the src/ tree (via the
+      # flattened ESPHOME-release/ bundle and component includes), so changes
+      # there must trigger this job too - otherwise a shared-source change that
+      # breaks only the ESPHome build (e.g. an ESPHome-only logging path) slips
+      # through because the ESP8266/ESP32 build jobs compile only the MQTT firmware.
+      - src/**
+      - include/**
+      - platformio.ini
+      - ESPHOME-release/**
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
     paths:
@@ -17,6 +26,11 @@ on:
       - ESPHOME/example-*.yaml
       - ESPHOME/README.md
       - .github/workflows/esphome-external-component.yml
+      # Shared source (see the push trigger above for the rationale).
+      - src/**
+      - include/**
+      - platformio.ini
+      - ESPHOME-release/**
   workflow_dispatch:
 
 concurrency:
