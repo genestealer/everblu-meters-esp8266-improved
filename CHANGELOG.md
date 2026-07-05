@@ -8,32 +8,45 @@ Releases are created manually by tagging commits with version tags matching `v*.
 
 ### Added
 
-- **Timestamps in MQTT serial log output**: all tagged `[TAG] message` log lines in the standalone (MQTT) firmware now carry a `[HH:MM:SS]` UTC timestamp prefix matching the ESPHome log format. Timestamps are emitted from the moment the firmware starts (showing `[00:00:00]` until NTP syncs, then real UTC wall-clock time). Affects `[STATUS]`, `[MQTT]`, `[TIME]`, `[FREQ]`, `[WIFI]`, `[OTA]`, `[HISTORY]`, `[ERROR]`, `[WARN]`, `[SCHEDULE]`, and all other tagged lines. Plain banner/separator lines (`===...`, `METER READ - START`, etc.) are intentionally left without timestamps.
-- **`tuned_frequency` and `frequency_estimate` MQTT sensors**: the standalone (MQTT) build now publishes Home Assistant discovery messages for `Tuned Frequency (MHz)` (unit `MHz`, topic `tuned_frequency`) and `Frequency Estimate` (unit `kHz`, topic `frequency_estimate`), matching the three frequency-calibration sensors already present in the ESPHome component.
-- **`scripts/capture-mqtt-log.ps1`**: convenience script that builds, uploads, and captures a timestamped serial monitor log to `temp/mqtt_<date>.log`.
+- **`AUTO_SCAN_ON_FAILURE_ENABLED`** (both builds, opt-in, default `0`): when `MAX_RETRIES` is reached and the firmware enters cooldown, optionally run a narrow ±20 kHz / 1 kHz Deep scan once per failure streak to recalibrate the carrier-frequency offset. Set `#define AUTO_SCAN_ON_FAILURE_ENABLED 1` in `private.h` or `auto_scan_on_failure: true` in ESPHome YAML to enable.
+- **Timestamps in MQTT serial log output**: all tagged `[TAG] message` log lines in the standalone (MQTT) firmware now carry a `[HH:MM:SS]` UTC timestamp prefix matching the ESPHome log format.
+- **`tuned_frequency` and `frequency_estimate` MQTT sensors**: the standalone (MQTT) build now publishes Home Assistant discovery messages for `Tuned Frequency (MHz)` (topic `tuned_frequency`) and `Frequency Estimate (kHz)` (topic `frequency_estimate`), matching the sensors already present in the ESPHome component.
+- **Near-field RF saturation detection**: when a data frame is received but CRC fails and RSSI is above −50 dBm, the firmware now emits a prominent warning identifying the root cause:
+  ```
+  [METER] *** NEAR-FIELD SATURATION DETECTED (RSSI=X dBm) ***
+  [METER] The signal is too STRONG, not too weak. Move the device at least 1-2 m away.
+  ```
+  Below −50 dBm the existing weak-signal/offset message is shown unchanged. Documented in both README troubleshooting sections.
+- **`scripts/capture-mqtt-log.ps1`**: convenience script that builds, flashes, and captures a timestamped serial monitor log to `temp/mqtt_<date>.log`.
+- **`docs/FREQUENCY_CALIBRATION_SYSTEM.md`**: design reference covering the CC1101 bandwidth/FOC changes, two-phase scan algorithm, FREQEST adaptive tracking, CC1101 hardware frequency-resolution boundary (~397 Hz/register), and Fast-scan removal rationale.
 
 ### Changed
 
-- **Two-phase deep frequency scan algorithm** (MQTT and ESPHome builds):
-  - **Phase 1 — window mapping**: scans at the configured step size and continues past the first successful decode (`reads_counter > 0`) until `MISS_TOLERANCE` (5) consecutive misses, recording `firstHitFreq` and `lastHitFreq`. Exits as soon as the window closes — no longer scans to end of range unnecessarily.
-  - **Phase 2 — zoom**: always runs. Re-scans `firstHitFreq − step` to `lastHitFreq + step` with 4× finer steps to locate the exact carrier centre. Falls back to the window midpoint if all zoom steps miss (FREQEST adaptive tracking refines further on the next successful read). Single-point windows still trigger the zoom — the coarse hit may be at the band edge.
-- **`performDeepFrequencyScan()` parameterised** with `scanRangeMHz` (default `0.150`) and `scanStepMHz` (default `0.0025`); existing callers are unaffected by the defaults.
-- **Auto-scan-on-failure uses a narrow ±20 kHz / 1 kHz scan** (~41 steps, ~30 s) instead of the full ±150 kHz / 2.5 kHz sweep (~121 steps, ~6 min). When `MAX_RETRIES` is reached the radio is already close to the carrier; a wide sweep wastes time. Manual "Deep Scan" MQTT command and startup scans retain the full ±150 kHz range.
+- **CC1101 RX bandwidth widened 58 kHz → 270 kHz and FOC_LIMIT raised to ±BW/4** (`MDMCFG4 0xF6 → 0x66`, `FOCCFG 0x1D → 0x1E`) in the shared radio driver (both MQTT and ESPHome builds).
+
+  **Why this matters:** The previous 58 kHz receive filter with ±7.25 kHz automatic frequency-offset compensation could not tolerate a CC1101 reference-crystal error larger than a few ppm — the signal literally fell outside the filter passband, so software frequency scanning was required just to hear the meter at all. The 270 kHz filter gives the chip **±67.7 kHz of automatic carrier-offset correction (~±156 ppm at 433 MHz)**, so the radio locks onto the meter at the nominal 433.82 MHz even with a badly out-of-spec crystal — usually with no scan required. The RADIAN signal is ~15 kHz wide, so the extra bandwidth costs ~6.7 dB of noise floor against a typical >20 dB link margin. Frequency scanning is retained as a fallback for extreme drift or weak signals.
+
+  | Register | Before | After | Effect |
+  |---|---|---|---|
+  | `MDMCFG4` | `0xF6` (58 kHz) | `0x66` (270 kHz) | Filter captures signal despite crystal error |
+  | `FOCCFG` | `0x1D` (±7.25 kHz) | `0x1E` (±67.7 kHz) | Chip self-corrects up to ±156 ppm automatically |
+
+- **Deep frequency scan algorithm overhauled** (MQTT and ESPHome builds) — two phases replace the previous single-pass sweep:
+  - **Phase 1 — window mapping**: scans the configured range in coarse steps, continuing past the first successful decode (`reads_counter > 0`) until `MISS_TOLERANCE` (5) consecutive misses, recording `firstHitFreq` and `lastHitFreq`. Exits as soon as the window closes.
+  - **Phase 2 — zoom**: always runs. Re-scans `firstHitFreq − step` to `lastHitFreq + step` with 4× finer steps. Falls back to window midpoint if all zoom steps miss (FREQEST adaptive tracking refines further on the next successful read). Single-point windows still trigger the zoom — the coarse hit may be at the band edge.
+  - **Zoom step clamped to CC1101 hardware minimum**: `Fxosc / 2^16 = 26 MHz / 65536 ≈ 397 Hz` per register step. Steps finer than this silently round to the same register value; the zoom step is now `max(scanStep × 0.25, 397 Hz)`.
+  - `performDeepFrequencyScan()` now accepts optional `scanRangeMHz` (default `0.150`) and `scanStepMHz` (default `0.0025`) parameters; existing callers are unaffected. The auto-scan-on-failure path uses a narrow `±20 kHz / 1 kHz` call; manual Deep Scan and startup scans retain the full `±150 kHz` range.
+- **Deep Scan renamed** from "Scan Frequency" / MQTT topic `freq_scan` to "Deep Frequency Scan" / MQTT topic `deep_scan`. HA button name and icon (`mdi:radar`) updated to match.
+- **Read retry interval** reduced from 10 seconds to 5 seconds between successive attempts after a failed read.
 
 ### Fixed
 
-- **Radio-state hang in `cc1101_rec_mode()`**: the wait loop that spins until the CC1101 reports an RX MARCSTATE (`0x0D`/`0x0E`/`0x0F`) had no timeout. If the radio wedged in a stuck state (e.g. `0x11` RXFIFO_OVERFLOW) it would spin forever while feeding the watchdog — hanging the whole firmware with the activity LED on and no reboot or further logs. The loop is now bounded: on timeout it flushes the RX FIFO (`SFRX`) and re-strobes RX once to recover, and if that still fails it returns so the caller's GDO0 wait times out gracefully.
-- **`frequency_estimate` was incorrectly published to `frequency_offset`** in the MQTT `publishMeterReading()` path. The raw CC1101 `FREQEST` register value is now routed to the correct `frequency_estimate` topic (converted to kHz), and no longer overwrites the true offset value published by `publishFrequencyOffset()`.
+- **Radio-state hang in `cc1101_rec_mode()`**: the wait loop had no timeout. A wedged radio state (e.g. `0x11` RXFIFO_OVERFLOW) would spin forever while feeding the watchdog — firmware hung with the activity LED on and no reboot. The loop is now bounded: on timeout it flushes the RX FIFO (`SFRX`) and re-strobes RX once; if still failing, returns so the caller's GDO0 wait times out gracefully.
+- **`frequency_estimate` was incorrectly published to `frequency_offset`** in the MQTT `publishMeterReading()` path. The CC1101 `FREQEST` value (live carrier-offset measurement) is now routed to the correct `frequency_estimate` topic and no longer overwrites the persisted offset published by `publishFrequencyOffset()`.
 
-## [v3.0.2] - 2026-07-02
+### Removed
 
-### Added
-
-- **Auto frequency scan on failure (optional).** After `MAX_RETRIES` is reached and the device enters cooldown, run a narrow frequency scan once per failure streak to recover from carrier-frequency drift (`AUTO_SCAN_ON_FAILURE_ENABLED` / `auto_scan_on_failure`).
-
-### Changed
-
-- **`AUTO_SCAN_ON_FAILURE_ENABLED` default changed to `0` (off).** The automatic frequency scan after repeated read failures is now opt-in. Previously the scan ran silently on every failure streak, which could cause unexpected Wi-Fi/MQTT disruption (scans block 1–2 minutes). Set `#define AUTO_SCAN_ON_FAILURE_ENABLED 1` in `private.h` to restore the previous behaviour.
+- **Fast frequency scan** (both builds). It was redundant — the two-phase Deep scan's coarse window-mapping pass supersedes the old coarse-only Fast scan. Removed: `performFastFrequencyScan()`, the `fast_scan` MQTT command and HA button, and the ESPHome `fast_scan_button` config option. Use `deep_scan` / `deep_scan_button` instead.
 
 ## [v3.0.1] - 2026-06-26
 
