@@ -548,11 +548,10 @@ void setMHZ(float mhz)
       i = 1;
     }
   }
-  if (freq0 > 255)
-  {
-    freq1 += 1;
-    freq0 -= 256;
-  }
+  // No carry handling is needed here: the loop above subtracts a full FREQ1 step
+  // (0.1015625 MHz == 256 FREQ0 LSBs) before freq0 can reach 256, so freq0 always
+  // fits in a single byte. (The former `if (freq0 > 255)` check was dead code -
+  // freq0 is a uint8_t and can never exceed 255.)
 
   /*
   Serial.printf("FREQ2=0x%02X ", freq2);
@@ -786,115 +785,6 @@ void show_cc1101_registers_settings(void)
     echo_debug(debug_out, "%02X ", Patable_verify[i]);
   }
   echo_debug(debug_out, "\n");
-}
-
-uint8_t is_look_like_radian_frame(uint8_t *buffer, size_t len)
-{
-  int ret;
-  ret = FALSE;
-  for (size_t i = 0; i < len; i++)
-  {
-    if (buffer[i] == 0xFF)
-      ret = TRUE;
-  }
-
-  return ret;
-}
-
-//-----------------[check if Packet is received]-------------------------
-uint8_t cc1101_check_packet_received(void)
-{
-  uint8_t rxBuffer[100];
-  uint8_t l_nb_byte;
-  int8_t l_Rssi_dbm;
-  uint8_t l_lqi, l_freq_est, pktLen;
-  pktLen = 0;
-  if (digitalRead(GET_GDO0_PIN()) == TRUE)
-  {
-    // Read RSSI immediately while signal is present (carrier active)
-    // RSSI register needs to be sampled during packet reception for accuracy
-    l_Rssi_dbm = cc1100_rssi_convert2dbm(halRfReadReg(RSSI_ADDR));
-
-    bool buffer_overflow = false;
-    while (digitalRead(GET_GDO0_PIN()) == TRUE)
-    {
-      delay(2); // Reduced from 5ms to 2ms for faster FIFO reading (prevents overflow)
-
-      // Check for FIFO overflow (bit 7 of RXBYTES register)
-      uint8_t rxbytes_reg = halRfReadReg(RXBYTES_ADDR);
-      if (rxbytes_reg & 0x80)
-      {
-        echo_debug(1, "[ERROR] RX FIFO overflow detected - data corrupted\n");
-        CC1101_CMD(SFRX); // Flush RX FIFO to recover
-        return FALSE;
-      }
-
-      l_nb_byte = rxbytes_reg & RXBYTES_MASK;
-
-      // Bounds check before reading to prevent buffer overflow
-      if ((l_nb_byte) && ((pktLen + l_nb_byte) <= 100))
-      {
-        SPIReadBurstReg(RX_FIFO_ADDR, &rxBuffer[pktLen], l_nb_byte); // Pull data
-        pktLen += l_nb_byte;
-      }
-      else if (l_nb_byte && ((pktLen + l_nb_byte) > 100))
-      {
-        echo_debug(1, "[ERROR] Would overflow rxBuffer (pktLen=%u + l_nb_byte=%u > 100)\n", pktLen, l_nb_byte);
-        buffer_overflow = true;
-        break;
-      }
-    }
-
-    // Read LQI and FREQEST only if packet completed normally (GDO0 went low)
-    // If we exited via buffer overflow, GDO0 may still be high and these registers
-    // are not yet latched, so reading them would give incorrect values.
-    if (buffer_overflow)
-    {
-      echo_debug(1, "[ERROR] Buffer overflow - discarding incomplete packet\n");
-      CC1101_CMD(SFRX); // Flush RX FIFO to recover
-      return FALSE;
-    }
-    // These registers are latched at end-of-packet and contain final quality metrics
-    l_lqi = halRfReadReg(LQI_ADDR);
-    l_freq_est = halRfReadReg(FREQEST_ADDR);
-
-    if (is_look_like_radian_frame(rxBuffer, pktLen))
-    {
-      echo_debug(debug_out, "[CC1101] Packet looks like RADIAN frame");
-      echo_debug(debug_out, "[CC1101] bytes=%u rssi=%d lqi=%u F_est=%u", pktLen, l_Rssi_dbm, l_lqi, l_freq_est);
-      show_in_hex_one_line(rxBuffer, pktLen);
-      // show_in_bin(rxBuffer,l_nb_byte);
-    }
-    else
-    {
-      echo_debug(debug_out, ".");
-    }
-    fflush(stdout);
-    return TRUE;
-  }
-  return FALSE;
-}
-
-uint8_t cc1101_wait_for_packet(int milliseconds)
-{
-  int i;
-  for (i = 0; i < milliseconds; i++)
-  {
-    delay(1); // in ms
-    if (i % 100 == 0)
-      FEED_WDT(); // Feed watchdog every 100ms
-    // echo_cc1101_MARCSTATE();
-    if (cc1101_check_packet_received()) // delay till system has data available
-    {
-      return TRUE;
-    }
-    else if (i == milliseconds - 1)
-    {
-      // echo_debug(debug_out,"no packet received!\n");
-      return FALSE;
-    }
-  }
-  return TRUE;
 }
 
 static bool validate_radian_crc(const uint8_t *decoded_buffer, size_t size)

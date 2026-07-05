@@ -3,7 +3,7 @@ agent: 'agent'
 description: 'Perform a comprehensive code review'
 ---
 
-## Role
+# Role
 
 You're a senior software engineer conducting a thorough code review. Provide constructive, actionable feedback.
 
@@ -50,8 +50,6 @@ Provide feedback as:
 
 For each issue:
 
-
-- Specific line references
 - Clear explanation of the problem
 - Suggested solution with code example
 - Rationale for the change

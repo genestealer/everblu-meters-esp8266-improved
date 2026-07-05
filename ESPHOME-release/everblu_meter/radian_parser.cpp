@@ -33,8 +33,12 @@ bool radian_validate_crc(const uint8_t *decoded_buffer, size_t size)
 
     if (expected_len > size)
     {
-        // Keep compatibility with frames that advertise a longer length than payload.
-        return true;
+        // A length field larger than the decoded payload indicates a truncated
+        // or misaligned capture - there are not enough bytes to verify the CRC,
+        // so the frame cannot be trusted. Reject it rather than accepting it
+        // unchecked (which previously caused false parse attempts on corrupt
+        // frames).
+        return false;
     }
 
     if (expected_len < 4)

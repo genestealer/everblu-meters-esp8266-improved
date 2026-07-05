@@ -219,6 +219,9 @@ int MeterHistory::countValidMonths(const uint32_t history[13])
         return 0;
     }
 
+    // A zero entry marks the end of stored history: meter volume is a cumulative
+    // counter that is never legitimately 0 for an operational meter, so 0 is used
+    // as the "no more data" sentinel.
     for (int i = 0; i < 13; i++)
     {
         if (history[i] == 0)
