@@ -1573,13 +1573,14 @@ void performDeepFrequencyScan(float scanRangeMHz, float scanStepMHz)
 {
   TS_PRINTLN("[FREQ] [NOTE] Wi-Fi/MQTT connections may temporarily drop and reconnect while the scan is running. This is expected.");
 
+  // FrequencyManager reports the final radio state via mqttFrequencyStatus
+  // ("Idle" on success/failure, "Error" if the radio did not respond), so we do
+  // NOT re-publish cc1101_state here. Doing so used the boot-time
+  // cc1101RadioConnected flag, which is still false during an early auto-scan and
+  // would wrongly overwrite the callback's "Idle" with "Not Connected".
   FrequencyManager::performDeepFrequencyScan(scanRangeMHz, scanStepMHz, mqttFrequencyStatus);
 
   publishFrequencyOffsetToMqtt();
-
-  char topicBuffer[MQTT_TOPIC_BUFFER_SIZE];
-  snprintf(topicBuffer, sizeof(topicBuffer), "%s/cc1101_state", mqttBaseTopic);
-  mqtt.publish(topicBuffer, cc1101RadioConnected ? "Idle" : "Not Connected", true);
 }
 
 // Function: adaptiveFrequencyTracking
@@ -1589,8 +1590,15 @@ void performDeepFrequencyScan(float scanRangeMHz, float scanStepMHz)
 //              then mirrors the resulting offset to MQTT.
 void adaptiveFrequencyTracking(int8_t freqest)
 {
+  // Publish frequency_offset only when the shared tracker actually changed the
+  // stored offset, to avoid churning the retained MQTT topic on every read when
+  // the frequency is already stable.
+  const float offsetBefore = FrequencyManager::getOffset();
   FrequencyManager::adaptiveFrequencyTracking(freqest);
-  publishFrequencyOffsetToMqtt();
+  if (FrequencyManager::getOffset() != offsetBefore)
+  {
+    publishFrequencyOffsetToMqtt();
+  }
 }
 
 /**
@@ -1755,12 +1763,13 @@ void setup()
 
   // Initialize persistent storage
 #if defined(ESP8266)
-  EEPROM.begin(EEPROM_SIZE);
-  TS_PRINTLN("[STORAGE] EEPROM initialized");
-
   // Clear EEPROM if requested (set CLEAR_EEPROM_ON_BOOT=1 in private.h)
-  // Use this when replacing ESP board, CC1101 module, or moving to a different meter
+  // Use this when replacing ESP board, CC1101 module, or moving to a different meter.
+  // The normal path leaves EEPROM init to FrequencyManager::begin() ->
+  // StorageAbstraction::begin(); only the maintenance clear needs an explicit
+  // EEPROM.begin() here (avoids initializing EEPROM twice on every boot).
 #if CLEAR_EEPROM_ON_BOOT
+  EEPROM.begin(EEPROM_SIZE);
   TS_PRINTLN("[STORAGE] CLEARING EEPROM (CLEAR_EEPROM_ON_BOOT = 1)...");
   for (int i = 0; i < EEPROM_SIZE; i++)
   {
