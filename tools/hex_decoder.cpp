@@ -111,7 +111,7 @@ static void display_parse_result(const uint8_t *buf, size_t len, const char *lab
                    "for compatibility\n",
                    length_field, length_field, len);
         else
-            printf("  CRC   : %s\n", crc_ok ? "VALID ✓" : "INVALID ✗");
+            printf("  CRC   : %s\n", crc_ok ? "VALID" : "INVALID (CRC mismatch)");
     }
     else
     {

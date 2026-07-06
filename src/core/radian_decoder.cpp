@@ -69,7 +69,7 @@ uint8_t radian_decode_4bitpbit(const uint8_t *rx_buf, int rx_len,
                     if (dest_bit_cnt < 8)
                     {
                         /* Data bit: shift in from MSB */
-                        if (dest_byte_cnt >= (uint8_t)decoded_max)
+                        if (dest_byte_cnt >= decoded_max)
                             return dest_byte_cnt;
 
                         decoded[dest_byte_cnt] >>= 1;
@@ -86,7 +86,7 @@ uint8_t radian_decode_4bitpbit(const uint8_t *rx_buf, int rx_len,
                             framing_errors++;
                         dest_bit_cnt = 0;
                         dest_byte_cnt++;
-                        if (dest_byte_cnt >= (uint8_t)decoded_max)
+                        if (dest_byte_cnt >= decoded_max)
                             return dest_byte_cnt;
                         continue;
                     }
@@ -96,7 +96,7 @@ uint8_t radian_decode_4bitpbit(const uint8_t *rx_buf, int rx_len,
                     {
                         dest_bit_cnt = 0;
                         dest_byte_cnt++;
-                        if (dest_byte_cnt >= (uint8_t)decoded_max)
+                        if (dest_byte_cnt >= decoded_max)
                             return dest_byte_cnt;
                     }
                 }
