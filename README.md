@@ -107,7 +107,7 @@ Supported meters:
 ### Advanced Frame Validation
 
 <details>
-<summary>How the firmware validates every frame (5 layers)</summary>
+<summary>How the firmware validates every frame (6 layers)</summary>
 
 The firmware implements multiple layers of validation to ensure data integrity:
 
