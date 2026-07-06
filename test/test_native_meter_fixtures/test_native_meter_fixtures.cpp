@@ -414,12 +414,14 @@ void test_radian_decode_roundtrip(void)
 void test_radian_decode_rejects_empty_and_null(void)
 {
     uint8_t decoded[16];
-    uint8_t sample = 0xF0;
+    // A full 4-byte buffer so rx_len=4 never implies an out-of-bounds read,
+    // even if a future change reordered the guard checks.
+    uint8_t sample[4] = {0xF0, 0xF0, 0xF0, 0xF0};
 
     TEST_ASSERT_EQUAL_UINT32(0, radian_decode_4bitpbit(nullptr, 4, decoded, sizeof(decoded)));
-    TEST_ASSERT_EQUAL_UINT32(0, radian_decode_4bitpbit(&sample, 0, decoded, sizeof(decoded)));
-    TEST_ASSERT_EQUAL_UINT32(0, radian_decode_4bitpbit(&sample, 4, nullptr, sizeof(decoded)));
-    TEST_ASSERT_EQUAL_UINT32(0, radian_decode_4bitpbit(&sample, 4, decoded, 0));
+    TEST_ASSERT_EQUAL_UINT32(0, radian_decode_4bitpbit(sample, 0, decoded, sizeof(decoded)));
+    TEST_ASSERT_EQUAL_UINT32(0, radian_decode_4bitpbit(sample, 4, nullptr, sizeof(decoded)));
+    TEST_ASSERT_EQUAL_UINT32(0, radian_decode_4bitpbit(sample, 4, decoded, 0));
 }
 
 // ---------------------------------------------------------------------------

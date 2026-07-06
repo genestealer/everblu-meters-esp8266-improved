@@ -1215,7 +1215,9 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
 // 01234567 ###01234 567###01 234567## #0123456 (# -> Start/Stop bit)
 // is decoded to:
 // 76543210 76543210 76543210 76543210
-// Note: decoded_buffer must be at least l_total_byte/4 bytes in size
+// Note: this wrapper always passes MAX_DECODED_SIZE (200) as the output-buffer
+// limit, so decoded_buffer must be at least 200 bytes (see the static
+// meter_data[200] caller); the decode stops early if that limit is reached.
 //
 // The core bit-recovery algorithm lives in radian_decode_4bitpbit()
 // (src/core/radian_decoder.cpp) so that a single, platform-neutral
