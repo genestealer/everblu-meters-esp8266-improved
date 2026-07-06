@@ -96,7 +96,7 @@ This will output detailed hex dumps of the decoded frame, helping identify:
   everblu_meter:
     rx_attenuation: 6  # dB — values: 0 (default), 6, 12, 18
   ```
-- **Enable auto_scan**: `auto_scan: true` (helps with frequency drift)
+- **Enable auto_scan**: `auto_scan: true` (opt-in; enables startup Deep scan for extreme frequency drift)
 - **Try different times**: Signal quality varies by time of day
 
 ---
@@ -672,7 +672,7 @@ everblu_meter:
 
 ```yaml
 everblu_meter:
-  auto_scan: true        # Enable frequency scanning
+  auto_scan: true        # Enable startup Deep frequency scan (opt-in; default is false)
   max_retries: 15        # Increase retry attempts
 ```
 
