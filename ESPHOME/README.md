@@ -326,6 +326,7 @@ esp32:
 | `retry_cooldown`     | duration | 1h            | No       | Cooldown time                                                                                                                                                                                                                                |
 | `gas_volume_divisor` | int      | 100           | No       | Gas divisor (100/1000)                                                                                                                                                                                                                       |
 | `debug_cc1101`       | bool     | false         | No       | Enable hex dump for debugging                                                                                                                                                                                                                |
+| `rx_attenuation`     | int      | 0             | No       | Front-end LNA gain limit for close-mounted installations. Values: `0` (default, no limit), `6`, `12`, `18` (dB, approximate). Increase when `*** NEAR-FIELD SATURATION DETECTED ***` is logged and moving the device further is not practical. |
 <!-- markdownlint-enable MD060 -->
 
 ### Schedule Options
