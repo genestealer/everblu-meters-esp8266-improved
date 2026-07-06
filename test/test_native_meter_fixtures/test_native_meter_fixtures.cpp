@@ -424,6 +424,54 @@ void test_radian_decode_rejects_empty_and_null(void)
     TEST_ASSERT_EQUAL_UINT32(0, radian_decode_4bitpbit(&sample, 4, decoded, 0));
 }
 
+// ---------------------------------------------------------------------------
+// Reading-vs-history plausibility guard
+//
+// radian_reading_within_history_bounds() rejects a reading whose implied
+// current-month usage exceeds 100x the largest historical monthly usage. The
+// check is skipped (accepts) when history is insufficient to judge.
+// ---------------------------------------------------------------------------
+void test_radian_reading_within_history_bounds(void)
+{
+    // Steady ~1000 L/month history; largest monthly usage = 1000 L.
+    const uint32_t history[] = {10000, 11000, 12000, 13000, 14000};
+    const int months = 5;
+
+    // Normal current-month usage (~1000 L) is well within bounds -> accept.
+    TEST_ASSERT_TRUE(radian_reading_within_history_bounds(15000, history, months, 100UL));
+
+    // Exactly 100x the largest monthly usage (100000 L) is the boundary and
+    // must still be accepted (only a strictly greater jump is rejected).
+    TEST_ASSERT_TRUE(radian_reading_within_history_bounds(14000 + 100000, history, months, 100UL));
+
+    // One litre beyond 100x is an implausible spike -> reject.
+    TEST_ASSERT_FALSE(radian_reading_within_history_bounds(14000 + 100001, history, months, 100UL));
+
+    // A grossly corrupted reading -> reject.
+    TEST_ASSERT_FALSE(radian_reading_within_history_bounds(500000000UL, history, months, 100UL));
+}
+
+void test_radian_reading_within_history_bounds_skips_when_insufficient(void)
+{
+    const uint32_t history[] = {10000, 11000, 12000};
+
+    // NULL history -> accept (skip).
+    TEST_ASSERT_TRUE(radian_reading_within_history_bounds(999999999UL, nullptr, 3, 100UL));
+
+    // Fewer than 2 months -> accept (skip).
+    TEST_ASSERT_TRUE(radian_reading_within_history_bounds(999999999UL, history, 1, 100UL));
+
+    // spike_factor 0 -> accept (skip).
+    TEST_ASSERT_TRUE(radian_reading_within_history_bounds(999999999UL, history, 3, 0UL));
+
+    // Flat history (largest monthly usage == 0) -> accept (skip), no baseline.
+    const uint32_t flat[] = {5000, 5000, 5000};
+    TEST_ASSERT_TRUE(radian_reading_within_history_bounds(999999999UL, flat, 3, 100UL));
+
+    // Current volume predates the newest snapshot -> accept (skip).
+    TEST_ASSERT_TRUE(radian_reading_within_history_bounds(11500, history, 3, 100UL));
+}
+
 int main(int argc, char **argv)
 {
     (void)argc;
@@ -434,6 +482,8 @@ int main(int argc, char **argv)
     RUN_TEST(test_radian_parse_primary_time_rejection);
     RUN_TEST(test_radian_decode_roundtrip);
     RUN_TEST(test_radian_decode_rejects_empty_and_null);
+    RUN_TEST(test_radian_reading_within_history_bounds);
+    RUN_TEST(test_radian_reading_within_history_bounds_skips_when_insufficient);
     RUN_TEST(test_replay_meter_fixtures);
     return UNITY_END();
 }

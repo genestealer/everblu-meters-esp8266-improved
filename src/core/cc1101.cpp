@@ -1153,6 +1153,20 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
         memset(data.history, 0, sizeof(data.history));
         echo_debug(1, "[WARN] Discarded corrupted historical block while keeping primary meter fields\n");
       }
+
+      // 4) Plausibility guard on the current reading versus its own history.
+      //    Reject the whole frame when the implied current-month usage exceeds
+      //    100x the largest historical monthly usage - a corrupted current
+      //    volume shows up as an absurd jump relative to the meter's history.
+      //    Skipped automatically when history is insufficient/unreliable (see
+      //    radian_reading_within_history_bounds()).
+      if (history_ok &&
+          !radian_reading_within_history_bounds((uint32_t)data.volume, data.history, num_values, 100UL))
+      {
+        echo_debug(1, "[ERROR] Current-month usage exceeds 100x the largest historical monthly usage - discarding reading\n");
+        memset(&data, 0, sizeof(data));
+        return data;
+      }
     }
     else
     {
