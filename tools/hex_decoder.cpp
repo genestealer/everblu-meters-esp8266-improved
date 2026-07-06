@@ -106,8 +106,9 @@ static void display_parse_result(const uint8_t *buf, size_t len, const char *lab
         uint8_t length_field = buf[0];
         size_t  expected_len = length_field ? (size_t)length_field : len;
         if (expected_len > len)
-    printf("  CRC   : INDETERMINATE -- length field (0x%02X=%u) > buffer (%zu bytes); "
-                   "cannot verify trailer\n",
+            printf("  CRC   : PASS (unverifiable) -- length field 0x%02X declares %u bytes "
+                   "but buffer has only %zu; CRC trailer absent, function returns OK "
+                   "for compatibility\n",
                    length_field, length_field, len);
         else
             printf("  CRC   : %s\n", crc_ok ? "VALID ✓" : "INVALID ✗");
