@@ -216,6 +216,15 @@
 // 0 = disable (default)
 #define DEBUG_CC1101 0
 
+// Front-end RX input attenuation (dB)
+// Use this if the device is permanently mounted close to the meter (<0.5 m) and
+// near-field saturation causes CRC failures despite strong RSSI (e.g. flat −31 dBm
+// plateau, correct header received but every frame fails CRC).
+// The setting limits the CC1101 LNA gain via AGCCTRL2 MAX_LNA_GAIN.
+// Values: 0 (default, no attenuation), 6 (~6 dB), 12 (~12 dB), 18 (~18 dB)
+// At normal installation distance (−60 to −85 dBm) keep this at 0.
+#define RX_ATTENUATION_DB 0
+
 // ============================================================================
 // READING RETRY CONFIGURATION
 // ============================================================================

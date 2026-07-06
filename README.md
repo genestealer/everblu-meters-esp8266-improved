@@ -830,7 +830,14 @@ The CC1101's front-end amplifier has a limited input range. When the device is p
 
 **Solution:**
 
-Move the device at least **1–2 m away** from the meter. At normal installation distance the RSSI should be around −60 to −85 dBm, well within the linear range. If the device must be mounted close to the meter, a firmware option to engage the CC1101 front-end attenuator (6/12/18 dB) is planned — see [issue #109](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/109).
+Move the device at least **1–2 m away** from the meter. At normal installation distance the RSSI should be around −60 to −85 dBm, well within the linear range. If the device must be permanently mounted close to the meter, set `RX_ATTENUATION_DB` in `include/private.h` to engage the CC1101 front-end LNA gain limiter:
+
+```cpp
+// Values: 0 (default), 6, 12, 18 (dB)
+#define RX_ATTENUATION_DB 6
+```
+
+Start with `6` and increase if CRC failures persist at close range. At normal distance keep this at `0`.
 
 ---
 
