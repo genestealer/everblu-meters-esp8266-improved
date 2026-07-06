@@ -9,7 +9,7 @@
 Import("env")
 
 env.BuildSources(
-    "$BUILD_DIR/tool_src",          # intermediate object directory
-    env.subst("$PROJECT_DIR/tools"), # source directory
-    ["+<hex_decoder.cpp>"],          # include only this file
+    "$BUILD_DIR/tool_src",  # intermediate object directory
+    env.subst("$PROJECT_DIR/tools"),  # source directory
+    ["+<hex_decoder.cpp>"],  # include only this file
 )
