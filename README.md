@@ -107,7 +107,7 @@ Supported meters:
 ### Advanced Frame Validation
 
 <details>
-<summary>How the firmware validates every frame (5 layers)</summary>
+<summary>How the firmware validates every frame (6 layers)</summary>
 
 The firmware implements multiple layers of validation to ensure data integrity:
 
@@ -130,6 +130,10 @@ The firmware implements multiple layers of validation to ensure data integrity:
    - RSSI threshold (configurable, default -90 dBm)
    - LQI (Link Quality Indicator) assessment
    - Frequency error estimation for adaptive tuning
+
+6. **Reading Plausibility (History Cross-Check)**:
+   - The frame carries up to 13 months of historical volume snapshots. The firmware rejects the whole reading when the implied **current-month usage** (current volume minus the newest history snapshot) exceeds **100× the largest historical monthly usage** — a corrupted current volume shows up as an absurd jump versus the meter's own history.
+   - The check is skipped (the reading is accepted) when there is insufficient history to judge: fewer than 2 valid months, a flat history with no recorded usage, or a current volume that predates the newest snapshot. First reads and no-consumption meters are therefore unaffected.
 
 **Result**: Data is only published after passing every check above, so corrupted or partial frames are discarded rather than reported to Home Assistant.
 

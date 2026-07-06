@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "core/radian_parser.h"
+#include "core/radian_decoder.h"
 
 struct Fixture
 {
@@ -309,6 +310,175 @@ void test_replay_meter_fixtures(void)
     }
 }
 
+// ---------------------------------------------------------------------------
+// 4-bit-per-bit decoder coverage (issue #118)
+//
+// radian_decode_4bitpbit() is the single, shared implementation of the RADIAN
+// 4x-oversampled bit-recovery algorithm; the firmware wrapper
+// decode_4bitpbit_serial() in cc1101.cpp now delegates to it. This encoder is
+// an *independent* implementation of the on-air framing, so a clean round-trip
+// (encode -> decode == original) validates the shared decode path against a
+// known-good oversampled bitstream.
+//
+// On-air framing per byte: 8 data bits (LSB first) + 3 stop bits (1), with a
+// single start/separator bit (0) between bytes. Each logical bit is
+// transmitted as four identical samples; samples are packed MSB-first into the
+// RX buffer bytes exactly as the CC1101 delivers them.
+// ---------------------------------------------------------------------------
+static void encode_4x_oversampled(const std::vector<uint8_t> &msg,
+                                  std::vector<uint8_t> &out)
+{
+    std::vector<uint8_t> bits; // logical bits in transmission order
+
+    for (uint8_t value : msg)
+    {
+        for (int i = 0; i < 8; i++) // 8 data bits, LSB first
+        {
+            bits.push_back(static_cast<uint8_t>((value >> i) & 1U));
+        }
+        bits.push_back(1); // 3 stop bits
+        bits.push_back(1);
+        bits.push_back(1);
+        bits.push_back(0); // start/separator bit terminating this byte
+    }
+
+    // Trailing high run so the decoder flushes (and therefore counts) the final
+    // separator bit; the decoder only emits a run when the polarity changes.
+    for (int i = 0; i < 8; i++)
+    {
+        bits.push_back(1);
+    }
+
+    // Each logical bit -> four identical samples.
+    std::vector<uint8_t> samples;
+    samples.reserve(bits.size() * 4);
+    for (uint8_t b : bits)
+    {
+        for (int s = 0; s < 4; s++)
+        {
+            samples.push_back(b);
+        }
+    }
+
+    // The framing yields 12 logical bits per byte plus an 8-bit trailing run,
+    // so the sample count (4 * (12*N + 8)) is always a multiple of 8 - no
+    // padding is required before packing.
+
+    // Pack MSB-first, matching how the CC1101 FIFO bytes are consumed.
+    out.clear();
+    out.reserve(samples.size() / 8);
+    for (size_t i = 0; i < samples.size(); i += 8)
+    {
+        uint8_t v = 0;
+        for (int b = 0; b < 8; b++)
+        {
+            v = static_cast<uint8_t>((v << 1) | (samples[i + b] & 1U));
+        }
+        out.push_back(v);
+    }
+}
+
+static void assert_decode_roundtrip(const std::vector<uint8_t> &message)
+{
+    std::vector<uint8_t> oversampled;
+    encode_4x_oversampled(message, oversampled);
+
+    uint8_t decoded[256];
+    uint8_t count = radian_decode_4bitpbit(
+        oversampled.data(), static_cast<int>(oversampled.size()),
+        decoded, static_cast<int>(sizeof(decoded)));
+
+    TEST_ASSERT_EQUAL_UINT32(static_cast<uint32_t>(message.size()),
+                             static_cast<uint32_t>(count));
+    for (size_t i = 0; i < message.size(); i++)
+    {
+        TEST_ASSERT_EQUAL_HEX8(message[i], decoded[i]);
+    }
+}
+
+void test_radian_decode_roundtrip(void)
+{
+    // Bit patterns chosen to exercise all-zero, all-one, alternating and
+    // sequential bytes through the run-length recovery.
+    assert_decode_roundtrip({0xA5});
+    assert_decode_roundtrip({0x00, 0xFF, 0xA5, 0x5A, 0x01, 0x80, 0x7F, 0xFE});
+
+    std::vector<uint8_t> sequential;
+    for (int i = 0; i < 32; i++)
+    {
+        sequential.push_back(static_cast<uint8_t>(i * 7 + 1));
+    }
+    assert_decode_roundtrip(sequential);
+}
+
+void test_radian_decode_rejects_empty_and_null(void)
+{
+    uint8_t decoded[16];
+    // A full 4-byte buffer so rx_len=4 never implies an out-of-bounds read,
+    // even if a future change reordered the guard checks.
+    uint8_t sample[4] = {0xF0, 0xF0, 0xF0, 0xF0};
+
+    TEST_ASSERT_EQUAL_UINT32(0, radian_decode_4bitpbit(nullptr, 4, decoded, sizeof(decoded)));
+    TEST_ASSERT_EQUAL_UINT32(0, radian_decode_4bitpbit(sample, 0, decoded, sizeof(decoded)));
+    TEST_ASSERT_EQUAL_UINT32(0, radian_decode_4bitpbit(sample, 4, nullptr, sizeof(decoded)));
+    TEST_ASSERT_EQUAL_UINT32(0, radian_decode_4bitpbit(sample, 4, decoded, 0));
+}
+
+// ---------------------------------------------------------------------------
+// Reading-vs-history plausibility guard
+//
+// radian_reading_within_history_bounds() rejects a reading whose implied
+// current-month usage exceeds 100x the largest historical monthly usage. The
+// check is skipped (accepts) when history is insufficient to judge.
+// ---------------------------------------------------------------------------
+void test_radian_reading_within_history_bounds(void)
+{
+    // Steady ~1000 L/month history; largest monthly usage = 1000 L.
+    const uint32_t history[] = {10000, 11000, 12000, 13000, 14000};
+    const int months = 5;
+
+    // Normal current-month usage (~1000 L) is well within bounds -> accept.
+    TEST_ASSERT_TRUE(radian_reading_within_history_bounds(15000, history, months, 100UL));
+
+    // Exactly 100x the largest monthly usage (100000 L) is the boundary and
+    // must still be accepted (only a strictly greater jump is rejected).
+    TEST_ASSERT_TRUE(radian_reading_within_history_bounds(14000 + 100000, history, months, 100UL));
+
+    // One litre beyond 100x is an implausible spike -> reject.
+    TEST_ASSERT_FALSE(radian_reading_within_history_bounds(14000 + 100001, history, months, 100UL));
+
+    // A grossly corrupted reading -> reject.
+    TEST_ASSERT_FALSE(radian_reading_within_history_bounds(500000000UL, history, months, 100UL));
+
+    // A decreasing month (meter reset/rollover) is skipped when computing the
+    // largest usage; the remaining rising months (all 1000 L) still bound the
+    // check. Newest = 2500.
+    const uint32_t with_reset[] = {10000, 11000, 500, 1500, 2500};
+    TEST_ASSERT_TRUE(radian_reading_within_history_bounds(2500 + 1000, with_reset, 5, 100UL));
+    TEST_ASSERT_FALSE(radian_reading_within_history_bounds(2500 + 100001, with_reset, 5, 100UL));
+}
+
+void test_radian_reading_within_history_bounds_skips_when_insufficient(void)
+{
+    const uint32_t history[] = {10000, 11000, 12000};
+
+    // NULL history -> accept (skip).
+    TEST_ASSERT_TRUE(radian_reading_within_history_bounds(999999999UL, nullptr, 3, 100UL));
+
+    // Fewer than 2 months -> accept (skip).
+    TEST_ASSERT_TRUE(radian_reading_within_history_bounds(999999999UL, history, 1, 100UL));
+
+    // spike_factor 0 -> accept (skip).
+    TEST_ASSERT_TRUE(radian_reading_within_history_bounds(999999999UL, history, 3, 0UL));
+
+    // Flat history (largest monthly usage == 0) -> accept (skip), no baseline.
+    const uint32_t flat[] = {5000, 5000, 5000};
+    TEST_ASSERT_TRUE(radian_reading_within_history_bounds(999999999UL, flat, 3, 100UL));
+
+    // Current volume predates the newest snapshot -> accept (skip).
+    TEST_ASSERT_TRUE(radian_reading_within_history_bounds(11500, history, 3, 100UL));
+}
+
 int main(int argc, char **argv)
 {
     (void)argc;
@@ -317,6 +487,10 @@ int main(int argc, char **argv)
     UNITY_BEGIN();
     RUN_TEST(test_radian_parse_primary_volume_rejection);
     RUN_TEST(test_radian_parse_primary_time_rejection);
+    RUN_TEST(test_radian_decode_roundtrip);
+    RUN_TEST(test_radian_decode_rejects_empty_and_null);
+    RUN_TEST(test_radian_reading_within_history_bounds);
+    RUN_TEST(test_radian_reading_within_history_bounds_skips_when_insufficient);
     RUN_TEST(test_replay_meter_fixtures);
     return UNITY_END();
 }
