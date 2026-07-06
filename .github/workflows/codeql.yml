@@ -1,0 +1,54 @@
+name: "CodeQL"
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "30 18 * * 4" # Thursday 18:30 UTC
+  push:
+    branches: [main, develop]
+
+# Deny by default; the analyze job opts in to exactly what it needs.
+permissions: {}
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write # upload CodeQL SARIF results to the Code Scanning API
+      packages: read          # fetch internal or private CodeQL query packs
+      actions: read           # required by codeql-action when run from a private repo
+      contents: read          # actions/checkout to scan the repository
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: python
+            build-mode: none
+          # C/C++ analysis requires a full toolchain build via PlatformIO.
+          # Uncomment and configure the manual build step below to enable it.
+          # - language: c-cpp
+          #   build-mode: manual
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      # If you enable c-cpp above, replace this step with the PlatformIO build:
+      # - name: Build C/C++ for CodeQL
+      #   if: matrix.build-mode == 'manual'
+      #   run: |
+      #     pip install platformio
+      #     cp include/private.example.h include/private.h
+      #     sed -i 's/#define METER_CODE "xx-xxxxxxx-xxx"/#define METER_CODE "99-1234567-000"/g' include/private.h
+      #     pio run -e huzzah
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
