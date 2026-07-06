@@ -582,7 +582,7 @@ EverbluMeterComponent (ESPHome)
 - **battery** - Estimated battery life (years)
 - **counter** - Alternative volume counter
 - **rssi** / **rssi_percentage** - Radio signal strength
-- **lqi** / **lqi_percentage** - Link quality indicator
+- **lqi** / **lqi_percentage** - Link quality indicator (raw `lqi` is 0-127 where *lower is better*; `lqi_percentage` inverts this so higher % = better link)
 - **time_start** / **time_end** - Reading timing
 - **frequency_offset** - Current frequency offset (kHz)
 - **tuned_frequency** - Actual tuned frequency (MHz)

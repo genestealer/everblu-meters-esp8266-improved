@@ -938,7 +938,7 @@ uint8_t cc1101_check_packet_received(void)
     if (is_look_like_radian_frame(rxBuffer, pktLen))
     {
       echo_debug(debug_out, "[CC1101] Packet looks like RADIAN frame");
-      echo_debug(debug_out, "[CC1101] bytes=%u rssi=%d lqi=%u F_est=%u", pktLen, l_Rssi_dbm, l_lqi, l_freq_est);
+      echo_debug(debug_out, "[CC1101] bytes=%u rssi=%d lqi=%u F_est=%d\n", pktLen, l_Rssi_dbm, l_lqi & 0x7F, (int8_t)l_freq_est);
       show_in_hex_one_line(rxBuffer, pktLen);
       // show_in_bin(rxBuffer,l_nb_byte);
     }
@@ -1483,7 +1483,7 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
   l_lqi = halRfReadReg(LQI_ADDR);
   l_freq_est = halRfReadReg(FREQEST_ADDR);
   l_Rssi_dbm = cc1100_rssi_convert2dbm(halRfReadReg(RSSI_ADDR));
-  echo_debug(debug_out, "[CC1101] rssi=%d lqi=%u F_est=%u", l_Rssi_dbm, l_lqi, l_freq_est);
+  echo_debug(debug_out, "[CC1101] rssi=%d lqi=%u F_est=%d\n", l_Rssi_dbm, l_lqi & 0x7F, (int8_t)l_freq_est);
 
   fflush(stdout);
 
@@ -1916,7 +1916,7 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
   {
     echo_debug(1, "[METER] WARNING: TX loop timed out after %dms before the FIFO drained (MARCSTATE=0x%02X); possible SPI/feeding issue\n", tmo * 10, marcstate & 0x1F);
   }
-  echo_debug(debug_out, "[CC1101] tmo=%i free_byte:0x%02X sts:0x%02X", tmo, CC1101_status_FIFO_FreeByte, CC1101_status_state);
+  echo_debug(debug_out, "[CC1101] tmo=%i free_byte:0x%02X sts:0x%02X\n", tmo, CC1101_status_FIFO_FreeByte, CC1101_status_state);
   CC1101_CMD(SIDLE); // Ensure IDLE before flushing (required by CC1101 datasheet)
   CC1101_CMD(SFTX);  // Flush TX FIFO; this clears the status and puts the state machine in IDLE
   // end of transition restore default register
@@ -2019,7 +2019,7 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
   }
   sdata.rssi = halRfReadReg(RSSI_ADDR);                              // Read RSSI value from CC1101
   sdata.rssi_dbm = cc1100_rssi_convert2dbm(halRfReadReg(RSSI_ADDR)); // Read RSSI value from CC1101 and convert to dBm
-  sdata.lqi = halRfReadReg(LQI_ADDR);                                // Read LQI value from CC1101
+  sdata.lqi = halRfReadReg(LQI_ADDR) & 0x7F;                         // Read LQI value from CC1101 (mask bit 7 = CRC_OK; bits 6:0 are the LQI)
   sdata.freqest = (int8_t)halRfReadReg(FREQEST_ADDR);                // Read frequency offset estimate for adaptive tracking
   return sdata;
 }

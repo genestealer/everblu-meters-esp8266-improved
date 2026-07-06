@@ -363,7 +363,10 @@ int ESPHomeDataPublisher::calculateRssiPercentage(int rssi_dbm) const
 
 int ESPHomeDataPublisher::calculateLqiPercentage(int lqi) const
 {
-    // LQI is 0-255, convert to percentage
-    int clamped = (lqi < 0) ? 0 : (lqi > 255 ? 255 : lqi);
-    return (int)(clamped * 100.0 / 255.0);
+    // CC1101 LQI is a 7-bit demodulation-error metric (bit 7 = CRC_OK, masked upstream)
+    // where a LOWER value means a better link. Invert so a higher percentage means a
+    // better link. Uses the same integer arithmetic as Arduino map(error, 0, 127, 100, 0)
+    // in calculateLQIToPercentage() so both builds report identical values.
+    int error = lqi & 0x7F;
+    return (error * -100) / 127 + 100;
 }
