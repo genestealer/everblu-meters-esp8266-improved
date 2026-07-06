@@ -80,6 +80,8 @@ Invoke-WithRetry -Description "copying source tree" -Action {
 Write-Host "Removing standalone-only files..." -ForegroundColor Yellow
 Remove-Item "$RELEASE_DIR\main.cpp" -ErrorAction SilentlyContinue
 Remove-Item "$RELEASE_DIR\adapters\implementations\define_config_provider.h" -ErrorAction SilentlyContinue
+# Remove host-only dev tools (contain a standalone main(); not part of ESPHome component)
+Remove-Item -Recurse -Force "$RELEASE_DIR\tools" -ErrorAction SilentlyContinue
 
 # Flatten headers and sources into a single folder for ESPHome
 Write-Host "Flattening sources into a single folder..." -ForegroundColor Green

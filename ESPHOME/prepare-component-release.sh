@@ -50,6 +50,8 @@ cp -r "$SRC_DIR"/* "$RELEASE_DIR/"
 # Remove main.cpp (standalone-only entry point, not for ESPHome)
 echo "Removing standalone-only files..."
 rm -f "$RELEASE_DIR/main.cpp"
+# Remove host-only dev tools (contain a standalone main(); not part of ESPHome component)
+rm -rf "$RELEASE_DIR/tools"
 rm -f "$RELEASE_DIR/adapters/implementations/define_config_provider.h"
 
 # Flatten headers and sources into a single folder for ESPHome
