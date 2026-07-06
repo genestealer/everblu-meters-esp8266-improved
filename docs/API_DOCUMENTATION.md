@@ -473,7 +473,7 @@ Convert LQI to percentage.
 - Link quality as percentage (0-100)
 
 **Purpose:**
-Converts CC1101 Link Quality Indicator (0-255) to 0-100% scale. LQI represents overall link quality including interference effects.
+Converts CC1101 Link Quality Indicator (0-127) to 0-100% scale. LQI is an accumulated demodulation-error metric where a lower value means a better link, so the mapping is inverted (LQI 0 → 100%).
 
 ---
 

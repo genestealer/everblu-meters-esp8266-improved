@@ -270,7 +270,7 @@ The component provides various sensors for monitoring your meter:
 | `battery`          | years   | Estimated battery life remaining      | `measurement`      |
 | `rssi`             | dBm     | Radio signal strength                 | `measurement`      |
 | `rssi_percentage`  | %       | Signal strength as percentage (0-100) | `measurement`      |
-| `lqi`              | -       | Link quality indicator (0-255)        | `measurement`      |
+| `lqi`              | -       | Link quality indicator (0-127, lower is better) | `measurement`      |
 | `lqi_percentage`   | %       | Link quality as percentage (0-100)    | `measurement`      |
 | `time_start`       | ms      | Reading start timestamp               | `measurement`      |
 | `time_end`         | ms      | Reading end timestamp                 | `measurement`      |

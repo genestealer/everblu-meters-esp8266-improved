@@ -99,7 +99,7 @@ struct tmeter_data
   int time_end;           // Reading window end time (24-hour format, e.g., 18 = 6pm)
   int rssi;               // Radio Signal Strength Indicator (raw value)
   int rssi_dbm;           // RSSI converted to dBm
-  int lqi;                // Link Quality Indicator (0-255, higher is better)
+  int lqi;                // Link Quality Indicator (0-127, lower is better; CRC_OK bit masked)
   int8_t freqest;         // Frequency offset estimate from CC1101 for adaptive tracking
   uint32_t history[13];   // Monthly historical readings (13 months), index 0 = oldest, 12 = most recent
   bool history_available; // True if historical data was successfully extracted
