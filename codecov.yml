@@ -1,0 +1,23 @@
+# Codecov configuration
+# https://docs.codecov.com/docs/codecovyml-reference
+
+coverage:
+  status:
+    # Show project coverage checks on every pull request.
+    # target: auto compares against the base commit so coverage must not drop.
+    # https://docs.codecov.com/docs/common-recipe-list#set-project-coverage-checks-on-a-pull-request
+    project:
+      default:
+        target: auto   # compare against the previous base commit
+        threshold: 0%  # no tolerance for coverage drops
+        base: auto
+
+# Show full project coverage changes (not just patch/diff) on the PR comment.
+# https://docs.codecov.com/docs/common-recipe-list#show-project-coverage-changes-on-the-pull-request-comment
+comment:
+  layout: "diff, flags, files"
+  behavior: default
+  require_changes: false  # post the comment even when coverage is unchanged
+  require_base: false     # post even when there is no base report yet
+  require_head: true      # only post when a head report is available
+  hide_project_coverage: false  # show project-level coverage, not just patch
