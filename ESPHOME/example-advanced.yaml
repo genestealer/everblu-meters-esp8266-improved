@@ -89,7 +89,8 @@ everblu_meter:
 
   # Radio configuration - custom frequency
   frequency: 433.82       # Fine-tuned frequency
-  auto_scan: false        # Disable auto-scan for faster readings
+  # auto_scan: false      # Default since CC1101 RX bandwidth was widened to 270 kHz;
+                          # set to true only if the meter is not found at 433.82 MHz
   auto_scan_on_failure: true  # Auto-scan once for offset drift after max retries (recovers unattended)
   debug_cc1101: true      # Enable detailed CC1101 radio debug logs
 

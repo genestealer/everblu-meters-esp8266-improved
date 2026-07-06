@@ -96,7 +96,7 @@ This will output detailed hex dumps of the decoded frame, helping identify:
   everblu_meter:
     rx_attenuation: 6  # dB — values: 0 (default), 6, 12, 18
   ```
-- **Enable auto_scan**: `auto_scan: true` (helps with frequency drift)
+- **Enable auto_scan**: `auto_scan: true` (opt-in; enables startup Deep scan for extreme frequency drift)
 - **Try different times**: Signal quality varies by time of day
 
 ---
@@ -317,7 +317,7 @@ esp32:
 | `disable_gdo2_fifo_management` | bool | false | No | Opt out of the GDO2 hardware FIFO mechanism and use the legacy SPI-polling behaviour. When `true`, `gdo2_pin` is not required and need not be wired. |
 | `time_id`            | id       | -             | Yes      | Time component ID                                                                                                                                                                                                                            |
 | `frequency`          | float    | 433.82        | No       | RF frequency (MHz)                                                                                                                                                                                                                           |
-| `auto_scan`          | bool     | true          | No       | Auto frequency scan                                                                                                                                                                                                                          |
+| `auto_scan`          | bool     | false         | No       | Auto frequency scan                                                                                                                                                                                                                          |
 | `auto_scan_on_failure` | bool   | true          | No       | Auto frequency scan (once) after read attempts keep failing and the component enters cooldown, to recover from carrier-frequency drift                                                                                                       |
 | `reading_schedule`   | string   | Monday-Friday | No       | Reading schedule. Presets: `Monday-Friday`, `Monday-Saturday`, `Monday-Sunday`, or any single day name                                                                                                                                       |
 | `read_hour`          | int      | 10            | No       | Read hour (0-23)                                                                                                                                                                                                                             |
@@ -672,7 +672,7 @@ everblu_meter:
 
 ```yaml
 everblu_meter:
-  auto_scan: true        # Enable frequency scanning
+  auto_scan: true        # Enable startup Deep frequency scan (opt-in; default is false)
   max_retries: 15        # Increase retry attempts
 ```
 
