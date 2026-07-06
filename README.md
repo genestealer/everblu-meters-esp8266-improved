@@ -6,6 +6,7 @@
 [![ESP32 Build](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/build-esp32.yml/badge.svg?branch=main)](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/build-esp32.yml)
 [![ESPHome Component](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/esphome-external-component.yml/badge.svg?branch=main)](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/esphome-external-component.yml)
 [![Meter Fixture Tests](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/meter-fixture-tests.yml/badge.svg?branch=main)](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/meter-fixture-tests.yml)
+[![codecov](https://codecov.io/gh/psykokwak-com/everblu-meters-esp8266/branch/main/graph/badge.svg)](https://codecov.io/gh/psykokwak-com/everblu-meters-esp8266)
 [![Code Quality](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/code-quality.yml/badge.svg?branch=main)](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/code-quality.yml)
 
 ## Platforms & Capabilities

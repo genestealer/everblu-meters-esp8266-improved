@@ -1,0 +1,85 @@
+name: Code Coverage
+
+on:
+  push:
+    branches: [main, master, develop]
+    paths:
+      - src/**
+      - include/**
+      - platformio.ini
+      - test/fixtures/**
+      - test/test_native_meter_fixtures/**
+      - .github/workflows/coverage.yml
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - src/**
+      - include/**
+      - platformio.ini
+      - test/fixtures/**
+      - test/test_native_meter_fixtures/**
+      - .github/workflows/coverage.yml
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  coverage:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    name: Collect and Upload Coverage
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-coverage-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-coverage-
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: ${{ runner.os }}-pio-native-${{ hashFiles('**/platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-native-
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install --upgrade platformio gcovr
+
+      - name: Run native tests with coverage instrumentation
+        run: |
+          pio test -e native -v
+
+      - name: Collect coverage
+        run: |
+          gcovr \
+            --root . \
+            --filter src/core/crc_kermit.cpp \
+            --filter src/core/radian_parser.cpp \
+            --object-directory .pio/build/native/ \
+            --xml coverage.xml \
+            --print-summary
+
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
