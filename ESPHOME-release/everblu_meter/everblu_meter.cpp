@@ -375,6 +375,10 @@ void EverbluMeterComponent::apply_radio_context() {
   } else {
     cc1101_set_gdo2_pin(-1);  // Ensure fallback mode on re-entry
   }
+
+  // Apply RX attenuation (0 = default, no LNA limiting; 6/12/18 = reduce LNA gain
+  // to prevent front-end saturation when mounted close to the meter).
+  cc1101_set_rx_attenuation(this->rx_attenuation_db_);
 }
 
 void EverbluMeterComponent::update() {

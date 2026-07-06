@@ -77,6 +77,11 @@ everblu_meter:
   # Examples: 60 = UTC+1, -300 = UTC-5, 660 = UTC+11
   # timezone_offset: 60  # Central Europe CET (UTC+1)
 
+  # Optional: Front-end RX input attenuation (default: 0)
+  # Increase to 6/12/18 only if log shows *** NEAR-FIELD SATURATION DETECTED ***
+  # and the device cannot be moved further from the meter.
+  # rx_attenuation: 0
+
   # Minimal sensors - just the essentials
 
   # Control button (optional but handy)

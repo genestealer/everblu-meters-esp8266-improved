@@ -100,6 +100,7 @@ class EverbluMeterComponent final : public PollingComponent,
   void set_adaptive_threshold(int threshold) { this->adaptive_threshold_ = threshold; }
   void set_gdo0_pin(InternalGPIOPin *pin) { this->gdo0_pin_ = pin; }
   void set_gdo2_pin(InternalGPIOPin *pin) { this->gdo2_pin_ = pin; }
+  void set_rx_attenuation(int db) { this->rx_attenuation_db_ = db; }
 
   // Sensor setters
   void set_volume_sensor(sensor::Sensor *sensor) { this->volume_sensor_ = sensor; }
@@ -157,6 +158,7 @@ class EverbluMeterComponent final : public PollingComponent,
   int max_retries_{5};
   unsigned long retry_cooldown_ms_{3600000};
   int adaptive_threshold_{1};
+  int rx_attenuation_db_{0};
 
   // Internal state tracking
   void publish_boot_states();

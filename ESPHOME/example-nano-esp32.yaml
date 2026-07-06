@@ -83,6 +83,11 @@ everblu_meter:
                           # To keep legacy SPI polling instead, remove this line and add:
                           #   disable_gdo2_fifo_management: true
 
+  # Optional: Front-end RX input attenuation (default: 0)
+  # Increase to 6/12/18 only if log shows *** NEAR-FIELD SATURATION DETECTED ***
+  # and the device cannot be moved further from the meter.
+  # rx_attenuation: 0
+
   # Optional: set meter_type to 'gas' for gas meters (defaults to water)
 
   # Link to time component

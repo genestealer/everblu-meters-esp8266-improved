@@ -102,6 +102,7 @@ CONF_FREQUENCY_ESTIMATE = "frequency_estimate"
 CONF_REQUEST_READING_BUTTON = "request_reading_button"
 CONF_DEEP_SCAN_BUTTON = "deep_scan_button"
 CONF_RESET_FREQUENCY_BUTTON = "reset_frequency_button"
+CONF_RX_ATTENUATION = "rx_attenuation"
 
 # Meter types
 METER_TYPE_WATER = "water"
@@ -216,6 +217,9 @@ CONFIG_SCHEMA = (
             cv.Optional(CONF_DEBUG_CC1101, default=False): cv.boolean,
             cv.Optional(CONF_ADAPTIVE_THRESHOLD, default=1): cv.int_range(
                 min=1, max=100
+            ),
+            cv.Optional(CONF_RX_ATTENUATION, default=0): cv.one_of(
+                0, 6, 12, 18, int=True
             ),
             # Sensors
             cv.Optional(CONF_VOLUME): sensor.sensor_schema(
@@ -461,6 +465,7 @@ async def to_code(config):
     cg.add(var.set_retry_cooldown(config[CONF_RETRY_COOLDOWN]))  # Already in ms
     cg.add(var.set_initial_read_on_boot(config[CONF_INITIAL_READ_ON_BOOT]))
     cg.add(var.set_adaptive_threshold(config[CONF_ADAPTIVE_THRESHOLD]))
+    cg.add(var.set_rx_attenuation(config[CONF_RX_ATTENUATION]))
 
     # Enable detailed CC1101 debug logs when requested
     if config.get(CONF_DEBUG_CC1101, False):

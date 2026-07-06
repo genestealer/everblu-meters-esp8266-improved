@@ -174,8 +174,25 @@ static const uint8_t debug_out = (uint8_t)(DEBUG_CC1101);
 // BSCFG - Bit Synchronization Configuration
 #define BSCFG_BS_PRE_KI_2 0x1C // Bit sync configuration
 
-// AGCCTRL2 - AGC Control
-#define AGCCTRL2_MAX_DVGA_LNA 0xC7 // Max DVGA and LNA gain
+// AGCCTRL2 - AGC Control (balanced profile)
+// 0x43 = 01 000 011: MAX_DVGA_GAIN=01 (more DVGA headroom), MAX_LNA_GAIN=000, MAGN_TARGET=011 (33 dB)
+// Replaces the former 0xC7 (42 dB target, 3 DVGA steps disabled) which locked the receiver near
+// maximum gain and caused front-end saturation / CRC failures at close range (< 0.5 m).
+// The 9 dB lower target gives the AGC loop headroom to reduce gain for strong near-field signals
+// without degrading sensitivity for weak/distant meters.
+#define AGCCTRL2_BALANCED 0x43
+
+// AGCCTRL2 values with optional LNA gain reduction (RX_ATTENUATION_DB).
+// Each step limits MAX_LNA_GAIN in AGCCTRL2[5:3] while preserving the 33 dB MAGN_TARGET.
+// Approximate actual reduction per CC1101 datasheet MAX_LNA_GAIN table:
+//   0 dB  -> MAX_LNA_GAIN=000 (no limit)          -> 0x43
+//   6 dB  -> MAX_LNA_GAIN=010 (6.1 dB reduction)  -> 0x53
+//  12 dB  -> MAX_LNA_GAIN=101 (11.5 dB reduction) -> 0x6B
+//  18 dB  -> MAX_LNA_GAIN=111 (17.1 dB reduction) -> 0x7B
+#define AGCCTRL2_ATT_0DB  0x43
+#define AGCCTRL2_ATT_6DB  0x53
+#define AGCCTRL2_ATT_12DB 0x6B
+#define AGCCTRL2_ATT_18DB 0x7B
 
 // AGCCTRL1 - AGC Control
 #define AGCCTRL1_DEFAULT 0x00 // Default AGC control
@@ -249,6 +266,7 @@ using CC1101SpiDevice = esphome::spi::SPIDevice<esphome::spi::BIT_ORDER_MSB_FIRS
 static CC1101SpiDevice *_spi_device = nullptr;
 static int _gdo0_pin = -1;
 static int _gdo2_pin = -1;
+static int _rx_attenuation_db = 0;
 
 void cc1101_set_spi_device(void *device)
 {
@@ -264,6 +282,11 @@ void cc1101_set_gdo0_pin(int gdo0_pin)
 void cc1101_set_gdo2_pin(int gdo2_pin)
 {
   _gdo2_pin = gdo2_pin;
+}
+
+void cc1101_set_rx_attenuation(int db)
+{
+  _rx_attenuation_db = db;
 }
 
 // Macros to get GDO pin numbers - use variables in ESPHome mode, build flags otherwise
@@ -612,7 +635,21 @@ void cc1101_configureRF_0(float freq)
   halRfWriteReg(MCSM0, MCSM0_FS_AUTOCAL_IDLE_TO_RXTX); // Auto-calibrate on IDLE→RX/TX
   halRfWriteReg(FOCCFG, FOCCFG_FOC_4K_2K);             // Frequency offset compensation
   halRfWriteReg(BSCFG, BSCFG_BS_PRE_KI_2);             // Bit synchronization
-  halRfWriteReg(AGCCTRL2, AGCCTRL2_MAX_DVGA_LNA);      // AGC: max gain
+  // Select AGCCTRL2 based on RX_ATTENUATION_DB (non-ESPHome) or _rx_attenuation_db (ESPHome)
+#ifdef USE_ESPHOME
+  const int att_db = _rx_attenuation_db;
+#else
+#ifndef RX_ATTENUATION_DB
+#define RX_ATTENUATION_DB 0
+#endif
+  const int att_db = RX_ATTENUATION_DB;
+#endif
+  uint8_t agcctrl2_val;
+  if (att_db >= 18)      { agcctrl2_val = AGCCTRL2_ATT_18DB; }
+  else if (att_db >= 12) { agcctrl2_val = AGCCTRL2_ATT_12DB; }
+  else if (att_db >= 6)  { agcctrl2_val = AGCCTRL2_ATT_6DB;  }
+  else                   { agcctrl2_val = AGCCTRL2_ATT_0DB;  }
+  halRfWriteReg(AGCCTRL2, agcctrl2_val);                 // AGC: balanced 33 dB target + optional LNA limit
   halRfWriteReg(AGCCTRL1, AGCCTRL1_DEFAULT);           // AGC: default
   halRfWriteReg(AGCCTRL0, AGCCTRL0_FILTER_16);         // AGC: 16 samples
   halRfWriteReg(WORCTRL, WORCTRL_WOR_RES_1_8);         // Wake-on-radio
@@ -1963,7 +2000,7 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
         // This is the OPPOSITE of a weak-signal problem.
         echo_debug(1, "[METER] *** NEAR-FIELD SATURATION DETECTED (RSSI=%d dBm) ***\n", frame_rssi_dbm);
         echo_debug(1, "[METER] The signal is too STRONG, not too weak. Move the device at least 1-2 m away from the meter.\n");
-        echo_debug(1, "[METER] If the device must be mounted close to the meter, see RX_ATTENUATION_DB in private.h (once implemented, issue #109).\n");
+        echo_debug(1, "[METER] Set #define RX_ATTENUATION_DB 6 (or 12/18) in private.h to engage the CC1101 front-end LNA gain limiter.\n");
       }
       else
       {

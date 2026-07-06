@@ -113,6 +113,13 @@ everblu_meter:
   # Use higher values (5-10) if you have frequent reads and stable conditions
   adaptive_threshold: 1
 
+  # Front-end RX input attenuation (optional, default: 0)
+  # Use only if the device is permanently mounted very close to the meter (< 0.5 m) AND
+  # the log shows *** NEAR-FIELD SATURATION DETECTED ***.  Start with 6 and increase if
+  # CRC failures persist.  At normal installation distance keep this at 0.
+  # Values: 0 (default), 6, 12, 18  (dB, approximate actual reduction)
+  # rx_attenuation: 0
+
   # Time component
   time_id: ha_time
 

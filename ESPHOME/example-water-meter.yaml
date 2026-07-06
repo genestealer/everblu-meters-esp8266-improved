@@ -90,6 +90,12 @@ everblu_meter:
   # max_retries: 5       # Read attempts before entering cooldown (default: 5, range 1-50)
   # retry_cooldown: 1h   # Cooldown after max_retries failed attempts (default: 1h)
 
+  # Optional: Front-end RX input attenuation (default: 0)
+  # Only needed when the device is permanently mounted very close to the meter (< 0.5 m)
+  # and the log shows *** NEAR-FIELD SATURATION DETECTED ***.
+  # Values: 0 (default), 6, 12, 18  (dB — approximate actual LNA gain reduction)
+  # rx_attenuation: 0
+
   # Control buttons
   request_reading_button:
     name: "Read Meter Now"
