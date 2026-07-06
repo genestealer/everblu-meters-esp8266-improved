@@ -360,11 +360,9 @@ static void encode_4x_oversampled(const std::vector<uint8_t> &msg,
         }
     }
 
-    // Pad to a byte boundary with 1s (harmlessly extends the trailing run).
-    while (samples.size() % 8 != 0)
-    {
-        samples.push_back(1);
-    }
+    // The framing yields 12 logical bits per byte plus an 8-bit trailing run,
+    // so the sample count (4 * (12*N + 8)) is always a multiple of 8 - no
+    // padding is required before packing.
 
     // Pack MSB-first, matching how the CC1101 FIFO bytes are consumed.
     out.clear();
@@ -449,6 +447,13 @@ void test_radian_reading_within_history_bounds(void)
 
     // A grossly corrupted reading -> reject.
     TEST_ASSERT_FALSE(radian_reading_within_history_bounds(500000000UL, history, months, 100UL));
+
+    // A decreasing month (meter reset/rollover) is skipped when computing the
+    // largest usage; the remaining rising months (all 1000 L) still bound the
+    // check. Newest = 2500.
+    const uint32_t with_reset[] = {10000, 11000, 500, 1500, 2500};
+    TEST_ASSERT_TRUE(radian_reading_within_history_bounds(2500 + 1000, with_reset, 5, 100UL));
+    TEST_ASSERT_FALSE(radian_reading_within_history_bounds(2500 + 100001, with_reset, 5, 100UL));
 }
 
 void test_radian_reading_within_history_bounds_skips_when_insufficient(void)
