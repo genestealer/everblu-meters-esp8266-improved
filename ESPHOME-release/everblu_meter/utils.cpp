@@ -144,8 +144,10 @@ int calculateMeterdBmToPercentage(int rssi_dbm)
 
 int calculateLQIToPercentage(int lqi)
 {
-	int strength = constrain(lqi & 0x7F, 0, 127); // Mask bit 7 (CRC_OK) and clamp to the 7-bit LQI range
-	return map(strength, 0, 127, 0, 100);          // Map LQI to percentage
+	int error = constrain(lqi & 0x7F, 0, 127); // Mask bit 7 (CRC_OK) and clamp to the 7-bit LQI range
+	// CC1101 LQI is an accumulated demodulation-error metric: a LOWER value means a better link.
+	// Invert the mapping so the reported percentage follows the intuitive "higher % = better link".
+	return map(error, 0, 127, 100, 0);
 }
 void printMeterDataSummary(const struct tmeter_data *meter_data, bool isMeterGas, int volumeDivisor)
 {
