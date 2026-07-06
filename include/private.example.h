@@ -161,8 +161,8 @@
 
 // Enable Deep frequency scan when no stored offset exists
 //
-// 1 (default): Perform a Deep scan before MQTT connection
-// 0:           Skip scan even if no offset is stored
+// 0 (default): Skip scan even if no offset is stored
+// 1:           Perform a Deep scan before MQTT connection
 //
 // To re-run the scan, set CLEAR_EEPROM_ON_BOOT to 1 or re-enable this.
 #define AUTO_SCAN_ENABLED 0

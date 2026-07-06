@@ -197,7 +197,7 @@ CONFIG_SCHEMA = (
             cv.Optional(CONF_FREQUENCY, default=433.82): cv.float_range(
                 min=300.0, max=928.0
             ),
-            cv.Optional(CONF_AUTO_SCAN, default=True): cv.boolean,
+            cv.Optional(CONF_AUTO_SCAN, default=False): cv.boolean,
             cv.Optional(CONF_AUTO_SCAN_ON_FAILURE, default=True): cv.boolean,
             cv.Optional(
                 CONF_READING_SCHEDULE, default=SCHEDULE_MONDAY_FRIDAY
