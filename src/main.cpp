@@ -28,8 +28,9 @@
 #include "core/wifi_serial.h"          // WiFi serial monitor
 #include "core/cc1101.h"               // CC1101 RF transceiver and meter data
 #include "core/meter_code_parser.h"    // Shared METER_CODE parser
-#include "core/utils.h"                // Utility functions
-#include "services/schedule_manager.h" // Schedule management
+#include "core/utils.h"                 // Utility functions
+#include "services/schedule_manager.h"  // Schedule management
+#include "services/frequency_manager.h" // Shared frequency calibration (scan/adaptive/storage)
 #if defined(ESP8266)
 #include <ESP8266WiFi.h> // Wi-Fi library for ESP8266
 #include <ESP8266mDNS.h> // mDNS library for ESP8266
@@ -44,19 +45,6 @@
 #include <ArduinoOTA.h>    // OTA update library
 #include <EspMQTTClient.h> // MQTT client library
 #include <math.h>          // For floor/ceil during scan alignment
-
-// Cross-platform watchdog feed helper
-static inline void FEED_WDT()
-{
-#if defined(ESP8266)
-  ESP.wdtFeed();
-#elif defined(ESP32)
-  esp_task_wdt_reset();
-  yield();
-#else
-  (void)0;
-#endif
-}
 
 // Define the LED_BUILTIN pin if missing
 #ifndef LED_BUILTIN
@@ -172,15 +160,13 @@ const char *lastErrorMessage = "None";
 // CC1101 radio connection state
 bool cc1101RadioConnected = false; // Tracks whether the radio is detected and initialized
 
-// Frequency offset storage
+// Frequency offset storage. The EEPROM/Preferences layout and all scan/adaptive
+// state now live in the shared FrequencyManager (src/services/frequency_manager.cpp),
+// which this build initializes in setup(). EEPROM_SIZE is retained only for the
+// optional CLEAR_EEPROM_ON_BOOT maintenance path below.
 #define EEPROM_SIZE 64
-#define FREQ_OFFSET_ADDR 0
-#define FREQ_OFFSET_MAGIC 0xABCD // Magic number to verify valid data
-float storedFrequencyOffset = 0.0;
 bool autoScanEnabled = (AUTO_SCAN_ENABLED != 0);                     // Enable automatic scan on first boot if no offset found
 bool autoScanOnFailureEnabled = (AUTO_SCAN_ON_FAILURE_ENABLED != 0); // Enable automatic scan after max retries reached
-int successfulReadsBeforeAdapt = 0;              // Track successful reads for adaptive tuning
-float cumulativeFreqError = 0.0;                 // Accumulate FREQEST readings for adaptive adjustment
 
 // Define the adaptive frequency tracking threshold if missing from private.h
 // Controls how many successful reads trigger a frequency adjustment
@@ -191,33 +177,9 @@ float cumulativeFreqError = 0.0;                 // Accumulate FREQEST readings 
 #endif
 const int ADAPT_THRESHOLD = ADAPTIVE_THRESHOLD;
 
-#if defined(ESP32)
-Preferences preferences;
-#endif
-
 // ============================================================================
-// Frequency Management API
+// Frequency Management API (thin MQTT wrappers over the shared FrequencyManager)
 // ============================================================================
-
-/**
- * @brief Save frequency offset to persistent storage
- *
- * Stores the frequency offset value to EEPROM (ESP8266) or Preferences (ESP32)
- * with a magic number for validation. This offset is applied on next boot.
- *
- * @param offset Frequency offset in MHz to be added to base frequency
- */
-void saveFrequencyOffset(float offset);
-
-/**
- * @brief Load frequency offset from persistent storage
- *
- * Retrieves previously saved frequency offset from EEPROM (ESP8266) or
- * Preferences (ESP32). Validates data integrity using magic number.
- *
- * @return Frequency offset in MHz, or 0.0 if no valid data found
- */
-float loadFrequencyOffset();
 
 /**
  * @brief Perform a Deep frequency scan
@@ -1542,7 +1504,7 @@ void onConnectionEstablished()
   delay(5);
 
   char freqBuffer[16];
-  snprintf(freqBuffer, sizeof(freqBuffer), "%.3f", storedFrequencyOffset * 1000.0); // Convert MHz to kHz
+  snprintf(freqBuffer, sizeof(freqBuffer), "%.3f", FrequencyManager::getOffset() * 1000.0); // Convert MHz to kHz
   snprintf(topicBuffer, sizeof(topicBuffer), "%s/frequency_offset", mqttBaseTopic);
   mqtt.publish(topicBuffer, freqBuffer, true);
   delay(5);
@@ -1564,366 +1526,78 @@ void onConnectionEstablished()
   onScheduled();
 }
 
-// Function: saveFrequencyOffset
-// Description: Saves the frequency offset to persistent storage (EEPROM for ESP8266, Preferences for ESP32)
-void saveFrequencyOffset(float offset)
+// ============================================================================
+// Frequency Management (MQTT glue over the shared FrequencyManager)
+// ============================================================================
+//
+// The scan / adaptive-tracking / persistence LOGIC lives in the shared
+// FrequencyManager (src/services/frequency_manager.cpp) - the SAME code the
+// ESPHome build uses. The thin wrappers below only add the MQTT-specific side
+// effects (status + offset topics) that FrequencyManager intentionally does not
+// know about, so the algorithm stays single-sourced across both builds.
+
+// Status callback handed to FrequencyManager during scans: mirrors scan
+// progress to the Home Assistant cc1101_state / status_message topics.
+static void mqttFrequencyStatus(const char *state, const char *message)
 {
-#if defined(ESP8266)
-  // ESP8266: Use EEPROM
-  uint16_t magic = FREQ_OFFSET_MAGIC;
-  EEPROM.put(FREQ_OFFSET_ADDR, magic);
-  EEPROM.put(FREQ_OFFSET_ADDR + 2, offset);
-  EEPROM.commit();
-  TS_PRINTF("[FREQ] Frequency offset %.6f MHz saved to EEPROM\n", offset);
-#elif defined(ESP32)
-  // ESP32: Use Preferences
-  preferences.begin("everblu", false);
-  preferences.putFloat("freq_offset", offset);
-  preferences.end();
-  TS_PRINTF("[FREQ] Frequency offset %.6f MHz saved to Preferences\n", offset);
-#endif
-  storedFrequencyOffset = offset;
+  char topicBuffer[MQTT_TOPIC_BUFFER_SIZE];
+  if (state && *state)
+  {
+    snprintf(topicBuffer, sizeof(topicBuffer), "%s/cc1101_state", mqttBaseTopic);
+    mqtt.publish(topicBuffer, state, true);
+  }
+  if (message && *message)
+  {
+    snprintf(topicBuffer, sizeof(topicBuffer), "%s/status_message", mqttBaseTopic);
+    mqtt.publish(topicBuffer, message, true);
+  }
 }
 
-// Function: loadFrequencyOffset
-// Description: Loads the frequency offset from persistent storage, returns 0.0 if not found or invalid
-float loadFrequencyOffset()
+// Publish the current frequency offset (kHz) to Home Assistant.
+static void publishFrequencyOffsetToMqtt()
 {
-#if defined(ESP8266)
-  // ESP8266: Use EEPROM
-  uint16_t magic = 0;
-  EEPROM.get(FREQ_OFFSET_ADDR, magic);
-  if (magic == FREQ_OFFSET_MAGIC)
-  {
-    float offset = 0.0;
-    EEPROM.get(FREQ_OFFSET_ADDR + 2, offset);
-    // Sanity check: offset should be reasonable (within ±0.1 MHz)
-    if (offset >= -0.1 && offset <= 0.1)
-    {
-      TS_PRINTF("[FREQ] Loaded frequency offset %.6f MHz from EEPROM\n", offset);
-      return offset;
-    }
-    else
-    {
-      TS_PRINTF("[FREQ] Invalid frequency offset %.6f MHz in EEPROM, using 0.0\n", offset);
-    }
-  }
-  else
-  {
-    TS_PRINTLN("[FREQ] No valid frequency offset found in EEPROM");
-  }
-#elif defined(ESP32)
-  // ESP32: Use Preferences
-  preferences.begin("everblu", true); // Read-only
-  if (preferences.isKey("freq_offset"))
-  {
-    float offset = preferences.getFloat("freq_offset", 0.0);
-    preferences.end();
-    // Sanity check: offset should be reasonable (within ±0.1 MHz)
-    if (offset >= -0.1 && offset <= 0.1)
-    {
-      TS_PRINTF("[FREQ] Loaded frequency offset %.6f MHz from Preferences\n", offset);
-      return offset;
-    }
-    else
-    {
-      TS_PRINTF("[FREQ] Invalid frequency offset %.6f MHz in Preferences, using 0.0\n", offset);
-    }
-  }
-  else
-  {
-    TS_PRINTLN("[FREQ] No frequency offset found in Preferences");
-    preferences.end();
-  }
-#endif
-  return 0.0;
+  char topicBuffer[MQTT_TOPIC_BUFFER_SIZE];
+  char freqBuffer[16];
+  snprintf(freqBuffer, sizeof(freqBuffer), "%.3f", FrequencyManager::getOffset() * 1000.0);
+  snprintf(topicBuffer, sizeof(topicBuffer), "%s/frequency_offset", mqttBaseTopic);
+  mqtt.publish(topicBuffer, freqBuffer, true);
 }
 
 // Function: performDeepFrequencyScan
-// Description: Performs a thorough sweep across ±150 kHz around the configured frequency in fine
-//              2.5 kHz steps, mapping the response window then zooming to the exact carrier centre.
-//              Also used on first boot to find the meter frequency automatically.
+// Description: Thin MQTT wrapper over the shared Deep frequency scan. The scan
+//              algorithm itself (window mapping, zoom, issue #104 quality guard)
+//              lives in FrequencyManager and is shared with the ESPHome build.
+//              This wrapper only adds the MQTT-specific side effects (progress
+//              status + resulting offset topic).
 void performDeepFrequencyScan(float scanRangeMHz, float scanStepMHz)
 {
-  TS_PRINTLN("[FREQ] Performing Deep frequency scan...");
   TS_PRINTLN("[FREQ] [NOTE] Wi-Fi/MQTT connections may temporarily drop and reconnect while the scan is running. This is expected.");
 
-  // Suppress the verbose per-attempt radio/meter read logging for the whole
-  // scan. Each frequency step performs a full read sequence whose detailed
-  // output is irrelevant noise here; high-level scan progress messages remain.
-  EchoDebugQuietGuard quietGuard;
+  // FrequencyManager reports the final radio state via mqttFrequencyStatus
+  // ("Idle" on success/failure, "Error" if the radio did not respond), so we do
+  // NOT re-publish cc1101_state here. Doing so used the boot-time
+  // cc1101RadioConnected flag, which is still false during an early auto-scan and
+  // would wrongly overwrite the callback's "Idle" with "Not Connected".
+  FrequencyManager::performDeepFrequencyScan(scanRangeMHz, scanStepMHz, mqttFrequencyStatus);
 
-  char topicBuffer[MQTT_TOPIC_BUFFER_SIZE];
-  snprintf(topicBuffer, sizeof(topicBuffer), "%s/cc1101_state", mqttBaseTopic);
-  mqtt.publish(topicBuffer, "Frequency Scanning", true);
-  snprintf(topicBuffer, sizeof(topicBuffer), "%s/status_message", mqttBaseTopic);
-  mqtt.publish(topicBuffer, "Performing Deep frequency scan", true);
-
-  float baseFreq = FREQUENCY;
-  // Snapshot the current known-good offset so the quality guard can avoid
-  // regressing a good calibration (issue #104).
-  float previousOffset = storedFrequencyOffset;
-  // Phase 1: window discovery — continue past first hit until MISS_TOLERANCE
-  // consecutive misses, mapping start and end of the carrier response band.
-  float firstHitFreq = -1.0f;
-  float lastHitFreq  = -1.0f;
-  int   bestRSSI = -120;
-  int   consecutiveMisses = 0;
-  const int MISS_TOLERANCE = 5;
-
-  float scanStart = baseFreq - scanRangeMHz;
-  float scanEnd = baseFreq + scanRangeMHz;
-  float scanStep = scanStepMHz;
-
-  int deepStepCount = (int)roundf((scanEnd - scanStart) / scanStep) + 1;
-  int deepEstSecs = deepStepCount * 3; // ~3 s per step (full radio TX+RX cycle)
-  TS_PRINTF("[FREQ] Deep scan from %.6f to %.6f MHz (%d steps, ~%d s / ~%d min)\n",
-                scanStart, scanEnd, deepStepCount, deepEstSecs, (deepEstSecs + 30) / 60);
-
-  for (float freq = scanStart; freq <= scanEnd; freq += scanStep)
-  {
-    FEED_WDT(); // Feed watchdog for each frequency step
-
-    // Check if CC1101 radio initialization succeeds before attempting communication
-    if (!cc1101_init(freq))
-    {
-      TS_PRINTLN("[FREQ] CC1101 radio not responding - aborting Deep scan");
-      TS_PRINTLN("[FREQ] Check: 1) Wiring connections 2) 3.3V power supply 3) SPI pins");
-      snprintf(topicBuffer, sizeof(topicBuffer), "%s/status_message", mqttBaseTopic);
-      mqtt.publish(topicBuffer, "ERROR: CC1101 radio not responding - cannot scan", true);
-      snprintf(topicBuffer, sizeof(topicBuffer), "%s/cc1101_state", mqttBaseTopic);
-      mqtt.publish(topicBuffer, "Error", true);
-      return; // Exit the scan immediately instead of continuing indefinitely
-    }
-
-    delay(100); // Longer delay for frequency to settle during Deep scan
-
-    struct tmeter_data test_data = get_meter_data();
-
-    TS_PRINTF("[FREQ] Freq %.6f MHz: RSSI=%d dBm, reads=%d\n", freq, test_data.rssi_dbm, test_data.reads_counter);
-
-    if (test_data.reads_counter > 0)
-    {
-      if (firstHitFreq < 0.0f)
-      {
-        firstHitFreq = freq;
-        TS_PRINTF("[FREQ] Window start: %.6f MHz\n", freq);
-      }
-      lastHitFreq = freq;
-      if (test_data.rssi_dbm > bestRSSI) bestRSSI = test_data.rssi_dbm;
-      consecutiveMisses = 0;
-    }
-    else if (firstHitFreq >= 0.0f)
-    {
-      if (++consecutiveMisses >= MISS_TOLERANCE)
-      {
-        TS_PRINTF("[FREQ] Window end: %.6f MHz (%d consecutive misses after last hit)\n",
-                      lastHitFreq, consecutiveMisses);
-        break;
-      }
-    }
-
-    // Drain the WiFi serial ring buffer so remote logs stream live during the
-    // scan instead of all arriving at once after it completes.
-    wifiSerialLoop();
-  }
-
-  if (firstHitFreq >= 0.0f)
-  {
-    float windowMidFreq = (firstHitFreq + lastHitFreq) * 0.5f;
-    float windowWidthKHz = (lastHitFreq - firstHitFreq) * 1000.0f;
-    TS_PRINTF("[FREQ] Window: %.6f - %.6f MHz (%.2f kHz wide), midpoint %.6f MHz\n",
-                  firstHitFreq, lastHitFreq, windowWidthKHz, windowMidFreq);
-
-    float bestFreq = windowMidFreq;
-
-    // Phase 2: zoom scan across the full discovered window with 4x finer steps.
-    // Always runs — even when Phase 1 found only a single point, that hit may be
-    // on the edge of the response band; finer steps can locate the true centre.
-    // Falls back to windowMidFreq (= firstHitFreq for single-point windows) if
-    // all zoom steps miss (FREQEST adaptive tracking will then refine further).
-    float zoomStart = firstHitFreq - scanStep;
-    float zoomEnd   = lastHitFreq  + scanStep;
-    // CC1101 minimum frequency step = Fxosc / 2^16 = 26 MHz / 65536 ≈ 397 Hz.
-    // Steps finer than this round to the same register value, silently retesting
-    // the same physical frequency. Clamp to at least 1 register step.
-    const float CC1101_MIN_STEP_MHZ = 26.0f / 65536.0f / 1000.0f; // ~0.000397 MHz
-    float zoomStep = scanStep * 0.25f;
-    if (zoomStep < CC1101_MIN_STEP_MHZ) zoomStep = CC1101_MIN_STEP_MHZ;
-
-    int zoomStepCount = (int)roundf((zoomEnd - zoomStart) / zoomStep) + 1;
-    TS_PRINTF("[FREQ] Zoom pass: %.6f - %.6f MHz (%d steps, %.2f kHz each)\n",
-                  zoomStart, zoomEnd, zoomStepCount, zoomStep * 1000.0f);
-
-    for (float zfreq = zoomStart; zfreq <= zoomEnd + zoomStep * 0.5f; zfreq += zoomStep)
-    {
-      FEED_WDT();
-      if (!cc1101_init(zfreq)) break;
-      delay(50);
-      struct tmeter_data zdata = get_meter_data();
-      TS_PRINTF("[FREQ] Zoom %.6f MHz: RSSI=%d dBm, reads=%d\n",
-                    zfreq, zdata.rssi_dbm, zdata.reads_counter);
-      if (zdata.reads_counter > 0)
-      {
-        bestFreq = zfreq;
-        bestRSSI = zdata.rssi_dbm;
-        TS_PRINTF("[FREQ] Zoom locked at %.6f MHz: RSSI=%d dBm\n", zfreq, zdata.rssi_dbm);
-        break;
-      }
-      wifiSerialLoop();
-    }
-
-    float offset = bestFreq - baseFreq;
-    TS_PRINTF("[FREQ] Deep scan candidate: %.6f MHz (offset: %.6f MHz, RSSI: %d dBm)\n",
-                  bestFreq, offset, bestRSSI);
-
-    // Post-lock verification + quality guard (issue #104): rank candidates by
-    // demodulation quality (smallest |FREQEST|), not RSSI, and never overwrite an
-    // existing known-good offset with a worse one. A strong RSSI at a frequency
-    // tens of kHz off the true carrier can still yield corrupted (CRC-failing)
-    // bits, so RSSI alone is an unreliable ranking signal.
-    cc1101_init(bestFreq);
-    delay(100);
-    struct tmeter_data candVerify = get_meter_data();
-    bool candDecoded = candVerify.reads_counter > 0;
-    int  candQuality = abs((int)candVerify.freqest); // smaller = better centred
-    TS_PRINTF("[FREQ] Verify candidate %.6f MHz: reads=%d, |FREQEST|=%d\n",
-                  bestFreq, candVerify.reads_counter, candQuality);
-
-    bool acceptCandidate;
-    if (previousOffset == 0.0f)
-    {
-      // No prior calibration to protect: persist the scan result as-is.
-      acceptCandidate = true;
-    }
-    else if (!candDecoded)
-    {
-      // Candidate failed post-lock verification: keep the known-good offset.
-      acceptCandidate = false;
-      TS_PRINTF("[FREQ] Candidate %.6f MHz did not verify (no decode) - keeping stored offset %.3f kHz\n",
-                    bestFreq, previousOffset * 1000.0);
-    }
-    else
-    {
-      // Both candidate and stored offset decode: keep the better-centred one.
-      cc1101_init(baseFreq + previousOffset);
-      delay(100);
-      struct tmeter_data prevVerify = get_meter_data();
-      bool prevDecoded = prevVerify.reads_counter > 0;
-      int  prevQuality = abs((int)prevVerify.freqest);
-      TS_PRINTF("[FREQ] Verify stored %.6f MHz: reads=%d, |FREQEST|=%d\n",
-                    baseFreq + previousOffset, prevVerify.reads_counter, prevQuality);
-      if (!prevDecoded)
-      {
-        acceptCandidate = true; // stored offset no longer decodes
-      }
-      else
-      {
-        acceptCandidate = candQuality < prevQuality; // strictly better only
-      }
-      if (!acceptCandidate)
-      {
-        TS_PRINTF("[FREQ] Stored offset %.3f kHz (|FREQEST|=%d) is as good or better than candidate "
-                      "%.3f kHz (|FREQEST|=%d) - keeping stored offset\n",
-                      previousOffset * 1000.0, prevQuality, offset * 1000.0, candQuality);
-      }
-    }
-
-    if (acceptCandidate)
-    {
-      saveFrequencyOffset(offset);
-      TS_PRINTF("[FREQ] Deep scan complete! Saved offset %.3f kHz (tuned %.6f MHz)\n",
-                    offset * 1000.0, bestFreq);
-    }
-    else
-    {
-      TS_PRINTF("[FREQ] Deep scan complete - retained existing offset %.3f kHz\n",
-                    storedFrequencyOffset * 1000.0);
-    }
-
-    char freqBuffer[16];
-    snprintf(freqBuffer, sizeof(freqBuffer), "%.3f", storedFrequencyOffset * 1000.0); // Convert MHz to kHz
-    snprintf(topicBuffer, sizeof(topicBuffer), "%s/frequency_offset", mqttBaseTopic);
-    mqtt.publish(topicBuffer, freqBuffer, true);
-
-    char statusMsg[128];
-    snprintf(statusMsg, sizeof(statusMsg), "Deep scan complete: offset %.3f kHz", storedFrequencyOffset * 1000.0);
-    snprintf(topicBuffer, sizeof(topicBuffer), "%s/status_message", mqttBaseTopic);
-    mqtt.publish(topicBuffer, statusMsg, true);
-
-    cc1101_init(baseFreq + storedFrequencyOffset);
-  }
-  else
-  {
-    TS_PRINTLN("[FREQ] Deep scan failed - no meter signal found!");
-    TS_PRINTLN("[FREQ] Please check:");
-    TS_PRINTLN("[FREQ]  1. Meter is within range (< 50m typically)");
-    TS_PRINTLN("[FREQ]  2. Antenna is connected to CC1101");
-    TS_PRINTLN("[FREQ]  3. Meter serial/year are correct in private.h");
-    TS_PRINTLN("[FREQ]  4. Current time is within meter's wake hours");
-    snprintf(topicBuffer, sizeof(topicBuffer), "%s/status_message", mqttBaseTopic);
-    mqtt.publish(topicBuffer, "Deep scan failed - check setup", true);
-    cc1101_init(baseFreq);
-  }
-
-  snprintf(topicBuffer, sizeof(topicBuffer), "%s/cc1101_state", mqttBaseTopic);
-  mqtt.publish(topicBuffer, cc1101RadioConnected ? "Idle" : "Not Connected", true);
+  publishFrequencyOffsetToMqtt();
 }
 
 // Function: adaptiveFrequencyTracking
-// Description: Uses FREQEST register to adaptively adjust frequency offset over time
-//              Accumulates frequency error estimates and adjusts when threshold is reached
+// Description: Thin MQTT wrapper over the shared adaptive frequency tracking.
+//              Delegates the FREQEST accumulation / correction / persistence and
+//              radio re-tune to FrequencyManager (shared with the ESPHome build),
+//              then mirrors the resulting offset to MQTT.
 void adaptiveFrequencyTracking(int8_t freqest)
 {
-  // FREQEST is a two's complement value representing frequency offset
-  // Resolution is approximately Fxosc/2^14 ≈ 1.59 kHz per LSB (for 26 MHz crystal)
-  const float FREQEST_TO_MHZ = 0.001587; // Conversion factor: ~1.59 kHz per LSB
-
-  // Accumulate the frequency error
-  float freqErrorMHz = (float)freqest * FREQEST_TO_MHZ;
-  cumulativeFreqError += freqErrorMHz;
-  successfulReadsBeforeAdapt++;
-
-  TS_PRINTF("[FREQ] FREQEST: %d (%.4f kHz error), cumulative: %.4f kHz over %d reads\n",
-                freqest, freqErrorMHz * 1000, cumulativeFreqError * 1000, successfulReadsBeforeAdapt);
-
-  // Only adapt after N successful reads to avoid over-correcting on noise
-  if (successfulReadsBeforeAdapt >= ADAPT_THRESHOLD)
+  // Publish frequency_offset only when the shared tracker actually changed the
+  // stored offset, to avoid churning the retained MQTT topic on every read when
+  // the frequency is already stable.
+  const float offsetBefore = FrequencyManager::getOffset();
+  FrequencyManager::adaptiveFrequencyTracking(freqest);
+  if (FrequencyManager::getOffset() != offsetBefore)
   {
-    float avgError = cumulativeFreqError / ADAPT_THRESHOLD;
-
-    // Only adjust if average error is significant (> 2 kHz)
-    if (abs(avgError * 1000) > 2.0)
-    {
-      TS_PRINTF("[FREQ] Adaptive adjustment: average error %.4f kHz over %d reads\n",
-                    avgError * 1000, ADAPT_THRESHOLD);
-
-      // Adjust the stored offset (apply 50% of the measured error to avoid over-correction)
-      float adjustment = avgError * 0.5;
-      storedFrequencyOffset += adjustment;
-
-      TS_PRINTF("[FREQ] Adjusting frequency offset by %.6f MHz (new offset: %.6f MHz)\n",
-                    adjustment, storedFrequencyOffset);
-
-      saveFrequencyOffset(storedFrequencyOffset);
-
-      char freqBuffer[16];
-      char topicBuffer[MQTT_TOPIC_BUFFER_SIZE];
-      snprintf(freqBuffer, sizeof(freqBuffer), "%.3f", storedFrequencyOffset * 1000.0); // Convert MHz to kHz
-      snprintf(topicBuffer, sizeof(topicBuffer), "%s/frequency_offset", mqttBaseTopic);
-      mqtt.publish(topicBuffer, freqBuffer, true);
-
-      // Reinitialize CC1101 with adjusted frequency
-      cc1101_init(FREQUENCY + storedFrequencyOffset);
-    }
-    else
-    {
-      TS_PRINTF("[FREQ] Frequency stable (avg error %.4f kHz < 2 kHz threshold)\n", avgError * 1000);
-    }
-
-    // Reset accumulators
-    cumulativeFreqError = 0.0;
-    successfulReadsBeforeAdapt = 0;
+    publishFrequencyOffsetToMqtt();
   }
 }
 
@@ -2089,12 +1763,13 @@ void setup()
 
   // Initialize persistent storage
 #if defined(ESP8266)
-  EEPROM.begin(EEPROM_SIZE);
-  TS_PRINTLN("[STORAGE] EEPROM initialized");
-
   // Clear EEPROM if requested (set CLEAR_EEPROM_ON_BOOT=1 in private.h)
-  // Use this when replacing ESP board, CC1101 module, or moving to a different meter
+  // Use this when replacing ESP board, CC1101 module, or moving to a different meter.
+  // The normal path leaves EEPROM init to FrequencyManager::begin() ->
+  // StorageAbstraction::begin(); only the maintenance clear needs an explicit
+  // EEPROM.begin() here (avoids initializing EEPROM twice on every boot).
 #if CLEAR_EEPROM_ON_BOOT
+  EEPROM.begin(EEPROM_SIZE);
   TS_PRINTLN("[STORAGE] CLEARING EEPROM (CLEAR_EEPROM_ON_BOOT = 1)...");
   for (int i = 0; i < EEPROM_SIZE; i++)
   {
@@ -2105,18 +1780,24 @@ void setup()
 #endif
 #endif
 
-  // Load stored frequency offset
-  storedFrequencyOffset = loadFrequencyOffset();
+  // Initialize the shared FrequencyManager: register this build's radio + meter
+  // callbacks, then load any persisted offset. This is the SAME implementation the
+  // ESPHome build uses (src/services/frequency_manager.cpp), so the scan, adaptive
+  // tracking and storage logic is single-sourced across both targets.
+  FrequencyManager::setRadioInitCallback(cc1101_init);
+  FrequencyManager::setMeterReadCallback(get_meter_data);
+  FrequencyManager::setAutoScanEnabled(autoScanEnabled);
+  FrequencyManager::setAdaptiveThreshold(ADAPT_THRESHOLD);
+  const float loadedOffset = FrequencyManager::begin(FREQUENCY);
 
-  const bool noStoredOffset = (storedFrequencyOffset == 0.0f);
+  const bool noStoredOffset = (loadedOffset == 0.0f);
 
-  // If no valid frequency offset found and auto-scan is enabled, perform Deep scan
+  // If no valid frequency offset found and auto-scan is enabled, perform Deep scan.
+  // FrequencyManager updates its own stored offset during the scan, so no reload.
   if (noStoredOffset && autoScanEnabled)
   {
     TS_PRINTLN("[FREQ] No stored frequency offset found. Performing Deep frequency scan...");
     performDeepFrequencyScan();
-    // Reload the frequency offset after scan
-    storedFrequencyOffset = loadFrequencyOffset();
   }
   else if (noStoredOffset)
   {
@@ -2167,11 +1848,11 @@ void setup()
 
   // Set CC1101 radio frequency with automatic calibration
   TS_PRINTLN("[FREQ] Initializing CC1101 radio...");
-  float effectiveFrequency = FREQUENCY + storedFrequencyOffset;
-  if (storedFrequencyOffset != 0.0)
+  float effectiveFrequency = FrequencyManager::getTunedFrequency();
+  if (FrequencyManager::getOffset() != 0.0)
   {
     TS_PRINTF("[FREQ] Applying stored frequency offset: %.6f MHz (effective: %.6f MHz)\n",
-                  storedFrequencyOffset, effectiveFrequency);
+                  FrequencyManager::getOffset(), effectiveFrequency);
   }
   if (!cc1101_init(effectiveFrequency))
   {
