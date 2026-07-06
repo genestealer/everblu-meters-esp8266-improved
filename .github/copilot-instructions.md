@@ -38,3 +38,7 @@ This project reads Itron/Actaris EverBlu Cyble water/gas meters via a CC1101 433
 - Treat `ESPHOME-release/` as read-only generated output.
 - Never edit files in `ESPHOME-release/` directly, even if a user asks for behavior changes.
 - Make changes only in `ESPHOME/components/everblu_meter/` (and related source), then regenerate `ESPHOME-release/` via `ESPHOME/prepare-component-release.ps1` or `.sh`.
+
+## ESPHome component development
+
+When working on `ESPHOME/components/everblu_meter/`, follow the upstream ESPHome conventions documented in the [ESPHome AI Collaboration Guide (AGENTS.md)](https://github.com/esphome/esphome/blob/dev/AGENTS.md). It covers C++ naming and style, Python schema patterns, component structure, automation helpers, heap allocation guidelines, and the PR contribution workflow.
