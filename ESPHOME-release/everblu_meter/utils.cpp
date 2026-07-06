@@ -144,8 +144,8 @@ int calculateMeterdBmToPercentage(int rssi_dbm)
 
 int calculateLQIToPercentage(int lqi)
 {
-	int strength = constrain(lqi, 0, 255); // Clamp LQI to valid range
-	return map(strength, 0, 255, 0, 100);  // Map LQI to percentage
+	int strength = constrain(lqi & 0x7F, 0, 127); // Mask bit 7 (CRC_OK) and clamp to the 7-bit LQI range
+	return map(strength, 0, 127, 0, 100);          // Map LQI to percentage
 }
 void printMeterDataSummary(const struct tmeter_data *meter_data, bool isMeterGas, int volumeDivisor)
 {

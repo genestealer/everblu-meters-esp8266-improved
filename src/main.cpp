@@ -1286,7 +1286,7 @@ void publishHADiscovery()
 // Description: Handles MQTT connection establishment, including Home Assistant discovery and OTA setup.
 void onConnectionEstablished()
 {
-  TS_PRINTLN("[MQTT] Connected to MQTT Broker)");
+  TS_PRINTLN("[MQTT] Connected to MQTT Broker");
 
   TS_PRINTLN("[TIME] Configure time from NTP server. Please wait...");
   // Note, my VLAN has no WAN/internet, so I am useing Home Assistant Community Add-on: chrony to proxy the time
