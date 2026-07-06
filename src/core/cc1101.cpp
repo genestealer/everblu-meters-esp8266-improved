@@ -5,6 +5,7 @@
 #include "cc1101.h" // CC1101 interface
 #include "meter_code_parser.h"
 #include "radian_parser.h"
+#include "radian_decoder.h" // Shared platform-neutral 4-bit-per-bit decoder
 #include "logging.h" // Cross-platform logging
 #include <Arduino.h> // Arduino core
 #if !defined(USE_ESPHOME)
@@ -1201,120 +1202,39 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
 // is decoded to:
 // 76543210 76543210 76543210 76543210
 // Note: decoded_buffer must be at least l_total_byte/4 bytes in size
+//
+// The core bit-recovery algorithm lives in radian_decode_4bitpbit()
+// (src/core/radian_decoder.cpp) so that a single, platform-neutral
+// implementation is shared by the firmware and the native hex_decoder tool
+// (see issue #118). This function is a thin Arduino-side wrapper that keeps
+// the firmware-specific concerns - watchdog feeding and debug diagnostics -
+// around the pure decode.
 uint8_t decode_4bitpbit_serial(uint8_t *rxBuffer, int l_total_byte, uint8_t *decoded_buffer)
 {
-  uint16_t i, j, k;
-  uint8_t bit_cnt = 0;
-  int8_t bit_cnt_flush_S8 = 0;
-  uint8_t bit_pol = 0;
-  uint8_t dest_bit_cnt = 0;
-  uint8_t dest_byte_cnt = 0;
-  uint8_t current_Rx_Byte;
+  // Maximum decoded buffer size (matches the static meter_data[200] caller
+  // buffer; a conservative estimate of input bytes / 4).
+  const int MAX_DECODED_SIZE = 200;
 
-  // Maximum decoded buffer size (conservative estimate: input bytes / 4)
-  const uint8_t MAX_DECODED_SIZE = 200;
-  // Track framing/stop-bit errors so we can reject extremely corrupted frames.
-  uint8_t framing_error_count = 0;
+  // Feed the watchdog before and after the decode. The decode itself is a
+  // tight in-memory loop that completes well within the watchdog window for
+  // the ~1000-byte oversampled frames seen in practice, so a single feed on
+  // each side is sufficient to keep the SDK/WiFi task serviced.
+  FEED_WDT();
 
-  // show_in_hex(rxBuffer,l_total_byte);
-  /*set 1st bit polarity*/
-  bit_pol = (rxBuffer[0] & 0x80); // initialize with 1st bit state
+  uint8_t dest_byte_cnt =
+      radian_decode_4bitpbit(rxBuffer, l_total_byte, decoded_buffer, MAX_DECODED_SIZE);
 
-  for (i = 0; i < l_total_byte; i++)
+  FEED_WDT();
+
+  if (dest_byte_cnt == 0)
   {
-    current_Rx_Byte = rxBuffer[i];
-    // echo_debug(debug_out, "0x%02X ", rxBuffer[i]);
-
-    // Feed watchdog periodically during long decode operations
-    if (i > 0 && (i % 64) == 0)
-    {
-      FEED_WDT();
-    }
-
-    for (j = 0; j < 8; j++)
-    {
-      if ((current_Rx_Byte & 0x80) == bit_pol)
-        bit_cnt++;
-      else if (bit_cnt == 1)
-      {                                   // previous bit was a glitch so bit has not really changed
-        bit_pol = current_Rx_Byte & 0x80; // restore correct bit polarity
-        bit_cnt = bit_cnt_flush_S8 + 1;   // hope that previous bit was correctly decoded
-      }
-      else
-      { // bit polarity has changed
-        bit_cnt_flush_S8 = bit_cnt;
-        bit_cnt = (bit_cnt + 2) / 4;
-        bit_cnt_flush_S8 = bit_cnt_flush_S8 - (bit_cnt * 4);
-
-        for (k = 0; k < bit_cnt; k++)
-        { // insert the number of decoded bits
-          if (dest_bit_cnt < 8)
-          { // if data byte
-            // Bounds check before writing to buffer
-            if (dest_byte_cnt >= MAX_DECODED_SIZE)
-            {
-              echo_debug(debug_out, "[ERROR] Decode buffer overflow at byte %d\n", dest_byte_cnt);
-              return dest_byte_cnt;
-            }
-            decoded_buffer[dest_byte_cnt] = decoded_buffer[dest_byte_cnt] >> 1;
-            decoded_buffer[dest_byte_cnt] |= bit_pol;
-          }
-          dest_bit_cnt++;
-          // if ((dest_bit_cnt ==9) && (!bit_pol)){  echo_debug(debug_out,"stop bit error9"); return dest_byte_cnt;}
-          if ((dest_bit_cnt == 10) && (!bit_pol))
-          {
-            // A stop-bit mismatch was detected. Instead of aborting the whole
-            // decode (which produces tiny decoded outputs and breaks parsing),
-            // log the error, skip the current malformed byte and continue
-            // decoding. This makes the decoder more tolerant to single-bit
-            // corruption or brief polarity glitches on the air.
-            echo_debug(debug_out, "[ERROR] Stop bit error at bit 10 - skipping malformed byte\n");
-            if (framing_error_count < 255)
-            {
-              framing_error_count++;
-            }
-            // Reset the bit counter to align on the next byte boundary and
-            // advance to the next destination byte slot so we don't overwrite
-            // the current (corrupted) byte.
-            dest_bit_cnt = 0;
-            dest_byte_cnt++;
-            if (dest_byte_cnt >= MAX_DECODED_SIZE)
-            {
-              echo_debug(debug_out, "[ERROR] Decode buffer size limit reached while skipping malformed byte\n");
-              return dest_byte_cnt;
-            }
-            // Continue processing remaining samples
-            continue;
-          }
-          if ((dest_bit_cnt >= 11) && (!bit_pol)) // start bit
-          {
-            dest_bit_cnt = 0;
-            // echo_debug(debug_out, " dec[%i]=0x%02X \n", dest_byte_cnt, decoded_buffer[dest_byte_cnt]);
-            dest_byte_cnt++;
-            // Additional bounds check before next iteration
-            if (dest_byte_cnt >= MAX_DECODED_SIZE)
-            {
-              echo_debug(debug_out, "[ERROR] Decode buffer size limit reached\n");
-              return dest_byte_cnt;
-            }
-          }
-        }
-        bit_pol = current_Rx_Byte & 0x80;
-        bit_cnt = 1;
-      }
-      current_Rx_Byte = current_Rx_Byte << 1;
-    } // scan TX_bit
-  } // scan TX_byte
-
-  // If we saw many framing errors compared to the number of bytes we managed
-  // to decode, treat the whole frame as unusable. This prevents obviously
-  // corrupted frames from being interpreted as valid meter data.
-  if (dest_byte_cnt > 0 && framing_error_count > (dest_byte_cnt / 2))
+    // radian_decode_4bitpbit() returns 0 when the frame quality is too low
+    // (too many framing errors relative to decoded byte count).
+    echo_debug(debug_out, "[ERROR] Decode quality too low or empty frame - discarding\n");
+  }
+  else
   {
-    echo_debug(debug_out,
-               "[ERROR] Decode quality too low (decoded=%u, framing_errors=%u) - discarding frame\n",
-               dest_byte_cnt, framing_error_count);
-    return 0;
+    echo_debug(debug_out, "[CC1101] Decoded %u bytes from %d raw bytes\n", dest_byte_cnt, l_total_byte);
   }
 
   return dest_byte_cnt;

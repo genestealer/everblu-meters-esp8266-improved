@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "core/radian_parser.h"
+#include "core/radian_decoder.h"
 
 struct Fixture
 {
@@ -309,6 +310,120 @@ void test_replay_meter_fixtures(void)
     }
 }
 
+// ---------------------------------------------------------------------------
+// 4-bit-per-bit decoder coverage (issue #118)
+//
+// radian_decode_4bitpbit() is the single, shared implementation of the RADIAN
+// 4x-oversampled bit-recovery algorithm; the firmware wrapper
+// decode_4bitpbit_serial() in cc1101.cpp now delegates to it. This encoder is
+// an *independent* implementation of the on-air framing, so a clean round-trip
+// (encode -> decode == original) validates the shared decode path against a
+// known-good oversampled bitstream.
+//
+// On-air framing per byte: 8 data bits (LSB first) + 3 stop bits (1), with a
+// single start/separator bit (0) between bytes. Each logical bit is
+// transmitted as four identical samples; samples are packed MSB-first into the
+// RX buffer bytes exactly as the CC1101 delivers them.
+// ---------------------------------------------------------------------------
+static void encode_4x_oversampled(const std::vector<uint8_t> &msg,
+                                  std::vector<uint8_t> &out)
+{
+    std::vector<uint8_t> bits; // logical bits in transmission order
+
+    for (uint8_t value : msg)
+    {
+        for (int i = 0; i < 8; i++) // 8 data bits, LSB first
+        {
+            bits.push_back(static_cast<uint8_t>((value >> i) & 1U));
+        }
+        bits.push_back(1); // 3 stop bits
+        bits.push_back(1);
+        bits.push_back(1);
+        bits.push_back(0); // start/separator bit terminating this byte
+    }
+
+    // Trailing high run so the decoder flushes (and therefore counts) the final
+    // separator bit; the decoder only emits a run when the polarity changes.
+    for (int i = 0; i < 8; i++)
+    {
+        bits.push_back(1);
+    }
+
+    // Each logical bit -> four identical samples.
+    std::vector<uint8_t> samples;
+    samples.reserve(bits.size() * 4);
+    for (uint8_t b : bits)
+    {
+        for (int s = 0; s < 4; s++)
+        {
+            samples.push_back(b);
+        }
+    }
+
+    // Pad to a byte boundary with 1s (harmlessly extends the trailing run).
+    while (samples.size() % 8 != 0)
+    {
+        samples.push_back(1);
+    }
+
+    // Pack MSB-first, matching how the CC1101 FIFO bytes are consumed.
+    out.clear();
+    out.reserve(samples.size() / 8);
+    for (size_t i = 0; i < samples.size(); i += 8)
+    {
+        uint8_t v = 0;
+        for (int b = 0; b < 8; b++)
+        {
+            v = static_cast<uint8_t>((v << 1) | (samples[i + b] & 1U));
+        }
+        out.push_back(v);
+    }
+}
+
+static void assert_decode_roundtrip(const std::vector<uint8_t> &message)
+{
+    std::vector<uint8_t> oversampled;
+    encode_4x_oversampled(message, oversampled);
+
+    uint8_t decoded[256];
+    uint8_t count = radian_decode_4bitpbit(
+        oversampled.data(), static_cast<int>(oversampled.size()),
+        decoded, static_cast<int>(sizeof(decoded)));
+
+    TEST_ASSERT_EQUAL_UINT32(static_cast<uint32_t>(message.size()),
+                             static_cast<uint32_t>(count));
+    for (size_t i = 0; i < message.size(); i++)
+    {
+        TEST_ASSERT_EQUAL_HEX8(message[i], decoded[i]);
+    }
+}
+
+void test_radian_decode_roundtrip(void)
+{
+    // Bit patterns chosen to exercise all-zero, all-one, alternating and
+    // sequential bytes through the run-length recovery.
+    assert_decode_roundtrip({0xA5});
+    assert_decode_roundtrip({0x00, 0xFF, 0xA5, 0x5A, 0x01, 0x80, 0x7F, 0xFE});
+
+    std::vector<uint8_t> sequential;
+    for (int i = 0; i < 32; i++)
+    {
+        sequential.push_back(static_cast<uint8_t>(i * 7 + 1));
+    }
+    assert_decode_roundtrip(sequential);
+}
+
+void test_radian_decode_rejects_empty_and_null(void)
+{
+    uint8_t decoded[16];
+    uint8_t sample = 0xF0;
+
+    TEST_ASSERT_EQUAL_UINT32(0, radian_decode_4bitpbit(nullptr, 4, decoded, sizeof(decoded)));
+    TEST_ASSERT_EQUAL_UINT32(0, radian_decode_4bitpbit(&sample, 0, decoded, sizeof(decoded)));
+    TEST_ASSERT_EQUAL_UINT32(0, radian_decode_4bitpbit(&sample, 4, nullptr, sizeof(decoded)));
+    TEST_ASSERT_EQUAL_UINT32(0, radian_decode_4bitpbit(&sample, 4, decoded, 0));
+}
+
 int main(int argc, char **argv)
 {
     (void)argc;
@@ -317,6 +432,8 @@ int main(int argc, char **argv)
     UNITY_BEGIN();
     RUN_TEST(test_radian_parse_primary_volume_rejection);
     RUN_TEST(test_radian_parse_primary_time_rejection);
+    RUN_TEST(test_radian_decode_roundtrip);
+    RUN_TEST(test_radian_decode_rejects_empty_and_null);
     RUN_TEST(test_replay_meter_fixtures);
     return UNITY_END();
 }
