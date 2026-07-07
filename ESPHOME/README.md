@@ -90,8 +90,13 @@ This will output detailed hex dumps of the decoded frame, helping identify:
 
 ### Signal Quality Issues
 
-- **Low RSSI (<-90 dBm)**: Move ESP closer or improve antenna
-- **Enable auto_scan**: `auto_scan: true` (helps with frequency drift)
+- **Low RSSI (< −90 dBm)**: Move ESP closer or improve antenna
+- **Very high RSSI (> −50 dBm) + CRC failures**: Near-field saturation — the signal is **too strong**. Move the device at least 1–2 m away from the meter. When the device is too close, the CC1101 front-end clips and every frame fails CRC even though RSSI looks excellent. The log will show `*** NEAR-FIELD SATURATION DETECTED ***` to confirm this. If the device must be permanently mounted close to the meter, add `rx_attenuation: 6` (or `12` / `18`) to your YAML configuration to limit the CC1101 LNA gain:
+  ```yaml
+  everblu_meter:
+    rx_attenuation: 6  # dB — values: 0 (default), 6, 12, 18
+  ```
+- **Enable auto_scan**: `auto_scan: true` (opt-in; enables startup Deep scan for extreme frequency drift)
 - **Try different times**: Signal quality varies by time of day
 
 ---
@@ -312,14 +317,21 @@ esp32:
 | `disable_gdo2_fifo_management` | bool | false | No | Opt out of the GDO2 hardware FIFO mechanism and use the legacy SPI-polling behaviour. When `true`, `gdo2_pin` is not required and need not be wired. |
 | `time_id`            | id       | -             | Yes      | Time component ID                                                                                                                                                                                                                            |
 | `frequency`          | float    | 433.82        | No       | RF frequency (MHz)                                                                                                                                                                                                                           |
-| `auto_scan`          | bool     | true          | No       | Auto frequency scan                                                                                                                                                                                                                          |
-| `schedule`           | enum     | Monday-Friday | No       | Reading schedule                                                                                                                                                                                                                             |
+| `auto_scan`          | bool     | false         | No       | Auto frequency scan                                                                                                                                                                                                                          |
+| `auto_scan_on_failure` | bool   | true          | No       | Auto frequency scan (once) after read attempts keep failing and the component enters cooldown, to recover from carrier-frequency drift                                                                                                       |
+| `reading_schedule`   | string   | Monday-Friday | No       | Reading schedule. Presets: `Monday-Friday`, `Monday-Saturday`, `Monday-Sunday`, or any single day name                                                                                                                                       |
 | `read_hour`          | int      | 10            | No       | Read hour (0-23)                                                                                                                                                                                                                             |
 | `read_minute`        | int      | 0             | No       | Read minute (0-59)                                                                                                                                                                                                                           |
+| `timezone_offset`    | int      | 0             | No       | Local time offset from UTC in **minutes**. Examples: `60` = UTC+1, `-300` = UTC-5, `330` = UTC+5:30. Applied to scheduling; does **not** auto-adjust for DST.                                                                               |
+| `auto_align_time`    | bool     | true          | No       | Automatically shift the read time to fall inside the meter's wake window                                                                                                                                                                     |
+| `auto_align_midpoint`| bool     | true          | No       | When auto-aligning, target the midpoint of the wake window instead of its start                                                                                                                                                              |
 | `max_retries`        | int      | 5             | No       | Max read attempts                                                                                                                                                                                                                            |
 | `retry_cooldown`     | duration | 1h            | No       | Cooldown time                                                                                                                                                                                                                                |
+| `initial_read_on_boot` | bool   | false         | No       | Trigger a read immediately after the time component syncs (useful for fast first-boot data; disabled by default to avoid blocking during meter-absent setups)                                                                                |
+| `adaptive_threshold` | int      | 1             | No       | Successful-read count before applying a FREQEST frequency correction (1 = adjust after every read; higher values dampen frequent small corrections)                                                                                          |
 | `gas_volume_divisor` | int      | 100           | No       | Gas divisor (100/1000)                                                                                                                                                                                                                       |
 | `debug_cc1101`       | bool     | false         | No       | Enable hex dump for debugging                                                                                                                                                                                                                |
+| `rx_attenuation`     | int      | 0             | No       | Front-end LNA gain limit for close-mounted installations. Values: `0` (default, no limit), `6`, `12`, `18` (dB, approximate). Increase when `*** NEAR-FIELD SATURATION DETECTED ***` is logged and moving the device further is not practical. |
 <!-- markdownlint-enable MD060 -->
 
 ### Schedule Options
@@ -341,7 +353,7 @@ everblu_meter:
   time_id: ha_time
 
   # Weekend-only, early morning
-  schedule: Saturday
+  reading_schedule: Saturday
   read_hour: 6
   read_minute: 30
 
@@ -367,7 +379,8 @@ logger:
 
 ```yaml
 everblu_meter:
-  timezone_offset: -5  # Hours from UTC
+  timezone_offset: -300  # Minutes from UTC (e.g. UTC-5 = -300). Range: -720 to +720.
+                         # ⚠️ Does NOT auto-adjust for DST — update manually when clocks change.
 ```
 
 ## Features
@@ -383,11 +396,13 @@ everblu_meter:
 
 ## Example Configurations
 
-Three complete example configurations are provided:
+Five complete example configurations are provided:
 
-1. **[Water Meter Example](example-water-meter.yaml)** - Full-featured water meter configuration
+1. **[Water Meter Example](example-water-meter.yaml)** - Full-featured water meter configuration (ESP8266)
 2. **[Gas Meter Example](example-gas-meter-minimal.yaml)** - Minimal gas meter configuration
-3. **[Advanced Example](example-advanced.yaml)** - Advanced features and customization
+3. **[Advanced Example](example-advanced.yaml)** - Advanced scheduling, retry, and debug options
+4. **[Multi-Meter Example](example-multi-meter.yaml)** - Two meters on one ESP with shared CC1101
+5. **[Arduino Nano ESP32 Example](example-nano-esp32.yaml)** - Board-specific setup for Nano ESP32 (ESP32-S3)
 
 ## Hardware Requirements
 
@@ -417,7 +432,7 @@ Three complete example configurations are provided:
 | SCK    | 18            |
 | MISO   | 19            |
 | MOSI   | 23            |
-| CSN    | 5             |
+| CSN    | 25            |
 | GDO0   | 4             |
 | GDO2   | 27 (required) |
 
@@ -567,7 +582,7 @@ EverbluMeterComponent (ESPHome)
 - **battery** - Estimated battery life (years)
 - **counter** - Alternative volume counter
 - **rssi** / **rssi_percentage** - Radio signal strength
-- **lqi** / **lqi_percentage** - Link quality indicator
+- **lqi** / **lqi_percentage** - Link quality indicator (raw `lqi` is 0-127 where *lower is better*; `lqi_percentage` inverts this so higher % = better link)
 - **time_start** / **time_end** - Reading timing
 - **frequency_offset** - Current frequency offset (kHz)
 - **tuned_frequency** - Actual tuned frequency (MHz)
@@ -595,7 +610,7 @@ EverbluMeterComponent (ESPHome)
 ### Control Buttons
 
 - **request_reading_button** - Trigger a manual reading
-- **frequency_scan_button** - Trigger a frequency scan
+- **deep_scan_button** - Trigger a Deep frequency scan (±150 kHz, fine 2.5 kHz steps, maps the response window then zooms to the carrier centre)
 - **reset_frequency_button** - Reset the frequency offset
 
 ## Common Configuration Patterns
@@ -657,7 +672,7 @@ everblu_meter:
 
 ```yaml
 everblu_meter:
-  auto_scan: true        # Enable frequency scanning
+  auto_scan: true        # Enable startup Deep frequency scan (opt-in; default is false)
   max_retries: 15        # Increase retry attempts
 ```
 
@@ -680,7 +695,7 @@ everblu_meter:
 
 ```yaml
 everblu_meter:
-  timezone_offset: -5  # Hours from UTC
+  timezone_offset: -300  # Minutes from UTC (UTC-5 = -300, UTC+1 = 60, UTC+5:30 = 330)
 ```
 
 For detailed troubleshooting, see the [Integration Guide](docs/ESPHOME_INTEGRATION_GUIDE.md#troubleshooting).

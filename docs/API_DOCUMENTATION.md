@@ -33,7 +33,7 @@ Water/gas meter data structure containing current readings and metadata.
 | `time_end`          | `int`        | Reading window end time (24-hour format, e.g., 18 = 6pm)                      |
 | `rssi`              | `int`        | Radio Signal Strength Indicator (raw value)                                   |
 | `rssi_dbm`          | `int`        | RSSI converted to dBm                                                         |
-| `lqi`               | `int`        | Link Quality Indicator (0-255, higher is better)                              |
+| `lqi`               | `int`        | Link Quality Indicator (0-127; CRC_OK bit 7 masked off, lower is better)      |
 | `freqest`           | `int8_t`     | Frequency offset estimate from CC1101 for adaptive tracking                   |
 | `history[13]`       | `uint32_t[]` | Monthly historical readings (13 months), index 0 = oldest, 12 = most recent   |
 | `history_available` | `bool`       | True if historical data was successfully extracted                            |
@@ -466,14 +466,14 @@ Convert LQI to percentage.
 
 **Parameters:**
 
-- `lqi`: Link Quality Indicator (0-255, higher is better)
+- `lqi`: Link Quality Indicator (0-127, lower is better)
 
 **Returns:**
 
 - Link quality as percentage (0-100)
 
 **Purpose:**
-Converts CC1101 Link Quality Indicator (0-255) to 0-100% scale. LQI represents overall link quality including interference effects.
+Converts CC1101 Link Quality Indicator (0-127) to 0-100% scale. LQI is an accumulated demodulation-error metric where a lower value means a better link, so the mapping is inverted (LQI 0 → 100%).
 
 ---
 

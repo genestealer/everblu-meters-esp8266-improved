@@ -105,9 +105,13 @@ int MeterHistory::generateHistoryJson(const uint32_t history[13], uint32_t curre
 
     pos += snprintf(outputBuffer + pos, remaining, "],\"monthly_usage\":[");
 
-    for (int i = 0; i < monthCount; i++)
+    // Start at the second month: the oldest month has no earlier baseline, so we
+    // omit it entirely rather than publishing a misleading value. monthly_usage
+    // holds (monthCount - 1) real month-over-month deltas, aligned so
+    // monthly_usage[k] pairs with history[k+1].
+    for (int i = 1; i < monthCount; i++)
     {
-        uint32_t usage = calculateUsage(history[i], (i > 0) ? history[i - 1] : 0);
+        uint32_t usage = calculateUsage(history[i], history[i - 1]);
 
         remaining = bufferSize - pos;
         if (remaining <= 1)
@@ -115,7 +119,7 @@ int MeterHistory::generateHistoryJson(const uint32_t history[13], uint32_t curre
             break;
         }
         pos += snprintf(outputBuffer + pos, remaining, "%s%u",
-                        (i > 0 ? "," : ""), usage);
+                        (i > 1 ? "," : ""), usage);
     }
 
     // Calculate current month usage
@@ -176,14 +180,15 @@ void MeterHistory::printToSerial(const uint32_t history[13], uint32_t currentVol
     LOG_I("everblu_meter", "%s Month  Volume (L)  Usage (L)", headerPrefix);
     LOG_I("everblu_meter", "%s -----  ----------  ---------", headerPrefix);
 
-    // Print each historical month
+    // Print each historical month. The oldest month has no earlier baseline, so
+    // its usage is unknown and shown as 0.
+    // Note: the JSON monthly_usage array omits this oldest-month usage value.
+    // Rows are labelled "-NN" months-ago; the live reading is printed separately
+    // below as "Now".
     for (int i = 0; i < monthCount; i++)
     {
-        char monthLabel[6];
-        getMonthLabel(i, monthCount, monthLabel, sizeof(monthLabel));
-
-        uint32_t usage = calculateUsage(history[i], (i > 0) ? history[i - 1] : 0);
-        LOG_I("everblu_meter", "%s  %s   %10u  %9u", headerPrefix, monthLabel, history[i], usage);
+        uint32_t usage = (i > 0) ? calculateUsage(history[i], history[i - 1]) : 0;
+        LOG_I("everblu_meter", "%s  -%02d   %10u  %9u", headerPrefix, monthCount - 1 - i, history[i], usage);
     }
 
     // Print current month usage

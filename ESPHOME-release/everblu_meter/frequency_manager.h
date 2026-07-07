@@ -34,7 +34,7 @@ struct tmeter_data
     int time_end;           // Reading window end time (24-hour format)
     int rssi;               // Radio Signal Strength Indicator (raw value)
     int rssi_dbm;           // RSSI converted to dBm
-    int lqi;                // Link Quality Indicator (0-255)
+    int lqi;                // Link Quality Indicator (0-127, lower is better)
     int8_t freqest;         // Frequency offset estimate for adaptive tracking
     uint32_t history[13];   // Monthly historical readings (13 months)
     bool history_available; // True if historical data was extracted
@@ -160,25 +160,22 @@ public:
     static float loadFrequencyOffset();
 
     /**
-     * @brief Perform narrow-range frequency scan
+     * @brief Perform a Deep frequency scan
      *
-     * Scans ±30 kHz around current frequency in 5 kHz steps to find optimal signal.
-     * Updates stored offset if better frequency is found.
-     * Recommended for periodic recalibration.
+     * Scans +-150 kHz (default) around the base frequency in fine 2.5 kHz steps for a
+     * thorough sweep. Maps the response window then zooms to the exact carrier centre.
+     * Also used on first boot when no offset is saved.
      *
+     * @param scanRangeMHz Half-width of scan in MHz. Default 0.150 (±150 kHz full sweep).
+     *                    Pass 0.020 for a narrow ±20 kHz re-tune after a drift failure.
+     * @param scanStepMHz Step size in MHz. Default 0.0025 (2.5 kHz).
+     *                    Pass 0.001 for 1 kHz steps in a narrow scan.
      * @param statusCallback Optional callback for status updates (can be nullptr)
      */
-    static void performFrequencyScan(void (*statusCallback)(const char *state, const char *message) = nullptr);
-
-    /**
-     * @brief Perform wide-range initial frequency scan
-     *
-     * Comprehensive scan over ±100 kHz in 10 kHz steps, followed by fine scan.
-     * Used on first boot when no offset is saved. Takes 1-2 minutes.
-     *
-     * @param statusCallback Optional callback for status updates (can be nullptr)
-     */
-    static void performWideInitialScan(void (*statusCallback)(const char *state, const char *message) = nullptr);
+    static void performDeepFrequencyScan(
+        float scanRangeMHz = 0.150f,
+        float scanStepMHz = 0.0025f,
+        void (*statusCallback)(const char *state, const char *message) = nullptr);
 
     /**
      * @brief Adaptive frequency tracking using FREQEST
@@ -240,7 +237,8 @@ private:
     // Configuration
     static float s_baseFrequency;   // Base meter frequency (e.g., 433.82 MHz)
     static float s_storedOffset;    // Current frequency offset in MHz
-    static bool s_autoScanEnabled;  // Enable auto-scan on first boot
+    static bool s_autoScanEnabled;      // Enable auto-scan on first boot
+    static bool s_hasStoredCalibration;  // True when a non-default offset was loaded from storage
     static int s_adaptiveThreshold; // Reads before adapting (default: 10)
 
     // Adaptive tracking state

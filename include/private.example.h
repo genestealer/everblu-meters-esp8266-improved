@@ -140,7 +140,13 @@
 // ============================================================================
 
 // Optional: manually set meter centre frequency (MHz)
-// Defaults to 433.82 MHz if not defined
+// Defaults to 433.82 MHz if not defined.
+//
+// Most users should leave this at the default. The CC1101 RX bandwidth is 270 kHz
+// with ±67.7 kHz of automatic frequency-offset compensation, so the radio locks
+// onto the meter at the nominal 433.82 MHz carrier even with a significantly
+// off-spec reference crystal - no frequency scan is normally required. Only set
+// this (or run a Deep scan) if reads consistently fail due to extreme drift.
 // #define FREQUENCY                 433.820000
 
 // Optional: clear EEPROM on next boot to force frequency rediscovery
@@ -153,13 +159,25 @@
 // After one successful boot, set back to 0 to retain the stored frequency.
 #define CLEAR_EEPROM_ON_BOOT 0
 
-// Enable wide frequency scan when no stored offset exists
+// Enable Deep frequency scan when no stored offset exists
 //
-// 1 (default): Perform ~2 minute scan before MQTT connection
-// 0:           Skip scan even if no offset is stored
+// 0 (default): Skip scan even if no offset is stored
+// 1:           Perform a Deep scan before MQTT connection
 //
 // To re-run the scan, set CLEAR_EEPROM_ON_BOOT to 1 or re-enable this.
 #define AUTO_SCAN_ENABLED 0
+
+// Enable automatic frequency scan after repeated read failures
+//
+// When a full streak of read attempts fails (MAX_RETRIES reached) and the
+// firmware enters its cooldown period, automatically run a frequency scan to
+// check for meter carrier-frequency (crystal) drift. This helps users who
+// never trigger a manual scan recover from offset drift. Runs at most once per
+// failure streak (reset after the next successful read).
+//
+// 0 (default): Never auto-scan on failure (manual scan only)
+// 1:           Auto-scan once when entering cooldown after max retries
+#define AUTO_SCAN_ON_FAILURE_ENABLED 0
 
 // CC1101 GDO0 (data-ready) pin assignment
 // ESP8266 (D1 mini / HUZZAH): GPIO5 (D1)
@@ -197,6 +215,15 @@
 // 1 = enable verbose CC1101 / RADIAN logging
 // 0 = disable (default)
 #define DEBUG_CC1101 0
+
+// Front-end RX input attenuation (dB)
+// Use this if the device is permanently mounted close to the meter (<0.5 m) and
+// near-field saturation causes CRC failures despite strong RSSI (e.g. flat −31 dBm
+// plateau, correct header received but every frame fails CRC).
+// The setting limits the CC1101 LNA gain via AGCCTRL2 MAX_LNA_GAIN.
+// Values: 0 (default, no attenuation), 6 (~6 dB), 12 (~12 dB), 18 (~18 dB)
+// At normal installation distance (−60 to −85 dBm) keep this at 0.
+#define RX_ATTENUATION_DB 0
 
 // ============================================================================
 // READING RETRY CONFIGURATION

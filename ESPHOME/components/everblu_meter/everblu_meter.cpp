@@ -43,10 +43,8 @@ void EverbluMeterTriggerButton::press_action() {
     return;
   }
 
-  if (this->is_wide_frequency_scan_) {
-    this->parent_->request_wide_frequency_scan();
-  } else if (this->is_frequency_scan_) {
-    this->parent_->request_frequency_scan();
+  if (this->is_deep_scan_) {
+    this->parent_->request_deep_scan();
   } else if (this->is_reset_frequency_) {
     this->parent_->request_reset_frequency();
   } else {
@@ -72,6 +70,7 @@ void EverbluMeterComponent::setup() {
   this->config_provider_->setGasVolumeDivisor(this->gas_volume_divisor_);
   this->config_provider_->setFrequency(this->frequency_);
   this->config_provider_->setAutoScanEnabled(this->auto_scan_);
+  this->config_provider_->setAutoScanOnFailureEnabled(this->auto_scan_on_failure_);
   this->config_provider_->setReadingSchedule(this->reading_schedule_.c_str());
   this->config_provider_->setReadHourUTC(this->read_hour_);
   this->config_provider_->setReadMinuteUTC(this->read_minute_);
@@ -331,26 +330,15 @@ void EverbluMeterComponent::request_manual_read() {
   this->meter_reader_->triggerReading(false);
 }
 
-void EverbluMeterComponent::request_frequency_scan() {
+void EverbluMeterComponent::request_deep_scan() {
   if (this->meter_reader_ == nullptr) {
-    ESP_LOGW(TAG, "Frequency scan ignored: meter reader not ready");
+    ESP_LOGW(TAG, "Deep scan ignored: meter reader not ready");
     return;
   }
 
-  ESP_LOGI(TAG, "Frequency scan requested via button");
+  ESP_LOGI(TAG, "Deep scan requested via button");
   this->apply_radio_context();
-  this->meter_reader_->performFrequencyScan(false);
-}
-
-void EverbluMeterComponent::request_wide_frequency_scan() {
-  if (this->meter_reader_ == nullptr) {
-    ESP_LOGW(TAG, "Wide frequency scan ignored: meter reader not ready");
-    return;
-  }
-
-  ESP_LOGI(TAG, "Wide frequency scan requested via button");
-  this->apply_radio_context();
-  this->meter_reader_->performFrequencyScan(true);
+  this->meter_reader_->performFrequencyScan();
 }
 
 void EverbluMeterComponent::request_reset_frequency() {
@@ -387,6 +375,10 @@ void EverbluMeterComponent::apply_radio_context() {
   } else {
     cc1101_set_gdo2_pin(-1);  // Ensure fallback mode on re-entry
   }
+
+  // Apply RX attenuation (0 = default, no LNA limiting; 6/12/18 = reduce LNA gain
+  // to prevent front-end saturation when mounted close to the meter).
+  cc1101_set_rx_attenuation(this->rx_attenuation_db_);
 }
 
 void EverbluMeterComponent::update() {

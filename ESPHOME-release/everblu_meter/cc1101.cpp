@@ -5,6 +5,7 @@
 #include "cc1101.h" // CC1101 interface
 #include "meter_code_parser.h"
 #include "radian_parser.h"
+#include "radian_decoder.h" // Shared platform-neutral 4-bit-per-bit decoder
 #include "logging.h" // Cross-platform logging
 #include <Arduino.h> // Arduino core
 #if !defined(USE_ESPHOME)
@@ -129,7 +130,16 @@ static const uint8_t debug_out = (uint8_t)(DEBUG_CC1101);
 #define FSCTRL1_FREQ_IF 0x08 // Intermediate frequency
 
 // MDMCFG4 - Modem Configuration
-#define MDMCFG4_RX_BW_58KHZ 0xF6         // RX filter bandwidth = 58 kHz, 2.4 kbps
+// RX filter bandwidth = Fxosc / (8 * (4 + CHANBW_M) * 2^CHANBW_E).
+// 0x66: CHANBW_E=1, CHANBW_M=2, DRATE_E=6 -> BW = 26000/(8*6*2) = 270.8 kHz.
+// The wide 270 kHz filter lets the CC1101's own frequency-offset compensation
+// (see FOCCFG, +-BW/4 = +-67.7 kHz) absorb even a badly out-of-spec reference
+// crystal (~150 ppm) so the radio locks at the nominal 433.82 MHz carrier
+// without any software frequency scanning. The RADIAN signal itself is only
+// ~15 kHz wide (2.4 kbps, 5.157 kHz deviation), so the extra bandwidth costs
+// ~6.7 dB of noise floor - negligible against the typical >20 dB link margin.
+#define MDMCFG4_RX_BW_270KHZ 0x66        // RX filter bandwidth = 270 kHz, 2.4 kbps
+#define MDMCFG4_RX_BW_58KHZ 0xF6         // RX filter bandwidth = 58 kHz, 2.4 kbps (legacy narrow)
 #define MDMCFG4_RX_BW_58KHZ_9_6KBPS 0xF8 // RX filter bandwidth = 58 kHz, 9.6 kbps (4x oversampling)
 
 // MDMCFG3 - Modem Configuration (Data Rate)
@@ -156,13 +166,34 @@ static const uint8_t debug_out = (uint8_t)(DEBUG_CC1101);
 #define MCSM0_FS_AUTOCAL_IDLE_TO_RXTX 0x18 // Auto-calibrate from IDLE to RX/TX
 
 // FOCCFG - Frequency Offset Compensation
-#define FOCCFG_FOC_4K_2K 0x1D // FOC enabled, 4K before sync, K/2 after sync
+// 0x1E: FOC enabled, 4K before sync, K/2 after sync, FOC_LIMIT = +-BW/4.
+// With the 270 kHz RX bandwidth this gives +-67.7 kHz of automatic carrier
+// offset correction (~+-156 ppm at 433 MHz), enough to lock onto the meter at
+// the nominal frequency even with a significantly off-spec reference crystal.
+#define FOCCFG_FOC_4K_2K 0x1E // FOC enabled, 4K before sync, K/2 after sync, FOC_LIMIT = +-BW/4
 
 // BSCFG - Bit Synchronization Configuration
 #define BSCFG_BS_PRE_KI_2 0x1C // Bit sync configuration
 
-// AGCCTRL2 - AGC Control
-#define AGCCTRL2_MAX_DVGA_LNA 0xC7 // Max DVGA and LNA gain
+// AGCCTRL2 - AGC Control (balanced profile)
+// 0x43 = 01 000 011: MAX_DVGA_GAIN=01 (more DVGA headroom), MAX_LNA_GAIN=000, MAGN_TARGET=011 (33 dB)
+// Replaces the former 0xC7 (42 dB target, 3 DVGA steps disabled) which locked the receiver near
+// maximum gain and caused front-end saturation / CRC failures at close range (< 0.5 m).
+// The 9 dB lower target gives the AGC loop headroom to reduce gain for strong near-field signals
+// without degrading sensitivity for weak/distant meters.
+#define AGCCTRL2_BALANCED 0x43
+
+// AGCCTRL2 values with optional LNA gain reduction (RX_ATTENUATION_DB).
+// Each step limits MAX_LNA_GAIN in AGCCTRL2[5:3] while preserving the 33 dB MAGN_TARGET.
+// Approximate actual reduction per CC1101 datasheet MAX_LNA_GAIN table:
+//   0 dB  -> MAX_LNA_GAIN=000 (no limit)          -> 0x43
+//   6 dB  -> MAX_LNA_GAIN=010 (6.1 dB reduction)  -> 0x53
+//  12 dB  -> MAX_LNA_GAIN=101 (11.5 dB reduction) -> 0x6B
+//  18 dB  -> MAX_LNA_GAIN=111 (17.1 dB reduction) -> 0x7B
+#define AGCCTRL2_ATT_0DB  0x43
+#define AGCCTRL2_ATT_6DB  0x53
+#define AGCCTRL2_ATT_12DB 0x6B
+#define AGCCTRL2_ATT_18DB 0x7B
 
 // AGCCTRL1 - AGC Control
 #define AGCCTRL1_DEFAULT 0x00 // Default AGC control
@@ -236,6 +267,7 @@ using CC1101SpiDevice = esphome::spi::SPIDevice<esphome::spi::BIT_ORDER_MSB_FIRS
 static CC1101SpiDevice *_spi_device = nullptr;
 static int _gdo0_pin = -1;
 static int _gdo2_pin = -1;
+static int _rx_attenuation_db = 0;
 
 void cc1101_set_spi_device(void *device)
 {
@@ -251,6 +283,11 @@ void cc1101_set_gdo0_pin(int gdo0_pin)
 void cc1101_set_gdo2_pin(int gdo2_pin)
 {
   _gdo2_pin = gdo2_pin;
+}
+
+void cc1101_set_rx_attenuation(int db)
+{
+  _rx_attenuation_db = db;
 }
 
 // Macros to get GDO pin numbers - use variables in ESPHome mode, build flags otherwise
@@ -589,7 +626,7 @@ void cc1101_configureRF_0(float freq)
 
   setMHZ(freq); // Configure frequency using helper function
 
-  halRfWriteReg(MDMCFG4, MDMCFG4_RX_BW_58KHZ);         // RX bandwidth: 58 kHz
+  halRfWriteReg(MDMCFG4, MDMCFG4_RX_BW_270KHZ);        // RX bandwidth: 270 kHz
   halRfWriteReg(MDMCFG3, MDMCFG3_DRATE_2_4KBPS);       // Data rate: 2.4 kbps
   halRfWriteReg(MDMCFG2, MDMCFG2_2FSK_16_16_SYNC);     // 2-FSK, 16/16 sync bits
   halRfWriteReg(MDMCFG1, MDMCFG1_NUM_PREAMBLE_2);      // Preamble: 2 bytes
@@ -599,7 +636,21 @@ void cc1101_configureRF_0(float freq)
   halRfWriteReg(MCSM0, MCSM0_FS_AUTOCAL_IDLE_TO_RXTX); // Auto-calibrate on IDLE→RX/TX
   halRfWriteReg(FOCCFG, FOCCFG_FOC_4K_2K);             // Frequency offset compensation
   halRfWriteReg(BSCFG, BSCFG_BS_PRE_KI_2);             // Bit synchronization
-  halRfWriteReg(AGCCTRL2, AGCCTRL2_MAX_DVGA_LNA);      // AGC: max gain
+  // Select AGCCTRL2 based on RX_ATTENUATION_DB (non-ESPHome) or _rx_attenuation_db (ESPHome)
+#ifdef USE_ESPHOME
+  const int att_db = _rx_attenuation_db;
+#else
+#ifndef RX_ATTENUATION_DB
+#define RX_ATTENUATION_DB 0
+#endif
+  const int att_db = RX_ATTENUATION_DB;
+#endif
+  uint8_t agcctrl2_val;
+  if (att_db >= 18)      { agcctrl2_val = AGCCTRL2_ATT_18DB; }
+  else if (att_db >= 12) { agcctrl2_val = AGCCTRL2_ATT_12DB; }
+  else if (att_db >= 6)  { agcctrl2_val = AGCCTRL2_ATT_6DB;  }
+  else                   { agcctrl2_val = AGCCTRL2_ATT_0DB;  }
+  halRfWriteReg(AGCCTRL2, agcctrl2_val);                 // AGC: balanced 33 dB target + optional LNA limit
   halRfWriteReg(AGCCTRL1, AGCCTRL1_DEFAULT);           // AGC: default
   halRfWriteReg(AGCCTRL0, AGCCTRL0_FILTER_16);         // AGC: 16 samples
   halRfWriteReg(WORCTRL, WORCTRL_WOR_RES_1_8);         // Wake-on-radio
@@ -739,13 +790,40 @@ int8_t cc1100_rssi_convert2dbm(uint8_t Rssi_dec)
 void cc1101_rec_mode(void)
 {
   uint8_t marcstate;
-  CC1101_CMD(SIDLE);                                                        // sets to idle first. must be in
-  CC1101_CMD(SRX);                                                          // writes receive strobe (receive mode)
-  marcstate = 0xFF;                                                         // set unknown/dummy state value
+  CC1101_CMD(SIDLE);       // sets to idle first. must be in
+  CC1101_CMD(SRX);         // writes receive strobe (receive mode)
+  marcstate = 0xFF;        // set unknown/dummy state value
+  // Bounded wait for the radio to reach an RX state (0x0D/0x0E/0x0F).
+  // Without a timeout a wedged radio state (e.g. 0x11 RXFIFO_OVERFLOW) would
+  // spin here forever while feeding the watchdog - hanging the whole firmware
+  // with no reboot. Cap the wait and attempt a FIFO flush + re-strobe to
+  // recover; if that still fails, return so the caller's GDO0 wait times out
+  // gracefully instead of hanging.
+  uint16_t spin = 0;
+  const uint16_t kMaxSpin = 20000; // ~50-100ms of tight SPI polling
+  bool recovered_once = false;
   while ((marcstate != 0x0D) && (marcstate != 0x0E) && (marcstate != 0x0F)) // 0x0D = RX
   {
     marcstate = halRfReadReg(MARCSTATE_ADDR); // read out state of cc1100 to be sure in RX
     FEED_WDT();                               // Avoid soft WDT while waiting for RX state
+    if (++spin >= kMaxSpin)
+    {
+      if (!recovered_once)
+      {
+        // First timeout: try to unwedge the radio (flush RX FIFO, re-strobe RX).
+        recovered_once = true;
+        spin = 0;
+        echo_debug(1, "[CC1101] WARNING: radio stuck in state 0x%02X while entering RX - flushing and retrying\n", marcstate & 0x1F);
+        CC1101_CMD(SIDLE);
+        CC1101_CMD(SFRX); // flush RX FIFO (clears RXFIFO_OVERFLOW)
+        CC1101_CMD(SRX);
+        marcstate = 0xFF;
+        continue;
+      }
+      // Second timeout: give up so the caller can fail this read gracefully.
+      echo_debug(1, "[CC1101] ERROR: radio failed to enter RX (last state 0x%02X) - aborting receive\n", marcstate & 0x1F);
+      return;
+    }
   }
 }
 
@@ -861,7 +939,7 @@ uint8_t cc1101_check_packet_received(void)
     if (is_look_like_radian_frame(rxBuffer, pktLen))
     {
       echo_debug(debug_out, "[CC1101] Packet looks like RADIAN frame");
-      echo_debug(debug_out, "[CC1101] bytes=%u rssi=%d lqi=%u F_est=%u", pktLen, l_Rssi_dbm, l_lqi, l_freq_est);
+      echo_debug(debug_out, "[CC1101] bytes=%u rssi=%d lqi=%u F_est=%d\n", pktLen, l_Rssi_dbm, l_lqi & 0x7F, (int8_t)l_freq_est);
       show_in_hex_one_line(rxBuffer, pktLen);
       // show_in_bin(rxBuffer,l_nb_byte);
     }
@@ -1075,6 +1153,20 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
         memset(data.history, 0, sizeof(data.history));
         echo_debug(1, "[WARN] Discarded corrupted historical block while keeping primary meter fields\n");
       }
+
+      // 4) Plausibility guard on the current reading versus its own history.
+      //    Reject the whole frame when the implied current-month usage exceeds
+      //    100x the largest historical monthly usage - a corrupted current
+      //    volume shows up as an absurd jump relative to the meter's history.
+      //    Skipped automatically when history is insufficient/unreliable (see
+      //    radian_reading_within_history_bounds()).
+      if (history_ok &&
+          !radian_reading_within_history_bounds((uint32_t)data.volume, data.history, num_values, 100UL))
+      {
+        echo_debug(1, "[ERROR] Current-month usage exceeds 100x the largest historical monthly usage - discarding reading\n");
+        memset(&data, 0, sizeof(data));
+        return data;
+      }
     }
     else
     {
@@ -1123,121 +1215,42 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
 // 01234567 ###01234 567###01 234567## #0123456 (# -> Start/Stop bit)
 // is decoded to:
 // 76543210 76543210 76543210 76543210
-// Note: decoded_buffer must be at least l_total_byte/4 bytes in size
+// Note: this wrapper always passes MAX_DECODED_SIZE (200) as the output-buffer
+// limit, so decoded_buffer must be at least 200 bytes (see the static
+// meter_data[200] caller); the decode stops early if that limit is reached.
+//
+// The core bit-recovery algorithm lives in radian_decode_4bitpbit()
+// (src/core/radian_decoder.cpp) so that a single, platform-neutral
+// implementation is shared by the firmware and the native hex_decoder tool
+// (see issue #118). This function is a thin Arduino-side wrapper that keeps
+// the firmware-specific concerns - watchdog feeding and debug diagnostics -
+// around the pure decode.
 uint8_t decode_4bitpbit_serial(uint8_t *rxBuffer, int l_total_byte, uint8_t *decoded_buffer)
 {
-  uint16_t i, j, k;
-  uint8_t bit_cnt = 0;
-  int8_t bit_cnt_flush_S8 = 0;
-  uint8_t bit_pol = 0;
-  uint8_t dest_bit_cnt = 0;
-  uint8_t dest_byte_cnt = 0;
-  uint8_t current_Rx_Byte;
+  // Maximum decoded buffer size (matches the static meter_data[200] caller
+  // buffer; a conservative estimate of input bytes / 4).
+  const int MAX_DECODED_SIZE = 200;
 
-  // Maximum decoded buffer size (conservative estimate: input bytes / 4)
-  const uint8_t MAX_DECODED_SIZE = 200;
-  // Track framing/stop-bit errors so we can reject extremely corrupted frames.
-  uint8_t framing_error_count = 0;
+  // Feed the watchdog before and after the decode. The decode itself is a
+  // tight in-memory loop that completes well within the watchdog window for
+  // the ~1000-byte oversampled frames seen in practice, so a single feed on
+  // each side is sufficient to keep the SDK/WiFi task serviced.
+  FEED_WDT();
 
-  // show_in_hex(rxBuffer,l_total_byte);
-  /*set 1st bit polarity*/
-  bit_pol = (rxBuffer[0] & 0x80); // initialize with 1st bit state
+  uint8_t dest_byte_cnt =
+      radian_decode_4bitpbit(rxBuffer, l_total_byte, decoded_buffer, MAX_DECODED_SIZE);
 
-  for (i = 0; i < l_total_byte; i++)
+  FEED_WDT();
+
+  if (dest_byte_cnt == 0)
   {
-    current_Rx_Byte = rxBuffer[i];
-    // echo_debug(debug_out, "0x%02X ", rxBuffer[i]);
-
-    // Feed watchdog periodically during long decode operations
-    if (i > 0 && (i % 64) == 0)
-    {
-      FEED_WDT();
-    }
-
-    for (j = 0; j < 8; j++)
-    {
-      if ((current_Rx_Byte & 0x80) == bit_pol)
-        bit_cnt++;
-      else if (bit_cnt == 1)
-      {                                   // previous bit was a glitch so bit has not really changed
-        bit_pol = current_Rx_Byte & 0x80; // restore correct bit polarity
-        bit_cnt = bit_cnt_flush_S8 + 1;   // hope that previous bit was correctly decoded
-      }
-      else
-      { // bit polarity has changed
-        bit_cnt_flush_S8 = bit_cnt;
-        bit_cnt = (bit_cnt + 2) / 4;
-        bit_cnt_flush_S8 = bit_cnt_flush_S8 - (bit_cnt * 4);
-
-        for (k = 0; k < bit_cnt; k++)
-        { // insert the number of decoded bits
-          if (dest_bit_cnt < 8)
-          { // if data byte
-            // Bounds check before writing to buffer
-            if (dest_byte_cnt >= MAX_DECODED_SIZE)
-            {
-              echo_debug(debug_out, "[ERROR] Decode buffer overflow at byte %d\n", dest_byte_cnt);
-              return dest_byte_cnt;
-            }
-            decoded_buffer[dest_byte_cnt] = decoded_buffer[dest_byte_cnt] >> 1;
-            decoded_buffer[dest_byte_cnt] |= bit_pol;
-          }
-          dest_bit_cnt++;
-          // if ((dest_bit_cnt ==9) && (!bit_pol)){  echo_debug(debug_out,"stop bit error9"); return dest_byte_cnt;}
-          if ((dest_bit_cnt == 10) && (!bit_pol))
-          {
-            // A stop-bit mismatch was detected. Instead of aborting the whole
-            // decode (which produces tiny decoded outputs and breaks parsing),
-            // log the error, skip the current malformed byte and continue
-            // decoding. This makes the decoder more tolerant to single-bit
-            // corruption or brief polarity glitches on the air.
-            echo_debug(debug_out, "[ERROR] Stop bit error at bit 10 - skipping malformed byte\n");
-            if (framing_error_count < 255)
-            {
-              framing_error_count++;
-            }
-            // Reset the bit counter to align on the next byte boundary and
-            // advance to the next destination byte slot so we don't overwrite
-            // the current (corrupted) byte.
-            dest_bit_cnt = 0;
-            dest_byte_cnt++;
-            if (dest_byte_cnt >= MAX_DECODED_SIZE)
-            {
-              echo_debug(debug_out, "[ERROR] Decode buffer size limit reached while skipping malformed byte\n");
-              return dest_byte_cnt;
-            }
-            // Continue processing remaining samples
-            continue;
-          }
-          if ((dest_bit_cnt >= 11) && (!bit_pol)) // start bit
-          {
-            dest_bit_cnt = 0;
-            // echo_debug(debug_out, " dec[%i]=0x%02X \n", dest_byte_cnt, decoded_buffer[dest_byte_cnt]);
-            dest_byte_cnt++;
-            // Additional bounds check before next iteration
-            if (dest_byte_cnt >= MAX_DECODED_SIZE)
-            {
-              echo_debug(debug_out, "[ERROR] Decode buffer size limit reached\n");
-              return dest_byte_cnt;
-            }
-          }
-        }
-        bit_pol = current_Rx_Byte & 0x80;
-        bit_cnt = 1;
-      }
-      current_Rx_Byte = current_Rx_Byte << 1;
-    } // scan TX_bit
-  } // scan TX_byte
-
-  // If we saw many framing errors compared to the number of bytes we managed
-  // to decode, treat the whole frame as unusable. This prevents obviously
-  // corrupted frames from being interpreted as valid meter data.
-  if (dest_byte_cnt > 0 && framing_error_count > (dest_byte_cnt / 2))
+    // radian_decode_4bitpbit() returns 0 when the frame quality is too low
+    // (too many framing errors relative to decoded byte count).
+    echo_debug(debug_out, "[ERROR] Decode quality too low or empty frame - discarding\n");
+  }
+  else
   {
-    echo_debug(debug_out,
-               "[ERROR] Decode quality too low (decoded=%u, framing_errors=%u) - discarding frame\n",
-               dest_byte_cnt, framing_error_count);
-    return 0;
+    echo_debug(debug_out, "[CC1101] Decoded %u bytes from %d raw bytes\n", dest_byte_cnt, l_total_byte);
   }
 
   return dest_byte_cnt;
@@ -1406,7 +1419,7 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
   l_lqi = halRfReadReg(LQI_ADDR);
   l_freq_est = halRfReadReg(FREQEST_ADDR);
   l_Rssi_dbm = cc1100_rssi_convert2dbm(halRfReadReg(RSSI_ADDR));
-  echo_debug(debug_out, "[CC1101] rssi=%d lqi=%u F_est=%u", l_Rssi_dbm, l_lqi, l_freq_est);
+  echo_debug(debug_out, "[CC1101] rssi=%d lqi=%u F_est=%d\n", l_Rssi_dbm, l_lqi & 0x7F, (int8_t)l_freq_est);
 
   fflush(stdout);
 
@@ -1839,7 +1852,7 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
   {
     echo_debug(1, "[METER] WARNING: TX loop timed out after %dms before the FIFO drained (MARCSTATE=0x%02X); possible SPI/feeding issue\n", tmo * 10, marcstate & 0x1F);
   }
-  echo_debug(debug_out, "[CC1101] tmo=%i free_byte:0x%02X sts:0x%02X", tmo, CC1101_status_FIFO_FreeByte, CC1101_status_state);
+  echo_debug(debug_out, "[CC1101] tmo=%i free_byte:0x%02X sts:0x%02X\n", tmo, CC1101_status_FIFO_FreeByte, CC1101_status_state);
   CC1101_CMD(SIDLE); // Ensure IDLE before flushing (required by CC1101 datasheet)
   CC1101_CMD(SFTX);  // Flush TX FIFO; this clears the status and puts the state machine in IDLE
   // end of transition restore default register
@@ -1904,6 +1917,9 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
     }
 
     echo_debug(1, "[METER] Validating CRC...\n");
+    // Read RSSI now while the channel is still active so we can use it to
+    // diagnose the cause of a CRC failure (saturation vs. weak signal).
+    int8_t frame_rssi_dbm = cc1100_rssi_convert2dbm(halRfReadReg(RSSI_ADDR));
     if (validate_radian_crc(meter_data, meter_data_size))
     {
       echo_debug(1, "[METER] CRC valid - parsing meter data\n");
@@ -1912,7 +1928,20 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
     else
     {
       echo_debug(1, "[METER] CRC check failed: a frame was received but arrived corrupted, so this reading was discarded.\n");
-      echo_debug(1, "[METER] This points to a marginal/noisy RF link (weak signal or a slight frequency offset), not a code fault. Improving antenna placement or running a frequency scan usually fixes it.\n");
+      if (frame_rssi_dbm > -50)
+      {
+        // Very strong signal: near-field RF saturation is the likely cause.
+        // The CC1101 front-end clips when the input exceeds its linear range,
+        // producing frames that look valid (correct header bytes) but fail CRC.
+        // This is the OPPOSITE of a weak-signal problem.
+        echo_debug(1, "[METER] *** NEAR-FIELD SATURATION DETECTED (RSSI=%d dBm) ***\n", frame_rssi_dbm);
+        echo_debug(1, "[METER] The signal is too STRONG, not too weak. Move the device at least 1-2 m away from the meter.\n");
+        echo_debug(1, "[METER] Set #define RX_ATTENUATION_DB 6 (or 12/18) in private.h to engage the CC1101 front-end LNA gain limiter.\n");
+      }
+      else
+      {
+        echo_debug(1, "[METER] This points to a marginal/noisy RF link (weak signal or a slight frequency offset), not a code fault. Improving antenna placement or running a frequency scan usually fixes it.\n");
+      }
       meter_data_size = 0;
     }
   }
@@ -1920,12 +1949,13 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
   {
     echo_debug(1, "[METER] No data frame received within the timeout window - the meter did not respond.\n");
     echo_debug(1, "[METER] This usually means the meter is asleep (outside its daily listening window), out of range, the signal is too weak, or the configured Year/Serial is incorrect.\n");
-    echo_debug(1, "[METER] If this persists, try improving antenna placement or running a frequency scan to recalibrate the radio (see AUTO_SCAN_ENABLED / CLEAR_EEPROM_ON_BOOT).\n");
+    echo_debug(1, "[METER] If this persists, try improving antenna placement or running a frequency scan to recalibrate the radio.\n");
+    echo_debug(1, "[METER] A scan runs automatically after repeated failures unless disabled (AUTO_SCAN_ON_FAILURE_ENABLED / auto_scan_on_failure); for a full re-scan see AUTO_SCAN_ENABLED / CLEAR_EEPROM_ON_BOOT.\n");
     echo_debug(debug_out, "[METER] Meter data frame timeout\n");
   }
   sdata.rssi = halRfReadReg(RSSI_ADDR);                              // Read RSSI value from CC1101
   sdata.rssi_dbm = cc1100_rssi_convert2dbm(halRfReadReg(RSSI_ADDR)); // Read RSSI value from CC1101 and convert to dBm
-  sdata.lqi = halRfReadReg(LQI_ADDR);                                // Read LQI value from CC1101
+  sdata.lqi = halRfReadReg(LQI_ADDR) & 0x7F;                         // Read LQI value from CC1101 (mask bit 7 = CRC_OK; bits 6:0 are the LQI)
   sdata.freqest = (int8_t)halRfReadReg(FREQEST_ADDR);                // Read frequency offset estimate for adaptive tracking
   return sdata;
 }

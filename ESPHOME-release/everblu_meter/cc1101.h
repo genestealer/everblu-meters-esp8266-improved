@@ -52,6 +52,19 @@ void cc1101_set_gdo0_pin(int gdo0_pin);
  * @param gdo2_pin GPIO pin number connected to CC1101 GDO2, or -1 to disable
  */
 void cc1101_set_gdo2_pin(int gdo2_pin);
+
+/**
+ * @brief Set the front-end RX input attenuation level (ESPHome mode).
+ *
+ * Must be called before cc1101_init() when compiling with ESPHome.
+ * Limits the CC1101 LNA gain via the AGCCTRL2 MAX_LNA_GAIN field to prevent
+ * front-end saturation when the device is permanently mounted close to the meter.
+ *
+ * @param db Attenuation in dB. Accepted values: 0 (default), 6, 12, 18.
+ *           Values are rounded down to the nearest supported step.
+ *           Actual hardware reduction is approximate (6.1 / 11.5 / 17.1 dB).
+ */
+void cc1101_set_rx_attenuation(int db);
 #endif
 
 /**
@@ -86,7 +99,7 @@ struct tmeter_data
   int time_end;           // Reading window end time (24-hour format, e.g., 18 = 6pm)
   int rssi;               // Radio Signal Strength Indicator (raw value)
   int rssi_dbm;           // RSSI converted to dBm
-  int lqi;                // Link Quality Indicator (0-255, higher is better)
+  int lqi;                // Link Quality Indicator (0-127, lower is better; CRC_OK bit masked)
   int8_t freqest;         // Frequency offset estimate from CC1101 for adaptive tracking
   uint32_t history[13];   // Monthly historical readings (13 months), index 0 = oldest, 12 = most recent
   bool history_available; // True if historical data was successfully extracted

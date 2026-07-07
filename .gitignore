@@ -64,3 +64,6 @@ __pycache__/
 *.pyc
 **/.esphome/
 scripts/dev_notes.txt
+/test/rommess
+issue-58-reply.md
+/temp

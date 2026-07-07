@@ -93,10 +93,9 @@ public:
     void triggerReading(bool isScheduled);
 
     /**
-     * @brief Perform frequency scan
-     * @param wideRange true for wide scan, false for narrow
+     * @brief Perform a Deep frequency scan (window-map + zoom) to recalibrate the carrier offset
      */
-    void performFrequencyScan(bool wideRange);
+    void performFrequencyScan();
 
     /**
      * @brief Reset frequency offset to 0
@@ -194,6 +193,7 @@ private:
     int m_retryCount;
     unsigned long m_lastFailedAttempt;
     unsigned long m_nextRetryTime;
+    bool m_autoScanAfterFailureDone; // Guards the failure-recovery frequency scan to once per failure streak
 
     // Statistics
     unsigned long m_totalReadAttempts;

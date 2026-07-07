@@ -137,11 +137,12 @@ int calculateMeterdBmToPercentage(int rssi_dbm);
 /**
  * @brief Convert LQI to percentage
  *
- * Converts CC1101 Link Quality Indicator (0-255) to 0-100% scale.
- * LQI represents overall link quality including interference effects.
+ * Converts CC1101 Link Quality Indicator (0-127) to 0-100% scale.
+ * The CC1101 LQI is an accumulated demodulation-error metric where a lower
+ * value means a better link, so the mapping is inverted (LQI 0 -> 100%).
  *
- * @param lqi Link Quality Indicator (0-255, higher is better)
- * @return Link quality as percentage (0-100)
+ * @param lqi Link Quality Indicator (0-127, lower is better; CRC_OK bit masked)
+ * @return Link quality as percentage (0-100, higher is better)
  */
 int calculateLQIToPercentage(int lqi);
 

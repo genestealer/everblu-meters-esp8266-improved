@@ -45,8 +45,7 @@ class EverbluMeterComponent;
 class EverbluMeterTriggerButton final : public button::Button {
  public:
   void set_parent(EverbluMeterComponent *parent) { this->parent_ = parent; }
-  void set_frequency_scan(bool is_frequency_scan) { this->is_frequency_scan_ = is_frequency_scan; }
-  void set_wide_frequency_scan(bool is_wide_frequency_scan) { this->is_wide_frequency_scan_ = is_wide_frequency_scan; }
+  void set_deep_scan(bool is_deep_scan) { this->is_deep_scan_ = is_deep_scan; }
   void set_reset_frequency(bool is_reset) { this->is_reset_frequency_ = is_reset; }
 
  protected:
@@ -54,8 +53,7 @@ class EverbluMeterTriggerButton final : public button::Button {
 
  private:
   EverbluMeterComponent *parent_{nullptr};
-  bool is_frequency_scan_{false};
-  bool is_wide_frequency_scan_{false};
+  bool is_deep_scan_{false};
   bool is_reset_frequency_{false};
 };
 
@@ -88,6 +86,7 @@ class EverbluMeterComponent final : public PollingComponent,
   void set_gas_volume_divisor(int divisor) { this->gas_volume_divisor_ = divisor; }
   void set_frequency(float freq) { this->frequency_ = freq; }
   void set_auto_scan(bool enabled) { this->auto_scan_ = enabled; }
+  void set_auto_scan_on_failure(bool enabled) { this->auto_scan_on_failure_ = enabled; }
   void set_reading_schedule(const std::string &schedule) { this->reading_schedule_ = schedule; }
   void set_read_hour(int hour) { this->read_hour_ = hour; }
   void set_read_minute(int minute) { this->read_minute_ = minute; }
@@ -101,6 +100,7 @@ class EverbluMeterComponent final : public PollingComponent,
   void set_adaptive_threshold(int threshold) { this->adaptive_threshold_ = threshold; }
   void set_gdo0_pin(InternalGPIOPin *pin) { this->gdo0_pin_ = pin; }
   void set_gdo2_pin(InternalGPIOPin *pin) { this->gdo2_pin_ = pin; }
+  void set_rx_attenuation(int db) { this->rx_attenuation_db_ = db; }
 
   // Sensor setters
   void set_volume_sensor(sensor::Sensor *sensor) { this->volume_sensor_ = sensor; }
@@ -136,8 +136,7 @@ class EverbluMeterComponent final : public PollingComponent,
 
   // External actions
   void request_manual_read();
-  void request_frequency_scan();
-  void request_wide_frequency_scan();
+  void request_deep_scan();
   void request_reset_frequency();
 
  protected:
@@ -149,6 +148,7 @@ class EverbluMeterComponent final : public PollingComponent,
   int gas_volume_divisor_{100};
   float frequency_{433.82f};
   bool auto_scan_{true};
+  bool auto_scan_on_failure_{true};
   std::string reading_schedule_{"Monday-Friday"};
   int read_hour_{10};
   int read_minute_{0};
@@ -158,6 +158,7 @@ class EverbluMeterComponent final : public PollingComponent,
   int max_retries_{5};
   unsigned long retry_cooldown_ms_{3600000};
   int adaptive_threshold_{1};
+  int rx_attenuation_db_{0};
 
   // Internal state tracking
   void publish_boot_states();

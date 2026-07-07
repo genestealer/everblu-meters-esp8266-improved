@@ -60,6 +60,14 @@
 #define LOG_E(tag, format, ...) ESP_LOGE(tag, format, ##__VA_ARGS__)
 #define LOG_V(tag, format, ...) ESP_LOGV(tag, format, ##__VA_ARGS__)
 
+// TS_PRINTLN / TS_PRINTF are the timestamped Serial helpers used by MQTT-mode
+// code. Some files are shared with the ESPHome build (e.g. frequency_manager.cpp,
+// schedule_manager.cpp), so provide ESPHome-mode equivalents that route through
+// the ESPHome logger. Without these the shared files fail to compile in ESPHome
+// mode. ESPHome supplies its own timestamp/level prefix and trailing newline.
+#define TS_PRINTLN(msg) ESP_LOGI("everblu_meter", "%s", msg)
+#define TS_PRINTF(fmt, ...) ESP_LOGI("everblu_meter", fmt, ##__VA_ARGS__)
+
 // Component TAG should be defined as: static const char *const TAG = "everblu_meter";
 // This ensures all logs appear under the "everblu_meter" component in ESPHome logs
 
@@ -81,7 +89,10 @@
 //
 // Disable at build time with -D EVERBLU_LOG_COLOR=0 (for example when piping
 // logs to a file or to the fixture-extraction script).
+#include <stdio.h>
 #include <string.h>
+#include <time.h>
+#include <Arduino.h> // for millis()
 
 #ifndef EVERBLU_LOG_COLOR
 #define EVERBLU_LOG_COLOR 1
@@ -148,9 +159,35 @@ inline const char *everblu_log_color_for_prefix(const char *msg)
 	return "";
 }
 
-#define LOG_D(tag, format, ...) Serial.printf(EVB_ANSI_GRAY "[D][%s]" EVB_ANSI_RESET " " format "\n", tag, ##__VA_ARGS__)
-#define LOG_I(tag, format, ...) Serial.printf(EVB_ANSI_GREEN "[I]" EVB_ANSI_RESET "[%s] " format "\n", tag, ##__VA_ARGS__)
-#define LOG_W(tag, format, ...) Serial.printf(EVB_ANSI_YELLOW "[W][%s] " format EVB_ANSI_RESET "\n", tag, ##__VA_ARGS__)
-#define LOG_E(tag, format, ...) Serial.printf(EVB_ANSI_RED "[E][%s] " format EVB_ANSI_RESET "\n", tag, ##__VA_ARGS__)
-#define LOG_V(tag, format, ...) Serial.printf(EVB_ANSI_GRAY "[V][%s] " format EVB_ANSI_RESET "\n", tag, ##__VA_ARGS__)
+// Returns a formatted UTC timestamp string "[HH:MM:SS]" for serial log lines.
+// Uses a static buffer (safe on single-threaded ESP8266/ESP32).
+// Before NTP sync (time() < 2020-01-01), shows actual boot uptime via millis().
+// Buffer is 20 bytes: "[boot+4294967s]" is 15 chars; "[HH:MM:SS]" is 10 chars.
+inline const char *everblu_log_timestamp()
+{
+	static char buf[20]; // "[boot+XXXXXXXs]" (15) or "[HH:MM:SS]" (10) + null
+	time_t now = time(nullptr);
+	if (now < 1577836800L) // before 2020-01-01 → not yet NTP-synced; show boot uptime
+	{
+		snprintf(buf, sizeof(buf), "[boot+%lus]", millis() / 1000UL);
+	}
+	else
+	{
+		struct tm *t = gmtime(&now);
+		snprintf(buf, sizeof(buf), "[%02d:%02d:%02d]", t->tm_hour, t->tm_min, t->tm_sec);
+	}
+	return buf;
+}
+
+// Timestamped Serial output helpers for tagged log lines (MQTT mode only).
+// Use TS_PRINTLN / TS_PRINTF in place of direct Serial.println / Serial.printf
+// for lines that carry a [TAG] prefix, so the output matches ESPHome log style.
+#define TS_PRINTLN(msg) do { Serial.print(everblu_log_timestamp()); Serial.println(msg); } while (0)
+#define TS_PRINTF(fmt, ...) do { Serial.print(everblu_log_timestamp()); Serial.printf(fmt, ##__VA_ARGS__); } while (0)
+
+#define LOG_D(tag, format, ...) Serial.printf("%s" EVB_ANSI_GRAY "[D][%s]" EVB_ANSI_RESET " " format "\n", everblu_log_timestamp(), tag, ##__VA_ARGS__)
+#define LOG_I(tag, format, ...) Serial.printf("%s" EVB_ANSI_GREEN "[I]" EVB_ANSI_RESET "[%s] " format "\n", everblu_log_timestamp(), tag, ##__VA_ARGS__)
+#define LOG_W(tag, format, ...) Serial.printf("%s" EVB_ANSI_YELLOW "[W][%s] " format EVB_ANSI_RESET "\n", everblu_log_timestamp(), tag, ##__VA_ARGS__)
+#define LOG_E(tag, format, ...) Serial.printf("%s" EVB_ANSI_RED "[E][%s] " format EVB_ANSI_RESET "\n", everblu_log_timestamp(), tag, ##__VA_ARGS__)
+#define LOG_V(tag, format, ...) Serial.printf("%s" EVB_ANSI_GRAY "[V][%s] " format EVB_ANSI_RESET "\n", everblu_log_timestamp(), tag, ##__VA_ARGS__)
 #endif

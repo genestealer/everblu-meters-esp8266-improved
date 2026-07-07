@@ -15,6 +15,7 @@
 float FrequencyManager::s_baseFrequency = 0.0;
 float FrequencyManager::s_storedOffset = 0.0;
 bool FrequencyManager::s_autoScanEnabled = true;
+bool FrequencyManager::s_hasStoredCalibration = false;
 int FrequencyManager::s_adaptiveThreshold = 10;
 int FrequencyManager::s_successfulReadsCount = 0;
 float FrequencyManager::s_cumulativeFreqError = 0.0;
@@ -39,12 +40,12 @@ bool FrequencyManager::validateCallbacks()
 {
     if (!s_radioInitCallback)
     {
-        Serial.println("[ERROR] Radio init callback not set. Call setRadioInitCallback() first!");
+        TS_PRINTLN("[ERROR] Radio init callback not set. Call setRadioInitCallback() first!");
         return false;
     }
     if (!s_meterReadCallback)
     {
-        Serial.println("[ERROR] Meter read callback not set. Call setMeterReadCallback() first!");
+        TS_PRINTLN("[ERROR] Meter read callback not set. Call setMeterReadCallback() first!");
         return false;
     }
     return true;
@@ -54,13 +55,13 @@ bool FrequencyManager::validateCallbacks()
 void FrequencyManager::setRadioInitCallback(RadioInitCallback callback)
 {
     s_radioInitCallback = callback;
-    Serial.println("[FREQ] FrequencyManager: Radio init callback registered");
+    TS_PRINTLN("[FREQ] FrequencyManager: Radio init callback registered");
 }
 
 void FrequencyManager::setMeterReadCallback(MeterReadCallback callback)
 {
     s_meterReadCallback = callback;
-    Serial.println("[FREQ] FrequencyManager: Meter read callback registered");
+    TS_PRINTLN("[FREQ] FrequencyManager: Meter read callback registered");
 }
 
 float FrequencyManager::begin(float baseFrequency)
@@ -70,7 +71,7 @@ float FrequencyManager::begin(float baseFrequency)
     // Validate callbacks are set
     if (!validateCallbacks())
     {
-        Serial.println("[ERROR] FrequencyManager::begin() failed - callbacks not configured!");
+        TS_PRINTLN("[ERROR] FrequencyManager::begin() failed - callbacks not configured!");
         return 0.0;
     }
 
@@ -83,6 +84,7 @@ float FrequencyManager::begin(float baseFrequency)
     float loaded = StorageAbstraction::loadFloat(STORAGE_KEY, NAN, STORAGE_MAGIC, MIN_OFFSET, MAX_OFFSET);
     bool persisted = !isnan(loaded);
     s_storedOffset = persisted ? loaded : 0.0f;
+    s_hasStoredCalibration = persisted;
 
     if (persisted)
     {
@@ -94,7 +96,7 @@ float FrequencyManager::begin(float baseFrequency)
     {
         LOG_W("everblu_meter",
               "No frequency calibration stored - using default 0.000 kHz "
-              "(run a Wide Frequency Scan to calibrate the radio)");
+              "(run a Deep Frequency Scan to calibrate the radio)");
     }
 
     LOG_I("everblu_meter", "Initialized: base=%.6f MHz, offset=%.6f MHz",
@@ -127,6 +129,7 @@ void FrequencyManager::saveFrequencyOffset(float offset)
 {
     StorageAbstraction::saveFloat(STORAGE_KEY, offset, STORAGE_MAGIC);
     s_storedOffset = offset;
+    s_hasStoredCalibration = true; // A real value is now persisted; quality guard is active
 
     LOG_I("everblu_meter", "Frequency offset %.3f kHz saved", offset * 1000.0);
 }
@@ -143,10 +146,9 @@ float FrequencyManager::loadFrequencyOffset()
     return offset;
 }
 
-void FrequencyManager::performFrequencyScan(void (*statusCallback)(const char *, const char *))
+void FrequencyManager::performDeepFrequencyScan(float scanRangeMHz, float scanStepMHz, void (*statusCallback)(const char *, const char *))
 {
-    LOG_I("everblu_meter", "Starting frequency scan...");
-    LOG_I("everblu_meter", "[NOTE] Wi-Fi/MQTT connections may temporarily drop and reconnect. This is expected.");
+    TS_PRINTLN("[FREQ] Performing Deep frequency scan...");
 
     // Suppress the verbose per-attempt radio/meter read logging for the whole
     // scan. Each frequency step performs a full read sequence whose detailed
@@ -156,192 +158,197 @@ void FrequencyManager::performFrequencyScan(void (*statusCallback)(const char *,
     // Reset adaptive tracking so the new offset has a chance to stabilize
     resetAdaptiveTracking();
 
+    // Snapshot the current known-good offset so the quality guard can avoid
+    // regressing a good calibration (issue #104).
+    float previousOffset = s_storedOffset;
+
     if (statusCallback)
     {
-        statusCallback("Frequency Scanning", "Performing frequency scan");
+        statusCallback("Frequency Scanning", "Performing Deep frequency scan");
     }
 
-    float bestFreq = s_baseFrequency;
-    int bestRSSI = -120; // Start with very low RSSI
+    // Phase 1: Walk the scan range to discover the full response window.
+    // Continue past the first hit until MISS_TOLERANCE consecutive misses,
+    // mapping both the start and end of the carrier response band before zooming.
+    float firstHitFreq = -1.0f;
+    float lastHitFreq  = -1.0f;
+    int   bestRSSI = -120;
+    int   consecutiveMisses = 0;
+    const int MISS_TOLERANCE = 5;
 
-    // Scan range: ±30 kHz in 5 kHz steps (±0.03 MHz in 0.005 MHz steps)
-    float scanStart = s_baseFrequency - 0.03;
-    float scanEnd = s_baseFrequency + 0.03;
-    float scanStep = 0.005;
+    float scanStart = s_baseFrequency - scanRangeMHz;
+    float scanEnd = s_baseFrequency + scanRangeMHz;
+    float scanStep = scanStepMHz;
 
-    LOG_I("everblu_meter", "Scanning from %.6f to %.6f MHz (step: %.6f MHz)", scanStart, scanEnd, scanStep);
+    int deepStepCount = (int)roundf((scanEnd - scanStart) / scanStep) + 1;
+    int deepEstSecs = deepStepCount * 3; // ~3 s per step (full radio TX+RX cycle)
+    LOG_I("everblu_meter", "Deep scan from %.6f to %.6f MHz (%d steps, ~%d s / ~%d min)",
+          scanStart, scanEnd, deepStepCount, deepEstSecs, (deepEstSecs + 30) / 60);
 
     for (float freq = scanStart; freq <= scanEnd; freq += scanStep)
     {
         feedWatchdog();
 
-        // Reinitialize radio with this frequency (via injected callback)
-        s_radioInitCallback(freq);
-        delay(50); // Allow time for frequency to settle
-
-        // Try to get meter data (via injected callback)
-        struct tmeter_data test_data = s_meterReadCallback();
-
-        LOG_I("everblu_meter", "Freq %.6f MHz: RSSI=%d dBm, reads=%d", freq, test_data.rssi_dbm, test_data.reads_counter);
-
-        if (test_data.rssi_dbm > bestRSSI && test_data.reads_counter > 0)
-        {
-            bestRSSI = test_data.rssi_dbm;
-            bestFreq = freq;
-            LOG_I("everblu_meter", "Better signal at %.6f MHz: RSSI=%d dBm", freq, test_data.rssi_dbm);
-        }
-    }
-
-    // Calculate and save the offset
-    float offset = bestFreq - s_baseFrequency;
-    LOG_I("everblu_meter", "Frequency scan complete. Best frequency: %.6f MHz (offset: %.6f MHz, RSSI: %d dBm)",
-          bestFreq, offset, bestRSSI);
-
-    if (bestRSSI > -120)
-    {
-        // Found a signal - save offset
-        saveFrequencyOffset(offset);
-
-        if (statusCallback)
-        {
-            char msg[128];
-            snprintf(msg, sizeof(msg), "Scan complete: offset %.3f kHz, RSSI %d dBm", offset * 1000.0, bestRSSI);
-            statusCallback("Idle", msg);
-        }
-
-        // Reinitialize with the tuned frequency to ensure consistency with normal operation
-        // This ensures the radio uses the same frequency calculation as getTunedFrequency()
-        // Wait a moment before reinitializing to let radio settle after scan
-        delay(100);
-        s_radioInitCallback(s_baseFrequency + s_storedOffset);
-        // Additional stabilization delay after reinitialization
-        delay(100);
-        LOG_I("everblu_meter", "Radio reinitialized with new frequency: %.6f MHz", s_baseFrequency + s_storedOffset);
-    }
-    else
-    {
-        Serial.println("[FREQ] Frequency scan failed - no valid signal found");
-
-        if (statusCallback)
-        {
-            statusCallback("Idle", "Frequency scan failed - no signal");
-        }
-
-        // Restore original frequency with stabilization delay
-        delay(100);
-        s_radioInitCallback(s_baseFrequency + s_storedOffset);
-        delay(100);
-        LOG_I("everblu_meter", "Radio restored to frequency: %.6f MHz", s_baseFrequency + s_storedOffset);
-    }
-}
-
-void FrequencyManager::performWideInitialScan(void (*statusCallback)(const char *, const char *))
-{
-    Serial.println("[FREQ] Performing wide initial scan (first boot - no saved offset)...");
-
-    // Suppress the verbose per-attempt radio/meter read logging for the whole
-    // scan. Each frequency step performs a full read sequence whose detailed
-    // output is irrelevant noise here; high-level scan progress (LOG_*) remains.
-    EchoDebugQuietGuard quietGuard;
-
-    // Reset adaptive tracking so the new offset has a chance to stabilize
-    resetAdaptiveTracking();
-
-    if (statusCallback)
-    {
-        statusCallback("Initial Frequency Scan", "First boot: scanning for meter frequency");
-    }
-
-    float bestFreq = s_baseFrequency;
-    int bestRSSI = -120;
-
-    // Wide scan: ±100 kHz in 10 kHz steps for faster initial discovery
-    float scanStart = s_baseFrequency - 0.10;
-    float scanEnd = s_baseFrequency + 0.10;
-    float scanStep = 0.010;
-
-    LOG_I("everblu_meter", "Wide scan from %.6f to %.6f MHz (step: %.6f MHz)", scanStart, scanEnd, scanStep);
-    LOG_I("everblu_meter", "This may take 1-2 minutes on first boot...");
-
-    for (float freq = scanStart; freq <= scanEnd; freq += scanStep)
-    {
-        feedWatchdog();
-
-        // Check if radio initialization succeeds
         if (!s_radioInitCallback(freq))
         {
-            LOG_E("everblu_meter", "Radio not responding - skipping wide initial scan");
+            LOG_E("everblu_meter", "Radio not responding - aborting Deep scan");
             LOG_E("everblu_meter", "Check: 1) Wiring connections 2) 3.3V power supply 3) SPI pins");
-
-            if (statusCallback)
-            {
-                statusCallback("Error", "[ERROR] Radio not responding - cannot scan");
-            }
-
-            return; // Exit scan
+            if (statusCallback) statusCallback("Error", "[ERROR] Radio not responding - cannot scan");
+            return;
         }
 
-        delay(100); // Longer delay for frequency to settle during wide scan
+        delay(100);
 
         struct tmeter_data test_data = s_meterReadCallback();
 
-        if (test_data.rssi_dbm > bestRSSI && test_data.reads_counter > 0)
+        LOG_I("everblu_meter", "Freq %.6f MHz: RSSI=%d dBm, reads=%d",
+              freq, test_data.rssi_dbm, test_data.reads_counter);
+
+        if (test_data.reads_counter > 0)
         {
-            bestRSSI = test_data.rssi_dbm;
-            bestFreq = freq;
-            LOG_I("everblu_meter", "Found signal at %.6f MHz: RSSI=%d dBm", freq, test_data.rssi_dbm);
+            if (firstHitFreq < 0.0f)
+            {
+                firstHitFreq = freq;
+                LOG_I("everblu_meter", "Window start: %.6f MHz", freq);
+            }
+            lastHitFreq = freq;
+            if (test_data.rssi_dbm > bestRSSI) bestRSSI = test_data.rssi_dbm;
+            consecutiveMisses = 0;
+        }
+        else if (firstHitFreq >= 0.0f)
+        {
+            if (++consecutiveMisses >= MISS_TOLERANCE)
+            {
+                LOG_I("everblu_meter", "Window end: %.6f MHz (%d consecutive misses)",
+                      lastHitFreq, consecutiveMisses);
+                break;
+            }
         }
     }
 
-    if (bestRSSI > -120)
+    if (firstHitFreq >= 0.0f)
     {
-        // Found a signal - perform fine scan around it
-        LOG_I("everblu_meter", "Performing fine scan around %.6f MHz...", bestFreq);
-        float fineStart = bestFreq - 0.015;
-        float fineEnd = bestFreq + 0.015;
-        float fineStep = 0.003;
-        int fineBestRSSI = bestRSSI;
-        float fineBestFreq = bestFreq;
+        float windowMidFreq = (firstHitFreq + lastHitFreq) * 0.5f;
+        float windowWidthKHz = (lastHitFreq - firstHitFreq) * 1000.0f;
+        LOG_I("everblu_meter", "Window: %.6f - %.6f MHz (%.2f kHz wide), midpoint %.6f MHz",
+              firstHitFreq, lastHitFreq, windowWidthKHz, windowMidFreq);
 
-        for (float freq = fineStart; freq <= fineEnd; freq += fineStep)
+        float bestFreq = windowMidFreq;
+
+        // Phase 2: zoom scan across the full discovered window with 4x finer steps.
+        // Always runs — even when Phase 1 found only a single point, that hit may be
+        // on the edge of the response band; finer steps can locate the true centre.
+        // Falls back to windowMidFreq (= firstHitFreq for single-point windows) if
+        // all zoom steps miss (FREQEST adaptive tracking will then refine further).
+        float zoomStart = firstHitFreq - scanStep;
+        float zoomEnd   = lastHitFreq  + scanStep;
+        // CC1101 minimum frequency step = Fxosc / 2^16 = 26 MHz / 65536 ≈ 397 Hz.
+        // Steps finer than this round to the same register value, silently retesting
+        // the same physical frequency. Clamp to at least 1 register step.
+        const float CC1101_MIN_STEP_MHZ = 26.0f / 65536.0f / 1000.0f; // ~0.000397 MHz
+        float zoomStep = scanStep * 0.25f;
+        if (zoomStep < CC1101_MIN_STEP_MHZ) zoomStep = CC1101_MIN_STEP_MHZ;
+
+        int zoomStepCount = (int)roundf((zoomEnd - zoomStart) / zoomStep) + 1;
+        LOG_I("everblu_meter", "Zoom pass: %.6f - %.6f MHz (%d steps, %.2f kHz each)",
+              zoomStart, zoomEnd, zoomStepCount, zoomStep * 1000.0f);
+
+        for (float zfreq = zoomStart; zfreq <= zoomEnd + zoomStep * 0.5f; zfreq += zoomStep)
         {
             feedWatchdog();
-
-            if (!s_radioInitCallback(freq))
-            {
-                LOG_E("everblu_meter", "Radio not responding during fine scan - aborting");
-                break;
-            }
-
+            if (!s_radioInitCallback(zfreq)) break;
             delay(50);
-
-            struct tmeter_data test_data = s_meterReadCallback();
-
-            if (test_data.rssi_dbm > fineBestRSSI && test_data.reads_counter > 0)
+            struct tmeter_data zdata = s_meterReadCallback();
+            LOG_I("everblu_meter", "Zoom %.6f MHz: RSSI=%d dBm, reads=%d",
+                  zfreq, zdata.rssi_dbm, zdata.reads_counter);
+            if (zdata.reads_counter > 0)
             {
-                fineBestRSSI = test_data.rssi_dbm;
-                fineBestFreq = freq;
-                LOG_I("everblu_meter", "Refined signal at %.6f MHz: RSSI=%d dBm", freq, test_data.rssi_dbm);
+                bestFreq = zfreq;
+                bestRSSI = zdata.rssi_dbm;
+                LOG_I("everblu_meter", "Zoom locked at %.6f MHz: RSSI=%d dBm", zfreq, zdata.rssi_dbm);
+                break;
             }
         }
 
-        bestFreq = fineBestFreq;
-        bestRSSI = fineBestRSSI;
-
         float offset = bestFreq - s_baseFrequency;
-        LOG_I("everblu_meter", "Initial scan complete! Best frequency: %.6f MHz (offset: %.6f MHz, RSSI: %d dBm)",
+        LOG_I("everblu_meter", "Deep scan candidate: %.6f MHz (offset: %.6f MHz, RSSI: %d dBm)",
               bestFreq, offset, bestRSSI);
 
-        saveFrequencyOffset(offset);
+        // Post-lock verification + quality guard (issue #104): rank candidates by
+        // demodulation quality (smallest |FREQEST|), not RSSI, and never overwrite
+        // an existing known-good offset with a worse one. A strong RSSI at a
+        // frequency tens of kHz off the true carrier can still yield corrupted
+        // (CRC-failing) bits, so RSSI alone is an unreliable ranking signal.
+        s_radioInitCallback(bestFreq);
+        delay(100);
+        struct tmeter_data candVerify = s_meterReadCallback();
+        bool candDecoded = candVerify.reads_counter > 0;
+        int  candQuality = abs((int)candVerify.freqest); // smaller = better centred
+        LOG_I("everblu_meter", "Verify candidate %.6f MHz: reads=%d, |FREQEST|=%d",
+              bestFreq, candVerify.reads_counter, candQuality);
+
+        bool acceptCandidate;
+        if (!s_hasStoredCalibration)
+        {
+            // No prior calibration to protect: persist the scan result as-is.
+            acceptCandidate = true;
+        }
+        else if (!candDecoded)
+        {
+            // Candidate failed post-lock verification: keep the known-good offset.
+            acceptCandidate = false;
+            LOG_W("everblu_meter",
+                  "Candidate %.6f MHz did not verify (no decode) - keeping stored offset %.3f kHz",
+                  bestFreq, previousOffset * 1000.0);
+        }
+        else
+        {
+            // Both candidate and stored offset decode: keep the better-centred one.
+            s_radioInitCallback(s_baseFrequency + previousOffset);
+            delay(100);
+            struct tmeter_data prevVerify = s_meterReadCallback();
+            bool prevDecoded = prevVerify.reads_counter > 0;
+            int  prevQuality = abs((int)prevVerify.freqest);
+            LOG_I("everblu_meter", "Verify stored %.6f MHz: reads=%d, |FREQEST|=%d",
+                  s_baseFrequency + previousOffset, prevVerify.reads_counter, prevQuality);
+
+            if (!prevDecoded)
+            {
+                acceptCandidate = true; // stored offset no longer decodes
+            }
+            else
+            {
+                acceptCandidate = candQuality < prevQuality; // strictly better only
+            }
+
+            if (!acceptCandidate)
+            {
+                LOG_I("everblu_meter",
+                      "Stored offset %.3f kHz (|FREQEST|=%d) is as good or better than candidate "
+                      "%.3f kHz (|FREQEST|=%d) - keeping stored offset",
+                      previousOffset * 1000.0, prevQuality, offset * 1000.0, candQuality);
+            }
+        }
+
+        if (acceptCandidate)
+        {
+            saveFrequencyOffset(offset);
+            LOG_I("everblu_meter", "Deep scan complete! Saved offset %.3f kHz (tuned %.6f MHz)",
+                  offset * 1000.0, bestFreq);
+        }
+        else
+        {
+            LOG_I("everblu_meter", "Deep scan complete - retained existing offset %.3f kHz",
+                  s_storedOffset * 1000.0);
+        }
 
         if (statusCallback)
         {
             char msg[128];
-            snprintf(msg, sizeof(msg), "Initial scan complete: offset %.3f kHz", offset * 1000.0);
+            snprintf(msg, sizeof(msg), "Deep scan complete: offset %.3f kHz", s_storedOffset * 1000.0);
             statusCallback("Idle", msg);
         }
 
-        // Reinitialize with stabilization delays
         delay(100);
         s_radioInitCallback(s_baseFrequency + s_storedOffset);
         delay(100);
@@ -349,18 +356,13 @@ void FrequencyManager::performWideInitialScan(void (*statusCallback)(const char 
     }
     else
     {
-        Serial.println("[FREQ] Wide scan failed - no meter signal found!");
-        Serial.println("[FREQ] Please check:");
-        Serial.println("[FREQ]  1. Meter is within range (< 50m typically)");
-        Serial.println("[FREQ]  2. Antenna is connected to CC1101");
-        Serial.println("[FREQ]  3. Meter serial/year are correct");
-        Serial.println("[FREQ]  4. Current time is within meter's wake hours");
-
-        if (statusCallback)
-        {
-            statusCallback("Idle", "Initial scan failed - check setup");
-        }
-
+        TS_PRINTLN("[FREQ] Deep scan failed - no meter signal found!");
+        TS_PRINTLN("[FREQ] Please check:");
+        TS_PRINTLN("[FREQ]  1. Meter is within range (< 50m typically)");
+        TS_PRINTLN("[FREQ]  2. Antenna is connected to CC1101");
+        TS_PRINTLN("[FREQ]  3. Meter serial/year are correct");
+        TS_PRINTLN("[FREQ]  4. Current time is within meter's wake hours");
+        if (statusCallback) statusCallback("Idle", "Deep scan failed - check setup");
         s_radioInitCallback(s_baseFrequency);
     }
 }

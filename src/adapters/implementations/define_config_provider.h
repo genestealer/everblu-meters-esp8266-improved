@@ -85,6 +85,15 @@ public:
 #endif
         }
 
+        bool isAutoScanOnFailureEnabled() const override
+        {
+#ifdef AUTO_SCAN_ON_FAILURE_ENABLED
+                return AUTO_SCAN_ON_FAILURE_ENABLED != 0;
+#else
+                return false; // Default off: matches private.example.h documentation
+#endif
+        }
+
         // Scheduling configuration
         const char *getReadingSchedule() const override
         {
@@ -213,6 +222,7 @@ public:
         int getGasVolumeDivisor() const override { return 100; }
         float getFrequency() const override { return 433.82f; }
         bool isAutoScanEnabled() const override { return true; }
+        bool isAutoScanOnFailureEnabled() const override { return true; }
         const char *getReadingSchedule() const override { return "Monday-Friday"; }
         int getReadHourUTC() const override { return 10; }
         int getReadMinuteUTC() const override { return 0; }

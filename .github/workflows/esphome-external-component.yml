@@ -9,6 +9,7 @@ on:
       - ESPHOME/example-*.yaml
       - ESPHOME/README.md
       - .github/workflows/esphome-external-component.yml
+      - tests/esphome/**
       # Shared source: the ESPHome component compiles the src/ tree (via the
       # flattened ESPHOME-release/ bundle and component includes), so changes
       # there must trigger this job too - otherwise a shared-source change that
@@ -26,6 +27,7 @@ on:
       - ESPHOME/example-*.yaml
       - ESPHOME/README.md
       - .github/workflows/esphome-external-component.yml
+      - tests/esphome/**
       # Shared source (see the push trigger above for the rationale).
       - src/**
       - include/**
@@ -205,3 +207,109 @@ jobs:
             echo ""
             echo "Validated with: \`esphome config\` + \`esphome compile\`"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  # Negative validation: assert that intentionally-invalid configs are REJECTED
+  # by the component's config validators (validate_esp32_framework, validate_pins,
+  # validate_gdo2_required, validate_reading_schedule, validate_meter_code).
+  # These fixtures must never compile - the test passes when `esphome config`
+  # exits non-zero AND prints the expected error substring.
+  negative-validation:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: invalid-esp32-idf
+            config: .ci/esphome/everblu_meter/test.invalid-esp32-idf.yaml
+            expect: "requires ESP32 Arduino framework"
+          - id: invalid-gdo2-both
+            config: .ci/esphome/everblu_meter/test.invalid-gdo2-both.yaml
+            expect: "mutually exclusive"
+          - id: invalid-pins-conflict
+            config: .ci/esphome/everblu_meter/test.invalid-pins-conflict.yaml
+            expect: "must be different GPIOs"
+          - id: invalid-schedule
+            config: .ci/esphome/everblu_meter/test.invalid-schedule.yaml
+            expect: "Invalid reading_schedule"
+          - id: invalid-meter-code
+            config: .ci/esphome/everblu_meter/test.invalid-meter-code.yaml
+            expect: "year section must be exactly 2 digits"
+
+    name: ${{ matrix.id }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-esphome-${{ hashFiles('.github/workflows/esphome-external-component.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-esphome-
+
+      - name: Install ESPHome
+        run: |
+          python -m pip install --upgrade pip
+          pip install "esphome>=2025.0"
+
+      - name: Assert configuration is rejected
+        run: |
+          set +e
+          OUTPUT=$(esphome config "${{ matrix.config }}" 2>&1)
+          STATUS=$?
+          echo "$OUTPUT"
+          if [ "$STATUS" -eq 0 ]; then
+            echo "::error::Expected 'esphome config ${{ matrix.config }}' to FAIL but it passed."
+            exit 1
+          fi
+          if ! printf '%s' "$OUTPUT" | grep -qF "${{ matrix.expect }}"; then
+            echo "::error::Config failed but the expected error substring was not found: ${{ matrix.expect }}"
+            exit 1
+          fi
+          echo "OK: rejected as expected (exit $STATUS) with: ${{ matrix.expect }}"
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Negative Validation: ${{ matrix.id }}"
+            echo ""
+            echo "Config: \`${{ matrix.config }}\`"
+            echo ""
+            echo "Expected rejection substring: \`${{ matrix.expect }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # Python unit tests for the component's config validators. These run the
+  # validators directly (no ESPHome compile) so failures are precise and fast.
+  python-unit-tests:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-esphome-${{ hashFiles('.github/workflows/esphome-external-component.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-esphome-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install "esphome>=2025.0" pytest
+
+      - name: Run validator unit tests
+        run: python -m pytest tests/esphome -v

@@ -1,0 +1,49 @@
+# NEGATIVE test: meter_code must use the dashed YY-SSSSSSS[-NNN] format.
+# validate_meter_code() must reject a 1-digit year section.
+# Expected error substring: "year section must be exactly 2 digits"
+# This file is intentionally invalid - do NOT add it to the compile matrix.
+esphome:
+  name: ci-invalid-meter-code
+  min_version: 2024.6.0
+
+esp8266:
+  board: d1_mini
+  framework:
+    version: recommended
+
+logger:
+
+api:
+
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: CI-WIFI
+  password: CI-PASSWORD
+
+spi:
+  id: ci_spi
+  clk_pin: GPIO14
+  miso_pin: GPIO12
+  mosi_pin: GPIO13
+
+time:
+  - platform: sntp
+    id: ci_time
+
+external_components:
+  - source:
+      type: local
+      path: ../../../ESPHOME-release
+    components: [ everblu_meter ]
+
+everblu_meter:
+  spi_id: ci_spi
+  cs_pin: GPIO15
+  meter_code: "1-1234567"
+  gdo0_pin: GPIO4
+  gdo2_pin: GPIO5
+  time_id: ci_time
+  volume:
+    name: "CI Volume"

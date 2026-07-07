@@ -6,6 +6,7 @@
 [![ESP32 Build](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/build-esp32.yml/badge.svg?branch=main)](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/build-esp32.yml)
 [![ESPHome Component](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/esphome-external-component.yml/badge.svg?branch=main)](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/esphome-external-component.yml)
 [![Meter Fixture Tests](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/meter-fixture-tests.yml/badge.svg?branch=main)](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/meter-fixture-tests.yml)
+[![codecov](https://codecov.io/gh/genestealer/everblu-meters-esp8266-improved/branch/main/graph/badge.svg)](https://codecov.io/gh/genestealer/everblu-meters-esp8266-improved)
 [![Code Quality](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/code-quality.yml/badge.svg?branch=main)](https://github.com/genestealer/everblu-meters-esp8266-improved/actions/workflows/code-quality.yml)
 
 ## Platforms & Capabilities
@@ -106,7 +107,7 @@ Supported meters:
 ### Advanced Frame Validation
 
 <details>
-<summary>How the firmware validates every frame (5 layers)</summary>
+<summary>How the firmware validates every frame (6 layers)</summary>
 
 The firmware implements multiple layers of validation to ensure data integrity:
 
@@ -129,6 +130,10 @@ The firmware implements multiple layers of validation to ensure data integrity:
    - RSSI threshold (configurable, default -90 dBm)
    - LQI (Link Quality Indicator) assessment
    - Frequency error estimation for adaptive tuning
+
+6. **Reading Plausibility (History Cross-Check)**:
+   - The frame carries up to 13 months of historical volume snapshots. The firmware rejects the whole reading when the implied **current-month usage** (current volume minus the newest history snapshot) exceeds **100× the largest historical monthly usage** — a corrupted current volume shows up as an absurd jump versus the meter's own history.
+   - The check is skipped (the reading is accepted) when there is insufficient history to judge: fewer than 2 valid months, a flat history with no recorded usage, or a current volume that predates the newest snapshot. First reads and no-consumption meters are therefore unaffected.
 
 **Result**: Data is only published after passing every check above, so corrupted or partial frames are discarded rather than reported to Home Assistant.
 
@@ -191,6 +196,7 @@ See the Hardware section below for full wiring tables and pictures.
   - `METER_TYPE` - set to `"water"` (default) or `"gas"` depending on your meter type
   - `GDO2` - **required by default (v3.0.0+)**: GPIO connected to CC1101 GDO2 (hardware FIFO management). To opt out and use legacy SPI polling, define `DISABLE_GDO2_FIFO_MANAGEMENT` instead. The firmware will not compile until you do one or the other.
   - `MAX_RETRIES` - maximum reading retry attempts before cooldown (optional, default is 5)
+  - `AUTO_SCAN_ON_FAILURE_ENABLED` - set to `1` to automatically run a frequency scan once after `MAX_RETRIES` is reached (recovers from carrier-frequency drift unattended); default is `0` (disabled)
   - `ADAPTIVE_THRESHOLD` - how many successful reads before adjusting frequency (optional, default is 1 = adjust after each read)
   - `WIFI_SERIAL_MONITOR_ENABLED` - set to `1` to enable WiFi serial monitor for remote debugging (default is `0` for security)
 - `platformio.ini`: select `env:huzzah` (ESP8266 HUZZAH) or `env:esp32dev` (ESP32 DevKit).
@@ -336,7 +342,7 @@ Pin wiring for the [Wemos D1 Mini](https://www.wemos.cc/en/latest/d1/index.html)
 | **SCK**        | SPI Clock    | GPIO 14          | D5                | #14                | GPIO 18        | SCK              | Hardware SPI clock                                  |
 | **MISO**       | SPI Data In  | GPIO 12          | D6                | #12                | GPIO 19        | MISO             | Also labeled as GDO1 on some CC1101 modules         |
 | **MOSI**       | SPI Data Out | GPIO 13          | D7                | #13                | GPIO 23        | MOSI             | Hardware SPI MOSI                                   |
-| **CSN/CS**     | Chip Select  | GPIO 15          | D8                | #15                | GPIO 5         | SS               | SPI chip select                                     |
+| **CSN/CS**     | Chip Select  | GPIO 15          | D8                | #15                | GPIO 25        | GPIO 25          | SPI chip select (ESP32: GPIO 25 avoids the GPIO 5 strapping pin) |
 | **GDO0**       | Data Ready   | GPIO 5           | D1                | #5                 | GPIO 4         | GPIO 4           | Digital interrupt pin (configurable in `private.h`) |
 | **GDO2**       | FIFO Threshold (required) | GPIO 4 | D2 | #4 | GPIO 27 | GPIO 27 | Required by default (v3.0.0+). Hardware FIFO threshold signal. Set via `private.h` (`#define GDO2`) / `gdo2_pin` in ESPHome, or opt out with `DISABLE_GDO2_FIFO_MANAGEMENT` / `disable_gdo2_fifo_management: true` |
 <!-- markdownlint-enable MD060 -->
@@ -386,15 +392,16 @@ GND    → GND
 SCK    → SCK (GPIO 18 on most DevKit boards)
 MISO   → MISO (GPIO 19)
 MOSI   → MOSI (GPIO 23)
-CSN    → SS (GPIO 5 by default on many boards)
+CSN    → GPIO 25 (recommended; avoids the GPIO 5 strapping pin)
 GDO0   → GPIO 4 (or GPIO 27)  ← set this in include/private.h as GDO0
 GDO2   → GPIO 27 (or another free GPIO)  ← required by default, set #define GDO2 in private.h (or opt out)
 ```
 
 Notes for ESP32
 
-- Use the board’s hardware SPI pins (SCK/MISO/MOSI/SS).
+- Use the board’s hardware SPI pins (SCK/MISO/MOSI).
 The defaults are provided by the Arduino core and used automatically by this project.
+- For chip-select (CSN/CS), prefer a non-strapping GPIO such as GPIO 25. The common default `SS` (GPIO 5) is a strapping pin and logs a boot-time warning, though it still works.
 - Choose a free GPIO for GDO0 (e.g., 4 or 27) and set `#define GDO0 <pin>` in `include/private.h`.
 - Wire GDO2 to another free GPIO and set `#define GDO2 <pin>` to enable hardware FIFO threshold management (required by default since v3.0.0); to keep legacy SPI polling instead, define `DISABLE_GDO2_FIFO_MANAGEMENT`.
 - Power the CC1101 from 3.3V only.
@@ -625,7 +632,8 @@ Both MQTT and ESPHome modes expose a **history sensor** containing 12 months of 
    - **Keep the device connected to your computer during this process.** The serial monitor will display debug output as the device scans frequencies in the 433 MHz range.
    - **Important**: During the initial scan (first boot with no stored frequency offset), the device performs a wide frequency scan that takes approximately 2 minutes **before** connecting to MQTT. You will see no MQTT/Home Assistant activity during this time - this is normal. Monitor the serial output to see the scan progress. Once the scan completes and the optimal frequency is found, the device will connect to MQTT and publish telemetry data.
    - Once the correct frequency is identified, update the `FREQUENCY` value in `private.h` if needed (the automatic scan stores the offset, so manual adjustment is usually not required).
-   - To re-run the wide scan later, either set `CLEAR_EEPROM_ON_BOOT` to `1` for a single boot cycle or re-enable `AUTO_SCAN_ENABLED`.
+   - To re-run the deep scan later, either set `CLEAR_EEPROM_ON_BOOT` to `1` for a single boot cycle, re-enable `AUTO_SCAN_ENABLED`, or press the **Deep Frequency Scan** button (`mdi:radar`) exposed in Home Assistant to trigger a full ±150 kHz fine-step sweep on demand. A faster **Fast Frequency Scan** button (`mdi:magnify-scan`) is also available for a quicker ±150 kHz coarse-step recalibration. **Note**: Both on-demand scan buttons can block for 1–2 minutes during which Wi-Fi/MQTT may temporarily disconnect and reconnect — this is expected and Home Assistant will reconnect automatically once the scan completes.
+   - **Automatic recovery on failure**: Separately from the first-boot scan, when a full streak of read attempts fails (`MAX_RETRIES` reached) and the firmware enters its cooldown period, it automatically runs a frequency scan once to check for meter carrier-frequency (crystal) drift. This is controlled by `AUTO_SCAN_ON_FAILURE_ENABLED` (default `1`) and helps users who never trigger a manual scan recover unattended. It runs at most once per failure streak (reset after the next successful read). Set `#define AUTO_SCAN_ON_FAILURE_ENABLED 0` in `include/private.h` to disable it.
    - For best results, perform this step during local business hours when the meter is most likely to transmit. Refer to the "Frequency Adjustment" section below for additional guidance.
 
 5. **Build and Upload**
@@ -810,6 +818,33 @@ See `ADAPTIVE_FREQUENCY_FEATURES.md` for deeper technical notes.
 ---
 
 ## Troubleshooting
+
+### Meter reads fail — near-field RF saturation (device too close to meter)
+
+**Symptoms:**
+
+- Log shows `*** NEAR-FIELD SATURATION DETECTED (RSSI=−31 dBm) ***`
+- RSSI is very high (> −50 dBm), often a flat plateau across a wide frequency band
+- Data frames ARE received (hex dumps with the correct `7C 11 00 45 20 0A` header visible in logs)
+- Every frame fails CRC despite a strong signal
+- Running a frequency scan shows a flat −31 dBm plateau across ~40 kHz rather than a single peaked response
+
+**Cause:**
+
+The CC1101's front-end amplifier has a limited input range. When the device is placed immediately next to the meter the received signal exceeds that range, the input stage clips, and the demodulated bit stream is corrupted. This produces CRC failures even with an excellent RSSI reading. It is the **opposite** of a weak-signal problem.
+
+**Solution:**
+
+Move the device at least **1–2 m away** from the meter. At normal installation distance the RSSI should be around −60 to −85 dBm, well within the linear range. If the device must be permanently mounted close to the meter, set `RX_ATTENUATION_DB` in `include/private.h` to engage the CC1101 front-end LNA gain limiter:
+
+```cpp
+// Values: 0 (default), 6, 12, 18 (dB)
+#define RX_ATTENUATION_DB 6
+```
+
+Start with `6` and increase if CRC failures persist at close range. At normal distance keep this at `0`.
+
+---
 
 ### Corrupted or Invalid Volume Readings
 

@@ -37,6 +37,7 @@ public:
     void setGasVolumeDivisor(int divisor) { gas_volume_divisor_ = divisor; }
     void setFrequency(float freq) { frequency_ = freq; }
     void setAutoScanEnabled(bool enabled) { auto_scan_enabled_ = enabled; }
+    void setAutoScanOnFailureEnabled(bool enabled) { auto_scan_on_failure_enabled_ = enabled; }
     void setReadingSchedule(const char *schedule);
     void setReadHourUTC(int hour) { read_hour_utc_ = hour; }
     void setReadMinuteUTC(int minute) { read_minute_utc_ = minute; }
@@ -53,6 +54,7 @@ public:
     int getGasVolumeDivisor() const override { return gas_volume_divisor_; }
     float getFrequency() const override { return frequency_; }
     bool isAutoScanEnabled() const override { return auto_scan_enabled_; }
+    bool isAutoScanOnFailureEnabled() const override { return auto_scan_on_failure_enabled_; }
     const char *getReadingSchedule() const override { return reading_schedule_; }
     int getReadHourUTC() const override { return read_hour_utc_; }
     int getReadMinuteUTC() const override { return read_minute_utc_; }
@@ -82,6 +84,7 @@ private:
     // RF configuration
     float frequency_{433.82f};
     bool auto_scan_enabled_{true};
+    bool auto_scan_on_failure_enabled_{true};
 
     // Scheduling configuration
     char reading_schedule_[32]{"Monday-Friday"};

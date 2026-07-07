@@ -49,9 +49,9 @@ Connect the CC1101 to your ESP board:
 | SCK        | D5 (GPIO14)       | GPIO18 |
 | MISO       | D6 (GPIO12)       | GPIO19 |
 | MOSI       | D7 (GPIO13)       | GPIO23 |
-| CSN        | D8 (GPIO15)       | GPIO5  |
+| CSN        | D8 (GPIO15)       | GPIO25 |
 | GDO0       | D1 (GPIO5)        | GPIO4  |
-| GDO2       | D2 (GPIO4)        | GPIO2  |
+| GDO2       | D2 (GPIO4)        | GPIO27 |
 
 ⚠️ **Important**: The CC1101 requires 3.3V power. Do not connect to 5V!
 
@@ -168,6 +168,7 @@ everblu_meter:
 | ----------- | ----- | -------- | ---------------------------------------- |
 | `frequency` | float | `433.82` | RF frequency in MHz (433.0-434.8)        |
 | `auto_scan` | bool  | `true`   | Automatically scan for optimal frequency |
+| `auto_scan_on_failure` | bool | `true` | Automatically run a frequency scan (once) when reads keep failing and the component enters cooldown, to recover from carrier-frequency (crystal) drift |
 
 #### Schedule Configuration
 
@@ -269,7 +270,7 @@ The component provides various sensors for monitoring your meter:
 | `battery`          | years   | Estimated battery life remaining      | `measurement`      |
 | `rssi`             | dBm     | Radio signal strength                 | `measurement`      |
 | `rssi_percentage`  | %       | Signal strength as percentage (0-100) | `measurement`      |
-| `lqi`              | -       | Link quality indicator (0-255)        | `measurement`      |
+| `lqi`              | -       | Link quality indicator (0-127, lower is better) | `measurement`      |
 | `lqi_percentage`   | %       | Link quality as percentage (0-100)    | `measurement`      |
 | `time_start`       | ms      | Reading start timestamp               | `measurement`      |
 | `time_end`         | ms      | Reading end timestamp                 | `measurement`      |

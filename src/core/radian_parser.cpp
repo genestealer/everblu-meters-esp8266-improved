@@ -105,3 +105,46 @@ bool radian_parse_primary_data(const uint8_t *decoded_buffer, size_t size, struc
     out->history_available = size >= 118;
     return true;
 }
+
+bool radian_reading_within_history_bounds(uint32_t volume, const uint32_t *history,
+                                          int num_months, uint32_t spike_factor)
+{
+    // Insufficient data to judge: accept the reading.
+    if (history == NULL || num_months < 2 || spike_factor == 0)
+    {
+        return true;
+    }
+
+    // Largest historical monthly usage (max delta between consecutive months).
+    uint32_t max_monthly_usage = 0;
+    for (int i = 1; i < num_months; i++)
+    {
+        if (history[i] >= history[i - 1])
+        {
+            uint32_t usage = history[i] - history[i - 1];
+            if (usage > max_monthly_usage)
+            {
+                max_monthly_usage = usage;
+            }
+        }
+    }
+
+    const uint32_t newest = history[num_months - 1];
+
+    // No consumption baseline, or the current volume predates the newest
+    // snapshot: nothing sensible to compare against, so accept.
+    if (max_monthly_usage == 0 || volume < newest)
+    {
+        return true;
+    }
+
+    const uint32_t current_month_usage = volume - newest;
+
+    // 64-bit math avoids overflow when scaling the usage by the factor.
+    if ((uint64_t)current_month_usage > (uint64_t)max_monthly_usage * (uint64_t)spike_factor)
+    {
+        return false; // implausible spike -> reject
+    }
+
+    return true;
+}

@@ -144,8 +144,10 @@ int calculateMeterdBmToPercentage(int rssi_dbm)
 
 int calculateLQIToPercentage(int lqi)
 {
-	int strength = constrain(lqi, 0, 255); // Clamp LQI to valid range
-	return map(strength, 0, 255, 0, 100);  // Map LQI to percentage
+	int error = constrain(lqi & 0x7F, 0, 127); // Mask bit 7 (CRC_OK) and clamp to the 7-bit LQI range
+	// CC1101 LQI is an accumulated demodulation-error metric: a LOWER value means a better link.
+	// Invert the mapping so the reported percentage follows the intuitive "higher % = better link".
+	return map(error, 0, 127, 100, 0);
 }
 void printMeterDataSummary(const struct tmeter_data *meter_data, bool isMeterGas, int volumeDivisor)
 {
@@ -211,12 +213,14 @@ void echo_debug(bool l_flag, const char *fmt, ...)
 	// the VS Code terminal / PlatformIO monitor is easier to scan. The RESET is
 	// emitted before any trailing newline to avoid colouring blank line breaks.
 	const char *col = everblu_log_color_for_prefix(buf);
+	const char *ts = everblu_log_timestamp();
 	if (col[0] != '\0')
 	{
 		size_t len = strlen(buf);
 		bool hasNewline = (len > 0 && buf[len - 1] == '\n');
 		if (hasNewline)
 			buf[len - 1] = '\0';
+		WiFiSerial.print(ts);
 		WiFiSerial.print(col);
 		WiFiSerial.print(buf);
 		WiFiSerial.print(EVB_ANSI_RESET);
@@ -225,6 +229,7 @@ void echo_debug(bool l_flag, const char *fmt, ...)
 	}
 	else
 	{
+		WiFiSerial.print(ts);
 		WiFiSerial.print(buf);
 	}
 #endif

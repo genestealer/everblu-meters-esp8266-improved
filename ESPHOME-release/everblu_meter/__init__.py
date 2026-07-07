@@ -26,6 +26,7 @@ import esphome.config_validation as cv
 from esphome.const import (
     CONF_FREQUENCY,
     CONF_ID,
+    CONF_NUMBER,
     CONF_TIME_ID,
     DEVICE_CLASS_CONNECTIVITY,
     DEVICE_CLASS_RUNNING,
@@ -35,7 +36,9 @@ from esphome.const import (
     STATE_CLASS_TOTAL_INCREASING,
     UNIT_DECIBEL_MILLIWATT,
     UNIT_PERCENT,
+    Framework,
 )
+from esphome.core import CORE
 
 DEPENDENCIES = ["time", "spi"]
 CODEOWNERS = ["@genestealer"]
@@ -57,6 +60,7 @@ CONF_METER_CODE = "meter_code"
 CONF_METER_TYPE = "meter_type"
 CONF_GAS_VOLUME_DIVISOR = "gas_volume_divisor"
 CONF_AUTO_SCAN = "auto_scan"
+CONF_AUTO_SCAN_ON_FAILURE = "auto_scan_on_failure"
 CONF_READING_SCHEDULE = "reading_schedule"
 CONF_READ_HOUR = "read_hour"
 CONF_READ_MINUTE = "read_minute"
@@ -99,18 +103,54 @@ CONF_FREQUENCY_OFFSET = "frequency_offset"
 CONF_TUNED_FREQUENCY = "tuned_frequency"
 CONF_FREQUENCY_ESTIMATE = "frequency_estimate"
 CONF_REQUEST_READING_BUTTON = "request_reading_button"
-CONF_FREQUENCY_SCAN_BUTTON = "frequency_scan_button"
-CONF_WIDE_FREQUENCY_SCAN_BUTTON = "wide_frequency_scan_button"
+CONF_DEEP_SCAN_BUTTON = "deep_scan_button"
 CONF_RESET_FREQUENCY_BUTTON = "reset_frequency_button"
+CONF_RX_ATTENUATION = "rx_attenuation"
 
 # Meter types
 METER_TYPE_WATER = "water"
 METER_TYPE_GAS = "gas"
 
-# Reading schedules - must match C++ ScheduleManager::isReadingDay(...) string comparisons
+# Reading schedules - must match C++ ScheduleManager::isValidSchedule(...) string comparisons
 SCHEDULE_MONDAY_FRIDAY = "Monday-Friday"
 SCHEDULE_MONDAY_SATURDAY = "Monday-Saturday"
 SCHEDULE_MONDAY_SUNDAY = "Monday-Sunday"
+SCHEDULE_SINGLE_DAYS = [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+]
+# Full set accepted by the C++ ScheduleManager (case-sensitive exact match).
+VALID_SCHEDULES = [
+    SCHEDULE_MONDAY_FRIDAY,
+    SCHEDULE_MONDAY_SATURDAY,
+    SCHEDULE_MONDAY_SUNDAY,
+    *SCHEDULE_SINGLE_DAYS,
+]
+# Lowercase -> canonical lookup so YAML values are accepted case-insensitively
+# and normalized to the exact form the C++ ScheduleManager compares against.
+_SCHEDULE_LOOKUP = {s.lower(): s for s in VALID_SCHEDULES}
+
+
+def validate_reading_schedule(value):
+    """Accept the reading schedule case-insensitively and normalize it.
+
+    The C++ ScheduleManager does a case-sensitive exact match, so map any
+    casing (e.g. 'monday-friday', 'FRIDAY') to the canonical form and reject
+    anything that is not a known preset or weekday.
+    """
+    canonical = _SCHEDULE_LOOKUP.get(cv.string(value).strip().lower())
+    if canonical is None:
+        raise cv.Invalid(
+            f"Invalid reading_schedule '{value}'. Expected one of (case-insensitive): "
+            + ", ".join(VALID_SCHEDULES)
+        )
+    return canonical
+
 
 CONF_GDO0_PIN = "gdo0_pin"
 CONF_GDO2_PIN = "gdo2_pin"
@@ -196,10 +236,11 @@ CONFIG_SCHEMA = (
             cv.Optional(CONF_FREQUENCY, default=433.82): cv.float_range(
                 min=300.0, max=928.0
             ),
-            cv.Optional(CONF_AUTO_SCAN, default=True): cv.boolean,
+            cv.Optional(CONF_AUTO_SCAN, default=False): cv.boolean,
+            cv.Optional(CONF_AUTO_SCAN_ON_FAILURE, default=True): cv.boolean,
             cv.Optional(
                 CONF_READING_SCHEDULE, default=SCHEDULE_MONDAY_FRIDAY
-            ): cv.string,
+            ): validate_reading_schedule,
             cv.Optional(CONF_READ_HOUR, default=10): cv.int_range(min=0, max=23),
             cv.Optional(CONF_READ_MINUTE, default=0): cv.int_range(min=0, max=59),
             cv.Optional(CONF_TIMEZONE_OFFSET, default=0): cv.int_range(
@@ -215,6 +256,9 @@ CONFIG_SCHEMA = (
             cv.Optional(CONF_DEBUG_CC1101, default=False): cv.boolean,
             cv.Optional(CONF_ADAPTIVE_THRESHOLD, default=1): cv.int_range(
                 min=1, max=100
+            ),
+            cv.Optional(CONF_RX_ATTENUATION, default=0): cv.one_of(
+                0, 6, 12, 18, int=True
             ),
             # Sensors
             cv.Optional(CONF_VOLUME): sensor.sensor_schema(
@@ -356,12 +400,7 @@ CONFIG_SCHEMA = (
             cv.Optional(CONF_REQUEST_READING_BUTTON): button.button_schema(
                 EverbluMeterTriggerButton
             ),
-            cv.Optional(CONF_FREQUENCY_SCAN_BUTTON): button.button_schema(
-                EverbluMeterTriggerButton,
-                icon="mdi:magnify-scan",
-                entity_category="config",
-            ),
-            cv.Optional(CONF_WIDE_FREQUENCY_SCAN_BUTTON): button.button_schema(
+            cv.Optional(CONF_DEEP_SCAN_BUTTON): button.button_schema(
                 EverbluMeterTriggerButton,
                 icon="mdi:radar",
                 entity_category="config",
@@ -417,7 +456,51 @@ def validate_gdo2_required(config):
     return config
 
 
-CONFIG_SCHEMA = cv.All(CONFIG_SCHEMA, validate_gdo2_required)
+def validate_esp32_framework(config):
+    """Fail early on ESP32 when not using the Arduino framework.
+
+    The component includes shared C++ sources that depend on Arduino headers.
+    On ESP32, ESPHome can default to ESP-IDF unless explicitly set, so provide
+    a clear validation error instead of a later C++ compile failure.
+    """
+    if CORE.is_esp32 and CORE.target_framework != Framework.ARDUINO:
+        raise cv.Invalid(
+            "everblu_meter requires ESP32 Arduino framework (uses Arduino.h).\n"
+            "\n"
+            "Add this under your 'esp32:' block:\n"
+            "  framework:\n"
+            "    type: arduino"
+        )
+    return config
+
+
+def validate_pins(config):
+    """Reject configs where gdo0_pin and gdo2_pin are the same GPIO.
+
+    GDO0 (packet/interrupt) and GDO2 (FIFO threshold) are independent CC1101
+    status outputs and must be wired to different GPIOs. Sharing one pin makes
+    the FIFO management and interrupt handling fight over the same signal.
+    """
+    if CONF_GDO2_PIN not in config:
+        return config
+    gdo0_num = config[CONF_GDO0_PIN][CONF_NUMBER]
+    gdo2_num = config[CONF_GDO2_PIN][CONF_NUMBER]
+    if gdo0_num == gdo2_num:
+        raise cv.Invalid(
+            f"'gdo0_pin' and 'gdo2_pin' must be different GPIOs (both set to GPIO{gdo0_num}).\n"
+            "GDO0 carries the packet/interrupt signal and GDO2 the FIFO threshold; "
+            "they cannot share a pin. Also avoid the SPI bus pins.",
+            path=[CONF_GDO2_PIN],
+        )
+    return config
+
+
+CONFIG_SCHEMA = cv.All(
+    CONFIG_SCHEMA,
+    validate_gdo2_required,
+    validate_esp32_framework,
+    validate_pins,
+)
 
 
 async def to_code(config):
@@ -454,6 +537,7 @@ async def to_code(config):
     cg.add(var.set_gas_volume_divisor(config[CONF_GAS_VOLUME_DIVISOR]))
     cg.add(var.set_frequency(config[CONF_FREQUENCY]))
     cg.add(var.set_auto_scan(config[CONF_AUTO_SCAN]))
+    cg.add(var.set_auto_scan_on_failure(config[CONF_AUTO_SCAN_ON_FAILURE]))
     cg.add(var.set_reading_schedule(config[CONF_READING_SCHEDULE]))
     cg.add(var.set_read_hour(config[CONF_READ_HOUR]))
     cg.add(var.set_read_minute(config[CONF_READ_MINUTE]))
@@ -464,6 +548,7 @@ async def to_code(config):
     cg.add(var.set_retry_cooldown(config[CONF_RETRY_COOLDOWN]))  # Already in ms
     cg.add(var.set_initial_read_on_boot(config[CONF_INITIAL_READ_ON_BOOT]))
     cg.add(var.set_adaptive_threshold(config[CONF_ADAPTIVE_THRESHOLD]))
+    cg.add(var.set_rx_attenuation(config[CONF_RX_ATTENUATION]))
 
     # Enable detailed CC1101 debug logs when requested
     if config.get(CONF_DEBUG_CC1101, False):
@@ -617,27 +702,17 @@ async def to_code(config):
     if CONF_REQUEST_READING_BUTTON in config:
         btn = await button.new_button(config[CONF_REQUEST_READING_BUTTON])
         cg.add(btn.set_parent(var))
-        cg.add(btn.set_frequency_scan(False))
-        cg.add(btn.set_wide_frequency_scan(False))
+        cg.add(btn.set_deep_scan(False))
         cg.add(btn.set_reset_frequency(False))
 
-    if CONF_FREQUENCY_SCAN_BUTTON in config:
-        btn = await button.new_button(config[CONF_FREQUENCY_SCAN_BUTTON])
+    if CONF_DEEP_SCAN_BUTTON in config:
+        btn = await button.new_button(config[CONF_DEEP_SCAN_BUTTON])
         cg.add(btn.set_parent(var))
-        cg.add(btn.set_frequency_scan(True))
-        cg.add(btn.set_wide_frequency_scan(False))
-        cg.add(btn.set_reset_frequency(False))
-
-    if CONF_WIDE_FREQUENCY_SCAN_BUTTON in config:
-        btn = await button.new_button(config[CONF_WIDE_FREQUENCY_SCAN_BUTTON])
-        cg.add(btn.set_parent(var))
-        cg.add(btn.set_frequency_scan(False))
-        cg.add(btn.set_wide_frequency_scan(True))
+        cg.add(btn.set_deep_scan(True))
         cg.add(btn.set_reset_frequency(False))
 
     if CONF_RESET_FREQUENCY_BUTTON in config:
         btn = await button.new_button(config[CONF_RESET_FREQUENCY_BUTTON])
         cg.add(btn.set_parent(var))
-        cg.add(btn.set_frequency_scan(False))
-        cg.add(btn.set_wide_frequency_scan(False))
+        cg.add(btn.set_deep_scan(False))
         cg.add(btn.set_reset_frequency(True))
