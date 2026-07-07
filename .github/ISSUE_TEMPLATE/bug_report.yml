@@ -116,6 +116,7 @@ body:
         - Are there any walls, metal obstacles, or other RF sources between the radio and meter?
         - What type of antenna does your CC1101 module have (wire, PCB trace, external)?
         - Have you tried running a frequency scan to find a better frequency? (See QUICK_REFERENCE.md or ESPHOME_INTEGRATION_GUIDE.md for how to trigger the scan button)
+        - Have you tried using the **Reset Frequency Offset** button/command to clear any stored calibration and let the radio re-lock from scratch?
       render: text
     validations:
       required: false
