@@ -88,3 +88,12 @@ Existing YAML keys and MQTT topic names used by prior versions will no longer tr
 ### Note On Superseded Work
 
 - Earlier manual wide-scan UX/topic naming work is superseded by final Deep-scan naming/behavior documented in the changelog.
+
+### Post-Review Bug Fixes (PR #125 Copilot Review)
+
+Four bugs identified during the Copilot review of this PR were fixed before merge:
+
+- **`AUTO_SCAN_ON_FAILURE_ENABLED` default mismatch**: `isAutoScanOnFailureEnabled()` in `define_config_provider.h` returned `true` by default when the macro was not defined, contradicting `private.example.h` which documents the default as `0` (disabled). Fixed to return `false`.
+- **Boot-uptime timestamp showed `[boot+0s]`**: `everblu_log_timestamp()` used `time()` for the pre-NTP branch, which returns 0 before the clock is set. Fixed to use `millis()/1000` (actual seconds since reset); static buffer enlarged from 16 to 20 bytes to prevent truncation.
+- **Deep scan quality guard treated 0.0 kHz calibration as "no prior calibration"**: the guard used `previousOffset == 0.0f` to bypass quality comparison, but `begin()` assigns `s_storedOffset = 0.0f` for both "nothing saved" and "saved value is 0.0". A `s_hasStoredCalibration` flag (set by `begin()` and `saveFrequencyOffset()`) is now used instead.
+- **Serial history table month labels off by one**: `printToSerial()` labelled the oldest entry as `-13` when `monthCount=13`. Formula changed from `monthCount − i` to `monthCount − 1 − i`, consistent with `getMonthLabel()`.
