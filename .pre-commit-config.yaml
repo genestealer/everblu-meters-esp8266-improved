@@ -57,6 +57,21 @@ repos:
         additional_dependencies: ["clang-format"]
         files: ^ESPHOME/components/everblu_meter/.*\.(cpp|h)$
 
+      # --- ESPHOME-release regeneration ---
+      # Keep the generated ESPHOME-release/ tree in sync with its sources.
+      # Autofix hooks above (ruff, clang-format) can rewrite files under src/
+      # and ESPHOME/components/everblu_meter/; without regenerating the release
+      # output the "ESPHOME Sync Check" job fails. This hook re-runs the release
+      # script so pre-commit.ci commits the regenerated ESPHOME-release/ output.
+      # Must run after the formatting hooks (declaration order is honoured).
+      - id: esphome-release-sync
+        name: Regenerate ESPHOME-release
+        entry: bash ESPHOME/prepare-component-release.sh
+        language: system
+        pass_filenames: false
+        require_serial: true
+        files: ^(src/|ESPHOME/components/everblu_meter/|ESPHOME/prepare-component-release\.sh)
+
   # --- Markdown: markdownlint-cli2 (rules in .markdownlint-cli2.yaml) ---
   # Node-based hook; pre-commit / pre-commit.ci provision Node automatically.
   - repo: https://github.com/DavidAnson/markdownlint-cli2
