@@ -342,7 +342,7 @@ Pin wiring for the [Wemos D1 Mini](https://www.wemos.cc/en/latest/d1/index.html)
 | **SCK**        | SPI Clock    | GPIO 14          | D5                | #14                | GPIO 18        | SCK              | Hardware SPI clock                                  |
 | **MISO**       | SPI Data In  | GPIO 12          | D6                | #12                | GPIO 19        | MISO             | Also labeled as GDO1 on some CC1101 modules         |
 | **MOSI**       | SPI Data Out | GPIO 13          | D7                | #13                | GPIO 23        | MOSI             | Hardware SPI MOSI                                   |
-| **CSN/CS**     | Chip Select  | GPIO 15          | D8                | #15                | GPIO 5         | SS               | SPI chip select                                     |
+| **CSN/CS**     | Chip Select  | GPIO 15          | D8                | #15                | GPIO 25        | GPIO 25          | SPI chip select (ESP32: GPIO 25 avoids the GPIO 5 strapping pin) |
 | **GDO0**       | Data Ready   | GPIO 5           | D1                | #5                 | GPIO 4         | GPIO 4           | Digital interrupt pin (configurable in `private.h`) |
 | **GDO2**       | FIFO Threshold (required) | GPIO 4 | D2 | #4 | GPIO 27 | GPIO 27 | Required by default (v3.0.0+). Hardware FIFO threshold signal. Set via `private.h` (`#define GDO2`) / `gdo2_pin` in ESPHome, or opt out with `DISABLE_GDO2_FIFO_MANAGEMENT` / `disable_gdo2_fifo_management: true` |
 <!-- markdownlint-enable MD060 -->
@@ -392,15 +392,16 @@ GND    → GND
 SCK    → SCK (GPIO 18 on most DevKit boards)
 MISO   → MISO (GPIO 19)
 MOSI   → MOSI (GPIO 23)
-CSN    → SS (GPIO 5 by default on many boards)
+CSN    → GPIO 25 (recommended; avoids the GPIO 5 strapping pin)
 GDO0   → GPIO 4 (or GPIO 27)  ← set this in include/private.h as GDO0
 GDO2   → GPIO 27 (or another free GPIO)  ← required by default, set #define GDO2 in private.h (or opt out)
 ```
 
 Notes for ESP32
 
-- Use the board’s hardware SPI pins (SCK/MISO/MOSI/SS).
+- Use the board’s hardware SPI pins (SCK/MISO/MOSI).
 The defaults are provided by the Arduino core and used automatically by this project.
+- For chip-select (CSN/CS), prefer a non-strapping GPIO such as GPIO 25. The common default `SS` (GPIO 5) is a strapping pin and logs a boot-time warning, though it still works.
 - Choose a free GPIO for GDO0 (e.g., 4 or 27) and set `#define GDO0 <pin>` in `include/private.h`.
 - Wire GDO2 to another free GPIO and set `#define GDO2 <pin>` to enable hardware FIFO threshold management (required by default since v3.0.0); to keep legacy SPI polling instead, define `DISABLE_GDO2_FIFO_MANAGEMENT`.
 - Power the CC1101 from 3.3V only.

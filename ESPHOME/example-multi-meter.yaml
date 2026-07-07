@@ -2,9 +2,10 @@ substitutions:
   device_name: everblu-meter
   friendly_name: EverBlu Meter
 
-  cc1101_cs: "GPIO15"
-  cc1101_gdo0: "GPIO5"
+  cc1101_cs: "GPIO15"    # ESP8266 Huzzah: GPIO15 (safe — onboard pull-down). For ESP32 use GPIO25.
+  cc1101_gdo0: "GPIO5"   # ESP8266: GPIO5 (D1). For ESP32 use GPIO4.
   cc1101_gdo2: "GPIO4"   # REQUIRED (v3.0.0+): free GPIO -> CC1101 GDO2 (hardware FIFO threshold)
+                         # ESP8266: GPIO4 (D2). For ESP32 use GPIO27.
   tz_offset_min: "0"
   meter_1_prefix: "Meter 1"
   meter_2_prefix: "Meter 2"
@@ -22,10 +23,19 @@ esphome:
     - id: water_meter_device_2
       name: "${meter_2_prefix}"
 
+# Choose your board configuration below (uncomment one):
+
+# ========== ESP8266 (Adafruit HUZZAH) ==========
 esp8266:
   board: huzzah
   framework:
     version: recommended
+
+# ========== ESP32 (uncomment to use instead of ESP8266) ==========
+# esp32:
+#   board: esp32dev
+#   framework:
+#     type: arduino  # Required since ESPHome 2026.1.0 (everblu_meter needs Arduino.h)
 
 logger:
   level: DEBUG
@@ -58,6 +68,8 @@ time:
   - platform: homeassistant
     id: homeassistant_time
 
+# SPI bus shared with the CC1101 radio
+# Pins below are for ESP8266. For ESP32, use: clk_pin GPIO18, mosi_pin GPIO23, miso_pin GPIO19
 spi:
   - id: main_bus
     clk_pin: GPIO14

@@ -4,11 +4,19 @@
 esphome:
   name: everblu-meter-advanced
 
+# Choose your board configuration below (uncomment one):
+
+# ========== ESP32 (generic) ==========
 esp32:
-  # WARNING: Arduino framework is required; ESP-IDF builds fail because everblu_meter depends on Arduino headers
   board: esp32dev
   framework:
-    type: arduino
+    type: arduino  # Required since ESPHome 2026.1.0 (everblu_meter needs Arduino.h)
+
+# ========== ESP8266 (uncomment to use instead of ESP32) ==========
+# esp8266:
+#   board: huzzah
+#   framework:
+#     version: recommended
 
 # WiFi configuration
 wifi:
@@ -51,6 +59,7 @@ time:
         - logger.log: "Time synchronized with Home Assistant"
 
 # SPI bus shared with the CC1101 radio
+# Pins below are for ESP32. For ESP8266, use: clk_pin GPIO14, mosi_pin GPIO13, miso_pin GPIO12
 spi:
   id: main_bus
   clk_pin: GPIO18
@@ -78,11 +87,11 @@ everblu_meter:
   # Example (with suffix):    '23-1234567-800' -> meter_code: '23-1234567-800'
   # Example (without suffix): '23-1234567-800' -> meter_code: '23-1234567'
   meter_code: "23-1234567-800"  # Replace with your meter's code
-  cs_pin: GPIO5
-  gdo0_pin: 4
-  gdo2_pin: 27            # REQUIRED (v3.0.0+): wire CC1101 GDO2 here for hardware FIFO threshold (TX+RX)
-                          # Use any free GPIO (not SPI pins: avoid GPIO18/CLK, GPIO19/MISO, GPIO23/MOSI)
-                          # (not strapping pins: avoid GPIO0, GPIO2, GPIO12; GPIO27 is safe)
+  cs_pin: GPIO25              # ESP32 CC1101 CS / NSS — GPIO25 is safe (non-strapping, non-SPI)
+  gdo0_pin: GPIO4             # ESP32 GPIO4 -> CC1101 GDO0
+  gdo2_pin: GPIO27        # REQUIRED (v3.0.0+): wire CC1101 GDO2 here for hardware FIFO threshold (TX+RX)
+                          # Use any free GPIO (not SPI: avoid GPIO18/CLK, GPIO19/MISO, GPIO23/MOSI)
+                          # (not strapping pins: avoid GPIO0, GPIO2, GPIO5, GPIO12, GPIO15; GPIO27 is safe)
                           # (prevents TXFIFO_UNDERFLOW). To keep legacy SPI polling instead, remove
                           # this line and add: disable_gdo2_fifo_management: true
   meter_type: water

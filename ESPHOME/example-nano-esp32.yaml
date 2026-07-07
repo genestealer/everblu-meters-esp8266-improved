@@ -5,12 +5,13 @@
 esphome:
   name: everblu-nano-esp32
 
+# Choose your board configuration below (uncomment one):
+
+# ========== Arduino Nano ESP32 (ESP32-S3) ==========
 esp32:
-  # WARNING: Arduino framework is required; ESP-IDF builds fail because everblu_meter depends on Arduino headers
-  # Arduino Nano ESP32 uses ESP32S3 chip
   board: arduino_nano_esp32
   framework:
-    type: arduino
+    type: arduino  # Required since ESPHome 2026.1.0 (everblu_meter needs Arduino.h)
 
   # CRITICAL: These platformio options are required for Nano ESP32
   # to resolve USBSerial compilation errors
@@ -23,6 +24,18 @@ esp32:
     build_flags:
       - -DARDUINO_USB_CDC_ON_BOOT=1
       - -DARDUINO_USB_MODE=1
+
+# ========== Generic ESP32 (uncomment to use esp32dev instead) ==========
+# esp32:
+#   board: esp32dev
+#   framework:
+#     type: arduino
+
+# ========== ESP8266 (uncomment to use instead of ESP32) ==========
+# esp8266:
+#   board: huzzah
+#   framework:
+#     version: recommended
 
 # WiFi configuration
 wifi:

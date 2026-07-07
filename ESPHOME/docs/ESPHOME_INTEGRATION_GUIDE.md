@@ -49,9 +49,9 @@ Connect the CC1101 to your ESP board:
 | SCK        | D5 (GPIO14)       | GPIO18 |
 | MISO       | D6 (GPIO12)       | GPIO19 |
 | MOSI       | D7 (GPIO13)       | GPIO23 |
-| CSN        | D8 (GPIO15)       | GPIO5  |
+| CSN        | D8 (GPIO15)       | GPIO25 |
 | GDO0       | D1 (GPIO5)        | GPIO4  |
-| GDO2       | D2 (GPIO4)        | GPIO2  |
+| GDO2       | D2 (GPIO4)        | GPIO27 |
 
 ⚠️ **Important**: The CC1101 requires 3.3V power. Do not connect to 5V!
 

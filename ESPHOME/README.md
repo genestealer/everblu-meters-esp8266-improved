@@ -432,7 +432,7 @@ Five complete example configurations are provided:
 | SCK    | 18            |
 | MISO   | 19            |
 | MOSI   | 23            |
-| CSN    | 5             |
+| CSN    | 25            |
 | GDO0   | 4             |
 | GDO2   | 27 (required) |
 

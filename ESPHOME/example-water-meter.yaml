@@ -4,10 +4,21 @@
 esphome:
   name: everblu-water-meter
 
+# Choose your board configuration below (uncomment one):
+
+# ========== ESP8266 (Adafruit HUZZAH) ==========
 esp8266:
   board: huzzah
   framework:
     version: recommended  # Arduino core (explicit)
+
+# ========== ESP32 (uncomment to use instead of ESP8266) ==========
+# esp32:
+#   board: esp32dev
+#   framework:
+#     type: arduino  # Required since ESPHome 2026.1.0 (everblu_meter needs Arduino.h)
+# 
+# # Note: For ESP32, change SPI pins below from GPIO14/13/12 to GPIO18/23/19
 
 # WiFi configuration
 wifi:
@@ -61,8 +72,8 @@ everblu_meter:
   # Example (with suffix):    label '21-1234567-800' -> meter_code: '21-1234567-800'
   # Example (without suffix): label '21-1234567-800' -> meter_code: '21-1234567'
   meter_code: "21-1234567-800"  # Replace with your meter's code
-  cs_pin: GPIO15          # CC1101 CS / NSS on ESP8266 Huzzah GPIO15
-  gdo0_pin: GPIO5         # GPIO connected to CC1101 GDO0 on ESP8266 Huzzah GPIO5 (D1)
+  cs_pin: GPIO15          # CC1101 CS / NSS — ESP8266 Huzzah GPIO15 (D8); safe on Huzzah (onboard pull-down keeps it LOW at boot)
+  gdo0_pin: GPIO5         # CC1101 GDO0 -> ESP8266 Huzzah GPIO5 (D1)
   gdo2_pin: GPIO4         # REQUIRED (v3.0.0+): CC1101 GDO2 -> ESP8266 GPIO4 (D2), hardware FIFO threshold.
                           # Avoid SPI bus pins (GPIO12/13/14/15) and gdo0_pin.
                           # To keep legacy SPI polling instead, remove this line and add:

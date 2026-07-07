@@ -64,6 +64,10 @@ scope_summary:
 - **Deep Scan renamed** from "Scan Frequency" / MQTT topic `freq_scan` to "Deep Frequency Scan" / MQTT topic `deep_scan`. The Home Assistant button name and icon (`mdi:radar`) updated to match.
 - **Read retry interval** reduced from 10 seconds to 5 seconds between successive attempts after a failed read.
 - **History payload shaping for monthly usage** ([#124](https://github.com/genestealer/everblu-meters-esp8266-improved/pull/124)): `monthly_usage` now omits the oldest history month (which has no previous month for delta computation), and the JSON-building path was consolidated to keep history payload generation consistent.
+- **Example YAML board configuration**: all five example YAMLs now include both an ESP8266 and ESP32 board configuration block; the inactive one is commented out with a clear `==========` section header so users can switch boards by toggling comments. All ESP32 blocks explicitly set `framework: type: arduino` (required since ESPHome 2026.1.0, whose default ESP32 framework is ESP-IDF — the `everblu_meter` component depends on Arduino headers and fails to compile under ESP-IDF).
+- **Example YAML SPI pin guidance**: each example now carries a comment on the `spi:` block noting the alternative board's CLK/MOSI/MISO pins (e.g. ESP8266 `GPIO14/13/12` ↔ ESP32 `GPIO18/23/19`).
+- **ESP32 CS pin changed from GPIO5 to GPIO25** in `example-advanced.yaml` and `example-gas-meter-minimal.yaml`: GPIO5 is an ESP32 strapping pin that causes boot warnings; GPIO25 is non-strapping, non-SPI, and output-capable. The `example-gas-meter-minimal.yaml` SPI pins and GDO2 pin were also corrected to their ESP32 equivalents (`GPIO18/23/19` and `GPIO27`), which had been left at ESP8266 values.
+- **Pin references standardised to `GPIO` prefix** throughout all example YAMLs: bare integer values (e.g. `gdo0_pin: 4`) have been replaced with the `GPIO` prefix form (`gdo0_pin: GPIO4`) for consistency.
 
 ### Fixed
 
