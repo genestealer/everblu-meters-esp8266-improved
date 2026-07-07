@@ -1509,6 +1509,11 @@ void onConnectionEstablished()
   mqtt.publish(topicBuffer, freqBuffer, true);
   delay(5);
 
+  snprintf(freqBuffer, sizeof(freqBuffer), "%.6f", FrequencyManager::getTunedFrequency());
+  snprintf(topicBuffer, sizeof(topicBuffer), "%s/tuned_frequency", mqttBaseTopic);
+  mqtt.publish(topicBuffer, freqBuffer, true);
+  delay(5);
+
   TS_PRINTLN("[MQTT] MQTT config sent");
 
   // Publish initial Wi-Fi details
@@ -1599,6 +1604,20 @@ void adaptiveFrequencyTracking(int8_t freqest)
   {
     publishFrequencyOffsetToMqtt();
   }
+
+  // Always publish tuned_frequency and frequency_estimate after each read so
+  // the corresponding HA sensors are not left blank/unknown.
+  char topicBuffer[MQTT_TOPIC_BUFFER_SIZE];
+  char freqBuffer[16];
+
+  snprintf(freqBuffer, sizeof(freqBuffer), "%.6f", FrequencyManager::getTunedFrequency());
+  snprintf(topicBuffer, sizeof(topicBuffer), "%s/tuned_frequency", mqttBaseTopic);
+  mqtt.publish(topicBuffer, freqBuffer, false);
+
+  constexpr float FREQEST_TO_KHZ = 1.587f;
+  snprintf(freqBuffer, sizeof(freqBuffer), "%.3f", static_cast<float>(freqest) * FREQEST_TO_KHZ);
+  snprintf(topicBuffer, sizeof(topicBuffer), "%s/frequency_estimate", mqttBaseTopic);
+  mqtt.publish(topicBuffer, freqBuffer, false);
 }
 
 /**

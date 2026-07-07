@@ -7,8 +7,10 @@
  * (MQTT, ESPHome sensors, HTTP API, etc.) without knowing implementation details.
  *
  * Implementations:
- * - MQTTDataPublisher: Publishes to MQTT broker (standalone mode)
  * - ESPHomeDataPublisher: Updates ESPHome sensor components (ESPHome mode)
+ *
+ * Note: the standalone MQTT build (src/main.cpp) publishes to MQTT directly
+ * rather than through this interface.
  */
 
 #ifndef DATA_PUBLISHER_H
