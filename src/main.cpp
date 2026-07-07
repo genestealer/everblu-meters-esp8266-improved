@@ -276,6 +276,7 @@ const int max_retries = MAX_RETRIES;          // Maximum number of retry attempt
 unsigned long lastFailedAttempt = 0;          // Timestamp of last failed attempt
 const unsigned long RETRY_COOLDOWN = 3600000; // 1 hour cooldown in milliseconds
 bool g_autoScanAfterFailureDone = false;      // Guards the failure-recovery frequency scan to once per failure streak
+bool g_postScanReadAttempted = false;         // Guards the single post-scan re-read to once per failure streak
 
 // Global variable to store the reading schedule (default from private.h)
 const char *readingSchedule = DEFAULT_READING_SCHEDULE;
@@ -590,7 +591,26 @@ void onUpdateData()
       {
         g_autoScanAfterFailureDone = true;
         TS_PRINTLN("[FREQ] Max retries reached - running narrow frequency scan (±20 kHz) to re-tune after drift... (disable: AUTO_SCAN_ON_FAILURE_ENABLED 0 in private.h)");
+        const float offsetBeforeScan = FrequencyManager::getOffset();
         performDeepFrequencyScan(0.020f, 0.001f); // ±20 kHz, 1 kHz steps, ~41 steps, ~2 min
+        const float offsetAfterScan = FrequencyManager::getOffset();
+
+        // Only re-read if the scan actually found and stored a *new* offset: the
+        // carrier had drifted and the radio is now tuned to a frequency we have
+        // not yet tried this streak, so an immediate read is worthwhile instead
+        // of waiting out the 1-hour cooldown. Attempt exactly ONE more read.
+        // This cannot loop: g_autoScanAfterFailureDone (already set) blocks a
+        // second scan and g_postScanReadAttempted (set here) blocks a second
+        // re-read, so a still-failing re-read falls straight through to cooldown.
+        if (offsetAfterScan != offsetBeforeScan && !g_postScanReadAttempted)
+        {
+          g_postScanReadAttempted = true;
+          lastFailedAttempt = 0;    // lift the cooldown for this single retry
+          _retry = max_retries - 1; // enter as the final attempt: one shot only
+          TS_PRINTF("[FREQ] New frequency offset found (%.3f -> %.3f kHz) - attempting one more read...\n",
+                    offsetBeforeScan * 1000.0, offsetAfterScan * 1000.0);
+          mqtt.executeDelayed(2000, onUpdateData);
+        }
       }
     }
     Serial.println("========================================");
@@ -862,6 +882,7 @@ skip_history_publish:;
   _retry = 0;
   lastFailedAttempt = 0;
   g_autoScanAfterFailureDone = false; // Allow a fresh auto-scan on the next failure streak
+  g_postScanReadAttempted = false;    // Allow a fresh post-scan re-read on the next failure streak
   successfulReads++;
   lastErrorMessage = "None";
 
