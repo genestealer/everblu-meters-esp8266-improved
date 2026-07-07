@@ -1,10 +1,36 @@
-# Changelog
+﻿# Changelog
 
 All notable changes to this project will be documented in this file.
 
 Releases are created manually by tagging commits with version tags matching `v*.*.*` (e.g., `v2.1.0`). Users should build from source and configure `private.h` with their own meter settings.
 
 ## [Unreleased]
+
+## AI Notes For Maintainers And Tools
+
+- Treat release sections as the source of truth for shipped behavior.
+- The `Unreleased` section is for in-progress work and may be rewritten before tagging.
+- If an item was introduced and later superseded in the same release branch, keep only the final behavior in Added/Changed/Fixed/Removed and record superseded work in the AI metadata block.
+- Keep PR coverage explicit per release so branch-only work is auditable against merge history.
+
+## [v3.1.0] - 2026-07-07
+
+### AI Metadata
+
+```yaml
+release_type: minor
+base_branch: main
+release_branch: develop
+includes_prs: [105, 106, 111, 117, 119, 120, 121, 124]
+notable_superseded_work:
+  - "Manual wide-scan UX/topic naming work superseded by Deep scan naming and behavior"
+  - "Earlier scan-flow iterations replaced by final two-phase Deep scan + optional auto-scan-on-failure behavior"
+scope_summary:
+  - "Frequency calibration reliability and scan workflow"
+  - "MQTT sensor/discovery correctness and telemetry"
+  - "Decoder correctness, plausibility validation, and history payload shaping"
+  - "CI/tooling improvements including Codecov and developer frame-decoder tooling"
+```
 
 ### Added
 
@@ -17,6 +43,7 @@ Releases are created manually by tagging commits with version tags matching `v*.
 - **Near-field RF saturation detection**: when a data frame is received but fails CRC and the RSSI is very strong (> −50 dBm), the firmware now logs an explicit `*** NEAR-FIELD SATURATION DETECTED ***` warning explaining that the device is **too close** to the meter (front-end overload), rather than the generic weak-signal message. Both README troubleshooting sections document the symptom and the fix (move 1–2 m away).
 - **`scripts/capture-mqtt-log.ps1`**: convenience script that builds, uploads, and captures a timestamped serial monitor log to `temp/mqtt_<date>.log`.
 - **`docs/FREQUENCY_CALIBRATION_SYSTEM.md`**: design reference covering the CC1101 bandwidth/FOC register changes, two-phase scan algorithm, FREQEST adaptive tracking loop, CC1101 hardware frequency-resolution boundary, and Fast-scan removal rationale.
+- **RADIAN frame decoder developer tool** ([#119](https://github.com/genestealer/everblu-meters-esp8266-improved/pull/119)): added a local/offline decoder utility at `tools/hex_decoder.cpp` (with helper scripts) for protocol analysis and fixture/debug workflows.
 
 ### Changed
 
@@ -36,6 +63,7 @@ Releases are created manually by tagging commits with version tags matching `v*.
 - **Deep scan now ranks by decode quality and will not regress a good calibration** (both builds, [#104](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/104)). Previously the scan persisted its chosen frequency unconditionally, ranking candidates by RSSI / first successful decode — so a strong-RSSI frequency tens of kHz off the true carrier (still decoding but with corrupted, CRC-failing bits) could overwrite a well-centred stored offset and degrade subsequent reads. The scan now: (1) performs a **post-lock verification read** at the chosen candidate frequency, measuring demodulation quality via `|FREQEST|` (smallest = best-centred on the carrier); and (2) when a known-good offset is already stored, **only overwrites it if the candidate is strictly better** — it verifies the existing offset too and keeps it unless the candidate decodes with a smaller `|FREQEST|` (or the stored offset no longer decodes at all). A candidate that fails post-lock verification never replaces a working stored offset. First-time calibration (no stored offset) still persists the scan result as before.
 - **Deep Scan renamed** from "Scan Frequency" / MQTT topic `freq_scan` to "Deep Frequency Scan" / MQTT topic `deep_scan`. The Home Assistant button name and icon (`mdi:radar`) updated to match.
 - **Read retry interval** reduced from 10 seconds to 5 seconds between successive attempts after a failed read.
+- **History payload shaping for monthly usage** ([#124](https://github.com/genestealer/everblu-meters-esp8266-improved/pull/124)): `monthly_usage` now omits the oldest history month (which has no previous month for delta computation), and the JSON-building path was consolidated to keep history payload generation consistent.
 
 ### Fixed
 
@@ -53,7 +81,30 @@ Releases are created manually by tagging commits with version tags matching `v*.
 - **`MQTTDataPublisher` class** (`src/adapters/implementations/mqtt_data_publisher.{cpp,h}`). The standalone build publishes via `main.cpp` directly and never used this adapter; only the ESPHome build uses `IDataPublisher`. Removed to eliminate dead code.
 - **Fast frequency scan** (both builds). It was redundant — the two-phase Deep scan does a coarse window-mapping pass followed by a fine zoom, making the old coarse-only Fast scan unnecessary. Removed: `performFastFrequencyScan()`, the `fast_scan` MQTT command and Home Assistant button, and the ESPHome `fast_scan_button` config option. Use the Deep scan (`deep_scan` MQTT topic / `deep_scan_button`) instead.
 
+### Pull Requests Included In This Release Branch
+
+- [#105](https://github.com/genestealer/everblu-meters-esp8266-improved/pull/105): standalone manual wide-scan button groundwork; later superseded by the current Deep-scan UX/topic naming reflected above.
+- [#106](https://github.com/genestealer/everblu-meters-esp8266-improved/pull/106): frequency-scan logging/UX follow-up captured in the scan-related Changed entries.
+- [#111](https://github.com/genestealer/everblu-meters-esp8266-improved/pull/111): MQTT frequency-management refactor to shared `FrequencyManager` implementation.
+- [#117](https://github.com/genestealer/everblu-meters-esp8266-improved/pull/117): CC1101 AGC rebalance and attenuation configuration improvements.
+- [#119](https://github.com/genestealer/everblu-meters-esp8266-improved/pull/119): RADIAN hex/frame decoder developer tooling additions.
+- [#120](https://github.com/genestealer/everblu-meters-esp8266-improved/pull/120): LQI/CRC-bit correctness and related logging/value presentation fixes.
+- [#121](https://github.com/genestealer/everblu-meters-esp8266-improved/pull/121): decoder deduplication/test follow-up and review-fix pass.
+- [#124](https://github.com/genestealer/everblu-meters-esp8266-improved/pull/124): monthly-usage history payload correction (omit oldest month).
+
 ## [v3.0.1] - 2026-06-26
+
+### AI Metadata
+
+```yaml
+release_type: patch
+base_branch: main
+release_branch: historical
+includes_prs: unknown
+notable_superseded_work: []
+scope_summary: []
+metadata_status: inferred_from_changelog
+```
 
 Non-breaking hardening follow-up to the v3.0.0 GDO2 changes. The default and both opt-out paths are unchanged; correctly-wired setups behave identically to v3.0.0.
 
@@ -73,6 +124,22 @@ Non-breaking hardening follow-up to the v3.0.0 GDO2 changes. The default and bot
 - **ESPHome config validation** now rejects setting both `gdo2_pin:` and `disable_gdo2_fifo_management: true` (previously the opt-out was silently ignored when a pin was also present).
 
 ## [v3.0.0] - 2026-06-24
+
+### AI Metadata
+
+```yaml
+release_type: major
+base_branch: main
+release_branch: historical
+includes_prs: [79, 87, 91, 92]
+notable_superseded_work: []
+scope_summary:
+  - "GDO2 FIFO management became default with explicit opt-out path (breaking migration)"
+  - "Radio reliability/diagnostics hardening and release-bundle standardization"
+  - "CI workflow trigger/cost optimization and documentation rendering cleanup"
+  - "Single-day schedule support"
+metadata_status: derived_from_main_tag_range_and_pr_descriptions
+```
 
 > **⚠️ BREAKING CHANGE** - CC1101 GDO2 hardware-assisted FIFO threshold management is now the **default** mechanism for talking to the radio on **both** the standalone (MQTT) and ESPHome targets. You must wire CC1101 GDO2 to a free GPIO and configure it, **or** explicitly opt out. Existing setups that did not wire GDO2 require migration (see below).
 >
@@ -144,6 +211,23 @@ Non-breaking hardening follow-up to the v3.0.0 GDO2 changes. The default and bot
 
 ## [v2.3.0] - 2026-05-15
 
+### AI Metadata
+
+```yaml
+release_type: minor
+base_branch: main
+release_branch: historical
+includes_prs: [74, 75, 76, 78, 81, 82]
+notable_superseded_work: []
+scope_summary:
+  - "Migration from year/serial fields to unified meter_code with stricter validation"
+  - "ESPHome multi-meter support and validation/schema hardening"
+  - "Fixture-based native regression testing and CI automation for frame replay"
+  - "Optional MQTT Home Assistant discovery publishing toggle"
+  - "Generated-output policy for ESPHOME-release enforced in docs/repo config"
+metadata_status: derived_from_main_tag_range_and_pr_descriptions
+```
+
 > **⚠️ BREAKING CHANGE** - This release enforces strict validation of the meter code format. Existing configurations with flexible serial lengths (1–8 digits) **will not validate** without migration. See [Migration Required](#migration-required) below.
 
 ### Breaking Changes
@@ -174,6 +258,18 @@ Non-breaking hardening follow-up to the v3.0.0 GDO2 changes. The default and bot
 
 ## [v2.2.1] - 2026-05-07
 
+### AI Metadata
+
+```yaml
+release_type: patch
+base_branch: main
+release_branch: historical
+includes_prs: unknown
+notable_superseded_work: []
+scope_summary: []
+metadata_status: inferred_from_changelog
+```
+
 ### Added
 
 - Added compile-time MQTT option `ENABLE_HA_DISCOVERY` (default `1`) to allow disabling Home Assistant discovery topic publishing (`homeassistant/...`) while keeping raw MQTT telemetry and command topics active (Issue #77).
@@ -184,6 +280,20 @@ Non-breaking hardening follow-up to the v3.0.0 GDO2 changes. The default and bot
 - Bumped firmware/component version to `2.2.1`.
 
 ## [v2.2.0] - 2026-04-21
+
+### AI Metadata
+
+```yaml
+release_type: minor
+base_branch: main
+release_branch: historical
+includes_prs: [57, 72]
+notable_superseded_work: []
+scope_summary:
+  - "ESPHome SPI bus integration with explicit spi_id/cs_pin schema (breaking config migration)"
+  - "Broader ESPHome external-component CI matrix and local component build test tooling"
+metadata_status: derived_from_main_tag_range_and_pr_descriptions
+```
 
 > **⚠️ BREAKING CHANGE** - This release contains a breaking ESPHome configuration schema change due to the explicit SPI integration. Existing `everblu_meter` YAML configurations **will not validate** without migration. See [Migration Required](#migration-required) below.
 
@@ -221,6 +331,18 @@ Non-breaking hardening follow-up to the v3.0.0 GDO2 changes. The default and bot
 
 ## [v2.1.4] - 2026-03-29
 
+### AI Metadata
+
+```yaml
+release_type: patch
+base_branch: main
+release_branch: historical
+includes_prs: unknown
+notable_superseded_work: []
+scope_summary: []
+metadata_status: inferred_from_changelog
+```
+
 ### Changed
 
 - Applied build updates and ESPHome `2026.3` compatibility updates (PR #68 by @davidc).
@@ -231,6 +353,18 @@ Non-breaking hardening follow-up to the v3.0.0 GDO2 changes. The default and bot
 - Resolved ESPHome compatibility issue tracked in #65.
 
 ## [v2.1.3] - 2026-03-12
+
+### AI Metadata
+
+```yaml
+release_type: patch
+base_branch: main
+release_branch: historical
+includes_prs: unknown
+notable_superseded_work: []
+scope_summary: []
+metadata_status: inferred_from_changelog
+```
 
 ### Changed
 
@@ -243,6 +377,18 @@ Non-breaking hardening follow-up to the v3.0.0 GDO2 changes. The default and bot
 
 ## [v2.1.2] - 2026-02-13
 
+### AI Metadata
+
+```yaml
+release_type: patch
+base_branch: main
+release_branch: historical
+includes_prs: unknown
+notable_superseded_work: []
+scope_summary: []
+metadata_status: inferred_from_changelog
+```
+
 ### Fixed
 
 - CC1101 LQI/FREQEST register reads on buffer overflow (only read when packet completes normally)
@@ -250,6 +396,18 @@ Non-breaking hardening follow-up to the v3.0.0 GDO2 changes. The default and bot
 - Comment typo in SFTX flush operation
 
 ## [v2.1.1] - 2026-02-13
+
+### AI Metadata
+
+```yaml
+release_type: patch
+base_branch: main
+release_branch: historical
+includes_prs: unknown
+notable_superseded_work: []
+scope_summary: []
+metadata_status: inferred_from_changelog
+```
 
 ### Fixed
 
@@ -276,6 +434,21 @@ Non-breaking hardening follow-up to the v3.0.0 GDO2 changes. The default and bot
 - References to legacy "Everyday", "Saturday", "Sunday" schedule options
 
 ## [v2.1.0] - 2026-01-19
+
+### AI Metadata
+
+```yaml
+release_type: minor
+base_branch: main
+release_branch: historical
+includes_prs: [45]
+notable_superseded_work: []
+scope_summary:
+  - "ESPHome integration moved to production-ready status with hardware validation"
+  - "Expanded sensor/control surface and adaptive frequency tracking rollout"
+  - "Dual-mode packaging workflow for ESPHOME-release maintained from shared sources"
+metadata_status: derived_from_main_tag_range_and_pr_descriptions
+```
 
 **🎉 ESPHome Integration is NOW FULLY WORKING! 🎉**
 
@@ -331,6 +504,21 @@ This approach eliminates code duplication while supporting both MQTT discovery a
 
 ## [v2.0.0] - 2026-01-08
 
+### AI Metadata
+
+```yaml
+release_type: major
+base_branch: main
+release_branch: historical
+includes_prs: [37]
+notable_superseded_work: []
+scope_summary:
+  - "Large architecture refactor to adapter/dependency-injection design"
+  - "Initial dual-target foundation for standalone MQTT and ESPHome component mode"
+  - "ESPHome support introduced but not yet production-hardened in this release"
+metadata_status: derived_from_main_tag_range_and_pr_descriptions
+```
+
 Major architectural refactor with ESPHome integration support.
 
 ### Added
@@ -366,9 +554,33 @@ Major architectural refactor with ESPHome integration support.
 
 ## [v1.2.0] - 2026-01-07
 
+### AI Metadata
+
+```yaml
+release_type: minor
+base_branch: main
+release_branch: historical
+includes_prs: unknown
+notable_superseded_work: []
+scope_summary: []
+metadata_status: inferred_from_changelog
+```
+
 - Major release version bump.
 
 ## [v1.1.7] - 2025-01-07
+
+### AI Metadata
+
+```yaml
+release_type: patch
+base_branch: main
+release_branch: historical
+includes_prs: unknown
+notable_superseded_work: []
+scope_summary: []
+metadata_status: inferred_from_changelog
+```
 
 What's changed since v1.1.6:
 
@@ -381,6 +593,18 @@ What's changed since v1.1.6:
 - WiFi and MQTT functionality maintained even when CC1101 radio is disconnected
 
 ## [v1.1.6] - 2026-01-07
+
+### AI Metadata
+
+```yaml
+release_type: patch
+base_branch: main
+release_branch: historical
+includes_prs: unknown
+notable_superseded_work: []
+scope_summary: []
+metadata_status: inferred_from_changelog
+```
 
 What's changed since v1.1.5:
 
@@ -399,6 +623,18 @@ What's changed since v1.1.5:
 
 ## [v1.1.5] - 2025-11-18
 
+### AI Metadata
+
+```yaml
+release_type: patch
+base_branch: main
+release_branch: historical
+includes_prs: unknown
+notable_superseded_work: []
+scope_summary: []
+metadata_status: inferred_from_changelog
+```
+
 What's changed since v1.1.4:
 
 - Address Copilot AI review feedback
@@ -408,6 +644,18 @@ What's changed since v1.1.4:
 - Add error handling for invalid `reads_counter` values during meter report parsing
 
 ## [v1.1.4] - 2025-11-18
+
+### AI Metadata
+
+```yaml
+release_type: patch
+base_branch: main
+release_branch: historical
+includes_prs: unknown
+notable_superseded_work: []
+scope_summary: []
+metadata_status: inferred_from_changelog
+```
 
 What's changed since v1.1.3:
 
@@ -419,6 +667,18 @@ What's changed since v1.1.3:
 
 ## [v1.1.3] - 2025-11-18
 
+### AI Metadata
+
+```yaml
+release_type: patch
+base_branch: main
+release_branch: historical
+includes_prs: unknown
+notable_superseded_work: []
+scope_summary: []
+metadata_status: inferred_from_changelog
+```
+
 What's changed since v1.1.2:
 
 - Enhance RADIAN CRC validation to handle frame length discrepancies
@@ -427,6 +687,18 @@ What's changed since v1.1.2:
 - Improve error logging around CRC failures
 
 ## [v1.1.2] - 2025-11-18
+
+### AI Metadata
+
+```yaml
+release_type: patch
+base_branch: main
+release_branch: historical
+includes_prs: unknown
+notable_superseded_work: []
+scope_summary: []
+metadata_status: inferred_from_changelog
+```
 
 What's changed since v1.1.1:
 
@@ -439,6 +711,18 @@ What's changed since v1.1.1:
 
 ## [v1.1.1] - 2025-11-17
 
+### AI Metadata
+
+```yaml
+release_type: patch
+base_branch: main
+release_branch: historical
+includes_prs: unknown
+notable_superseded_work: []
+scope_summary: []
+metadata_status: inferred_from_changelog
+```
+
 What's changed since v1.1.0:
 
 - Add additional plausibility checks for parsed meter readings (liters) to reject clearly impossible totals before publishing
@@ -446,6 +730,18 @@ What's changed since v1.1.0:
 - Make historical attributes JSON generation more robust by using a larger buffer, tracking remaining space, and avoiding malformed payloads on truncation
 
 ## [v1.1.0] - 2025-11-17
+
+### AI Metadata
+
+```yaml
+release_type: minor
+base_branch: main
+release_branch: historical
+includes_prs: unknown
+notable_superseded_work: []
+scope_summary: []
+metadata_status: inferred_from_changelog
+```
 
 What's changed since v1.0.1:
 
@@ -458,6 +754,18 @@ What's changed since v1.0.1:
 
 ## [v1.0.1] - 2025-11-01
 
+### AI Metadata
+
+```yaml
+release_type: patch
+base_branch: main
+release_branch: historical
+includes_prs: unknown
+notable_superseded_work: []
+scope_summary: []
+metadata_status: inferred_from_changelog
+```
+
 What's changed since v1.0.0:
 
 - Add WeMos D1 Mini board configuration to release workflow
@@ -468,8 +776,21 @@ What's changed since v1.0.0:
 
 ## [v1.0.0] - 2025-10-30
 
+### AI Metadata
+
+```yaml
+release_type: major
+base_branch: main
+release_branch: historical
+includes_prs: unknown
+notable_superseded_work: []
+scope_summary: []
+metadata_status: inferred_from_changelog
+```
+
 - Initial tagged release
 
 ---
 
 Format inspired by Keep a Changelog. For full details, see the Git commit history and GitHub Releases.
+
