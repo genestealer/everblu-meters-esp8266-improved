@@ -642,6 +642,53 @@ void test_radian_decode_rejects_framing_errors(void)
     TEST_ASSERT_EQUAL_UINT32(0, count);
 }
 
+// A buffer with no polarity transitions (all samples identical) never flushes
+// a run, so no bytes are decoded: the decoder returns 0 via the
+// `dest_byte_cnt == 0` path at the end.
+void test_radian_decode_returns_zero_without_transitions(void)
+{
+    uint8_t all_high[16];
+    memset(all_high, 0xFF, sizeof(all_high));
+    uint8_t decoded[16];
+    TEST_ASSERT_EQUAL_UINT32(
+        0, radian_decode_4bitpbit(all_high, sizeof(all_high), decoded, sizeof(decoded)));
+
+    uint8_t all_low[16];
+    memset(all_low, 0x00, sizeof(all_low));
+    TEST_ASSERT_EQUAL_UINT32(
+        0, radian_decode_4bitpbit(all_low, sizeof(all_low), decoded, sizeof(decoded)));
+}
+
+// A framing error that fills the destination buffer must stop immediately and
+// return the bytes written so far (the framing-error branch's buffer-full
+// guard), rather than running on to the end-of-frame rejection.
+void test_radian_decode_framing_error_truncates(void)
+{
+    const std::vector<uint8_t> message = {0x00, 0x00, 0x00, 0x00};
+
+    std::vector<uint8_t> samples;
+    oversample_bits(message, samples);
+
+    const size_t bits_per_byte = 12;
+    for (size_t b = 0; b < message.size(); b++)
+    {
+        size_t base = b * bits_per_byte * 4;
+        for (size_t s = base + 32; s < base + 44 && s < samples.size(); s++)
+            samples[s] = 0;
+    }
+
+    std::vector<uint8_t> rx;
+    pack_samples(samples, rx);
+
+    // decoded_max = 2 fills after the second framing-error byte, forcing the
+    // early return from inside the framing-error path.
+    uint8_t decoded[2];
+    uint8_t count = radian_decode_4bitpbit(
+        rx.data(), static_cast<int>(rx.size()), decoded, sizeof(decoded));
+
+    TEST_ASSERT_EQUAL_UINT32(2, count);
+}
+
 // ---------------------------------------------------------------------------
 // Reading-vs-history plausibility guard
 //
@@ -712,6 +759,8 @@ int main(int argc, char **argv)
     RUN_TEST(test_radian_decode_tolerates_single_sample_glitch);
     RUN_TEST(test_radian_decode_truncates_on_full_buffer);
     RUN_TEST(test_radian_decode_rejects_framing_errors);
+    RUN_TEST(test_radian_decode_returns_zero_without_transitions);
+    RUN_TEST(test_radian_decode_framing_error_truncates);
     RUN_TEST(test_radian_reading_within_history_bounds);
     RUN_TEST(test_radian_reading_within_history_bounds_skips_when_insufficient);
     RUN_TEST(test_replay_meter_fixtures);
