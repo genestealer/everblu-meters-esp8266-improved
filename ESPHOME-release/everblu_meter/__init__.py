@@ -151,6 +151,7 @@ def validate_reading_schedule(value):
         )
     return canonical
 
+
 CONF_GDO0_PIN = "gdo0_pin"
 CONF_GDO2_PIN = "gdo2_pin"
 CONF_DISABLE_GDO2 = "disable_gdo2_fifo_management"
