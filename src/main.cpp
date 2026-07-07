@@ -192,6 +192,11 @@ const int ADAPT_THRESHOLD = ADAPTIVE_THRESHOLD;
  */
 void performDeepFrequencyScan(float scanRangeMHz = 0.150f, float scanStepMHz = 0.0025f);
 
+/**
+ * @brief Reset the persisted frequency offset to zero and re-tune the radio.
+ */
+void resetFrequencyOffset();
+
 // ============================================================================
 // Frequency Management Implementation
 // ============================================================================
@@ -1264,6 +1269,20 @@ void publishHADiscovery()
   json += "}";
   publishDiscoveryMessage("button", "everblu_meter_deep_scan", json);
 
+  json = "{\n";
+  json += "  \"name\": \"Reset Frequency Offset\",\n";
+  json += "  \"uniq_id\": \"" + getMeterPrefix() + "everblu_meter_reset_frequency\",\n";
+  json += "  \"obj_id\": \"" + getMeterPrefix() + "everblu_meter_reset_frequency\",\n";
+  json += "  \"ic\": \"mdi:restore\",\n";
+  json += "  \"qos\": 0,\n";
+  json += "  \"avty_t\": \"" + String(mqttBaseTopic) + "/status\",\n";
+  json += "  \"cmd_t\": \"" + String(mqttBaseTopic) + "/reset_frequency\",\n";
+  json += "  \"pl_prs\": \"reset\",\n";
+  json += "  \"ent_cat\": \"config\",\n";
+  json += "  \"dev\": {\n    " + buildDeviceJson() + "\n  }\n";
+  json += "}";
+  publishDiscoveryMessage("button", "everblu_meter_reset_frequency", json);
+
   // Binary sensor for active reading
   json = "{\n";
   json += "  \"name\": \"Active Reading\",\n";
@@ -1459,6 +1478,22 @@ void onConnectionEstablished()
     Serial.println("Deep frequency scan command received via MQTT");
     performDeepFrequencyScan(); });
 
+  char resetFrequencyTopic[MQTT_TOPIC_BUFFER_SIZE];
+  snprintf(resetFrequencyTopic, sizeof(resetFrequencyTopic), "%s/reset_frequency", mqttBaseTopic);
+  mqtt.subscribe(resetFrequencyTopic, [](const String &message)
+                 {
+    // Input validation: only accept "reset" command
+    if (message != "reset") {
+      TS_PRINTF("[WARN] Invalid reset frequency command '%s' (expected 'reset')\n", message.c_str());
+      char topicBuffer[MQTT_TOPIC_BUFFER_SIZE];
+      snprintf(topicBuffer, sizeof(topicBuffer), "%s/status_message", mqttBaseTopic);
+      mqtt.publish(topicBuffer, "Invalid reset command", true);
+      return;
+    }
+
+    Serial.println("Reset frequency offset command received via MQTT");
+    resetFrequencyOffset(); });
+
   // Publish Home Assistant discovery only when enabled in compile-time config.
 #if ENABLE_HA_DISCOVERY
   TS_PRINTLN("[MQTT] Send Home Assistant discovery config.");
@@ -1586,6 +1621,44 @@ void performDeepFrequencyScan(float scanRangeMHz, float scanStepMHz)
   FrequencyManager::performDeepFrequencyScan(scanRangeMHz, scanStepMHz, mqttFrequencyStatus);
 
   publishFrequencyOffsetToMqtt();
+}
+
+// Function: resetFrequencyOffset
+// Description: Clears the persisted CC1101 frequency offset back to 0, re-tunes
+//              the radio to the configured base frequency and mirrors the reset
+//              values to MQTT. This is the MQTT-build equivalent of the ESPHome
+//              "Reset Frequency Offset" button and shares FrequencyManager so the
+//              storage/re-tune logic stays single-sourced across both targets.
+void resetFrequencyOffset()
+{
+  TS_PRINTLN("[FREQ] Resetting frequency offset to 0");
+
+  // Reset the stored offset to 0 and persist it.
+  FrequencyManager::saveFrequencyOffset(0.0);
+
+  // Reset adaptive tracking so a stale correction history cannot immediately
+  // re-apply an offset after the reset.
+  FrequencyManager::resetAdaptiveTracking();
+
+  // Re-initialize the radio at the base frequency.
+  const float baseFrequency = FrequencyManager::getBaseFrequency();
+  cc1101RadioConnected = cc1101_init(baseFrequency);
+  if (cc1101RadioConnected)
+  {
+    TS_PRINTF("[FREQ] Radio reinitialized with base frequency: %.6f MHz\n", baseFrequency);
+  }
+  else
+  {
+    TS_PRINTF("[FREQ] Radio reinit failed at base frequency: %.6f MHz\n", baseFrequency);
+  }
+
+  // Mirror the reset values to Home Assistant.
+  publishFrequencyOffsetToMqtt();
+  char topicBuffer[MQTT_TOPIC_BUFFER_SIZE];
+  char freqBuffer[16];
+  snprintf(freqBuffer, sizeof(freqBuffer), "%.6f", FrequencyManager::getTunedFrequency());
+  snprintf(topicBuffer, sizeof(topicBuffer), "%s/tuned_frequency", mqttBaseTopic);
+  mqtt.publish(topicBuffer, freqBuffer, false);
 }
 
 // Function: adaptiveFrequencyTracking
