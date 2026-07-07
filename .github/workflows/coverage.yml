@@ -73,11 +73,13 @@ jobs:
             --root . \
             --filter src/core/crc_kermit.cpp \
             --filter src/core/radian_parser.cpp \
+            --filter src/core/radian_decoder.cpp \
             --object-directory .pio/build/native/ \
             --xml coverage.xml \
             --print-summary
 
       - name: Upload to Codecov
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         uses: codecov/codecov-action@v5
         with:
           files: coverage.xml

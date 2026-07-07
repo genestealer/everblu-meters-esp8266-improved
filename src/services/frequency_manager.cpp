@@ -15,6 +15,7 @@
 float FrequencyManager::s_baseFrequency = 0.0;
 float FrequencyManager::s_storedOffset = 0.0;
 bool FrequencyManager::s_autoScanEnabled = true;
+bool FrequencyManager::s_hasStoredCalibration = false;
 int FrequencyManager::s_adaptiveThreshold = 10;
 int FrequencyManager::s_successfulReadsCount = 0;
 float FrequencyManager::s_cumulativeFreqError = 0.0;
@@ -83,6 +84,7 @@ float FrequencyManager::begin(float baseFrequency)
     float loaded = StorageAbstraction::loadFloat(STORAGE_KEY, NAN, STORAGE_MAGIC, MIN_OFFSET, MAX_OFFSET);
     bool persisted = !isnan(loaded);
     s_storedOffset = persisted ? loaded : 0.0f;
+    s_hasStoredCalibration = persisted;
 
     if (persisted)
     {
@@ -127,6 +129,7 @@ void FrequencyManager::saveFrequencyOffset(float offset)
 {
     StorageAbstraction::saveFloat(STORAGE_KEY, offset, STORAGE_MAGIC);
     s_storedOffset = offset;
+    s_hasStoredCalibration = true; // A real value is now persisted; quality guard is active
 
     LOG_I("everblu_meter", "Frequency offset %.3f kHz saved", offset * 1000.0);
 }
@@ -285,7 +288,7 @@ void FrequencyManager::performDeepFrequencyScan(float scanRangeMHz, float scanSt
               bestFreq, candVerify.reads_counter, candQuality);
 
         bool acceptCandidate;
-        if (previousOffset == 0.0f)
+        if (!s_hasStoredCalibration)
         {
             // No prior calibration to protect: persist the scan result as-is.
             acceptCandidate = true;

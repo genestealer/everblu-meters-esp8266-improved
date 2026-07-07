@@ -237,7 +237,8 @@ private:
     // Configuration
     static float s_baseFrequency;   // Base meter frequency (e.g., 433.82 MHz)
     static float s_storedOffset;    // Current frequency offset in MHz
-    static bool s_autoScanEnabled;  // Enable auto-scan on first boot
+    static bool s_autoScanEnabled;      // Enable auto-scan on first boot
+    static bool s_hasStoredCalibration;  // True when a non-default offset was loaded from storage
     static int s_adaptiveThreshold; // Reads before adapting (default: 10)
 
     // Adaptive tracking state

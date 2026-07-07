@@ -188,7 +188,7 @@ void MeterHistory::printToSerial(const uint32_t history[13], uint32_t currentVol
     for (int i = 0; i < monthCount; i++)
     {
         uint32_t usage = (i > 0) ? calculateUsage(history[i], history[i - 1]) : 0;
-        LOG_I("everblu_meter", "%s  -%02d   %10u  %9u", headerPrefix, monthCount - i, history[i], usage);
+        LOG_I("everblu_meter", "%s  -%02d   %10u  %9u", headerPrefix, monthCount - 1 - i, history[i], usage);
     }
 
     // Print current month usage

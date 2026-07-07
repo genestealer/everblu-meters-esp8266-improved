@@ -92,6 +92,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <Arduino.h> // for millis()
 
 #ifndef EVERBLU_LOG_COLOR
 #define EVERBLU_LOG_COLOR 1
@@ -160,14 +161,15 @@ inline const char *everblu_log_color_for_prefix(const char *msg)
 
 // Returns a formatted UTC timestamp string "[HH:MM:SS]" for serial log lines.
 // Uses a static buffer (safe on single-threaded ESP8266/ESP32).
-// Before NTP sync, time() returns 0 so the output is "[00:00:00]".
+// Before NTP sync (time() < 2020-01-01), shows actual boot uptime via millis().
+// Buffer is 20 bytes: "[boot+4294967s]" is 15 chars; "[HH:MM:SS]" is 10 chars.
 inline const char *everblu_log_timestamp()
 {
-	static char buf[16]; // "[boot+XXXXs]" or "[HH:MM:SS]" + null
+	static char buf[20]; // "[boot+XXXXXXXs]" (15) or "[HH:MM:SS]" (10) + null
 	time_t now = time(nullptr);
 	if (now < 1577836800L) // before 2020-01-01 → not yet NTP-synced; show boot uptime
 	{
-		snprintf(buf, sizeof(buf), "[boot+%lus]", (unsigned long)now);
+		snprintf(buf, sizeof(buf), "[boot+%lus]", millis() / 1000UL);
 	}
 	else
 	{

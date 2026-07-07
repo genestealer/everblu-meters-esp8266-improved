@@ -90,7 +90,7 @@ public:
 #ifdef AUTO_SCAN_ON_FAILURE_ENABLED
                 return AUTO_SCAN_ON_FAILURE_ENABLED != 0;
 #else
-                return true;
+                return false; // Default off: matches private.example.h documentation
 #endif
         }
 
