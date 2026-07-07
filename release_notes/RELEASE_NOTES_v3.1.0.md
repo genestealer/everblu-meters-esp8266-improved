@@ -2,6 +2,8 @@
 
 This release includes integration-level breaking changes for ESPHome and MQTT scan naming/behavior.
 
+> **Upgrading from before v3.0.0?** Also review the earlier breaking changes you'd be skipping — most importantly the **v3.0.0 GDO2 requirement** (wire `gdo2_pin` / `GDO2` or explicitly opt out, or the build/config fails), plus **v2.3.0** (strict `YY-SSSSSSS[-NNN]` meter code) and **v2.2.0** (explicit ESPHome `spi:` schema). See the corresponding sections in `CHANGELOG.md`.
+
 ## ESPHome Configuration Migration
 
 Update scan button keys in YAML:
