@@ -262,6 +262,92 @@ void test_radian_parse_primary_time_rejection(void)
     TEST_ASSERT_EQUAL_UINT32(18, out.time_end);
 }
 
+void test_radian_parse_primary_data_edge_cases(void)
+{
+    uint8_t buf[120];
+    struct radian_primary_data out;
+
+    // out == NULL must fail regardless of buffer contents.
+    make_test_buf(buf, sizeof(buf), 774431UL, 6, 18);
+    TEST_ASSERT_FALSE(radian_parse_primary_data(buf, sizeof(buf), nullptr));
+
+    // decoded_buffer == NULL must fail.
+    TEST_ASSERT_FALSE(radian_parse_primary_data(nullptr, sizeof(buf), &out));
+
+    // size < 30 must fail (not enough bytes for the volume field).
+    make_test_buf(buf, sizeof(buf), 774431UL, 6, 18);
+    TEST_ASSERT_FALSE(radian_parse_primary_data(buf, 20, &out));
+
+    // battery_left == 0xFF must be rejected (invalid sentinel).
+    make_test_buf(buf, sizeof(buf), 774431UL, 6, 18);
+    buf[31] = 0xFF;
+    TEST_ASSERT_FALSE(radian_parse_primary_data(buf, sizeof(buf), &out));
+
+    // reads_counter == 0xFF must be rejected (invalid sentinel).
+    make_test_buf(buf, sizeof(buf), 774431UL, 6, 18);
+    buf[48] = 0xFF;
+    TEST_ASSERT_FALSE(radian_parse_primary_data(buf, sizeof(buf), &out));
+
+    // 30 <= size < 49: volume is parsed but the extended fields (battery,
+    // counter, wake window) and history are skipped and remain zero.
+    make_test_buf(buf, sizeof(buf), 774431UL, 6, 18);
+    TEST_ASSERT_TRUE(radian_parse_primary_data(buf, 40, &out));
+    TEST_ASSERT_EQUAL_UINT32(774431UL, out.volume);
+    TEST_ASSERT_EQUAL_UINT32(0, out.battery_left);
+    TEST_ASSERT_EQUAL_UINT32(0, out.reads_counter);
+    TEST_ASSERT_EQUAL_UINT32(0, out.time_start);
+    TEST_ASSERT_EQUAL_UINT32(0, out.time_end);
+    TEST_ASSERT_FALSE(out.history_available);
+
+    // size >= 118 sets history_available.
+    make_test_buf(buf, sizeof(buf), 774431UL, 6, 18);
+    TEST_ASSERT_TRUE(radian_parse_primary_data(buf, sizeof(buf), &out));
+    TEST_ASSERT_TRUE(out.history_available);
+}
+
+// ---------------------------------------------------------------------------
+// CRC validation coverage (radian_validate_crc)
+//
+// Exercised end-to-end elsewhere only through captured fixtures, which may be
+// absent in CI. These direct tests keep the function covered unconditionally.
+// ---------------------------------------------------------------------------
+void test_radian_validate_crc(void)
+{
+    // Build a well-formed frame: buf[0] = length, buf[1..len-3] = payload,
+    // buf[len-2..len-1] = CRC-16/KERMIT (big-endian) over the payload.
+    uint8_t buf[8] = {8, 0x11, 0x22, 0x33, 0x44, 0x55, 0, 0};
+    const uint16_t crc = radian_crc_kermit(&buf[1], 5);
+    buf[6] = static_cast<uint8_t>(crc >> 8);
+    buf[7] = static_cast<uint8_t>(crc & 0xFF);
+    TEST_ASSERT_TRUE(radian_validate_crc(buf, sizeof(buf)));
+
+    // A corrupted payload byte must fail the CRC check.
+    uint8_t bad[8];
+    memcpy(bad, buf, sizeof(buf));
+    bad[3] ^= 0xFF;
+    TEST_ASSERT_FALSE(radian_validate_crc(bad, sizeof(bad)));
+
+    // NULL buffer and undersized buffers are rejected.
+    TEST_ASSERT_FALSE(radian_validate_crc(nullptr, sizeof(buf)));
+    uint8_t tiny[3] = {3, 0, 0};
+    TEST_ASSERT_FALSE(radian_validate_crc(tiny, sizeof(tiny)));
+
+    // length_field advertising fewer than 4 bytes is rejected.
+    uint8_t short_len[8] = {3, 0, 0, 0, 0, 0, 0, 0};
+    TEST_ASSERT_FALSE(radian_validate_crc(short_len, sizeof(short_len)));
+
+    // length_field larger than the buffer is accepted (compat shim).
+    uint8_t long_len[8] = {200, 0, 0, 0, 0, 0, 0, 0};
+    TEST_ASSERT_TRUE(radian_validate_crc(long_len, sizeof(long_len)));
+
+    // length_field == 0 falls back to the actual buffer size.
+    uint8_t implicit[8] = {0, 0xDE, 0xAD, 0xBE, 0xEF, 0x01, 0, 0};
+    const uint16_t crc2 = radian_crc_kermit(&implicit[1], sizeof(implicit) - 3);
+    implicit[6] = static_cast<uint8_t>(crc2 >> 8);
+    implicit[7] = static_cast<uint8_t>(crc2 & 0xFF);
+    TEST_ASSERT_TRUE(radian_validate_crc(implicit, sizeof(implicit)));
+}
+
 void test_replay_meter_fixtures(void)
 {
     FixtureLoadResult loaded = load_fixtures();
@@ -619,6 +705,8 @@ int main(int argc, char **argv)
     UNITY_BEGIN();
     RUN_TEST(test_radian_parse_primary_volume_rejection);
     RUN_TEST(test_radian_parse_primary_time_rejection);
+    RUN_TEST(test_radian_parse_primary_data_edge_cases);
+    RUN_TEST(test_radian_validate_crc);
     RUN_TEST(test_radian_decode_roundtrip);
     RUN_TEST(test_radian_decode_rejects_empty_and_null);
     RUN_TEST(test_radian_decode_tolerates_single_sample_glitch);
