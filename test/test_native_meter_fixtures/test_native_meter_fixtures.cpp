@@ -425,6 +425,138 @@ void test_radian_decode_rejects_empty_and_null(void)
 }
 
 // ---------------------------------------------------------------------------
+// Sample-level helpers: expose the oversampled bitstream so tests can inject
+// glitches / corruption that the byte-level encode helper cannot express.
+// Framing matches encode_4x_oversampled(): per byte, 8 data bits (LSB first)
+// + 3 stop bits (1) + 1 separator (0), each logical bit repeated 4x, plus a
+// trailing 8-bit high run so the decoder flushes the final separator.
+// ---------------------------------------------------------------------------
+static void oversample_bits(const std::vector<uint8_t> &msg,
+                            std::vector<uint8_t> &samples)
+{
+    std::vector<uint8_t> bits;
+    for (uint8_t value : msg)
+    {
+        for (int i = 0; i < 8; i++)
+            bits.push_back(static_cast<uint8_t>((value >> i) & 1U));
+        bits.push_back(1);
+        bits.push_back(1);
+        bits.push_back(1);
+        bits.push_back(0);
+    }
+    for (int i = 0; i < 8; i++)
+        bits.push_back(1);
+
+    samples.clear();
+    samples.reserve(bits.size() * 4);
+    for (uint8_t b : bits)
+        for (int s = 0; s < 4; s++)
+            samples.push_back(static_cast<uint8_t>(b & 1U));
+}
+
+// Pack a flat sample vector (0/1) MSB-first into bytes, zero-padding the tail.
+static void pack_samples(const std::vector<uint8_t> &samples,
+                         std::vector<uint8_t> &out)
+{
+    out.clear();
+    out.reserve((samples.size() + 7) / 8);
+    for (size_t i = 0; i < samples.size(); i += 8)
+    {
+        uint8_t v = 0;
+        for (int b = 0; b < 8; b++)
+        {
+            uint8_t s = (i + b < samples.size())
+                            ? static_cast<uint8_t>(samples[i + b] & 1U)
+                            : 0;
+            v = static_cast<uint8_t>((v << 1) | s);
+        }
+        out.push_back(v);
+    }
+}
+
+// A single-sample polarity flip inside an isolated bit run must be tolerated
+// (the decoder's glitch-recovery path, `bit_cnt == 1`) and still decode to the
+// original bytes. An alternating message (0x55 / 0xAA) makes each data bit its
+// own 4-sample run, so flipping one interior sample produces a lone 1-sample
+// run at the transition that the decoder absorbs.
+void test_radian_decode_tolerates_single_sample_glitch(void)
+{
+    const std::vector<uint8_t> message = {0x55, 0xAA};
+
+    std::vector<uint8_t> samples;
+    oversample_bits(message, samples);
+
+    // Index 5 sits inside the second data bit's run (an isolated run of four),
+    // exercising the single-sample glitch branch without desyncing the frame.
+    samples[5] ^= 1U;
+
+    std::vector<uint8_t> rx;
+    pack_samples(samples, rx);
+
+    uint8_t decoded[64];
+    uint8_t count = radian_decode_4bitpbit(
+        rx.data(), static_cast<int>(rx.size()), decoded, sizeof(decoded));
+
+    TEST_ASSERT_EQUAL_UINT32(static_cast<uint32_t>(message.size()), count);
+    TEST_ASSERT_EQUAL_HEX8(message[0], decoded[0]);
+    TEST_ASSERT_EQUAL_HEX8(message[1], decoded[1]);
+}
+
+// When the destination buffer fills before the frame ends, the decoder must
+// stop and return the number of bytes written (exercises the
+// `dest_byte_cnt >= decoded_max` early-return guards).
+void test_radian_decode_truncates_on_full_buffer(void)
+{
+    std::vector<uint8_t> message;
+    for (int i = 0; i < 8; i++)
+        message.push_back(static_cast<uint8_t>(0x11 * (i + 1)));
+
+    std::vector<uint8_t> oversampled;
+    encode_4x_oversampled(message, oversampled);
+
+    uint8_t decoded[3];
+    uint8_t count = radian_decode_4bitpbit(
+        oversampled.data(), static_cast<int>(oversampled.size()),
+        decoded, static_cast<int>(sizeof(decoded)));
+
+    // Never writes past the buffer, and the bytes it did emit are correct.
+    TEST_ASSERT_TRUE(count <= sizeof(decoded));
+    TEST_ASSERT_EQUAL_HEX8(message[0], decoded[0]);
+    TEST_ASSERT_EQUAL_HEX8(message[1], decoded[1]);
+}
+
+// A frame whose stop bits are corrupted to 0 accumulates framing errors; once
+// they exceed half the decoded byte count the decoder rejects the frame
+// (returns 0). Corrupting every byte's stop region guarantees rejection.
+void test_radian_decode_rejects_framing_errors(void)
+{
+    const std::vector<uint8_t> message = {0x00, 0x00, 0x00, 0x00};
+
+    std::vector<uint8_t> samples;
+    oversample_bits(message, samples);
+
+    // Each byte occupies 12 logical bits (48 samples): data[0..31] then
+    // stop/separator[32..47]. Force the three stop bits of every byte low so
+    // the stop-bit check at dest_bit_cnt == 10 flags a framing error.
+    const size_t bits_per_byte = 12;
+    for (size_t b = 0; b < message.size(); b++)
+    {
+        size_t base = b * bits_per_byte * 4;
+        for (size_t s = base + 32; s < base + 44 && s < samples.size(); s++)
+            samples[s] = 0;
+    }
+
+    std::vector<uint8_t> rx;
+    pack_samples(samples, rx);
+
+    uint8_t decoded[64];
+    uint8_t count = radian_decode_4bitpbit(
+        rx.data(), static_cast<int>(rx.size()), decoded, sizeof(decoded));
+
+    TEST_ASSERT_EQUAL_UINT32(0, count);
+}
+
+// ---------------------------------------------------------------------------
 // Reading-vs-history plausibility guard
 //
 // radian_reading_within_history_bounds() rejects a reading whose implied
@@ -489,6 +621,9 @@ int main(int argc, char **argv)
     RUN_TEST(test_radian_parse_primary_time_rejection);
     RUN_TEST(test_radian_decode_roundtrip);
     RUN_TEST(test_radian_decode_rejects_empty_and_null);
+    RUN_TEST(test_radian_decode_tolerates_single_sample_glitch);
+    RUN_TEST(test_radian_decode_truncates_on_full_buffer);
+    RUN_TEST(test_radian_decode_rejects_framing_errors);
     RUN_TEST(test_radian_reading_within_history_bounds);
     RUN_TEST(test_radian_reading_within_history_bounds_skips_when_insufficient);
     RUN_TEST(test_replay_meter_fixtures);
