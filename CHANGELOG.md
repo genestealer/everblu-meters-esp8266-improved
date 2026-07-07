@@ -44,6 +44,9 @@ scope_summary:
 - **`scripts/capture-mqtt-log.ps1`**: convenience script that builds, uploads, and captures a timestamped serial monitor log to `temp/mqtt_<date>.log`.
 - **`docs/FREQUENCY_CALIBRATION_SYSTEM.md`**: design reference covering the CC1101 bandwidth/FOC register changes, two-phase scan algorithm, FREQEST adaptive tracking loop, CC1101 hardware frequency-resolution boundary, and Fast-scan removal rationale.
 - **RADIAN frame decoder developer tool** ([#119](https://github.com/genestealer/everblu-meters-esp8266-improved/pull/119)): added a local/offline decoder utility at `tools/hex_decoder.cpp` (with helper scripts) for protocol analysis and fixture/debug workflows.
+- **ESPHome config validation - ESP32 Arduino framework required**: the `everblu_meter` component now fails fast during `esphome config` with a clear message ("requires ESP32 Arduino framework") when an ESP32 target is not using `framework: type: arduino`, instead of failing later in the C++ build with `fatal error: Arduino.h`. ESP8266 is unaffected.
+- **ESPHome config validation - GDO0/GDO2 pin conflict**: configuration is now rejected at validation time when `gdo0_pin` and `gdo2_pin` resolve to the same GPIO (the two CC1101 status outputs must be on different pins).
+- **ESPHome config validator test coverage**: added negative `esphome config` fixtures (`.ci/esphome/everblu_meter/test.invalid-*.yaml`) and Python unit tests (`tests/esphome/test_validators.py`, 27 cases) exercising the meter-code, GDO2-required, framework, pin-conflict, and reading-schedule validators. Wired into the ESPHome CI workflow as new `negative-validation` (asserts invalid configs are rejected with the expected error) and `python-unit-tests` jobs.
 
 ### Changed
 
@@ -68,6 +71,7 @@ scope_summary:
 - **Example YAML SPI pin guidance**: each example now carries a comment on the `spi:` block noting the alternative board's CLK/MOSI/MISO pins (e.g. ESP8266 `GPIO14/13/12` ↔ ESP32 `GPIO18/23/19`).
 - **ESP32 CS pin changed from GPIO5 to GPIO25** in `example-advanced.yaml` and `example-gas-meter-minimal.yaml`: GPIO5 is an ESP32 strapping pin that causes boot warnings; GPIO25 is non-strapping, non-SPI, and output-capable. The `example-gas-meter-minimal.yaml` SPI pins and GDO2 pin were also corrected to their ESP32 equivalents (`GPIO18/23/19` and `GPIO27`), which had been left at ESP8266 values.
 - **Pin references standardised to `GPIO` prefix** throughout all example YAMLs: bare integer values (e.g. `gdo0_pin: 4`) have been replaced with the `GPIO` prefix form (`gdo0_pin: GPIO4`) for consistency.
+- **`reading_schedule` is now validated at config time and case-insensitive** (ESPHome): the option previously accepted any string and silently fell back to `Monday-Friday` at runtime when unrecognised. It is now validated against the known presets/weekdays (matching the C++ `ScheduleManager::isValidSchedule`) and accepts any letter case, normalising e.g. `monday-friday` -> `Monday-Friday` and `FRIDAY` -> `Friday`. An unknown value now fails `esphome config` with the list of valid options.
 
 ### Fixed
 

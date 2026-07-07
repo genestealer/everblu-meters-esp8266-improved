@@ -26,6 +26,7 @@ import esphome.config_validation as cv
 from esphome.const import (
     CONF_FREQUENCY,
     CONF_ID,
+    CONF_NUMBER,
     CONF_TIME_ID,
     DEVICE_CLASS_CONNECTIVITY,
     DEVICE_CLASS_RUNNING,
@@ -110,10 +111,45 @@ CONF_RX_ATTENUATION = "rx_attenuation"
 METER_TYPE_WATER = "water"
 METER_TYPE_GAS = "gas"
 
-# Reading schedules - must match C++ ScheduleManager::isReadingDay(...) string comparisons
+# Reading schedules - must match C++ ScheduleManager::isValidSchedule(...) string comparisons
 SCHEDULE_MONDAY_FRIDAY = "Monday-Friday"
 SCHEDULE_MONDAY_SATURDAY = "Monday-Saturday"
 SCHEDULE_MONDAY_SUNDAY = "Monday-Sunday"
+SCHEDULE_SINGLE_DAYS = [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+]
+# Full set accepted by the C++ ScheduleManager (case-sensitive exact match).
+VALID_SCHEDULES = [
+    SCHEDULE_MONDAY_FRIDAY,
+    SCHEDULE_MONDAY_SATURDAY,
+    SCHEDULE_MONDAY_SUNDAY,
+    *SCHEDULE_SINGLE_DAYS,
+]
+# Lowercase -> canonical lookup so YAML values are accepted case-insensitively
+# and normalized to the exact form the C++ ScheduleManager compares against.
+_SCHEDULE_LOOKUP = {s.lower(): s for s in VALID_SCHEDULES}
+
+
+def validate_reading_schedule(value):
+    """Accept the reading schedule case-insensitively and normalize it.
+
+    The C++ ScheduleManager does a case-sensitive exact match, so map any
+    casing (e.g. 'monday-friday', 'FRIDAY') to the canonical form and reject
+    anything that is not a known preset or weekday.
+    """
+    canonical = _SCHEDULE_LOOKUP.get(cv.string(value).strip().lower())
+    if canonical is None:
+        raise cv.Invalid(
+            f"Invalid reading_schedule '{value}'. Expected one of (case-insensitive): "
+            + ", ".join(VALID_SCHEDULES)
+        )
+    return canonical
 
 CONF_GDO0_PIN = "gdo0_pin"
 CONF_GDO2_PIN = "gdo2_pin"
@@ -203,7 +239,7 @@ CONFIG_SCHEMA = (
             cv.Optional(CONF_AUTO_SCAN_ON_FAILURE, default=True): cv.boolean,
             cv.Optional(
                 CONF_READING_SCHEDULE, default=SCHEDULE_MONDAY_FRIDAY
-            ): cv.string,
+            ): validate_reading_schedule,
             cv.Optional(CONF_READ_HOUR, default=10): cv.int_range(min=0, max=23),
             cv.Optional(CONF_READ_MINUTE, default=0): cv.int_range(min=0, max=59),
             cv.Optional(CONF_TIMEZONE_OFFSET, default=0): cv.int_range(
@@ -437,7 +473,33 @@ def validate_esp32_framework(config):
     return config
 
 
-CONFIG_SCHEMA = cv.All(CONFIG_SCHEMA, validate_gdo2_required, validate_esp32_framework)
+def validate_pins(config):
+    """Reject configs where gdo0_pin and gdo2_pin are the same GPIO.
+
+    GDO0 (packet/interrupt) and GDO2 (FIFO threshold) are independent CC1101
+    status outputs and must be wired to different GPIOs. Sharing one pin makes
+    the FIFO management and interrupt handling fight over the same signal.
+    """
+    if CONF_GDO2_PIN not in config:
+        return config
+    gdo0_num = config[CONF_GDO0_PIN][CONF_NUMBER]
+    gdo2_num = config[CONF_GDO2_PIN][CONF_NUMBER]
+    if gdo0_num == gdo2_num:
+        raise cv.Invalid(
+            f"'gdo0_pin' and 'gdo2_pin' must be different GPIOs (both set to GPIO{gdo0_num}).\n"
+            "GDO0 carries the packet/interrupt signal and GDO2 the FIFO threshold; "
+            "they cannot share a pin. Also avoid the SPI bus pins.",
+            path=[CONF_GDO2_PIN],
+        )
+    return config
+
+
+CONFIG_SCHEMA = cv.All(
+    CONFIG_SCHEMA,
+    validate_gdo2_required,
+    validate_esp32_framework,
+    validate_pins,
+)
 
 
 async def to_code(config):

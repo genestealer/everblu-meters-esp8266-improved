@@ -67,6 +67,17 @@ Existing YAML keys and MQTT topic names used by prior versions will no longer tr
 - History payload correction:
 	- `monthly_usage` omits oldest month lacking prior delta baseline.
 
+### ESPHome Config Validation And Tests
+
+- New config-time validators in the `everblu_meter` component (fail fast during `esphome config` instead of a later C++ compile error or a silent runtime fallback):
+	- **ESP32 Arduino framework required**: rejects an ESP32 target that is not using `framework: type: arduino` with a clear "requires ESP32 Arduino framework" message (the component depends on Arduino headers). ESP8266 is unaffected.
+	- **GDO0/GDO2 pin conflict**: rejects `gdo0_pin` and `gdo2_pin` set to the same GPIO.
+	- **`reading_schedule` validated and case-insensitive**: previously accepted any string and silently fell back to `Monday-Friday`; now validated against the known presets/weekdays and normalised for case (e.g. `monday-friday` -> `Monday-Friday`).
+- New test coverage for all component config validators:
+	- Negative `esphome config` fixtures (`.ci/esphome/everblu_meter/test.invalid-*.yaml`) that must be rejected.
+	- Python unit tests (`tests/esphome/test_validators.py`, 27 cases) calling the validators directly.
+	- New CI jobs `negative-validation` and `python-unit-tests` in the ESPHome external-component workflow.
+
 ### Linked PRs Included In This Release Branch
 
 - #105

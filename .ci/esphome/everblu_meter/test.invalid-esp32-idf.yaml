@@ -1,0 +1,36 @@
+# NEGATIVE test: ESP32 with the ESP-IDF framework must be REJECTED.
+# The everblu_meter component pulls in shared C++ that depends on Arduino.h,
+# so validate_esp32_framework() should raise cv.Invalid at config time rather
+# than letting the build fail later with "fatal error: Arduino.h".
+# Expected error substring: "requires ESP32 Arduino framework"
+# This file is intentionally invalid - do NOT add it to the compile matrix.
+substitutions:
+  spi_clk_pin: GPIO18
+  spi_miso_pin: GPIO19
+  spi_mosi_pin: GPIO23
+  cs_pin: GPIO15
+  gdo0_pin: GPIO4
+  gdo2_pin: GPIO27
+  meter_type: water
+
+esphome:
+  name: ci-invalid-esp32-idf
+  min_version: 2024.6.0
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+
+api:
+
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: CI-WIFI
+  password: CI-PASSWORD
+
+<<: !include common.yaml
