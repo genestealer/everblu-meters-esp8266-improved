@@ -181,7 +181,8 @@ void MeterHistory::printToSerial(const uint32_t history[13], uint32_t currentVol
     LOG_I("everblu_meter", "%s -----  ----------  ---------", headerPrefix);
 
     // Print each historical month. The oldest month has no earlier baseline, so
-    // its usage is unknown and shown as 0 (matching the published monthly_usage).
+    // its usage is unknown and shown as 0.
+    // Note: the JSON monthly_usage array omits this oldest-month usage value.
     // Rows are labelled "-NN" months-ago; the live reading is printed separately
     // below as "Now".
     for (int i = 0; i < monthCount; i++)
