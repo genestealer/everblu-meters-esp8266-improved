@@ -35,7 +35,9 @@ from esphome.const import (
     STATE_CLASS_TOTAL_INCREASING,
     UNIT_DECIBEL_MILLIWATT,
     UNIT_PERCENT,
+    Framework,
 )
+from esphome.core import CORE
 
 DEPENDENCIES = ["time", "spi"]
 CODEOWNERS = ["@genestealer"]
@@ -417,7 +419,25 @@ def validate_gdo2_required(config):
     return config
 
 
-CONFIG_SCHEMA = cv.All(CONFIG_SCHEMA, validate_gdo2_required)
+def validate_esp32_framework(config):
+    """Fail early on ESP32 when not using the Arduino framework.
+
+    The component includes shared C++ sources that depend on Arduino headers.
+    On ESP32, ESPHome can default to ESP-IDF unless explicitly set, so provide
+    a clear validation error instead of a later C++ compile failure.
+    """
+    if CORE.is_esp32 and CORE.target_framework != Framework.ARDUINO:
+        raise cv.Invalid(
+            "everblu_meter requires ESP32 Arduino framework (uses Arduino.h).\n"
+            "\n"
+            "Add this under your 'esp32:' block:\n"
+            "  framework:\n"
+            "    type: arduino"
+        )
+    return config
+
+
+CONFIG_SCHEMA = cv.All(CONFIG_SCHEMA, validate_gdo2_required, validate_esp32_framework)
 
 
 async def to_code(config):
