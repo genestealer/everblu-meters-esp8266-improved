@@ -59,6 +59,10 @@ public:
      * Creates a JSON object with historical volumes and calculated monthly usage.
      * Format: {"history":[...], "monthly_usage":[...], "current_month_usage":X, "months_available":Y}
      *
+     * Note: monthly_usage omits the oldest month (no earlier baseline to subtract
+     * from), so it contains (months_available - 1) real month-over-month deltas,
+     * aligned so monthly_usage[k] pairs with history[k+1].
+     *
      * @param history Array of 13 uint32_t values
      * @param currentVolume Current meter reading
      * @param outputBuffer Buffer to write JSON to

@@ -72,7 +72,6 @@ Historical readings (bytes 66-117):
     713744   // Month -1 (most recent complete month)
   ],
   "monthly_usage": [
-    0,       // Unknown (no baseline for oldest month)
     6699,    // Month -12 usage
     7381,    // Month -11 usage
     8010,    // Month -10 usage
@@ -110,10 +109,11 @@ Access historical data in automations and templates:
 {{ state_attr('sensor.water_meter_value', 'current_month_usage') }}
 
 # Get previous month's total usage
-{{ state_attr('sensor.water_meter_value', 'monthly_usage')[12] }}
+{{ state_attr('sensor.water_meter_value', 'monthly_usage')[-1] }}
 
-# Calculate average monthly consumption over last 12 months (excluding oldest which has no baseline)
-{% set monthly = state_attr('sensor.water_meter_value', 'monthly_usage')[1:] %}
+# Calculate average monthly consumption over the available months
+# monthly_usage already excludes the oldest month (which has no baseline)
+{% set monthly = state_attr('sensor.water_meter_value', 'monthly_usage') %}
 {{ (monthly | sum / monthly | length) | round(0) }}
 ```
 
@@ -136,7 +136,7 @@ template:
         unit_of_measurement: "L"
         state: >
           {% set monthly = state_attr('sensor.water_meter_value', 'monthly_usage') %}
-          {{ monthly[12] | int(0) if monthly else 0 }}
+          {{ monthly[-1] | int(0) if monthly else 0 }}
         icon: mdi:water-pump
 
       - name: "Water Usage Average (12 months)"
@@ -145,8 +145,7 @@ template:
         state: >
           {% set monthly = state_attr('sensor.water_meter_value', 'monthly_usage') %}
           {% if monthly %}
-            {% set valid_months = monthly[1:] %}
-            {{ (valid_months | sum / valid_months | length) | round(0) }}
+            {{ (monthly | sum / monthly | length) | round(0) }}
           {% else %}
             0
           {% endif %}
@@ -168,10 +167,10 @@ series:
     name: Monthly Usage
     type: column
     data_generator: |
-      const monthly = entity.attributes.monthly_usage.slice(1); // Skip first (unknown)
+      const monthly = entity.attributes.monthly_usage; // already excludes oldest month
       const now = new Date();
       return monthly.map((usage, i) => {
-        const date = new Date(now.getFullYear(), now.getMonth() - (12 - i), 1);
+        const date = new Date(now.getFullYear(), now.getMonth() - (monthly.length - i), 1);
 
         return [date.getTime(), usage];
       });

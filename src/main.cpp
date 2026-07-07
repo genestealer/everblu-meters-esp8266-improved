@@ -30,6 +30,7 @@
 #include "core/meter_code_parser.h"    // Shared METER_CODE parser
 #include "core/utils.h"                 // Utility functions
 #include "services/schedule_manager.h"  // Schedule management
+#include "services/meter_history.h"      // Shared historical data processing (JSON + serial)
 #include "services/frequency_manager.h" // Shared frequency calibration (scan/adaptive/storage)
 #if defined(ESP8266)
 #include <ESP8266WiFi.h> // Wi-Fi library for ESP8266
@@ -651,160 +652,37 @@ void onUpdateData()
   mqtt.publish(String(mqttBaseTopic) + "/liters", valueBuffer, true);
   delay(5);
 
-  // Publish historical data as JSON attributes for Home Assistant
-  // This provides 13 months of historical volume readings that can be accessed as attributes
-  // in Home Assistant. Each value represents the total volume at the end of that month.
-  // The meter stores these internally with timestamps, but the RADIAN protocol only
-  // returns the volume values without dates.
-  int num_history = 0;
-  if (meter_data.history_available)
+  // Publish historical data as JSON attributes for Home Assistant.
+  // The 13-month history table, monthly-usage math and JSON formatting all live
+  // in the shared MeterHistory service (src/services/meter_history.cpp) - the
+  // SAME code the ESPHome build uses - so the published format stays
+  // single-sourced across both targets.
+  if (meter_data.history_available && MeterHistory::isHistoryValid(meter_data.history))
   {
-    // Count valid historical values (non-zero)
-    for (int i = 0; i < 13; i++)
-    {
-      if (meter_data.history[i] == 0)
-        break;
-      num_history++;
-    }
+    const uint32_t currentVolume = static_cast<uint32_t>(meter_data.volume);
 
-    // If the history block was marked available but contained no
-    // non‑zero entries, treat it as unavailable for this frame.
-    if (num_history == 0)
-    {
-      TS_PRINTLN("[WARN] history_available=true but no non-zero history entries found - skipping history publish for this frame");
-      meter_data.history_available = false;
-    }
-  }
+    // Human-readable table to the serial console
+    MeterHistory::printToSerial(meter_data.history, currentVolume, "[HISTORY]");
 
-  if (meter_data.history_available)
-  {
-
-    Serial.printf("\n=== HISTORICAL DATA (%d months) ===\n", num_history);
-    TS_PRINTLN("[HISTORY] Month  Volume (L)  Usage (L)");
-    TS_PRINTLN("[HISTORY] -----  ----------  ---------");
-
-    // Calculate monthly consumption from the historical data
-    // Format: {"history": [oldest_volume, ..., newest_volume], "monthly_usage": [month1_usage, ..., month13_usage]}
-    // The attributes JSON can become relatively large when all 13 history
-    // slots are populated. Use a sufficiently large buffer and carefully
-    // track remaining space to avoid truncation that would yield malformed
-    // JSON on MQTT.
+    // Build and publish the JSON attributes payload
     char historyJson[1024];
-    int pos = 0;
-
-    // Start JSON object
-    int remaining = sizeof(historyJson) - pos;
-    if (remaining <= 1)
+    int written = MeterHistory::generateHistoryJson(meter_data.history, currentVolume,
+                                                    historyJson, sizeof(historyJson));
+    if (written > 0)
     {
-      TS_PRINTLN("[ERROR] historyJson buffer too small before writing header - skipping history publish");
-      // Nothing written, just bail out of history publishing for this frame.
-      return;
-    }
-    pos += snprintf(historyJson + pos, remaining, "{\"history\":[");
-
-    // Add historical volumes and print to serial
-    for (int i = 0; i < num_history; i++)
-    {
-      remaining = sizeof(historyJson) - pos;
-      if (remaining <= 1)
-      {
-        TS_PRINTLN("[ERROR] historyJson buffer full while writing history array - truncating");
-        break;
-      }
-      pos += snprintf(historyJson + pos, remaining, "%s%u",
-                      (i > 0 ? "," : ""), meter_data.history[i]);
-
-      // Calculate and display monthly usage
-      uint32_t usage = 0;
-      if (i > 0 && meter_data.history[i] > meter_data.history[i - 1])
-      {
-        usage = meter_data.history[i] - meter_data.history[i - 1];
-      }
-      TS_PRINTF("[HISTORY]  -%02d   %10u  %9u\n", num_history - i, meter_data.history[i], usage);
-    }
-
-    // Calculate current month usage (difference from most recent historical reading).
-    // Declare these outside of any goto targets to avoid crossing initialisation
-    // when jumping to finalize_history_json.
-    uint32_t currentMonthUsage = 0;
-    uint32_t currentVolume = static_cast<uint32_t>(meter_data.volume);
-    if (num_history > 0 && currentVolume > meter_data.history[num_history - 1])
-    {
-      currentMonthUsage = currentVolume - meter_data.history[num_history - 1];
-    }
-    TS_PRINTF("[HISTORY]   Now  %10u  %9u (current month usage: %u L)\n", currentVolume, currentMonthUsage, currentMonthUsage);
-    Serial.println("===================================\n");
-
-    // Add monthly usage calculations to JSON
-    remaining = sizeof(historyJson) - pos;
-    if (remaining <= 1)
-    {
-      TS_PRINTLN("[ERROR] historyJson buffer full before monthly_usage - truncating");
-      // Close what we have so far and publish best-effort JSON.
-      historyJson[sizeof(historyJson) - 1] = '\0';
-      TS_PRINTF("[MQTT] Publishing JSON attributes (%d bytes): %s\n\n", strlen(historyJson), historyJson);
+      TS_PRINTF("[MQTT] Publishing JSON attributes (%d bytes): %s\n\n", written, historyJson);
       mqtt.publish(String(mqttBaseTopic) + "/liters_attributes", historyJson, true);
       delay(5);
+
+      HistoryStats stats = MeterHistory::calculateStats(meter_data.history, currentVolume);
       TS_PRINTF("[MQTT] Published %d months historical data (current month usage: %u L)\n",
-                    num_history, currentMonthUsage);
-      goto skip_history_publish;
+                stats.monthCount, stats.currentMonthUsage);
     }
-    pos += snprintf(historyJson + pos, remaining, "],\"monthly_usage\":[");
-    for (int i = 0; i < num_history; i++)
+    else
     {
-      uint32_t usage;
-      if (i == 0)
-      {
-        // For oldest month, we can't calculate usage without an older baseline
-        usage = 0;
-      }
-      else if (meter_data.history[i] > meter_data.history[i - 1])
-      {
-        // Calculate consumption as difference between consecutive months
-        usage = meter_data.history[i] - meter_data.history[i - 1];
-      }
-      else
-      {
-        usage = 0; // Sanity check - shouldn't go backwards
-      }
-      remaining = sizeof(historyJson) - pos;
-      if (remaining <= 1)
-      {
-        TS_PRINTLN("[ERROR] historyJson buffer full while writing monthly_usage - truncating");
-        break;
-      }
-      pos += snprintf(historyJson + pos, remaining, "%s%u",
-                      (i > 0 ? "," : ""), usage);
+      TS_PRINTLN("[WARN] No historical data JSON generated - skipping history publish for this frame");
     }
-
-    remaining = sizeof(historyJson) - pos;
-    if (remaining <= 1)
-    {
-      TS_PRINTLN("[ERROR] historyJson buffer full before tail - truncating");
-      historyJson[sizeof(historyJson) - 1] = '\0';
-      TS_PRINTF("[MQTT] Publishing JSON attributes (%d bytes): %s\n\n", strlen(historyJson), historyJson);
-      mqtt.publish(String(mqttBaseTopic) + "/liters_attributes", historyJson, true);
-      delay(5);
-      TS_PRINTF("[MQTT] Published %d months historical data (current month usage: %u L)\n",
-                    num_history, currentMonthUsage);
-      goto skip_history_publish;
-    }
-    pos += snprintf(historyJson + pos, remaining,
-                    "],\"current_month_usage\":%u,\"months_available\":%d}",
-                    currentMonthUsage, num_history);
-
-    // Ensure null termination even if we had to truncate early.
-    historyJson[sizeof(historyJson) - 1] = '\0';
-
-    TS_PRINTF("[MQTT] Publishing JSON attributes (%d bytes): %s\n\n", strlen(historyJson), historyJson);
-    mqtt.publish(String(mqttBaseTopic) + "/liters_attributes", historyJson, true);
-    delay(5);
-
-    TS_PRINTF("[MQTT] Published %d months historical data (current month usage: %u L)\n",
-                  num_history, currentMonthUsage);
   }
-
-skip_history_publish:;
 
   snprintf(valueBuffer, sizeof(valueBuffer), "%d", meter_data.reads_counter);
   mqtt.publish(String(mqttBaseTopic) + "/counter", valueBuffer, true);
