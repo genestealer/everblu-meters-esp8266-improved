@@ -23,9 +23,7 @@ from esphome.core import CORE
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-COMPONENT_INIT = (
-    REPO_ROOT / "ESPHOME" / "components" / "everblu_meter" / "__init__.py"
-)
+COMPONENT_INIT = REPO_ROOT / "ESPHOME" / "components" / "everblu_meter" / "__init__.py"
 
 
 def _load_component():
