@@ -110,3 +110,13 @@ Four bugs identified during the Copilot review of this PR were fixed before merg
 - **Boot-uptime timestamp showed `[boot+0s]`**: `everblu_log_timestamp()` used `time()` for the pre-NTP branch, which returns 0 before the clock is set. Fixed to use `millis()/1000` (actual seconds since reset); static buffer enlarged from 16 to 20 bytes to prevent truncation.
 - **Deep scan quality guard treated 0.0 kHz calibration as "no prior calibration"**: the guard used `previousOffset == 0.0f` to bypass quality comparison, but `begin()` assigns `s_storedOffset = 0.0f` for both "nothing saved" and "saved value is 0.0". A `s_hasStoredCalibration` flag (set by `begin()` and `saveFrequencyOffset()`) is now used instead.
 - **Serial history table month labels off by one**: `printToSerial()` labelled the oldest entry as `-13` when `monthCount=13`. Formula changed from `monthCount − i` to `monthCount − 1 − i`, consistent with `getMonthLabel()`.
+
+### Test Coverage Improvements (PR #125)
+
+Codecov coverage now tracks three platform-neutral core files (`crc_kermit.cpp`, `radian_parser.cpp`, `radian_decoder.cpp`). New native unit tests raise patch and project coverage by exercising previously-missed branches:
+
+- **`radian_decode_4bitpbit()`**: single-sample glitch recovery, decoded-buffer truncation, framing-error rejection, framing-error-during-truncation, and no-transition input.
+- **`radian_validate_crc()`**: valid/corrupt CRC, NULL, undersized, short/long length-field, and implicit-length (`length_field == 0`) frames — previously only covered indirectly via optional captured fixtures.
+- **`radian_parse_primary_data()`**: `out == NULL`, `decoded == NULL`, `size < 30`, battery/counter `0xFF` sentinels, and the `30 <= size < 49` path.
+
+The only remaining uncovered lines are genuinely defensive: an unreachable bounds guard (both byte-increment sites already return when the buffer fills) and the `framing_errors < 255` saturation branch (needs 255+ framing errors in one frame).
