@@ -78,7 +78,9 @@ Existing YAML keys and MQTT topic names used by prior versions will no longer tr
 	- Python unit tests (`tests/esphome/test_validators.py`, 27 cases) calling the validators directly.
 	- New CI jobs `negative-validation` and `python-unit-tests` in the ESPHome external-component workflow.
 
-### Linked PRs Included In This Release Branch
+### CI/Tooling: ESPHOME-release Auto-Sync On pre-commit.ci
+
+- **New `esphome-release-sync` pre-commit hook** (`.pre-commit-config.yaml`): re-runs `ESPHOME/prepare-component-release.sh` whenever `src/`, `ESPHOME/components/everblu_meter/`, or the release script changes. Because pre-commit.ci autofix hooks (`ruff`, `clang-format`) rewrite source files, the generated `ESPHOME-release/` tree could drift out of sync and fail the "ESPHOME Sync Check" job. The new hook makes pre-commit.ci regenerate and commit `ESPHOME-release/` alongside its autofixes, keeping the check green. Verified in the cloud: pre-commit.ci's autofix commit on PR #125 regenerated `ESPHOME-release/everblu_meter/__init__.py`, which also corrected a pre-existing formatting drift (a missing blank line vs. its source).
 
 - #105
 - #106
