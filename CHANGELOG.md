@@ -793,4 +793,3 @@ metadata_status: inferred_from_changelog
 ---
 
 Format inspired by Keep a Changelog. For full details, see the Git commit history and GitHub Releases.
-
