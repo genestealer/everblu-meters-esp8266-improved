@@ -46,3 +46,9 @@ When working on `ESPHOME/components/everblu_meter/`, follow the upstream ESPHome
 ## General coding-behavior guidelines
 
 See [SKILL.md](../SKILL.md) for general LLM coding-behavior guidelines (surgical changes, simplicity-first, verify-before-done).
+
+## Writing style (docs and comments)
+
+- Do not use em dashes (—). Rewrite the sentence, or use a colon, comma, parentheses, or separate sentences instead.
+- Avoid patterns that read as AI-generated text. See [Wikipedia: Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing) for the tells to avoid (for example: puffery, hollow "not only... but also" constructions, overuse of "moreover"/"furthermore", vague attributions, and needless summary sections).
+- Prefer plain, direct language that matches the surrounding text.
