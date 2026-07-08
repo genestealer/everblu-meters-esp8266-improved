@@ -1663,6 +1663,22 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
   if (GET_GDO2_PIN() >= 0)
     halRfWriteReg(IOCFG2, IOCFG2_TX_FIFO_THR);
 
+  // Restore the 2.4 kbps data rate for this transmit phase. receive_radian_frame()
+  // reprograms MDMCFG4 to MDMCFG4_RX_BW_58KHZ_9_6KBPS (0xF8) for its 4x-oversampled
+  // RX stage, which raises the data-rate exponent to 9.6 kbps. cc1101_init() leaves
+  // MDMCFG4 at the 2.4 kbps value, so the FIRST read after boot transmits correctly,
+  // but every subsequent read would otherwise inherit the stale 9.6 kbps rate and
+  // clock the wake-up burst out 4x too fast - draining the pre-filled TX FIFO in
+  // ~47ms and triggering TXFIFO_UNDERFLOW after ~60ms instead of the full ~2s burst.
+  // Only the DRATE_E (low) nibble of MDMCFG4 sets the data rate; the upper CHANBW
+  // nibble is RX-only, so preserve it via read-modify-write and rewrite just the
+  // low nibble to the 2.4 kbps exponent. This makes every attempt transmit at 2.4 kbps.
+  // See: https://github.com/genestealer/everblu-meters-esp8266-improved/issues/127
+  uint8_t mdmcfg4 = halRfReadReg(MDMCFG4);
+  mdmcfg4 = (mdmcfg4 & 0xF0) | (MDMCFG4_RX_BW_270KHZ & 0x0F); // DRATE_E -> 2.4 kbps
+  halRfWriteReg(MDMCFG4, mdmcfg4);               // TX data rate exponent: 2.4 kbps
+  halRfWriteReg(MDMCFG3, MDMCFG3_DRATE_2_4KBPS); // TX data rate mantissa: 2.4 kbps
+
   halRfWriteReg(MDMCFG2, MDMCFG2_NO_PREAMBLE_SYNC);  // No preamble/sync for WUP
   halRfWriteReg(PKTCTRL0, PKTCTRL0_INFINITE_LENGTH); // Infinite packet length
 
