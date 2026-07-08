@@ -17,7 +17,7 @@ Releases are created manually by tagging commits with version tags matching `v*.
 
 ### Fixed
 
-- **Wake-up burst truncated to ~60ms on the second and later reads** ([#127](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/127)): `receive_radian_frame()` reprograms `MDMCFG4` to its 4x-oversampled 9.6 kbps RX rate, and `get_meter_data_for_meter()` never restored the 2.4 kbps TX data rate before transmitting. The first read after boot worked because `cc1101_init()` had just set 2.4 kbps, but every subsequent read inherited the stale 9.6 kbps rate and clocked the wake-up burst out 4x too fast — draining the pre-filled TX FIFO in ~47ms and hitting `TXFIFO_UNDERFLOW` (MARCSTATE 0x16) after ~60ms instead of sending the full ~2s burst. The TX phase now rewrites `MDMCFG4`/`MDMCFG3` to 2.4 kbps on every read, so retries transmit the complete wake-up burst.
+- **Wake-up burst truncated to ~60ms on the second and later reads** ([#127](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/127)): `receive_radian_frame()` switches `MDMCFG4` to the 4x-oversampled 9.6 kbps RX rate, but `get_meter_data_for_meter()` never restored the 2.4 kbps TX rate before transmitting. Only the first read after boot worked (fresh from `cc1101_init()`); every later read clocked the wake-up burst out 4x too fast, draining the TX FIFO and hitting `TXFIFO_UNDERFLOW` (MARCSTATE 0x16) after ~60ms instead of the full ~2s burst. The TX phase now rewrites `MDMCFG4`/`MDMCFG3` to 2.4 kbps on every read.
 
 
 
