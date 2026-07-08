@@ -33,50 +33,70 @@ Integrated with Home Assistant via MQTT AutoDiscovery and ESPHome external compo
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**
 
-  - [**ESPHome** - Release V3.0.0](#esphome---release-v300)
-- [Features](#features)
-  - [Full feature list](#full-feature-list)
-  - [Advanced Frame Validation](#advanced-frame-validation)
-- [Integration Options](#integration-options)
-  - [Option 1: ESPHome Component (Recommended)](#option-1-esphome-component-recommended)
-  - [Option 2: Standalone with MQTT](#option-2-standalone-with-mqtt)
-- [Quick Start: First Successful Reading](#quick-start-first-successful-reading)
-  - [1. Hardware you need](#1-hardware-you-need)
-  - [2. Files you must edit](#2-files-you-must-edit)
-  - [Meter Type Configuration](#meter-type-configuration)
-  - [3. Build and upload the firmware](#3-build-and-upload-the-firmware)
-- [Hardware](#hardware)
-  - [Connections (ESP32/ESP8266 to CC1101)](#connections-esp32esp8266-to-cc1101)
-  - [CC1101](#cc1101)
-- [MQTT Integration](#mqtt-integration)
-- [Multiple Devices](#multiple-devices)
-- [Home Assistant Best Practice: Utility Meter Helper](#home-assistant-best-practice-utility-meter-helper)
-  - [Migrating Sensor History Between Platforms](#migrating-sensor-history-between-platforms)
-  - [Historical Data from Meter](#historical-data-from-meter)
-- [Configuration](#configuration)
-  - [Local Development Setup](#local-development-setup)
-  - [Reading Schedule](#reading-schedule)
-  - [Time zone offset and wake-up window (simple)](#time-zone-offset-and-wake-up-window-simple)
-  - [Home Assistant Discovery Toggle (MQTT mode)](#home-assistant-discovery-toggle-mqtt-mode)
-  - [Radio and frequency (advanced)](#radio-and-frequency-advanced)
-  - [Frequency Configuration](#frequency-configuration)
-  - [Adaptive Frequency Management](#adaptive-frequency-management)
-- [Troubleshooting](#troubleshooting)
-  - [Meter reads fail — near-field RF saturation (device too close to meter)](#meter-reads-fail--near-field-rf-saturation-device-too-close-to-meter)
-  - [Corrupted or Invalid Volume Readings](#corrupted-or-invalid-volume-readings)
-  - [ESP32 build: ModuleNotFoundError: No module named 'intelhex'](#esp32-build-modulenotfounderror-no-module-named-intelhex)
-  - [ESP32 compile errors about ESP8266 headers](#esp32-compile-errors-about-esp8266-headers)
-  - [Frequency Adjustment](#frequency-adjustment)
-  - [Business Hours](#business-hours)
-  - [Serial Number Starting with 0](#serial-number-starting-with-0)
-  - [Distance Between Device and Meter](#distance-between-device-and-meter)
-- [Important: Utility Read Counter Compatibility](#important-utility-read-counter-compatibility)
-  - [Recommended Actions](#recommended-actions)
-- [Credits](#credits)
-- [Legal Notice](#legal-notice)
-  - [Community Resources](#community-resources)
+- [Itron EverBlu Cyble Enhanced RF RADIAN Water/Gas Usage Data for MQTT Home Assistant \& ESPHome External Component](#itron-everblu-cyble-enhanced-rf-radian-watergas-usage-data-for-mqtt-home-assistant--esphome-external-component)
+  - [Build \& QA](#build--qa)
+  - [Platforms \& Capabilities](#platforms--capabilities)
+    - [**ESPHome** - Release V3.0.0](#esphome---release-v300)
+  - [Features](#features)
+    - [Full feature list](#full-feature-list)
+    - [Advanced Frame Validation](#advanced-frame-validation)
+  - [Integration Options](#integration-options)
+    - [Option 1: ESPHome Component (Recommended)](#option-1-esphome-component-recommended)
+    - [Option 2: Standalone with MQTT](#option-2-standalone-with-mqtt)
+    - [Quick Start: First Successful Reading](#quick-start-first-successful-reading)
+      - [1. Hardware you need](#1-hardware-you-need)
+      - [2. Files you must edit](#2-files-you-must-edit)
+      - [Meter Type Configuration](#meter-type-configuration)
+        - [Gas Meter Volume Divisor](#gas-meter-volume-divisor)
+          - [How We Determined the Correct Divisor](#how-we-determined-the-correct-divisor)
+      - [3. Build and upload the firmware](#3-build-and-upload-the-firmware)
+        - [First-time USB Upload](#first-time-usb-upload)
+        - [Over-The-Air (OTA) Updates](#over-the-air-ota-updates)
+  - [Hardware](#hardware)
+    - [Connections (ESP32/ESP8266 to CC1101)](#connections-esp32esp8266-to-cc1101)
+      - [Pin Mapping Reference](#pin-mapping-reference)
+      - [Important Notes](#important-notes)
+      - [Wiring Table](#wiring-table)
+      - [Regulatory Notes](#regulatory-notes)
+      - [Quick Reference: Wemos D1 Mini](#quick-reference-wemos-d1-mini)
+      - [Quick Reference: Adafruit Feather HUZZAH ESP8266](#quick-reference-adafruit-feather-huzzah-esp8266)
+      - [Quick Reference: ESP32 DevKit (esp32dev)](#quick-reference-esp32-devkit-esp32dev)
+      - [Adafruit Feather HUZZAH Silkscreen Labels](#adafruit-feather-huzzah-silkscreen-labels)
+      - [HUZZAH Boot-Strap Pins and Red LED (GPIO #0)](#huzzah-boot-strap-pins-and-red-led-gpio-0)
+    - [CC1101](#cc1101)
+  - [MQTT Integration](#mqtt-integration)
+  - [Multiple Devices](#multiple-devices)
+  - [Home Assistant Best Practice: Utility Meter Helper](#home-assistant-best-practice-utility-meter-helper)
+    - [Migrating Sensor History Between Platforms](#migrating-sensor-history-between-platforms)
+    - [Historical Data from Meter](#historical-data-from-meter)
+  - [Configuration](#configuration)
+    - [Local Development Setup](#local-development-setup)
+    - [Reading Schedule](#reading-schedule)
+    - [Time zone offset and wake-up window (simple)](#time-zone-offset-and-wake-up-window-simple)
+    - [Home Assistant Discovery Toggle (MQTT mode)](#home-assistant-discovery-toggle-mqtt-mode)
+    - [Radio and frequency (advanced)](#radio-and-frequency-advanced)
+    - [Frequency Configuration](#frequency-configuration)
+      - [How it works](#how-it-works)
+      - [Example](#example)
+    - [Adaptive Frequency Management](#adaptive-frequency-management)
+      - [When to clear EEPROM](#when-to-clear-eeprom)
+  - [Troubleshooting](#troubleshooting)
+    - [Meter reads fail — near-field RF saturation (device too close to meter)](#meter-reads-fail--near-field-rf-saturation-device-too-close-to-meter)
+    - [Corrupted or Invalid Volume Readings](#corrupted-or-invalid-volume-readings)
+    - [ESP32 build: ModuleNotFoundError: No module named 'intelhex'](#esp32-build-modulenotfounderror-no-module-named-intelhex)
+    - [ESP32 compile errors about ESP8266 headers](#esp32-compile-errors-about-esp8266-headers)
+    - [Frequency Adjustment](#frequency-adjustment)
+    - [Business Hours](#business-hours)
+    - [Serial Number Starting with 0](#serial-number-starting-with-0)
+    - [Distance Between Device and Meter](#distance-between-device-and-meter)
+  - [Important: Utility Read Counter Compatibility](#important-utility-read-counter-compatibility)
+    - [Recommended Actions](#recommended-actions)
+  - [Credits](#credits)
+  - [Legal Notice](#legal-notice)
+    - [Community Resources](#community-resources)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 
 
 
@@ -203,6 +223,9 @@ Examples: use the ready-made ESPHome configs:
 
 ### Option 2: Standalone with MQTT
 
+<details>
+<summary>Expand: standalone MQTT setup and first-reading quick start</summary>
+
 **Best for**: Users who want direct control, custom builds, or already use MQTT extensively.
 
 - Full control over firmware
@@ -212,9 +235,9 @@ Examples: use the ready-made ESPHome configs:
 
 **Quick start**: Edit `include/private.h` and build with PlatformIO (see below).
 
-## Quick Start: First Successful Reading
+### Quick Start: First Successful Reading
 
-### 1. Hardware you need
+#### 1. Hardware you need
 
 - ESP8266 (HUZZAH / Wemos D1 Mini) or ESP32 DevKit.
 - CC1101 433 MHz RF module (3.3V only).
@@ -222,7 +245,7 @@ Examples: use the ready-made ESPHome configs:
 
 See the Hardware section below for full wiring tables and pictures.
 
-### 2. Files you must edit
+#### 2. Files you must edit
 
 - `include/private.h` (copy from `include/private.example.h`):
   - Wi‑Fi SSID/password
@@ -237,7 +260,7 @@ See the Hardware section below for full wiring tables and pictures.
   - `WIFI_SERIAL_MONITOR_ENABLED` - set to `1` to enable WiFi serial monitor for remote debugging (default is `0` for security)
 - `platformio.ini`: select `env:huzzah` (ESP8266 HUZZAH) or `env:esp32dev` (ESP32 DevKit).
 
-### Meter Type Configuration
+#### Meter Type Configuration
 
 This project supports both **water meters** and **gas meters**. The main differences are:
 
@@ -254,7 +277,7 @@ To configure your meter type, set `METER_TYPE` in `include/private.h`:
 #define METER_TYPE "gas"    // For gas meters
 ```
 
-#### Gas Meter Volume Divisor
+##### Gas Meter Volume Divisor
 
 For gas meters, this firmware assumes an internal count in liter-equivalents and converts those values to cubic meters (m³) before publishing to Home Assistant. If your gas meter uses a different base unit or scaling, you may need to adjust the meter configuration or conversion logic accordingly.
 
@@ -270,7 +293,7 @@ The conversion uses a configurable **gas volume divisor** that can be set in `in
 - `100`: 0.01 m³ per unit (typical for modern EverBlu Cyble gas modules)
 - `1000`: 0.001 m³ per unit (0.1 L per unit, less common)
 
-##### How We Determined the Correct Divisor
+###### How We Determined the Correct Divisor
 
 <details>
 <summary>Background: empirical derivation of the 0.01 m³/unit pulse weight</summary>
@@ -290,9 +313,9 @@ The gap of ~11 m³ is consistent with the assumption that the EverBlu module was
 
 **If your readings seem incorrect:** Verify your specific meter's pulse weight (often printed on the device label) and adjust `GAS_VOLUME_DIVISOR` accordingly.
 
-### 3. Build and upload the firmware
+#### 3. Build and upload the firmware
 
-#### First-time USB Upload
+##### First-time USB Upload
 
 1. Wire the CC1101 to your board as shown in the Hardware section.
 2. Connect the board to your computer via USB.
@@ -311,7 +334,7 @@ The gap of ~11 m³ is consistent with the assumption that the EverBlu module was
 7. On first boot, wait up to ~2 minutes while the automatic wide frequency scan runs (serial monitor will show progress).
 8. Once the scan finishes, you should see meter data in the serial monitor and MQTT topics `everblu/cyble/{PARSED_SERIAL}/...` on your broker/Home Assistant.
 
-#### Over-The-Air (OTA) Updates
+##### Over-The-Air (OTA) Updates
 
 Once your device is running and connected to Wi-Fi, you can update it wirelessly:
 
@@ -333,6 +356,8 @@ Once your device is running and connected to Wi-Fi, you can update it wirelessly
 5. The firmware will be uploaded over your Wi-Fi network.
 
 > **Note**: You can find your device's IP address in the serial monitor output at startup, or check your router's DHCP client list, or look at the `everblu/cyble/{PARSED_SERIAL}/wifi_ip` MQTT topic in Home Assistant.
+
+</details>
 
 ---
 
@@ -615,6 +640,9 @@ Both MQTT and ESPHome modes expose a **history sensor** containing 12 months of 
 
 ## Configuration
 
+<details>
+<summary>Expand: full configuration reference</summary>
+
 ### Local Development Setup
 
 1. **Install Required Tools**
@@ -854,6 +882,8 @@ Upload, let it boot once (wide scan runs), then set it back to:
 ```
 
 See `ADAPTIVE_FREQUENCY_FEATURES.md` for deeper technical notes.
+
+</details>
 
 </details>
 
