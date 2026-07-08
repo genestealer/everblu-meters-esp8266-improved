@@ -29,20 +29,56 @@ Integrated with Home Assistant via MQTT AutoDiscovery and ESPHome external compo
 
 ---
 
-## Table of Contents
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**
 
+  - [**ESPHome** - Release V3.0.0](#esphome---release-v300)
 - [Features](#features)
+  - [Full feature list](#full-feature-list)
+  - [Advanced Frame Validation](#advanced-frame-validation)
 - [Integration Options](#integration-options)
+  - [Option 1: ESPHome Component (Recommended)](#option-1-esphome-component-recommended)
+  - [Option 2: Standalone with MQTT](#option-2-standalone-with-mqtt)
 - [Quick Start: First Successful Reading](#quick-start-first-successful-reading)
+  - [1. Hardware you need](#1-hardware-you-need)
+  - [2. Files you must edit](#2-files-you-must-edit)
+  - [Meter Type Configuration](#meter-type-configuration)
+  - [3. Build and upload the firmware](#3-build-and-upload-the-firmware)
 - [Hardware](#hardware)
+  - [Connections (ESP32/ESP8266 to CC1101)](#connections-esp32esp8266-to-cc1101)
+  - [CC1101](#cc1101)
 - [MQTT Integration](#mqtt-integration)
 - [Multiple Devices](#multiple-devices)
 - [Home Assistant Best Practice: Utility Meter Helper](#home-assistant-best-practice-utility-meter-helper)
+  - [Migrating Sensor History Between Platforms](#migrating-sensor-history-between-platforms)
+  - [Historical Data from Meter](#historical-data-from-meter)
 - [Configuration](#configuration)
+  - [Local Development Setup](#local-development-setup)
+  - [Reading Schedule](#reading-schedule)
+  - [Time zone offset and wake-up window (simple)](#time-zone-offset-and-wake-up-window-simple)
+  - [Home Assistant Discovery Toggle (MQTT mode)](#home-assistant-discovery-toggle-mqtt-mode)
+  - [Radio and frequency (advanced)](#radio-and-frequency-advanced)
+  - [Frequency Configuration](#frequency-configuration)
+  - [Adaptive Frequency Management](#adaptive-frequency-management)
 - [Troubleshooting](#troubleshooting)
-- [Utility Read Counter Compatibility](#important-utility-read-counter-compatibility)
+  - [Meter reads fail — near-field RF saturation (device too close to meter)](#meter-reads-fail--near-field-rf-saturation-device-too-close-to-meter)
+  - [Corrupted or Invalid Volume Readings](#corrupted-or-invalid-volume-readings)
+  - [ESP32 build: ModuleNotFoundError: No module named 'intelhex'](#esp32-build-modulenotfounderror-no-module-named-intelhex)
+  - [ESP32 compile errors about ESP8266 headers](#esp32-compile-errors-about-esp8266-headers)
+  - [Frequency Adjustment](#frequency-adjustment)
+  - [Business Hours](#business-hours)
+  - [Serial Number Starting with 0](#serial-number-starting-with-0)
+  - [Distance Between Device and Meter](#distance-between-device-and-meter)
+- [Important: Utility Read Counter Compatibility](#important-utility-read-counter-compatibility)
+  - [Recommended Actions](#recommended-actions)
 - [Credits](#credits)
 - [Legal Notice](#legal-notice)
+  - [Community Resources](#community-resources)
+
+<!-- END doctoc -->
+
+
 
 ---
 
@@ -531,6 +567,8 @@ utility_meter:
 ```
 
 When you change platforms or meters, simply update the `source` to point to the new sensor - your history remains unbroken.
+
+### Migrating Sensor History Between Platforms
 
 **Migrating from MQTT to ESPHome (or replacing hardware)?** A utility meter helper protects future data, but it does not move the history that already accumulated on your *old* sensor onto the *new* one. To merge the past readings from the old entity into the new entity (both raw states and long-term statistics for the Energy dashboard), use the [HA Merge Sensor History](https://github.com/mayerwin/HA-Merge-Sensor-History) custom component. It imports the older history in front of the new sensor in a single atomic, idempotent transaction, so your consumption graphs and lifetime totals stay continuous across the switch. Back up your recorder database first.
 

@@ -2,59 +2,64 @@
 
 Complete ESPHome custom component for reading EverBlu Cyble Enhanced water and gas meters. This integration connects to Home Assistant without requiring an MQTT broker.
 
-## Table of Contents
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**
 
-- [ESPHome Integration for EverBlu Cyble Enhanced Meters](#esphome-integration-for-everblu-cyble-enhanced-meters)
-  - [Table of Contents](#table-of-contents)
-  - [Troubleshooting](#troubleshooting)
-    - [Corrupted or Invalid Volume Readings](#corrupted-or-invalid-volume-readings)
-    - [No Meter Response](#no-meter-response)
-    - [Signal Quality Issues](#signal-quality-issues)
-  - [Documentation](#documentation)
-    - [For End Users](#for-end-users)
-    - [For Developers](#for-developers)
-  - [Quick Start](#quick-start)
-  - [Breaking Change: SPI Configuration Required](#breaking-change-spi-configuration-required)
-    - [1. Use as External Component](#1-use-as-external-component)
-    - [2. Build and Upload](#2-build-and-upload)
-  - [ESPHome Device Builder (Visual Dashboard)](#esphome-device-builder-visual-dashboard)
-  - [Board-Specific Configuration](#board-specific-configuration)
-    - [Arduino Nano ESP32 (ESP32S3)](#arduino-nano-esp32-esp32s3)
-    - [Other ESP32 Boards](#other-esp32-boards)
-  - [Configuration Reference](#configuration-reference)
-    - [Key Parameters](#key-parameters)
-    - [Schedule Options](#schedule-options)
-    - [Custom Schedule Example](#custom-schedule-example)
-    - [Logging](#logging)
-    - [Timezone Adjustment](#timezone-adjustment)
-  - [Features](#features)
-  - [Example Configurations](#example-configurations)
-  - [Hardware Requirements](#hardware-requirements)
-    - [Wiring (ESP8266 D1 Mini)](#wiring-esp8266-d1-mini)
-    - [Wiring (ESP32)](#wiring-esp32)
-  - [Benefits](#benefits)
-    - [vs. Standalone MQTT Mode](#vs-standalone-mqtt-mode)
-    - [ESPHome Mode Advantages](#esphome-mode-advantages)
-  - [Home Assistant Best Practice: Utility Meter Helper](#home-assistant-best-practice-utility-meter-helper)
-    - [Historical Data from Meter](#historical-data-from-meter)
-  - [Architecture](#architecture)
-  - [Available Sensors](#available-sensors)
-    - [Numeric Sensors](#numeric-sensors)
-    - [Text Sensors](#text-sensors)
-    - [Binary Sensors](#binary-sensors)
-    - [Control Buttons](#control-buttons)
-  - [Common Configuration Patterns](#common-configuration-patterns)
-    - [Water Meter - Basic](#water-meter---basic)
-    - [Gas Meter - Basic](#gas-meter---basic)
-    - [With Full Monitoring](#with-full-monitoring)
-  - [Quick Troubleshooting](#quick-troubleshooting)
-    - [Quick Fixes](#quick-fixes)
-  - [License](#license)
-  - [Credits](#credits)
-  - [Links](#links)
-  - [Development: Code Style \& Formatting](#development-code-style--formatting)
-    - [Running the formatter](#running-the-formatter)
-    - [Linting \& pre-commit](#linting--pre-commit)
+- [Troubleshooting](#troubleshooting)
+  - [Corrupted or Invalid Volume Readings](#corrupted-or-invalid-volume-readings)
+  - [No Meter Response](#no-meter-response)
+  - [Signal Quality Issues](#signal-quality-issues)
+- [Documentation](#documentation)
+  - [For End Users](#for-end-users)
+  - [For Developers](#for-developers)
+- [Quick Start](#quick-start)
+- [Breaking Change: SPI Configuration Required](#breaking-change-spi-configuration-required)
+  - [1. Use as External Component](#1-use-as-external-component)
+  - [2. Build and Upload](#2-build-and-upload)
+- [ESPHome Device Builder (Visual Dashboard)](#esphome-device-builder-visual-dashboard)
+- [Board-Specific Configuration](#board-specific-configuration)
+  - [Arduino Nano ESP32 (ESP32S3)](#arduino-nano-esp32-esp32s3)
+  - [Other ESP32 Boards](#other-esp32-boards)
+- [Configuration Reference](#configuration-reference)
+  - [Key Parameters](#key-parameters)
+  - [Schedule Options](#schedule-options)
+  - [Custom Schedule Example](#custom-schedule-example)
+  - [Logging](#logging)
+  - [Timezone Adjustment](#timezone-adjustment)
+- [Features](#features)
+- [Example Configurations](#example-configurations)
+- [Hardware Requirements](#hardware-requirements)
+  - [Wiring (ESP8266 D1 Mini)](#wiring-esp8266-d1-mini)
+  - [Wiring (ESP32)](#wiring-esp32)
+- [Benefits](#benefits)
+  - [vs. Standalone MQTT Mode](#vs-standalone-mqtt-mode)
+  - [ESPHome Mode Advantages](#esphome-mode-advantages)
+- [Home Assistant Best Practice: Utility Meter Helper](#home-assistant-best-practice-utility-meter-helper)
+  - [Migrating Sensor History Between Platforms](#migrating-sensor-history-between-platforms)
+  - [Historical Data from Meter](#historical-data-from-meter)
+- [Architecture](#architecture)
+- [Available Sensors](#available-sensors)
+  - [Numeric Sensors](#numeric-sensors)
+  - [Text Sensors](#text-sensors)
+  - [Binary Sensors](#binary-sensors)
+  - [Control Buttons](#control-buttons)
+- [Common Configuration Patterns](#common-configuration-patterns)
+  - [Water Meter - Basic](#water-meter---basic)
+  - [Gas Meter - Basic](#gas-meter---basic)
+  - [With Full Monitoring](#with-full-monitoring)
+- [Quick Troubleshooting](#quick-troubleshooting)
+  - [Quick Fixes](#quick-fixes)
+- [License](#license)
+- [Credits](#credits)
+- [Links](#links)
+- [Development: Code Style & Formatting](#development-code-style--formatting)
+  - [Running the formatter](#running-the-formatter)
+  - [Linting & pre-commit](#linting--pre-commit)
+
+<!-- END doctoc -->
+
+
 
 ## Troubleshooting
 
@@ -495,6 +500,8 @@ utility_meter:
 ```
 
 When changing platforms or meters, update only the `source` - your history stays intact!
+
+### Migrating Sensor History Between Platforms
 
 **Migrating from MQTT to ESPHome (or replacing hardware)?** A utility meter helper protects future data, but it does not move the history that already accumulated on your *old* sensor onto the *new* one. To merge the past readings from the old entity into the new entity (both raw states and long-term statistics for the Energy dashboard), use the [HA Merge Sensor History](https://github.com/mayerwin/HA-Merge-Sensor-History) custom component. It imports the older history in front of the new sensor in a single atomic, idempotent transaction, so your consumption graphs and lifetime totals stay continuous across the switch. Back up your recorder database first.
 
