@@ -1,95 +1,192 @@
-# EverBlu Meter — ESPHome External Component
+# ESPHome Integration for EverBlu Cyble Enhanced Meters
 
-[![Contributors][contributors-shield]][contributors-url]
-[![Forks][forks-shield]][forks-url]
-[![Stargazers][stars-shield]][stars-url]
-[![Issues][issues-shield]][issues-url]
-[![MIT License][license-shield]][license-url]
-
-Native ESPHome integration for reading EverBlu Cyble Enhanced water & gas meters — no MQTT broker required.
-
-- [Explore the docs](docs/ESPHOME_INTEGRATION_GUIDE.md)
-- [View Examples](example-water-meter.yaml)
-- [Report Bug](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/new?labels=bug)
-- [Request Feature](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/new?labels=enhancement)
+Complete ESPHome custom component for reading EverBlu Cyble Enhanced water and gas meters. This integration connects to Home Assistant without requiring an MQTT broker.
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**
 
-- [About The Project](#about-the-project)
-  - [Built With](#built-with)
-- [Getting Started](#getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Installation](#installation)
-- [Usage](#usage)
-- [Roadmap](#roadmap)
-- [Contributing](#contributing)
+- [Troubleshooting](#troubleshooting)
+  - [Corrupted or Invalid Volume Readings](#corrupted-or-invalid-volume-readings)
+  - [No Meter Response](#no-meter-response)
+  - [Signal Quality Issues](#signal-quality-issues)
+- [Documentation](#documentation)
+  - [For End Users](#for-end-users)
+  - [For Developers](#for-developers)
+- [Quick Start](#quick-start)
+- [Breaking Change: SPI Configuration Required](#breaking-change-spi-configuration-required)
+  - [1. Use as External Component](#1-use-as-external-component)
+  - [2. Build and Upload](#2-build-and-upload)
+- [ESPHome Device Builder (Visual Dashboard)](#esphome-device-builder-visual-dashboard)
+- [Board-Specific Configuration](#board-specific-configuration)
+  - [Arduino Nano ESP32 (ESP32S3)](#arduino-nano-esp32-esp32s3)
+  - [Other ESP32 Boards](#other-esp32-boards)
+- [Configuration Reference](#configuration-reference)
+  - [Key Parameters](#key-parameters)
+  - [Schedule Options](#schedule-options)
+  - [Custom Schedule Example](#custom-schedule-example)
+  - [Logging](#logging)
+  - [Timezone Adjustment](#timezone-adjustment)
+- [Features](#features)
+- [Example Configurations](#example-configurations)
+- [Hardware Requirements](#hardware-requirements)
+  - [Wiring (ESP8266 D1 Mini)](#wiring-esp8266-d1-mini)
+  - [Wiring (ESP32)](#wiring-esp32)
+- [Benefits](#benefits)
+  - [vs. Standalone MQTT Mode](#vs-standalone-mqtt-mode)
+  - [ESPHome Mode Advantages](#esphome-mode-advantages)
+- [Home Assistant Best Practice: Utility Meter Helper](#home-assistant-best-practice-utility-meter-helper)
+  - [Migrating Sensor History Between Platforms](#migrating-sensor-history-between-platforms)
+  - [Historical Data from Meter](#historical-data-from-meter)
+- [Architecture](#architecture)
+- [Available Sensors](#available-sensors)
+  - [Numeric Sensors](#numeric-sensors)
+  - [Text Sensors](#text-sensors)
+  - [Binary Sensors](#binary-sensors)
+  - [Control Buttons](#control-buttons)
+- [Common Configuration Patterns](#common-configuration-patterns)
+  - [Water Meter - Basic](#water-meter---basic)
+  - [Gas Meter - Basic](#gas-meter---basic)
+  - [With Full Monitoring](#with-full-monitoring)
+- [Quick Troubleshooting](#quick-troubleshooting)
+  - [Quick Fixes](#quick-fixes)
 - [License](#license)
-- [Contact](#contact)
-- [Acknowledgments](#acknowledgments)
+- [Credits](#credits)
+- [Links](#links)
+- [Development: Code Style & Formatting](#development-code-style--formatting)
+  - [Running the formatter](#running-the-formatter)
+  - [Linting & pre-commit](#linting--pre-commit)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
-## About The Project
 
-![ESPHome EverBlu Meter](../docs/images/esphome.jpg)
 
-This is the **ESPHome external component** for the
-[EverBlu Meters](../README.md) project. It reads EverBlu Cyble Enhanced water and gas
-meters (RADIAN protocol, 433 MHz) with an ESP8266/ESP32 + CC1101 and integrates
-directly with Home Assistant via the ESPHome API — no MQTT broker needed.
+## Troubleshooting
 
-It shares the same core radio/protocol code as the standalone MQTT firmware, wrapped in
-an ESPHome `Component`/`Sensor` hierarchy via a clean adapter pattern:
+### Corrupted or Invalid Volume Readings
 
-```text
-EverbluMeterComponent (ESPHome)
-├── ESPHomeConfigProvider    → Configuration from YAML
-├── ESPHomeTimeProvider      → Time synchronization
-├── ESPHomeDataPublisher     → Sensor publishing
-└── MeterReader (shared)
-    ├── CC1101 · FrequencyManager · ScheduleManager
+If you're seeing:
+
+- Volume reading as 0, small values, or negative numbers
+- Historical data showing impossible decreases
+- Battery showing as 0 months
+
+**Enable hex dump debugging:**
+
+```yaml
+everblu_meter:
+  debug_cc1101: true  # Show raw 200-byte payload (default: false)
 ```
 
-> [!WARNING]
-> **Breaking change (v3.0.0+):** GDO2 is required by default. Wire CC1101 GDO2 to a free
-> GPIO and set `gdo2_pin:`, or opt out with `disable_gdo2_fifo_management: true`.
+This will output detailed hex dumps of the decoded frame, helping identify:
 
-### Built With
+- Wrong byte offsets for your meter variant
+- Regional/manufacturing differences in data layout
+- Specific bytes causing parsing errors
 
-[![ESPHome][ESPHome-badge]][ESPHome-url]
-[![Home Assistant][HA-badge]][HA-url]
-[![ESP8266][ESP8266-badge]][ESP8266-url]
-[![ESP32][ESP32-badge]][ESP32-url]
+**Complete troubleshooting guide:** [../docs/TROUBLESHOOTING_CORRUPTED_READINGS.md](../docs/TROUBLESHOOTING_CORRUPTED_READINGS.md)
 
-Build with the **Arduino** framework (`esp32.framework.type: arduino`). ESP-IDF is not supported.
+### No Meter Response
 
-## Getting Started
+1. **Check hardware connections** (see hardware setup section)
+2. **Verify frequency**: Try frequency scan button
+3. **Check wake window**: Meter may only respond during specific hours
+4. **Increase retries**: `max_retries: 15`
 
-### Prerequisites
+### Signal Quality Issues
 
-- An **ESP8266** (e.g. D1 Mini) or **ESP32** board.
-- A **CC1101** RF transceiver module (**3.3V only**).
-- An **EverBlu Cyble Enhanced** meter with RF module.
-- A working [ESPHome](https://esphome.io/) install (Device Builder or CLI).
+- **Low RSSI (< −90 dBm)**: Move ESP closer or improve antenna
+- **Very high RSSI (> −50 dBm) + CRC failures**: Near-field saturation — the signal is **too strong**. Move the device at least 1–2 m away from the meter. When the device is too close, the CC1101 front-end clips and every frame fails CRC even though RSSI looks excellent. The log will show `*** NEAR-FIELD SATURATION DETECTED ***` to confirm this. If the device must be permanently mounted close to the meter, add `rx_attenuation: 6` (or `12` / `18`) to your YAML configuration to limit the CC1101 LNA gain:
+  ```yaml
+  everblu_meter:
+    rx_attenuation: 6  # dB — values: 0 (default), 6, 12, 18
+  ```
+- **Enable auto_scan**: `auto_scan: true` (opt-in; enables startup Deep scan for extreme frequency drift)
+- **Try different times**: Signal quality varies by time of day
 
-Wiring (see the [Integration Guide](docs/ESPHOME_INTEGRATION_GUIDE.md) for full details):
+---
 
-| CC1101 | Function     | ESP8266 (D1 Mini) | ESP32  |
-| ------ | ------------ | ----------------- | ------ |
-| VCC    | Power (3.3V) | 3.3V              | 3.3V   |
-| GND    | Ground       | GND               | GND    |
-| SCK    | SPI Clock    | D5 (GPIO14)       | GPIO18 |
-| MISO   | SPI Data In  | D6 (GPIO12)       | GPIO19 |
-| MOSI   | SPI Data Out | D7 (GPIO13)       | GPIO23 |
-| CSN    | Chip Select  | D8 (GPIO15)       | GPIO25 |
-| GDO0   | Data Ready   | D1 (GPIO5)        | GPIO4  |
-| GDO2   | FIFO (req.)  | D2 (GPIO4)        | GPIO27 |
+## Documentation
 
-### Installation
+### For End Users
 
-Add the external component and a matching `spi:` bus to your ESPHome YAML:
+- **[ESPHome Integration Guide](docs/ESPHOME_INTEGRATION_GUIDE.md)** - Complete installation and configuration guide
+  - Hardware requirements and wiring
+  - Installation steps
+  - Full configuration reference
+  - Sensor documentation
+  - Troubleshooting guide
+
+- **[Home Assistant Integration](docs/ESPHOME_HOME_ASSISTANT_INTEGRATION.md)** - Accessing meter data and historical readings in Home Assistant
+  - Template sensors and utility meters
+  - Historical data extraction
+  - Long-term consumption tracking
+  - Calibration and hardware change handling
+
+- **[Configuration Reference](#configuration-reference)** - Quick lookup for common tasks on this page
+  - Configuration parameter tables
+  - Common configuration patterns
+  - Wiring diagrams
+  - Troubleshooting quick fixes
+
+### For Developers
+
+- **[Developer Guide](docs/DEVELOPER_GUIDE.md)** - Technical architecture and integration patterns
+  - Architecture overview and design principles
+  - Dependency injection pattern
+  - ESPHome integration patterns
+  - How to extend the component
+  - Advanced customization
+
+- **[Component README](components/everblu_meter/README.md)** - Component structure and development
+  - Component file structure
+  - Architecture diagram
+  - Build process
+  - Development guidelines
+
+- **[Build Notes](docs/ESPHOME_BUILD_NOTES.md)** - Advanced build configuration
+  - Source file access strategies
+  - Distribution preparation
+  - Build troubleshooting
+  - **Important**: When to run `prepare-component-release` scripts
+
+> Developer Note: If you modify source files in `src/`, you must run `prepare-component-release.ps1/.sh` to update the `ESPHOME-release` folder.
+
+## Quick Start
+
+## Breaking Change: SPI Configuration Required
+
+This component now uses ESPHome's native `spi:` bus integration. Existing YAML that relied on implicit CC1101 SPI pins must be updated.
+
+Previous configuration:
+
+```yaml
+everblu_meter:
+  meter_code: "21-1234567-000"
+  gdo0_pin: 4
+  time_id: ha_time
+```
+
+Current configuration:
+
+```yaml
+spi:
+  id: main_bus
+  clk_pin: GPIO14
+  mosi_pin: GPIO13
+  miso_pin: GPIO12
+
+everblu_meter:
+  spi_id: main_bus
+  cs_pin: GPIO15
+  meter_code: "21-1234567-000"
+  gdo0_pin: 4
+  time_id: ha_time
+```
+
+### 1. Use as External Component
+
+The component is ready to use directly from the `ESPHOME-release` folder. Add to your ESPHome YAML configuration:
 
 ```yaml
 external_components:
@@ -100,6 +197,24 @@ external_components:
       path: ESPHOME-release
     components: [ everblu_meter ]
     refresh: 1d
+
+# Force Arduino framework (required for everblu_meter)
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+# For ESP8266, Arduino is the only framework, but you can be explicit:
+# esp8266:
+#   board: d1_mini
+#   framework:
+#     version: recommended
+
+# Or use locally:
+# external_components:
+#   - source:
+#       type: local
+#       path: path/to/everblu-meters-esp8266-improved/ESPHOME-release
+#     components: [ everblu_meter ]
 
 time:
   - platform: homeassistant
@@ -117,121 +232,574 @@ everblu_meter:
   meter_code: "21-1234567-000"
   meter_type: water
   gdo0_pin: 4
-  gdo2_pin: 4
   time_id: ha_time
+
+  # Optional: Enable for troubleshooting corrupted readings (default: false)
+  # debug_cc1101: true
+
   volume:
     name: "Water Volume"
+    device_class: water
+    state_class: total_increasing
+
   status:
     name: "Status"
 ```
 
-Then build and upload:
+For a manual local install, use the `external_components` feature with a local path:
 
-```sh
+```yaml
+external_components:
+  - source:
+      type: local
+      path: /path/to/ESPHOME-release
+    components: [ everblu_meter ]
+```
+
+### 2. Build and Upload
+
+```bash
 esphome run your-config.yaml
 ```
 
-## Usage
+## ESPHome Device Builder (Visual Dashboard)
 
-Sensors are auto-discovered in Home Assistant once the device connects. The component
-exposes volume, battery, RSSI/LQI, timing, frequency diagnostics, status/error text
-sensors, control buttons (manual read, deep scan, reset frequency), and a
-`history_json` sensor with 12 months of on-meter history.
+ESPHome 2026.6.0 replaced the legacy dashboard with the new **Device Builder**. This component works with it, with one caveat:
 
-Common key parameters:
+- **YAML editor:** Fully supported. Paste any of the example configs (which use `external_components:`) into the Device Builder's YAML editor and it validates, compiles, flashes, and OTA-updates exactly as before.
+- **Visual component catalog:** Not supported. The drag-and-drop catalog is generated from a nightly sync of ESPHome's *built-in* component schemas, so `everblu_meter` (like every other `external_components:` source) does not appear as a catalog card. This is a Device Builder limitation for all external components, not specific to this project.
 
-| Parameter            | Default       | Description                                          |
-| -------------------- | ------------- | ---------------------------------------------------- |
-| `meter_code`         | —             | Dashed meter code `YY-SSSSSSS[-NNN]` (required)      |
-| `meter_type`         | `water`       | `water` or `gas`                                     |
-| `gdo2_pin`           | —             | Required unless `disable_gdo2_fifo_management: true` |
-| `frequency`          | `433.82`      | RF frequency (MHz)                                   |
-| `reading_schedule`   | Monday-Friday | Days to read (preset or single day)                  |
-| `timezone_offset`    | `0`           | Minutes from UTC (no DST auto-adjust)                |
-| `gas_volume_divisor` | `100`         | Gas divisor (100 or 1000)                            |
-| `debug_cc1101`       | `false`       | Enable hex dump for troubleshooting                  |
+## Board-Specific Configuration
 
-Ready-made examples:
-[water](example-water-meter.yaml) ·
-[gas](example-gas-meter-minimal.yaml) ·
-[advanced](example-advanced.yaml) ·
-[multi-meter](example-multi-meter.yaml) ·
-[Nano ESP32](example-nano-esp32.yaml).
+### Arduino Nano ESP32 (ESP32S3)
 
-For the full parameter reference, sensor list, and troubleshooting, see the
-[Integration Guide](docs/ESPHOME_INTEGRATION_GUIDE.md) and
-[Home Assistant Integration](docs/ESPHOME_HOME_ASSISTANT_INTEGRATION.md).
+If using an **Arduino Nano ESP32** board, you may still need the following `platformio_options` depending on your ESPHome/PlatformIO toolchain configuration. These flags address board USB mode selection at build time; they are separate from the `Stream&` compatibility fix in `WifiSerialStream`.
 
-## Roadmap
+```yaml
+esp32:
+  board: arduino_nano_esp32
+  framework:
+    type: arduino
 
-- [x] Native ESPHome API integration (no MQTT broker)
-- [x] Automatic sensor discovery
-- [x] Water and gas meter support
-- [x] Frequency scanning and drift recovery
-- [x] Hardware FIFO management via GDO2
-- [x] 12-month on-meter history JSON sensor
-
-See the [open issues](https://github.com/genestealer/everblu-meters-esp8266-improved/issues)
-for proposed features and known issues.
-
-## Contributing
-
-Contributions are **greatly appreciated**. The C++ sources follow ESPHome's own coding
-standards; run the formatter before committing:
-
-```sh
-ESPHOME/format-component.sh --fix        # Linux / macOS
-./ESPHOME/format-component.ps1 -Fix      # Windows / PowerShell
+  # May be required on some Arduino Nano ESP32 toolchain setups
+  platformio_options:
+    build_unflags:
+      - -DARDUINO_USB_CDC_ON_BOOT=0
+      - -DARDUINO_USB_CDC_ON_BOOT=1
+      - -DARDUINO_USB_MODE=0
+      - -DARDUINO_USB_MODE=1
+    build_flags:
+      - -DARDUINO_USB_CDC_ON_BOOT=1
+      - -DARDUINO_USB_MODE=1
 ```
 
-Repo-wide linting runs through [pre-commit](https://pre-commit.com) (ruff, yamllint,
-clang-format). See [../CONTRIBUTING.md](../CONTRIBUTING.md) and
-[docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md).
+See [example-nano-esp32.yaml](example-nano-esp32.yaml) for a complete working configuration.
 
-> **Note:** `ESPHOME-release/` is generated output. Never edit it directly — make changes
-> in `ESPHOME/components/everblu_meter/` and regenerate via `prepare-component-release`.
+### Other ESP32 Boards
 
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+For other ESP32 boards (e.g., `esp32dev`), these platformio options are not needed:
+
+```yaml
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+```
+
+## Configuration Reference
+
+### Key Parameters
+
+<!-- markdownlint-disable MD060 -->
+| Parameter            | Type     | Default       | Required | Description                                                                                                                                                                                                                                  |
+| -------------------- | -------- | ------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `meter_code`         | string   | -             | Yes      | Dashed meter code: `YY-SSSSSSS` or `YY-SSSSSSS-NNN` (suffix optional)                                                                                                                                                                        |
+| `spi_id`             | id       | -             | Yes      | SPI bus ID from the top-level `spi:` block                                                                                                                                                                                                   |
+| `cs_pin`             | pin      | -             | Yes      | CC1101 chip select pin                                                                                                                                                                                                                       |
+| `meter_type`         | enum     | water         | No       | `water` or `gas`                                                                                                                                                                                                                             |
+| `gdo0_pin`           | pin      | -             | Yes      | CC1101 GDO0 pin (e.g. `GPIO4`, `D2`, `4`)                                                                                                                                                                                                    |
+| `gdo2_pin`           | pin      | -             | Yes\*    | **Required by default (v3.0.0+).** CC1101 GDO2 pin for hardware FIFO threshold signal. Dynamically reconfigured per phase: TX phase prevents `TXFIFO_UNDERFLOW`; RX phase eliminates unnecessary SPI reads and improves ESPHome scheduler efficiency. \*Not required only if `disable_gdo2_fifo_management: true` is set. |
+| `disable_gdo2_fifo_management` | bool | false | No | Opt out of the GDO2 hardware FIFO mechanism and use the legacy SPI-polling behaviour. When `true`, `gdo2_pin` is not required and need not be wired. |
+| `time_id`            | id       | -             | Yes      | Time component ID                                                                                                                                                                                                                            |
+| `frequency`          | float    | 433.82        | No       | RF frequency (MHz)                                                                                                                                                                                                                           |
+| `auto_scan`          | bool     | false         | No       | Auto frequency scan                                                                                                                                                                                                                          |
+| `auto_scan_on_failure` | bool   | true          | No       | Auto frequency scan (once) after read attempts keep failing and the component enters cooldown, to recover from carrier-frequency drift                                                                                                       |
+| `reading_schedule`   | string   | Monday-Friday | No       | Reading schedule. Presets: `Monday-Friday`, `Monday-Saturday`, `Monday-Sunday`, or any single day name                                                                                                                                       |
+| `read_hour`          | int      | 10            | No       | Read hour (0-23)                                                                                                                                                                                                                             |
+| `read_minute`        | int      | 0             | No       | Read minute (0-59)                                                                                                                                                                                                                           |
+| `timezone_offset`    | int      | 0             | No       | Local time offset from UTC in **minutes**. Examples: `60` = UTC+1, `-300` = UTC-5, `330` = UTC+5:30. Applied to scheduling; does **not** auto-adjust for DST.                                                                               |
+| `auto_align_time`    | bool     | true          | No       | Automatically shift the read time to fall inside the meter's wake window                                                                                                                                                                     |
+| `auto_align_midpoint`| bool     | true          | No       | When auto-aligning, target the midpoint of the wake window instead of its start                                                                                                                                                              |
+| `max_retries`        | int      | 5             | No       | Max read attempts                                                                                                                                                                                                                            |
+| `retry_cooldown`     | duration | 1h            | No       | Cooldown time                                                                                                                                                                                                                                |
+| `initial_read_on_boot` | bool   | false         | No       | Trigger a read immediately after the time component syncs (useful for fast first-boot data; disabled by default to avoid blocking during meter-absent setups)                                                                                |
+| `adaptive_threshold` | int      | 1             | No       | Successful-read count before applying a FREQEST frequency correction (1 = adjust after every read; higher values dampen frequent small corrections)                                                                                          |
+| `gas_volume_divisor` | int      | 100           | No       | Gas divisor (100/1000)                                                                                                                                                                                                                       |
+| `debug_cc1101`       | bool     | false         | No       | Enable hex dump for debugging                                                                                                                                                                                                                |
+| `rx_attenuation`     | int      | 0             | No       | Front-end LNA gain limit for close-mounted installations. Values: `0` (default, no limit), `6`, `12`, `18` (dB, approximate). Increase when `*** NEAR-FIELD SATURATION DETECTED ***` is logged and moving the device further is not practical. |
+<!-- markdownlint-enable MD060 -->
+
+### Schedule Options
+
+- Monday-Friday - Weekdays (default)
+- Monday-Saturday - Monday through Saturday
+- Monday-Sunday - All days
+- Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday - Read only on the selected day
+
+### Custom Schedule Example
+
+```yaml
+everblu_meter:
+  spi_id: main_bus
+  cs_pin: GPIO15
+  meter_code: "21-1234567-000"
+  gdo0_pin: 4
+  meter_type: water
+  time_id: ha_time
+
+  # Weekend-only, early morning
+  reading_schedule: Saturday
+  read_hour: 6
+  read_minute: 30
+
+  # Aggressive retries
+  max_retries: 15
+  retry_cooldown: 30min
+
+  volume:
+    name: "Volume"
+```
+
+### Logging
+
+```yaml
+logger:
+  level: DEBUG
+  logs:
+    everblu_meter: VERBOSE  # Maximum detail
+    sensor: WARN            # Reduce sensor noise
+```
+
+### Timezone Adjustment
+
+```yaml
+everblu_meter:
+  timezone_offset: -300  # Minutes from UTC (e.g. UTC-5 = -300). Range: -720 to +720.
+                         # ⚠️ Does NOT auto-adjust for DST — update manually when clocks change.
+```
+
+## Features
+
+- **Native ESPHome Integration**: Works with Home Assistant via the ESPHome API
+- **Automatic Discovery**: Sensors appear automatically in Home Assistant
+- **Scheduled Readings**: Configure when and how often to read the meter
+- **Frequency Management**: Automatic frequency scanning and optimization
+- **Comprehensive Monitoring**: Track signal quality, battery life, and reading statistics
+- **Multiple Meter Types**: Supports both water and gas meters
+- **Retry Logic**: Configurable retry attempts with cooldown periods
+- **Low Power**: Efficient reading schedule minimizes power consumption
+
+## Example Configurations
+
+Five complete example configurations are provided:
+
+1. **[Water Meter Example](example-water-meter.yaml)** - Full-featured water meter configuration (ESP8266)
+2. **[Gas Meter Example](example-gas-meter-minimal.yaml)** - Minimal gas meter configuration
+3. **[Advanced Example](example-advanced.yaml)** - Advanced scheduling, retry, and debug options
+4. **[Multi-Meter Example](example-multi-meter.yaml)** - Two meters on one ESP with shared CC1101
+5. **[Arduino Nano ESP32 Example](example-nano-esp32.yaml)** - Board-specific setup for Nano ESP32 (ESP32-S3)
+
+## Hardware Requirements
+
+- **ESP8266** (e.g., D1 Mini) or **ESP32** board
+- **CC1101** RF transceiver module (868/915 MHz version)
+- **EverBlu Cyble Enhanced** meter with RF module installed
+
+### Wiring (ESP8266 D1 Mini)
+
+| CC1101 Pin | D1 Mini | GPIO         |
+| ---------- | ------- | ------------ |
+| VCC        | 3.3V    | -            |
+| GND        | GND     | -            |
+| SCK        | D5      | 14           |
+| MISO       | D6      | 12           |
+| MOSI       | D7      | 13           |
+| CSN        | D8      | 15           |
+| GDO0       | D1      | 5            |
+| GDO2       | D2      | 4 (required) |
+
+### Wiring (ESP32)
+
+| CC1101 | ESP32         |
+| ------ | ------------- |
+| VCC    | 3.3V          |
+| GND    | GND           |
+| SCK    | 18            |
+| MISO   | 19            |
+| MOSI   | 23            |
+| CSN    | 25            |
+| GDO0   | 4             |
+| GDO2   | 27 (required) |
+
+Important: The CC1101 requires 3.3V power. Do not connect to 5V!
+
+> **Breaking change (v3.0.0): GDO2 is now required by default.** You must wire CC1101 GDO2 to a free GPIO and set `gdo2_pin:`. GDO2 is dynamically reconfigured per phase: during TX it acts as a TX FIFO threshold signal preventing `TXFIFO_UNDERFLOW`; during RX it signals when the RX FIFO has data (or end-of-packet), eliminating unnecessary `RXBYTES` SPI reads and allowing the ESPHome scheduler to run freely between batches. If you cannot or do not want to wire GDO2, explicitly opt out by setting `disable_gdo2_fifo_management: true`, which restores the original SPI-polling behaviour (still fully functional). If you neither set `gdo2_pin:` nor opt out, the configuration will fail validation with an error pointing you back here.
+
+## Benefits
+
+### vs. Standalone MQTT Mode
+
+| Feature       | ESPHome Mode | MQTT Mode   |
+| ------------- | ------------ | ----------- |
+| Configuration | YAML         | C++ defines |
+| Integration   | ESPHome API  | MQTT Broker |
+| Discovery     | Automatic    | Manual      |
+| Updates       | OTA          | OTA         |
+| Logging       | ESPHome logs | Serial/WiFi |
+| Complexity    | Low          | Medium      |
+
+### ESPHome Mode Advantages
+
+- **Simple Configuration**: YAML-based instead of C++ defines
+- **Native Integration**: Direct Home Assistant integration
+- **No MQTT Broker**: Reduces infrastructure complexity
+- **All ESPHome Features**: Web server, logging, diagnostics, etc.
+- **Automatic Discovery**: Sensors appear in Home Assistant automatically
+
+## Home Assistant Best Practice: Utility Meter Helper
+
+**Recommended:** Create a Home Assistant Utility Meter helper to preserve historical data across platform or meter changes.
+
+**Why use a utility meter helper?**
+
+If you switch between ESPHome and MQTT, change meter serial numbers, or replace hardware, a utility meter helper acts as a stable interface. You simply update the source sensor in the helper configuration, and all your historical data, dashboards, and automations remain intact.
+
+**Quick Setup:**
+
+1. In Home Assistant: **Settings** → **Devices & Services** → **Helpers**
+2. **Create Helper** → **Utility Meter**
+3. Configure:
+   - **Name**: "Master Water Meter" (or "Master Gas Meter")
+   - **Input sensor**: Your volume sensor (e.g., `sensor.water_volume`)
+   - **Meter type**: Daily/monthly/yearly or none
+
+**Benefits:**
+
+- Preserve history when switching ESPHome ↔ MQTT
+- Update the meter serial number in one place
+- Single point to update for hardware changes
+- Stable entity ID for dashboards and automations
+
+**Example:**
+
+```yaml
+utility_meter:
+  master_water_meter:
+    source: sensor.water_volume  # Just update this when you change platforms
+    name: Master Water Meter
+```
+
+When changing platforms or meters, update only the `source` - your history stays intact!
+
+### Migrating Sensor History Between Platforms
+
+**Migrating from MQTT to ESPHome (or replacing hardware)?** A utility meter helper protects future data, but it does not move the history that already accumulated on your *old* sensor onto the *new* one. To merge the past readings from the old entity into the new entity (both raw states and long-term statistics for the Energy dashboard), use the [HA Merge Sensor History](https://github.com/mayerwin/HA-Merge-Sensor-History) custom component. It imports the older history in front of the new sensor in a single atomic, idempotent transaction, so your consumption graphs and lifetime totals stay continuous across the switch. Back up your recorder database first.
+
+> Thanks to [rommess](https://github.com/rommess) for sharing this tip in [discussion #129](https://github.com/genestealer/everblu-meters-esp8266-improved/discussions/129).
+
+### Historical Data from Meter
+
+The ESPHome component exposes a **history text sensor** containing 12 months of historical readings stored directly in the meter. This data is retrieved from the meter itself and provided in JSON format.
+
+**Example JSON payload:**
+
+```json
+{
+  "history": [605696, 614107, 621401, 630219, 640054, 652789, 667441, 684214, 700917, 712720, 721549, 728836],
+  "monthly_usage": [605696, 8411, 7294, 8818, 9835, 12735, 14652, 16773, 16703, 11803, 8829, 7287],
+  "current_month_usage": 13043,
+  "months_available": 12
+}
+```
+
+**Data Structure:**
+
+- `history`: 12 monthly readings (oldest to newest) in L or m³
+- `monthly_usage`: 12 monthly consumption values (first is oldest reading, rest are differences)
+- `current_month_usage`: Current month consumption
+- `months_available`: Months of data (typically 12)
+
+**Use Cases:**
+
+- Bootstrap Home Assistant with 12 months of existing data on first setup
+- Analyze historical consumption patterns
+- Compare current vs. previous month usage
+- Verify readings against utility bills
+- Pre-populate energy dashboards
+
+**Accessing in Home Assistant:**
+
+The history sensor appears as `sensor.{device_name}_meter_history_json` (e.g., `sensor.water_meter_monitor_meter_history_json`). Parse it using template sensors:
+
+```yaml
+template:
+  - sensor:
+      - name: "Last Month Usage"
+        unit_of_measurement: "L"
+        state: >-
+          {% set data = states('sensor.water_meter_monitor_meter_history_json') | from_json %}
+          {{ data.monthly_usage[-1] if data.monthly_usage else 0 }}
+
+      - name: "Average Monthly Usage"
+        unit_of_measurement: "L"
+        state: >-
+          {% set data = states('sensor.water_meter_monitor_meter_history_json') | from_json %}
+          {% if data.monthly_usage %}
+            {{ (data.monthly_usage[1:] | sum / (data.monthly_usage[1:] | length)) | round(0) }}
+          {% else %}
+            0
+          {% endif %}
+```
+
+**Note:** This is historical data from the meter's internal memory, updated when the meter is read. It's separate from Home Assistant's own historical database.
+
+## Architecture
+
+The component uses a clean adapter pattern to separate platform-specific code from core meter reading logic:
+
+```text
+EverbluMeterComponent (ESPHome)
+├── ESPHomeConfigProvider    → Configuration from YAML
+├── ESPHomeTimeProvider      → Time synchronization
+├── ESPHomeDataPublisher     → Sensor publishing
+└── MeterReader (shared)
+    ├── CC1101               → Radio hardware
+    ├── FrequencyManager     → Frequency optimization
+    └── ScheduleManager      → Reading schedule
+```
+
+**Key Benefits**:
+
+- Most code is shared between ESPHome and standalone modes
+- Clean separation of concerns
+- Easy to test and maintain
+- Extensible for other platforms
+
+## Available Sensors
+
+### Numeric Sensors
+
+- **volume** - Current meter reading (L or m³)
+- **battery** - Estimated battery life (years)
+- **counter** - Alternative volume counter
+- **rssi** / **rssi_percentage** - Radio signal strength
+- **lqi** / **lqi_percentage** - Link quality indicator (raw `lqi` is 0-127 where *lower is better*; `lqi_percentage` inverts this so higher % = better link)
+- **time_start** / **time_end** - Reading timing
+- **frequency_offset** - Current frequency offset (kHz)
+- **tuned_frequency** - Actual tuned frequency (MHz)
+- **frequency_estimate** - CC1101 frequency estimate from last reading (kHz) - helps monitor frequency drift
+- **total_attempts** / **successful_reads** / **failed_reads** - Statistics
+
+### Text Sensors
+
+- **status** - Current meter status (Idle/Reading/Success/Error)
+- **error** - Last error message
+- **radio_state** - Radio state (Init/Scanning/Receiving/Idle)
+- **timestamp** - Last successful reading time
+- **history_json** - Meter history JSON payload
+- **firmware_version** - Firmware version string
+- **meter_serial_sensor** - Parsed serial section from `meter_code`
+- **meter_year_sensor** - Parsed year (`YY`) from `meter_code`
+- **reading_schedule_sensor** - Active reading schedule
+- **reading_time_utc_sensor** - Configured reading time (UTC)
+
+### Binary Sensors
+
+- **active_reading** - Whether a reading is currently in progress
+- **radio_connected** - CC1101 radio connectivity status
+
+### Control Buttons
+
+- **request_reading_button** - Trigger a manual reading
+- **deep_scan_button** - Trigger a Deep frequency scan (±150 kHz, fine 2.5 kHz steps, maps the response window then zooms to the carrier centre)
+- **reset_frequency_button** - Reset the frequency offset
+
+## Common Configuration Patterns
+
+### Water Meter - Basic
+
+```yaml
+everblu_meter:
+  meter_code: "21-1234567-000"
+  meter_type: water
+  gdo0_pin: 4
+  time_id: ha_time
+  debug_cc1101: false  # Optional: Enable hex dump debugging (default: false)
+  volume:
+    name: "Water Volume"
+```
+
+### Gas Meter - Basic
+
+```yaml
+everblu_meter:
+  meter_code: "22-8765432-000"
+  meter_type: gas
+  gdo0_pin: 4
+  time_id: ha_time
+  gas_volume_divisor: 100
+  debug_cc1101: false  # Optional: Enable hex dump debugging (default: false)
+  volume:
+    name: "Gas Volume"
+```
+
+### With Full Monitoring
+
+```yaml
+everblu_meter:
+  meter_code: "21-1234567-000"
+  meter_type: water
+  gdo0_pin: 4
+  time_id: ha_time
+  debug_cc1101: false  # Optional: Enable hex dump debugging (default: false)
+
+  volume:
+    name: "Volume"
+  battery:
+    name: "Battery"
+  rssi_percentage:
+    name: "Signal"
+  status:
+    name: "Status"
+  active_reading:
+    name: "Reading Active"
+```
+
+## Quick Troubleshooting
+
+### Quick Fixes
+
+**No readings received:**
+
+```yaml
+everblu_meter:
+  auto_scan: true        # Enable startup Deep frequency scan (opt-in; default is false)
+  max_retries: 15        # Increase retry attempts
+```
+
+**Poor signal quality:**
+
+```yaml
+everblu_meter:
+  frequency: 433.85      # Try different frequency
+  auto_scan: false       # Disable auto-scan once optimal found
+```
+
+**Wrong volume reading (gas meters):**
+
+```yaml
+everblu_meter:
+  gas_volume_divisor: 1000  # Try 100 or 1000
+```
+
+**Incorrect time or timezone:**
+
+```yaml
+everblu_meter:
+  timezone_offset: -300  # Minutes from UTC (UTC-5 = -300, UTC+1 = 60, UTC+5:30 = 330)
+```
+
+For detailed troubleshooting, see the [Integration Guide](docs/ESPHOME_INTEGRATION_GUIDE.md#troubleshooting).
 
 ## License
 
-Distributed under the MIT License. See [../LICENSE.md](../LICENSE.md) for more information.
+MIT License - See [LICENSE.md](../LICENSE.md)
 
-## Contact
+## Credits
 
-genestealer - [@genestealer](https://github.com/genestealer)
+Based on the EverBlu Meters ESP8266 project with architectural improvements for reusability and ESPHome integration.
 
-Project Link: [https://github.com/genestealer/everblu-meters-esp8266-improved](https://github.com/genestealer/everblu-meters-esp8266-improved)
+## Links
 
-## Acknowledgments
+- **Main Project**: [Main README](../README.md)
+- **GitHub Repository**: <https://github.com/yourusername/everblu-meters-esp8266-improved>
+- **ESPHome Documentation**: <https://esphome.io/>
+- **Home Assistant**: <https://www.home-assistant.io/>
 
-- [Main project README](../README.md)
-- [ESPHome](https://esphome.io/)
-- [Home Assistant](https://www.home-assistant.io/)
-- [ESPHome AI Collaboration Guide](https://github.com/esphome/esphome/blob/dev/AGENTS.md)
-- [Best-README-Template](https://github.com/othneildrew/Best-README-Template)
+---
 
-<!-- MARKDOWN LINKS & IMAGES -->
-[contributors-shield]: https://img.shields.io/github/contributors/genestealer/everblu-meters-esp8266-improved.svg?style=for-the-badge
-[contributors-url]: https://github.com/genestealer/everblu-meters-esp8266-improved/graphs/contributors
-[forks-shield]: https://img.shields.io/github/forks/genestealer/everblu-meters-esp8266-improved.svg?style=for-the-badge
-[forks-url]: https://github.com/genestealer/everblu-meters-esp8266-improved/network/members
-[stars-shield]: https://img.shields.io/github/stars/genestealer/everblu-meters-esp8266-improved.svg?style=for-the-badge
-[stars-url]: https://github.com/genestealer/everblu-meters-esp8266-improved/stargazers
-[issues-shield]: https://img.shields.io/github/issues/genestealer/everblu-meters-esp8266-improved.svg?style=for-the-badge
-[issues-url]: https://github.com/genestealer/everblu-meters-esp8266-improved/issues
-[license-shield]: https://img.shields.io/github/license/genestealer/everblu-meters-esp8266-improved.svg?style=for-the-badge
-[license-url]: https://github.com/genestealer/everblu-meters-esp8266-improved/blob/main/LICENSE.md
+**Need Help?**
 
-[ESPHome-badge]: https://img.shields.io/badge/ESPHome-Compatible-brightgreen?style=for-the-badge&logo=esphome&logoColor=white
-[ESPHome-url]: https://esphome.io
-[HA-badge]: https://img.shields.io/badge/Home%20Assistant-41BDF5?style=for-the-badge&logo=homeassistant&logoColor=white
-[HA-url]: https://www.home-assistant.io
-[ESP8266-badge]: https://img.shields.io/badge/ESP-8266-blue?style=for-the-badge&logo=espressif&logoColor=white
-[ESP8266-url]: https://www.espressif.com/en/products/socs/esp8266
-[ESP32-badge]: https://img.shields.io/badge/ESP-32-blue?style=for-the-badge&logo=espressif&logoColor=white
-[ESP32-url]: https://www.espressif.com/en/products/socs/esp32
+- Start with the [Integration Guide](docs/ESPHOME_INTEGRATION_GUIDE.md)
+- See [Home Assistant Integration](docs/ESPHOME_HOME_ASSISTANT_INTEGRATION.md) for accessing meter data in Home Assistant
+- See the Configuration Reference above for parameters and quick fixes
+- See [Troubleshooting](docs/ESPHOME_INTEGRATION_GUIDE.md#troubleshooting) for common issues
+- Developers: See [Developer Guide](docs/DEVELOPER_GUIDE.md) for architecture details
+
+## Development: Code Style & Formatting
+
+The C++ sources of this ESPHome component follow **ESPHome's own coding standards** so the
+code matches what ships in ESPHome core and stays compatible with the upstream review bar.
+
+- **Formatter:** [`clang-format`](https://clang.llvm.org/docs/ClangFormat.html), configured with a
+  verbatim copy of ESPHome's upstream style.
+- **Style file:** [`components/everblu_meter/.clang-format`](components/everblu_meter/.clang-format)
+  - copied from [esphome/esphome `.clang-format`](https://github.com/esphome/esphome/blob/dev/.clang-format).
+  It is placed in the component directory (not the repo root) so it applies **only** to the
+  ESPHome component; the portable library under [`src/`](../src) keeps its own house style.
+- **Naming / `this->` / `final` conventions** follow ESPHome's
+  [code standards](https://developers.esphome.io/contributing/code/) and
+  [`.clang-tidy`](https://github.com/esphome/esphome/blob/dev/.clang-tidy)
+  (private/protected members use a trailing `_`, `lower_case` methods, leaf classes marked `final`).
+
+### Running the formatter
+
+The component clang-format style is wired into pre-commit (below), so it runs automatically on
+commit. To run it manually, use the helper scripts (they auto-install the latest `clang-format`
+if it is missing):
+
+```powershell
+# Windows / PowerShell
+./ESPHOME/format-component.ps1          # check only (non-zero exit if changes needed)
+./ESPHOME/format-component.ps1 -Fix     # reformat in place
+```
+
+```bash
+# Linux / macOS
+ESPHOME/format-component.sh             # check only
+ESPHOME/format-component.sh --fix       # reformat in place
+```
+
+Or invoke `clang-format` directly (it auto-discovers the component `.clang-format`):
+
+```bash
+clang-format -style=file -i ESPHOME/components/everblu_meter/everblu_meter.{cpp,h}
+```
+
+### Linting & pre-commit
+
+Repo-wide linting mirrors ESPHome's toolchain and runs through [pre-commit](https://pre-commit.com):
+
+| Tool | Scope | Config |
+| --- | --- | --- |
+| **ruff** (lint + format) | all Python | [`ruff.toml`](../ruff.toml) (mirrors ESPHome) |
+| **yamllint** | all YAML | [`.yamllint`](../.yamllint) |
+| **clang-format** | ESPHome component C++ | [`.clang-format`](components/everblu_meter/.clang-format) |
+| trailing-whitespace, end-of-file, check-yaml, … | repo hygiene | [`.pre-commit-config.yaml`](../.pre-commit-config.yaml) |
+
+All tools install **unpinned** (latest), so there are no versions to maintain.
+
+```bash
+pip install pre-commit
+pre-commit install          # run automatically on every commit
+pre-commit run --all-files  # run across the whole repo now
+```
+
+On pull requests, the **[pre-commit.ci](https://pre-commit.ci)** app (if enabled for the repo,
+via the `ci:` block in [`.pre-commit-config.yaml`](../.pre-commit-config.yaml)) runs these hooks
+and can auto-fix them. They are advisory, not a hard merge gate.
+
+> Note: ESPHome also enforces `clang-tidy` upstream, but that requires a full ESPHome/PlatformIO
+> build environment (a compilation database with the ESPHome headers), so it is not wired into this
+> repository's lightweight CI. The [`.clang-tidy`](https://github.com/esphome/esphome/blob/dev/.clang-tidy)
+> rules are linked above for reference.
