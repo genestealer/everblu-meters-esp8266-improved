@@ -42,3 +42,13 @@ This project reads Itron/Actaris EverBlu Cyble water/gas meters via a CC1101 433
 ## ESPHome component development
 
 When working on `ESPHOME/components/everblu_meter/`, follow the upstream ESPHome conventions documented in the [ESPHome AI Collaboration Guide (AGENTS.md)](https://github.com/esphome/esphome/blob/dev/AGENTS.md). It covers C++ naming and style, Python schema patterns, component structure, automation helpers, heap allocation guidelines, and the PR contribution workflow.
+
+## General coding-behavior guidelines
+
+See [SKILL.md](../SKILL.md) for general LLM coding-behavior guidelines (surgical changes, simplicity-first, verify-before-done).
+
+## Writing style (docs and comments)
+
+- Do not use em dashes (—). Rewrite the sentence, or use a colon, comma, parentheses, or separate sentences instead.
+- Avoid patterns that read as AI-generated text. See [Wikipedia: Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing) for the tells to avoid (for example: puffery, hollow "not only... but also" constructions, overuse of "moreover"/"furthermore", vague attributions, and needless summary sections).
+- Prefer plain, direct language that matches the surrounding text.
