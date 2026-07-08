@@ -76,7 +76,7 @@ Integrated with Home Assistant via MQTT AutoDiscovery and ESPHome external compo
 - [Legal Notice](#legal-notice)
   - [Community Resources](#community-resources)
 
-<!-- END doctoc -->
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 
 

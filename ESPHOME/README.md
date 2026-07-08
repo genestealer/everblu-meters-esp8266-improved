@@ -57,7 +57,7 @@ Complete ESPHome custom component for reading EverBlu Cyble Enhanced water and g
   - [Running the formatter](#running-the-formatter)
   - [Linting & pre-commit](#linting--pre-commit)
 
-<!-- END doctoc -->
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 
 
