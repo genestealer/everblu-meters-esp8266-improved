@@ -496,6 +496,10 @@ utility_meter:
 
 When changing platforms or meters, update only the `source` - your history stays intact!
 
+**Migrating from MQTT to ESPHome (or replacing hardware)?** A utility meter helper protects future data, but it does not move the history that already accumulated on your *old* sensor onto the *new* one. To merge the past readings from the old entity into the new entity (both raw states and long-term statistics for the Energy dashboard), use the [HA Merge Sensor History](https://github.com/mayerwin/HA-Merge-Sensor-History) custom component. It imports the older history in front of the new sensor in a single atomic, idempotent transaction, so your consumption graphs and lifetime totals stay continuous across the switch. Back up your recorder database first.
+
+> Thanks to [rommess](https://github.com/rommess) for sharing this tip in [discussion #129](https://github.com/genestealer/everblu-meters-esp8266-improved/discussions/129).
+
 ### Historical Data from Meter
 
 The ESPHome component exposes a **history text sensor** containing 12 months of historical readings stored directly in the meter. This data is retrieved from the meter itself and provided in JSON format.
