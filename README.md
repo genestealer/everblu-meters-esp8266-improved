@@ -40,44 +40,67 @@ Two independent deployment targets share the same core radio/protocol logic:
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**
 
-  - [**ESPHome** - Release V3.0.0](#esphome---release-v300)
-- [Features](#features)
-  - [Full feature list](#full-feature-list)
-  - [Advanced Frame Validation](#advanced-frame-validation)
-- [Integration Options](#integration-options)
-  - [Option 1: ESPHome Component (Recommended)](#option-1-esphome-component-recommended)
-  - [Option 2: Standalone with MQTT](#option-2-standalone-with-mqtt)
-  - [Quick Start: First Successful Reading](#quick-start-first-successful-reading)
-- [Hardware](#hardware)
-  - [Connections (ESP32/ESP8266 to CC1101)](#connections-esp32esp8266-to-cc1101)
-  - [CC1101](#cc1101)
-- [MQTT Integration](#mqtt-integration)
-- [Multiple Devices](#multiple-devices)
-- [Home Assistant Best Practice: Utility Meter Helper](#home-assistant-best-practice-utility-meter-helper)
-  - [Migrating Sensor History Between Platforms](#migrating-sensor-history-between-platforms)
-  - [Historical Data from Meter](#historical-data-from-meter)
-- [Configuration](#configuration)
-  - [Local Development Setup](#local-development-setup)
-  - [Reading Schedule](#reading-schedule)
-  - [Time zone offset and wake-up window (simple)](#time-zone-offset-and-wake-up-window-simple)
-  - [Home Assistant Discovery Toggle (MQTT mode)](#home-assistant-discovery-toggle-mqtt-mode)
-  - [Radio and frequency (advanced)](#radio-and-frequency-advanced)
-  - [Frequency Configuration](#frequency-configuration)
-  - [Adaptive Frequency Management](#adaptive-frequency-management)
-- [Troubleshooting](#troubleshooting)
-  - [Meter reads fail: near-field RF saturation (device too close to meter)](#meter-reads-fail-near-field-rf-saturation-device-too-close-to-meter)
-  - [Corrupted or Invalid Volume Readings](#corrupted-or-invalid-volume-readings)
-  - [ESP32 build: ModuleNotFoundError: No module named 'intelhex'](#esp32-build-modulenotfounderror-no-module-named-intelhex)
-  - [ESP32 compile errors about ESP8266 headers](#esp32-compile-errors-about-esp8266-headers)
-  - [Frequency Adjustment](#frequency-adjustment)
-  - [Business Hours](#business-hours)
-  - [Serial Number Starting with 0](#serial-number-starting-with-0)
-  - [Distance Between Device and Meter](#distance-between-device-and-meter)
-- [Important: Utility Read Counter Compatibility](#important-utility-read-counter-compatibility)
-  - [Recommended Actions](#recommended-actions)
-- [Credits](#credits)
-- [Legal Notice](#legal-notice)
-  - [Community Resources](#community-resources)
+- [Itron EverBlu Cyble Enhanced RF RADIAN Water/Gas Usage Data for MQTT Home Assistant \& ESPHome External Component](#itron-everblu-cyble-enhanced-rf-radian-watergas-usage-data-for-mqtt-home-assistant--esphome-external-component)
+  - [Build \& QA](#build--qa)
+  - [Platforms \& Capabilities](#platforms--capabilities)
+    - [**ESPHome** - Release V3.0.0](#esphome---release-v300)
+  - [Features](#features)
+    - [Full feature list](#full-feature-list)
+    - [Advanced Frame Validation](#advanced-frame-validation)
+  - [Integration Options](#integration-options)
+    - [Option 1: ESPHome Component (Recommended)](#option-1-esphome-component-recommended)
+    - [Option 2: Standalone with MQTT](#option-2-standalone-with-mqtt)
+    - [Quick Start: First Successful Reading](#quick-start-first-successful-reading)
+      - [1. Hardware you need](#1-hardware-you-need)
+      - [2. Files you must edit](#2-files-you-must-edit)
+      - [Meter Type Configuration](#meter-type-configuration)
+        - [Gas Meter Volume Divisor](#gas-meter-volume-divisor)
+          - [How We Determined the Correct Divisor](#how-we-determined-the-correct-divisor)
+      - [3. Build and upload the firmware](#3-build-and-upload-the-firmware)
+        - [First-time USB Upload](#first-time-usb-upload)
+        - [Over-The-Air (OTA) Updates](#over-the-air-ota-updates)
+  - [Hardware](#hardware)
+    - [Connections (ESP32/ESP8266 to CC1101)](#connections-esp32esp8266-to-cc1101)
+      - [Pin Mapping Reference](#pin-mapping-reference)
+      - [Important Notes](#important-notes)
+      - [Wiring Table](#wiring-table)
+      - [Regulatory Notes](#regulatory-notes)
+      - [Quick Reference: Wemos D1 Mini](#quick-reference-wemos-d1-mini)
+      - [Quick Reference: Adafruit Feather HUZZAH ESP8266](#quick-reference-adafruit-feather-huzzah-esp8266)
+      - [Quick Reference: ESP32 DevKit (esp32dev)](#quick-reference-esp32-devkit-esp32dev)
+      - [Adafruit Feather HUZZAH Silkscreen Labels](#adafruit-feather-huzzah-silkscreen-labels)
+      - [HUZZAH Boot-Strap Pins and Red LED (GPIO #0)](#huzzah-boot-strap-pins-and-red-led-gpio-0)
+    - [CC1101](#cc1101)
+  - [MQTT Integration](#mqtt-integration)
+  - [Multiple Devices](#multiple-devices)
+  - [Home Assistant Best Practice: Utility Meter Helper](#home-assistant-best-practice-utility-meter-helper)
+    - [Migrating Sensor History Between Platforms](#migrating-sensor-history-between-platforms)
+    - [Historical Data from Meter](#historical-data-from-meter)
+  - [Configuration](#configuration)
+    - [Local Development Setup](#local-development-setup)
+    - [Reading Schedule](#reading-schedule)
+    - [Time zone offset and wake-up window (simple)](#time-zone-offset-and-wake-up-window-simple)
+    - [Home Assistant Discovery Toggle (MQTT mode)](#home-assistant-discovery-toggle-mqtt-mode)
+    - [Radio and frequency (advanced)](#radio-and-frequency-advanced)
+    - [Frequency Configuration](#frequency-configuration)
+      - [How it works](#how-it-works)
+      - [Example](#example)
+    - [Adaptive Frequency Management](#adaptive-frequency-management)
+      - [When to clear EEPROM](#when-to-clear-eeprom)
+  - [Troubleshooting](#troubleshooting)
+    - [Meter reads fail: near-field RF saturation (device too close to meter)](#meter-reads-fail-near-field-rf-saturation-device-too-close-to-meter)
+    - [Corrupted or Invalid Volume Readings](#corrupted-or-invalid-volume-readings)
+    - [ESP32 build: ModuleNotFoundError: No module named 'intelhex'](#esp32-build-modulenotfounderror-no-module-named-intelhex)
+    - [ESP32 compile errors about ESP8266 headers](#esp32-compile-errors-about-esp8266-headers)
+    - [Frequency Adjustment](#frequency-adjustment)
+    - [Business Hours](#business-hours)
+    - [Serial Number Starting with 0](#serial-number-starting-with-0)
+    - [Distance Between Device and Meter](#distance-between-device-and-meter)
+  - [Important: Utility Read Counter Compatibility](#important-utility-read-counter-compatibility)
+    - [Recommended Actions](#recommended-actions)
+  - [Credits](#credits)
+  - [Legal Notice](#legal-notice)
+    - [Community Resources](#community-resources)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -1002,10 +1025,10 @@ If you regularly read your meter yourself:
 
 This project builds on reverse engineering efforts by:
 
-- La Maison Simon (<http://www.lamaisonsimon.fr/>)
-- @neutrinus and @psykokwak on GitHub
+- La Maison Simon (site no longer active; archived copy in [docs/datasheets](docs/datasheets/maison2_%20water_counter_water_counter%20%5BThe%20WIKI%20of%20Maison%20Simon%5D.mhtml))
+- [@neutrinus](https://github.com/neutrinus) and [@psykokwak](https://github.com/psykokwak-com) on GitHub
 
-The original software (and much of the foundational work) was initially developed [on the La Maison Simon wiki](http://www.lamaisonsimon.fr/wiki/doku.php?id=maison2:compteur_d_eau:compteur_d_eau), later published on GitHub by @neutrinus [in the everblu-meters repository](https://github.com/neutrinus/everblu-meters), and subsequently forked by [psykokwak](https://github.com/psykokwak-com/everblu-meters-esp8266).
+The original software (and much of the foundational work) was initially developed [on the La Maison Simon wiki](docs/datasheets/maison2_%20water_counter_water_counter%20%5BThe%20WIKI%20of%20Maison%20Simon%5D.mhtml) (archived; site no longer active), later published on GitHub by [@neutrinus](https://github.com/neutrinus) [in the everblu-meters repository](https://github.com/neutrinus/everblu-meters), and subsequently forked by [psykokwak](https://github.com/psykokwak-com/everblu-meters-esp8266).
 
 Their original projects did not include an open-source licence. If you reuse or modify their specific code, please review their repositories and respect any stated limitations or intentions.
 
@@ -1027,7 +1050,7 @@ Consider obtaining utility permission. Never use on meters you don't own. Procee
 
 ### Community Resources
 
-- [Maison Simon Wiki (FR): RADIAN protocol explained](https://lamaisonsimon.fr/wiki/doku.php?id=eau:sonde_eau_radio)
+- [Maison Simon Wiki (FR): RADIAN protocol (archived)](docs/datasheets/maison2_%20water_counter_water_counter%20%5BThe%20WIKI%20of%20Maison%20Simon%5D.mhtml)
 - [ESP8266/ESP32 + CC1101 decoder](https://github.com/neutrinus/everblu-meters)
 
 ---

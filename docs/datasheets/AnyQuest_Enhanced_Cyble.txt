@@ -1,0 +1,134 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+AnyQuest
+Enhanced Cyble
+Radio Module for Mobile AMR
+
+
+Built on Itron proven expertise to design and manufacture high performance radio modules, AnyQuest Enhanced is the signiﬁcant next evolution step going far beyond the simple reading of the actual meter index for billing purpose.
+
+Mobile meter data collection systems have been widely adopted by utilities and service companies. This mature
+technology signiﬁcantly accelerates meter reading speed and avoids risk of visual reading mistakes. It also largely improves meter readers safety and customer satisfaction - avoiding intrusion in private facilities.
+AnyQuest Enhanced offers the beneﬁts of unprecedented functionalities within a mobile data collection system. Whether your challenge is to reduce non-revenue water, manage water conservation programs, or increase operation efﬁciency, the versatility of AnyQuest Enhanced functionalities provides you all the necessary tools.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+SYSTEM                                                                                                                                                                  knowledge to shape  your future
+ENHANCED FUNCTIONALITIES
+AnyQuest delivers a comprehensive list of functionalities to get the most out of the mobile data collection process.
+*functions also available with EverBlu Cyble Enhanced (Fixed network ready)
+
+
+
+
+Volume index                        Volume index at time of reading
+
+Preset billing date                  Volume index recorded at 4 preset dates (programmable)
+
+Data-logging                          History of up to 181 consumption intervals
+(hourly,daily,weekly,monthly)
+2 Time-Of-Use Indexes          Registers consumption within a deﬁned intervals of the year
+
+Volume above threshold         Total consumption above a high ﬂow-rate threshold
+
+
+
+AnyQuest Software
+
+Volume below threshold         Total consumption below a low ﬂow-rate threshold
+
+Meter sizing indicators          2 x 13 monthly indicators if the meter is oversized or undersized
+
+Leakage information               13 month history of number of leakage days
+
+Backﬂow volume and alarm   Total backﬂow volume and 13 monthly alarms
+
+Meter stopped detection        Alarm if no consumption over a conﬁgurable period has been recorded
+Reversed meter detection      Alarm if > 1000 consecutive target turns in reverse ﬂow have been recorded
+
+Module tamper detection       Alarm if the radio module module has been tampered
+
+Alarm log                                Log of start and end dates for last recorded alarms
+
+Peak ﬂow-rates                     5 highest peak ﬂow-rate values with date of occurrence
+
+Peak ﬂow alams                   13 monthly alarms if the peak ﬂow threshold has been exceeded
+
+
+
+Functional Speciﬁcations
+Dimensions                                               92 x 57 x 50 mm Power source                                         Lithium battery Battery lifetime (min)*                               15 years
+Case protection                                        IP68
+Relative humidity                                       0 to 100% - submersible
+Operating temperature **                        -10°C / +55°C***
+Radio Frequency Features
+Protocol                      RADIAN
+Modulation                  Frequency Shift Keying
+Frequency carrier        433.82 MHz Radiated power         ≤ 10 mW Transmission             Symmetrical 2-way
+communication
+Accidental temperature                          -20°C / +70°C
+Conformity                                                  certiﬁed, in accordance with the European
+R&TTE directive (1999/5/EC)
+* Under normal applications within the speciﬁed reference operating conditions.
+** High Temperature (HT) version also available on request.
+*** Operation: +5°C to +35°C / Storage: +5°C to +35°C / Transport: Min. -20°C (< 24 hours continuous), Max. +70°C (< 24 hours continuous) / Min. operational temperature: -10°C (< 15 days/years) / Max. operational temperature: +55°C (< 15 days/years).
+Line of sight reading
+distance (LOS)
+> 1500m
+
+
+
+
+Our company is the world’s leading provider of smart metering, data collection and utility software systems, with over
+8,000 utilities worldwide relying on our technology to optimize the delivery and use of energy and water.
+
+To realize your smarter energy and water future, start here: www.itron.com
+
+
+For more information, contact your local sales representative or agency:                                                                                                   ITRON WATER METERING
+9, rue Ampère
+71031 Mâcon cedex
+France
+Phone:    +33 3 85 29 39 00
+Fax:        +33 3 85 29 38 58
+
+
+While Itron strives to make the content of its marketing materials as timely and accurate as possible, Itron makes no claims, promises, or guarantees about the accuracy, completeness, or adequacy of, and expressly disclaims liability for errors and omissions in, such materials. No warranty of any kind, implied, expressed, or statutory, including but not limited to the warranties of non-infringement of third party rights, title, merchantability, and fitness for a particular purpose, is given with respect to the content of these marketing materials.
+© Copyright 2011, Itron. All rights reserved. SYS-0029.2-EN-09.11
