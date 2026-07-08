@@ -13,6 +13,8 @@ Releases are created manually by tagging commits with version tags matching `v*.
 - Keep PR coverage explicit per release so branch-only work is auditable against merge history.
 - Add new versions below, not above this section.
 
+## [Unreleased]
+
 ## [v3.1.1] - 2026-07-08
 
 ### AI Metadata
