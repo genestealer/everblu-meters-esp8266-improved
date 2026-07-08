@@ -13,7 +13,19 @@ Releases are created manually by tagging commits with version tags matching `v*.
 - Keep PR coverage explicit per release so branch-only work is auditable against merge history.
 - Add new versions below, not above this section.
 
-## [Unreleased]
+## [v3.1.1] - 2026-07-08
+
+### AI Metadata
+
+```yaml
+release_type: patch
+base_branch: main
+release_branch: develop
+includes_prs: [128]
+notable_superseded_work: []
+scope_summary:
+  - "CC1101 TX data-rate restoration fix for reliable wake-up bursts on repeat reads"
+```
 
 ### Fixed
 
