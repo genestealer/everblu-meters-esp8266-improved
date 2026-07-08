@@ -22,12 +22,19 @@
 [![Release](https://img.shields.io/github/v/release/genestealer/everblu-meters-esp8266-improved?sort=semver)](https://github.com/genestealer/everblu-meters-esp8266-improved/releases)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.md)
 
-Fetch water or gas usage data from Itron EverBlu Cyble Enhanced RF meters using the RADIAN protocol (Sontex, Itron) on 433 MHz with an ESP32/ESP8266 and CC1101 transceiver.
-Integrated with Home Assistant via MQTT AutoDiscovery and ESPHome external component
+Read Itron/Actaris EverBlu Cyble Enhanced RF water and gas meters (RADIAN protocol, Sontex/Itron) on 433 MHz using an ESP8266 or ESP32 and a CC1101 transceiver, then publish readings to Home Assistant.
+
+Two independent deployment targets share the same core radio/protocol logic:
+
+- **ESPHome external component** (recommended) — native Home Assistant integration, no MQTT broker.
+- **Standalone firmware with MQTT** — PlatformIO/Arduino build with MQTT AutoDiscovery.
 
 **Supports both water meters (readings in liters) and gas meters (readings in cubic meters)**.
 
 ---
+
+<details>
+<summary>Table of Contents</summary>
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
@@ -96,6 +103,8 @@ Integrated with Home Assistant via MQTT AutoDiscovery and ESPHome external compo
     - [Community Resources](#community-resources)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
+</details>
 
 
 

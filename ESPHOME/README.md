@@ -1,6 +1,9 @@
 # ESPHome Integration for EverBlu Cyble Enhanced Meters
 
-Complete ESPHome custom component for reading EverBlu Cyble Enhanced water and gas meters. This integration connects to Home Assistant without requiring an MQTT broker.
+Native ESPHome external component for reading EverBlu Cyble Enhanced water and gas meters (RADIAN protocol, 433 MHz) with an ESP8266/ESP32 + CC1101. It integrates directly with Home Assistant via the ESPHome API — no MQTT broker required — and shares the same core radio/protocol code as the standalone MQTT firmware.
+
+<details>
+<summary>Table of Contents</summary>
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
@@ -58,6 +61,8 @@ Complete ESPHome custom component for reading EverBlu Cyble Enhanced water and g
   - [Linting & pre-commit](#linting--pre-commit)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
+</details>
 
 
 
