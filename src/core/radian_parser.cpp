@@ -102,6 +102,57 @@ bool radian_parse_primary_data(const uint8_t *decoded_buffer, size_t size, struc
         }
     }
 
+    // Meter real-time clock and identifier string. Byte offsets are taken
+    // directly from the RADIAN reference display_meter_report():
+    //   [24]=day [25]=month [26]=year(20xx) [28]=hour [29]=minute [30]=second
+    //   [32..42]=ASCII meter type/identifier (NUL-terminated)
+    // Both are best-effort extras: a meter with an unset clock or a blank
+    // identifier must not cause an otherwise valid reading to be discarded, so
+    // failures only leave clock_valid false / meter_type empty.
+    if (size >= 31)
+    {
+        const uint8_t day = decoded_buffer[24];
+        const uint8_t month = decoded_buffer[25];
+        const uint8_t year = decoded_buffer[26];
+        const uint8_t hour = decoded_buffer[28];
+        const uint8_t minute = decoded_buffer[29];
+        const uint8_t second = decoded_buffer[30];
+
+        if (day >= 1 && day <= 31 && month >= 1 && month <= 12 &&
+            hour <= 23 && minute <= 59 && second <= 59)
+        {
+            out->clock_day = day;
+            out->clock_month = month;
+            out->clock_year = year;
+            out->clock_hour = hour;
+            out->clock_minute = minute;
+            out->clock_second = second;
+            out->clock_valid = true;
+        }
+    }
+
+    if (size >= 33)
+    {
+        size_t n = 0;
+        const size_t max_chars = sizeof(out->meter_type) - 1;
+        for (size_t idx = 32; idx < size && idx <= 42 && n < max_chars; idx++)
+        {
+            const uint8_t c = decoded_buffer[idx];
+            if (c == 0x00)
+            {
+                break; // NUL terminates the string
+            }
+            if (c < 0x20 || c > 0x7E)
+            {
+                // Non-printable byte: not a real identifier, discard partial.
+                n = 0;
+                break;
+            }
+            out->meter_type[n++] = (char)c;
+        }
+        out->meter_type[n] = '\0';
+    }
+
     out->history_available = size >= 118;
     return true;
 }

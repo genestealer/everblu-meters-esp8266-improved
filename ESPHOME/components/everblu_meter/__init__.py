@@ -91,6 +91,8 @@ CONF_HISTORY_JSON = "history_json"
 CONF_FIRMWARE_VERSION = "firmware_version"
 CONF_METER_SERIAL_SENSOR = "meter_serial_sensor"
 CONF_METER_YEAR_SENSOR = "meter_year_sensor"
+CONF_METER_CLOCK_SENSOR = "meter_clock_sensor"
+CONF_METER_MODEL_SENSOR = "meter_model_sensor"
 CONF_READING_SCHEDULE_SENSOR = "reading_schedule_sensor"
 CONF_READING_TIME_UTC_SENSOR = "reading_time_utc_sensor"
 CONF_ACTIVE_READING = "active_reading"
@@ -378,6 +380,14 @@ CONFIG_SCHEMA = (
             ),
             cv.Optional(CONF_METER_YEAR_SENSOR): text_sensor.text_sensor_schema(
                 icon="mdi:calendar",
+                entity_category="diagnostic",
+            ),
+            cv.Optional(CONF_METER_CLOCK_SENSOR): text_sensor.text_sensor_schema(
+                icon="mdi:clock-digital",
+                entity_category="diagnostic",
+            ),
+            cv.Optional(CONF_METER_MODEL_SENSOR): text_sensor.text_sensor_schema(
+                icon="mdi:barcode",
                 entity_category="diagnostic",
             ),
             cv.Optional(CONF_READING_SCHEDULE_SENSOR): text_sensor.text_sensor_schema(
@@ -681,6 +691,14 @@ async def to_code(config):
     if CONF_METER_YEAR_SENSOR in config:
         sens = await text_sensor.new_text_sensor(config[CONF_METER_YEAR_SENSOR])
         cg.add(var.set_meter_year_sensor(sens))
+
+    if CONF_METER_CLOCK_SENSOR in config:
+        sens = await text_sensor.new_text_sensor(config[CONF_METER_CLOCK_SENSOR])
+        cg.add(var.set_meter_clock_sensor(sens))
+
+    if CONF_METER_MODEL_SENSOR in config:
+        sens = await text_sensor.new_text_sensor(config[CONF_METER_MODEL_SENSOR])
+        cg.add(var.set_meter_model_sensor(sens))
 
     if CONF_READING_SCHEDULE_SENSOR in config:
         sens = await text_sensor.new_text_sensor(config[CONF_READING_SCHEDULE_SENSOR])

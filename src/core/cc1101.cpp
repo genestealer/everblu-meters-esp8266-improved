@@ -1020,6 +1020,22 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
   data.time_end = primary.time_end;
   data.history_available = primary.history_available;
 
+  // Meter real-time clock and identifier string, decoded per the RADIAN
+  // reference field map (display_meter_report). Logged for diagnostics; these
+  // extras never gate acceptance of the reading.
+  if (primary.clock_valid)
+  {
+    echo_debug(debug_out,
+               "[CC1101] Meter clock %02u/%02u/20%02u %02u:%02u:%02u type='%s'\n",
+               primary.clock_day, primary.clock_month, primary.clock_year,
+               primary.clock_hour, primary.clock_minute, primary.clock_second,
+               primary.meter_type);
+    snprintf(data.meter_time, sizeof(data.meter_time), "20%02u-%02u-%02u %02u:%02u:%02u",
+             primary.clock_year, primary.clock_month, primary.clock_day,
+             primary.clock_hour, primary.clock_minute, primary.clock_second);
+  }
+  snprintf(data.meter_type, sizeof(data.meter_type), "%s", primary.meter_type);
+
   // Extract extended data if buffer is large enough
   if (size >= 49)
   { // Need at least 49 bytes to safely access decoded_buffer[48]
@@ -1349,7 +1365,12 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
 {
   uint8_t l_byte_in_rx = 0;
   uint16_t l_total_byte = 0;
-  uint16_t l_radian_frame_size_byte = ((size_byte * (8 + 3)) / 8) + 1;
+  // On-air framing per byte is 1 start + 8 data + 3 stop = 12 bits (see
+  // encode2serial_1_3). The previous (8 + 3) = 11-bit estimate under-counted the
+  // raw capture length, so the hard cap l_expected_bytes stopped ~60 raw bytes
+  // early and the last ~4 decoded bytes (13th history month + CRC trailer) were
+  // lost. (8 + 4) = 12 bits sizes the capture to cover the whole frame.
+  uint16_t l_radian_frame_size_byte = ((size_byte * (8 + 4)) / 8) + 1;
   int l_tmo = 0;
   int8_t l_Rssi_dbm;
   uint8_t l_lqi, l_freq_est;
@@ -1889,15 +1910,19 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
   }
   // delay(30); //50ms de 111111  , mais on a 7+3ms de printf et xxms calculs
   /*34ms 0101...01  14.25ms 000...000  14ms 1111...11111  582ms de data avec l'index */
-  echo_debug(1, "[METER] Waiting for data frame (124-byte frame, 700ms timeout)...\n");
-  rxBuffer_size = receive_radian_frame(0x7C, 700, rxBuffer, sizeof(rxBuffer)); // 700ms timeout matches working 91jj ESPHome implementation
+  echo_debug(1, "[METER] Waiting for data frame (124-byte frame, 1000ms timeout)...\n");
+  // 1000ms: the larger 12-bit-framing raw capture (~748 bytes) takes longer to
+  // drain than the old 684-byte capture, so the previous 700ms budget is tight.
+  rxBuffer_size = receive_radian_frame(0x7C, 1000, rxBuffer, sizeof(rxBuffer));
   if (rxBuffer_size)
   {
     echo_debug(1, "[METER] Data frame received - decoding %d raw bytes...\n", rxBuffer_size);
     if (debug_out)
     {
-      //  echo_debug(debug_out, "rxBuffer:\n");
-      //  show_in_hex_array(rxBuffer, rxBuffer_size);
+      // Raw pre-decode oversampled buffer, for offline analysis of the full
+      // 124-byte frame (13th history month + CRC trailer live in the tail).
+      echo_debug(debug_out, "[CC1101] Raw pre-decode RX buffer (%d oversampled bytes):\n", rxBuffer_size);
+      show_in_hex_array(rxBuffer, rxBuffer_size);
     }
 
     meter_data_size = decode_4bitpbit_serial(rxBuffer, rxBuffer_size, meter_data);

@@ -113,6 +113,8 @@ void EverbluMeterComponent::setup() {
   this->data_publisher_->set_version_sensor(this->version_sensor_);
   this->data_publisher_->set_meter_serial_sensor(this->meter_serial_sensor_);
   this->data_publisher_->set_meter_year_sensor(this->meter_year_sensor_);
+  this->data_publisher_->set_meter_clock_sensor(this->meter_clock_sensor_);
+  this->data_publisher_->set_meter_model_sensor(this->meter_model_sensor_);
   this->data_publisher_->set_reading_schedule_sensor(this->reading_schedule_sensor_);
   this->data_publisher_->set_reading_time_utc_sensor(this->reading_time_utc_sensor_);
   this->data_publisher_->set_active_reading_sensor(this->active_reading_sensor_);

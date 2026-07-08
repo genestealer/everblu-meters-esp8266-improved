@@ -128,6 +128,8 @@ class EverbluMeterComponent final : public PollingComponent,
   void set_version_sensor(text_sensor::TextSensor *sensor) { this->version_sensor_ = sensor; }
   void set_meter_serial_sensor(text_sensor::TextSensor *sensor) { this->meter_serial_sensor_ = sensor; }
   void set_meter_year_sensor(text_sensor::TextSensor *sensor) { this->meter_year_sensor_ = sensor; }
+  void set_meter_clock_sensor(text_sensor::TextSensor *sensor) { this->meter_clock_sensor_ = sensor; }
+  void set_meter_model_sensor(text_sensor::TextSensor *sensor) { this->meter_model_sensor_ = sensor; }
   void set_reading_schedule_sensor(text_sensor::TextSensor *sensor) { this->reading_schedule_sensor_ = sensor; }
   void set_reading_time_utc_sensor(text_sensor::TextSensor *sensor) { this->reading_time_utc_sensor_ = sensor; }
 
@@ -200,6 +202,8 @@ class EverbluMeterComponent final : public PollingComponent,
   text_sensor::TextSensor *version_sensor_{nullptr};
   text_sensor::TextSensor *meter_serial_sensor_{nullptr};
   text_sensor::TextSensor *meter_year_sensor_{nullptr};
+  text_sensor::TextSensor *meter_clock_sensor_{nullptr};
+  text_sensor::TextSensor *meter_model_sensor_{nullptr};
   text_sensor::TextSensor *reading_schedule_sensor_{nullptr};
   text_sensor::TextSensor *reading_time_utc_sensor_{nullptr};
 

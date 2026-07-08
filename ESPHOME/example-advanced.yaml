@@ -204,6 +204,10 @@ everblu_meter:
     name: "Meter Serial"
   meter_year_sensor:
     name: "Meter Year"
+  meter_clock_sensor:
+    name: "Meter Clock"
+  meter_model_sensor:
+    name: "Meter Type"
   reading_schedule_sensor:
     name: "Reading Schedule"
   reading_time_utc_sensor:

@@ -92,6 +92,18 @@ void ESPHomeDataPublisher::publishMeterReading(const tmeter_data &data, const ch
         timestamp_sensor_->publish_state(timestamp);
     }
 
+    // Meter's own real-time clock and type/identifier string (decoded from the
+    // frame). Only published when present so an unset clock stays "unknown".
+    if (meter_clock_sensor_ && data.meter_time[0] != '\0')
+    {
+        meter_clock_sensor_->publish_state(data.meter_time);
+    }
+
+    if (meter_model_sensor_ && data.meter_type[0] != '\0')
+    {
+        meter_model_sensor_->publish_state(data.meter_type);
+    }
+
     // Frequency estimate from CC1101
     if (frequency_estimate_sensor_)
     {

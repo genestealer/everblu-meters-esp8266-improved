@@ -709,6 +709,10 @@ void onUpdateData()
   delay(5);
   mqtt.publish(String(mqttBaseTopic) + "/timestamp", iso8601, true); // timestamp since epoch in UTC
   delay(5);
+  mqtt.publish(String(mqttBaseTopic) + "/meter_time", meter_data.meter_time, true); // meter's own real-time clock
+  delay(5);
+  mqtt.publish(String(mqttBaseTopic) + "/meter_type", meter_data.meter_type, true); // meter type/identifier string
+  delay(5);
 
   snprintf(valueBuffer, sizeof(valueBuffer), "%d", calculateLQIToPercentage(meter_data.lqi));
   mqtt.publish(String(mqttBaseTopic) + "/lqi_percentage", valueBuffer, true);
@@ -1131,6 +1135,8 @@ void publishHADiscovery()
   publishDiscoveryMessage("sensor", "everblu_meter_lqi_percentage", buildDiscoveryJson("Signal Quality (LQI)", "lqi_percentage", "mdi:signal-cellular-outline", "%", nullptr, "measurement", nullptr));
   publishDiscoveryMessage("sensor", "everblu_meter_time_start", buildDiscoveryJson("Wake Time", "time_start", "mdi:clock-start", nullptr, nullptr, nullptr, nullptr));
   publishDiscoveryMessage("sensor", "everblu_meter_time_end", buildDiscoveryJson("Sleep Time", "time_end", "mdi:clock-end", nullptr, nullptr, nullptr, nullptr));
+  publishDiscoveryMessage("sensor", "everblu_meter_meter_time", buildDiscoveryJson("Meter Clock", "meter_time", "mdi:clock-digital", nullptr, nullptr, nullptr, "diagnostic"));
+  publishDiscoveryMessage("sensor", "everblu_meter_meter_type", buildDiscoveryJson("Meter Type", "meter_type", "mdi:barcode", nullptr, nullptr, nullptr, "diagnostic"));
   publishDiscoveryMessage("sensor", "everblu_meter_total_attempts", buildDiscoveryJson("Total Read Attempts", "total_attempts", "mdi:counter", nullptr, nullptr, "total_increasing", "diagnostic"));
   publishDiscoveryMessage("sensor", "everblu_meter_successful_reads", buildDiscoveryJson("Successful Reads", "successful_reads", "mdi:check-circle", nullptr, nullptr, "total_increasing", "diagnostic"));
   publishDiscoveryMessage("sensor", "everblu_meter_failed_reads", buildDiscoveryJson("Failed Reads", "failed_reads", "mdi:alert-circle", nullptr, nullptr, "total_increasing", "diagnostic"));

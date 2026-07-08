@@ -348,6 +348,67 @@ void test_radian_validate_crc(void)
     TEST_ASSERT_TRUE(radian_validate_crc(implicit, sizeof(implicit)));
 }
 
+// ---------------------------------------------------------------------------
+// Extended field decode: meter real-time clock and identifier string.
+//
+// Byte offsets confirmed against the RADIAN reference implementation
+// (display_meter_report in the radianprotocol.com sources) and verified
+// against the captured home_001 fixture:
+//   [24]=day [25]=month [26]=year(20xx) [28]=hour [29]=minute [30]=second
+//   [32..42]=ASCII meter type/identifier
+// ---------------------------------------------------------------------------
+void test_radian_parse_extended_fields_home001(void)
+{
+    // Captured EverBlu Cyble response (test/fixtures/meter_frames/fixtures.lst,
+    // fixture "home_001"). This is the real 120-byte decoded frame.
+    static const uint8_t frame[] = {
+        0x7C, 0x11, 0x00, 0x45, 0x20, 0x0A, 0x50, 0x14, 0x00, 0x45, 0x14, 0x03,
+        0xEE, 0xD6, 0x00, 0x01, 0x08, 0x00, 0x45, 0xBB, 0x0B, 0x00, 0x40, 0x06,
+        0x1B, 0x04, 0x1A, 0x01, 0x09, 0x3B, 0x31, 0x5F, 0x31, 0x33, 0x33, 0x32,
+        0x39, 0x30, 0x41, 0x4C, 0x30, 0x32, 0x00, 0x00, 0x06, 0x12, 0x04, 0x01,
+        0xD7, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x80, 0x80, 0x80,
+        0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x84, 0xCB, 0x9D,
+        0x09, 0x00, 0x36, 0xC4, 0x09, 0x00, 0xF5, 0xF5, 0x09, 0x00, 0x31, 0x2F,
+        0x0A, 0x00, 0xB6, 0x70, 0x0A, 0x00, 0xF5, 0xB1, 0x0A, 0x00, 0x10, 0xE0,
+        0x0A, 0x00, 0x8D, 0x02, 0x0B, 0x00, 0x04, 0x1F, 0x0B, 0x00, 0xBD, 0x3E,
+        0x0B, 0x00, 0xFF, 0x5D, 0x0B, 0x00, 0x9A, 0x79, 0x0B, 0x00, 0x07, 0x97};
+
+    struct radian_primary_data out;
+    TEST_ASSERT_TRUE(radian_parse_primary_data(frame, sizeof(frame), &out));
+
+    // Sanity: the already-supported fields still decode as expected.
+    TEST_ASSERT_EQUAL_UINT32(768837UL, out.volume);
+    TEST_ASSERT_EQUAL_UINT8(6, out.time_start);
+    TEST_ASSERT_EQUAL_UINT8(18, out.time_end);
+
+    // Meter real-time clock: 27/04/2026 09:59:49.
+    TEST_ASSERT_TRUE(out.clock_valid);
+    TEST_ASSERT_EQUAL_UINT8(27, out.clock_day);
+    TEST_ASSERT_EQUAL_UINT8(4, out.clock_month);
+    TEST_ASSERT_EQUAL_UINT8(26, out.clock_year); // 2000 + 26 = 2026
+    TEST_ASSERT_EQUAL_UINT8(9, out.clock_hour);
+    TEST_ASSERT_EQUAL_UINT8(59, out.clock_minute);
+    TEST_ASSERT_EQUAL_UINT8(49, out.clock_second);
+
+    // ASCII meter type / identifier string (bytes [32..42]).
+    TEST_ASSERT_EQUAL_STRING("133290AL02", out.meter_type);
+}
+
+// A frame large enough for the primary fields but too short to reach the
+// clock/identifier bytes must decode cleanly with those extras left blank.
+void test_radian_parse_extended_fields_absent_when_short(void)
+{
+    // Full-size backing buffer (make_test_buf writes up to index 48), but the
+    // reading is parsed with a logical size of 30 so the clock/type bytes are
+    // out of range.
+    uint8_t buf[120];
+    make_test_buf(buf, sizeof(buf), 774431UL, 6, 18);
+    struct radian_primary_data out;
+    TEST_ASSERT_TRUE(radian_parse_primary_data(buf, 30, &out));
+    TEST_ASSERT_FALSE(out.clock_valid);
+    TEST_ASSERT_EQUAL_STRING("", out.meter_type);
+}
+
 void test_replay_meter_fixtures(void)
 {
     FixtureLoadResult loaded = load_fixtures();
@@ -763,6 +824,8 @@ int main(int argc, char **argv)
     RUN_TEST(test_radian_decode_framing_error_truncates);
     RUN_TEST(test_radian_reading_within_history_bounds);
     RUN_TEST(test_radian_reading_within_history_bounds_skips_when_insufficient);
+    RUN_TEST(test_radian_parse_extended_fields_home001);
+    RUN_TEST(test_radian_parse_extended_fields_absent_when_short);
     RUN_TEST(test_replay_meter_fixtures);
     return UNITY_END();
 }

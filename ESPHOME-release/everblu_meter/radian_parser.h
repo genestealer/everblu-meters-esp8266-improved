@@ -27,6 +27,23 @@ struct radian_primary_data
     uint8_t time_start;
     uint8_t time_end;
     bool history_available;
+
+    // Meter real-time clock, decoded from the frame per the RADIAN reference
+    // implementation (display_meter_report in the radianprotocol.com sources):
+    //   byte [24]=day  [25]=month  [26]=year (add 2000)  [28]=hour  [29]=minute  [30]=second
+    // clock_valid is false when the bytes are out of range (e.g. an unset
+    // clock); an invalid clock never causes the whole reading to be discarded.
+    uint8_t clock_day;
+    uint8_t clock_month;
+    uint8_t clock_year; // two-digit year, full year = 2000 + clock_year
+    uint8_t clock_hour;
+    uint8_t clock_minute;
+    uint8_t clock_second;
+    bool clock_valid;
+
+    // ASCII meter type / identifier string, bytes [32..42] of the frame
+    // (NUL-terminated in the reference). Empty when the bytes are not printable.
+    char meter_type[12]; // up to 11 printable chars + NUL
 };
 
 uint16_t radian_crc_kermit(const uint8_t *input_ptr, size_t num_bytes);

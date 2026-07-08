@@ -107,6 +107,8 @@ public:
     }
     void set_meter_serial_sensor(esphome::text_sensor::TextSensor *sensor) { meter_serial_sensor_ = sensor; }
     void set_meter_year_sensor(esphome::text_sensor::TextSensor *sensor) { meter_year_sensor_ = sensor; }
+    void set_meter_clock_sensor(esphome::text_sensor::TextSensor *sensor) { meter_clock_sensor_ = sensor; }
+    void set_meter_model_sensor(esphome::text_sensor::TextSensor *sensor) { meter_model_sensor_ = sensor; }
     void set_reading_schedule_sensor(esphome::text_sensor::TextSensor *sensor) { reading_schedule_sensor_ = sensor; }
     void set_reading_time_utc_sensor(esphome::text_sensor::TextSensor *sensor) { reading_time_utc_sensor_ = sensor; }
 
@@ -177,6 +179,9 @@ private:
     static esphome::text_sensor::TextSensor *version_sensor_;
     esphome::text_sensor::TextSensor *meter_serial_sensor_{nullptr};
     esphome::text_sensor::TextSensor *meter_year_sensor_{nullptr};
+    // Per-read meter-reported fields (clock and type/identifier from the frame).
+    esphome::text_sensor::TextSensor *meter_clock_sensor_{nullptr};
+    esphome::text_sensor::TextSensor *meter_model_sensor_{nullptr};
     esphome::text_sensor::TextSensor *reading_schedule_sensor_{nullptr};
     esphome::text_sensor::TextSensor *reading_time_utc_sensor_{nullptr};
 
