@@ -4,7 +4,6 @@ All notable changes to this project will be documented in this file.
 
 Releases are created manually by tagging commits with version tags matching `v*.*.*` (e.g., `v2.1.0`). Users should build from source and configure `private.h` with their own meter settings.
 
-## [Unreleased]
 
 ## AI Notes For Maintainers And Tools
 
@@ -12,6 +11,29 @@ Releases are created manually by tagging commits with version tags matching `v*.
 - The `Unreleased` section is for in-progress work and may be rewritten before tagging.
 - If an item was introduced and later superseded in the same release branch, keep only the final behavior in Added/Changed/Fixed/Removed and record superseded work in the AI metadata block.
 - Keep PR coverage explicit per release so branch-only work is auditable against merge history.
+- Add new versions below, not above this section.
+
+## [Unreleased]
+
+## [v3.1.1] - 2026-07-08
+
+### AI Metadata
+
+```yaml
+release_type: patch
+base_branch: main
+release_branch: develop
+includes_prs: [128]
+notable_superseded_work: []
+scope_summary:
+  - "CC1101 TX data-rate restoration fix for reliable wake-up bursts on repeat reads"
+```
+
+### Fixed
+
+- **Wake-up burst truncated to ~60ms on the second and later reads** ([#127](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/127)): `receive_radian_frame()` switches `MDMCFG4` to the 4x-oversampled 9.6 kbps RX rate, but `get_meter_data_for_meter()` never restored the 2.4 kbps TX rate before transmitting. Only the first read after boot worked (fresh from `cc1101_init()`); every later read clocked the wake-up burst out 4x too fast, draining the TX FIFO and hitting `TXFIFO_UNDERFLOW` (MARCSTATE 0x16) after ~60ms instead of the full ~2s burst. The TX phase now rewrites `MDMCFG4`/`MDMCFG3` to 2.4 kbps on every read.
+
+
 
 ## [v3.1.0] - 2026-07-07
 
