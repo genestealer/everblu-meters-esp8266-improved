@@ -49,6 +49,7 @@ See [SKILL.md](../SKILL.md) for general LLM coding-behavior guidelines (surgical
 
 ## Writing style (docs and comments)
 
+- Use UK English spelling and conventions (for example: colour, behaviour, optimise, centre).
 - Do not use em dashes (—). Rewrite the sentence, or use a colon, comma, parentheses, or separate sentences instead.
 - Avoid patterns that read as AI-generated text. See [Wikipedia: Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing) for the tells to avoid (for example: puffery, hollow "not only... but also" constructions, overuse of "moreover"/"furthermore", vague attributions, and needless summary sections).
 - Prefer plain, direct language that matches the surrounding text.

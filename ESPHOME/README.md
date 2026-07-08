@@ -1,15 +1,14 @@
 # ESPHome Integration for EverBlu Cyble Enhanced Meters
 
-Complete ESPHome custom component for reading EverBlu Cyble Enhanced water and gas meters. This integration connects to Home Assistant without requiring an MQTT broker.
+Native ESPHome external component for reading EverBlu Cyble Enhanced water and gas meters (RADIAN protocol, 433 MHz) with an ESP8266/ESP32 + CC1101. It integrates directly with Home Assistant via the ESPHome API (no MQTT broker required) and shares the same core radio/protocol code as the standalone MQTT firmware.
+
+<details>
+<summary>Table of Contents</summary>
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**
 
-- [Troubleshooting](#troubleshooting)
-  - [Corrupted or Invalid Volume Readings](#corrupted-or-invalid-volume-readings)
-  - [No Meter Response](#no-meter-response)
-  - [Signal Quality Issues](#signal-quality-issues)
 - [Documentation](#documentation)
   - [For End Users](#for-end-users)
   - [For Developers](#for-developers)
@@ -48,6 +47,10 @@ Complete ESPHome custom component for reading EverBlu Cyble Enhanced water and g
   - [Water Meter - Basic](#water-meter---basic)
   - [Gas Meter - Basic](#gas-meter---basic)
   - [With Full Monitoring](#with-full-monitoring)
+- [Troubleshooting](#troubleshooting)
+  - [Corrupted or Invalid Volume Readings](#corrupted-or-invalid-volume-readings)
+  - [No Meter Response](#no-meter-response)
+  - [Signal Quality Issues](#signal-quality-issues)
 - [Quick Troubleshooting](#quick-troubleshooting)
   - [Quick Fixes](#quick-fixes)
 - [License](#license)
@@ -59,52 +62,7 @@ Complete ESPHome custom component for reading EverBlu Cyble Enhanced water and g
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
-
-
-## Troubleshooting
-
-### Corrupted or Invalid Volume Readings
-
-If you're seeing:
-
-- Volume reading as 0, small values, or negative numbers
-- Historical data showing impossible decreases
-- Battery showing as 0 months
-
-**Enable hex dump debugging:**
-
-```yaml
-everblu_meter:
-  debug_cc1101: true  # Show raw 200-byte payload (default: false)
-```
-
-This will output detailed hex dumps of the decoded frame, helping identify:
-
-- Wrong byte offsets for your meter variant
-- Regional/manufacturing differences in data layout
-- Specific bytes causing parsing errors
-
-**Complete troubleshooting guide:** [../docs/TROUBLESHOOTING_CORRUPTED_READINGS.md](../docs/TROUBLESHOOTING_CORRUPTED_READINGS.md)
-
-### No Meter Response
-
-1. **Check hardware connections** (see hardware setup section)
-2. **Verify frequency**: Try frequency scan button
-3. **Check wake window**: Meter may only respond during specific hours
-4. **Increase retries**: `max_retries: 15`
-
-### Signal Quality Issues
-
-- **Low RSSI (< −90 dBm)**: Move ESP closer or improve antenna
-- **Very high RSSI (> −50 dBm) + CRC failures**: Near-field saturation — the signal is **too strong**. Move the device at least 1–2 m away from the meter. When the device is too close, the CC1101 front-end clips and every frame fails CRC even though RSSI looks excellent. The log will show `*** NEAR-FIELD SATURATION DETECTED ***` to confirm this. If the device must be permanently mounted close to the meter, add `rx_attenuation: 6` (or `12` / `18`) to your YAML configuration to limit the CC1101 LNA gain:
-  ```yaml
-  everblu_meter:
-    rx_attenuation: 6  # dB — values: 0 (default), 6, 12, 18
-  ```
-- **Enable auto_scan**: `auto_scan: true` (opt-in; enables startup Deep scan for extreme frequency drift)
-- **Try different times**: Signal quality varies by time of day
-
----
+</details>
 
 ## Documentation
 
@@ -136,7 +94,7 @@ This will output detailed hex dumps of the decoded frame, helping identify:
   - Dependency injection pattern
   - ESPHome integration patterns
   - How to extend the component
-  - Advanced customization
+  - Advanced customisation
 
 - **[Component README](components/everblu_meter/README.md)** - Component structure and development
   - Component file structure
@@ -154,9 +112,11 @@ This will output detailed hex dumps of the decoded frame, helping identify:
 
 ## Quick Start
 
+Getting a reading takes three steps: update your SPI configuration (see the breaking change below), add the external component to your ESPHome YAML, then build and flash.
+
 ## Breaking Change: SPI Configuration Required
 
-This component now uses ESPHome's native `spi:` bus integration. Existing YAML that relied on implicit CC1101 SPI pins must be updated.
+This component uses ESPHome's native `spi:` bus integration, so any older YAML that relied on the CC1101's implicit SPI pins must be updated.
 
 Previous configuration:
 
@@ -385,7 +345,7 @@ logger:
 ```yaml
 everblu_meter:
   timezone_offset: -300  # Minutes from UTC (e.g. UTC-5 = -300). Range: -720 to +720.
-                         # ⚠️ Does NOT auto-adjust for DST — update manually when clocks change.
+                         # ⚠️ Does NOT auto-adjust for DST. Update manually when clocks change.
 ```
 
 ## Features
@@ -393,11 +353,11 @@ everblu_meter:
 - **Native ESPHome Integration**: Works with Home Assistant via the ESPHome API
 - **Automatic Discovery**: Sensors appear automatically in Home Assistant
 - **Scheduled Readings**: Configure when and how often to read the meter
-- **Frequency Management**: Automatic frequency scanning and optimization
+- **Frequency Management**: Automatic frequency scanning and optimisation
 - **Comprehensive Monitoring**: Track signal quality, battery life, and reading statistics
 - **Multiple Meter Types**: Supports both water and gas meters
 - **Retry Logic**: Configurable retry attempts with cooldown periods
-- **Low Power**: Efficient reading schedule minimizes power consumption
+- **Low Power**: Efficient reading schedule minimises power consumption
 
 ## Example Configurations
 
@@ -532,7 +492,7 @@ The ESPHome component exposes a **history text sensor** containing 12 months of 
 **Use Cases:**
 
 - Bootstrap Home Assistant with 12 months of existing data on first setup
-- Analyze historical consumption patterns
+- Analyse historical consumption patterns
 - Compare current vs. previous month usage
 - Verify readings against utility bills
 - Pre-populate energy dashboards
@@ -570,11 +530,11 @@ The component uses a clean adapter pattern to separate platform-specific code fr
 ```text
 EverbluMeterComponent (ESPHome)
 ├── ESPHomeConfigProvider    → Configuration from YAML
-├── ESPHomeTimeProvider      → Time synchronization
+├── ESPHomeTimeProvider      → Time synchronisation
 ├── ESPHomeDataPublisher     → Sensor publishing
 └── MeterReader (shared)
     ├── CC1101               → Radio hardware
-    ├── FrequencyManager     → Frequency optimization
+    ├── FrequencyManager     → Frequency optimisation
     └── ScheduleManager      → Reading schedule
 ```
 
@@ -675,6 +635,53 @@ everblu_meter:
     name: "Reading Active"
 ```
 
+## Troubleshooting
+
+### Corrupted or Invalid Volume Readings
+
+If you're seeing:
+
+- Volume reading as 0, small values, or negative numbers
+- Historical data showing impossible decreases
+- Battery showing as 0 months
+
+**Enable hex dump debugging:**
+
+```yaml
+everblu_meter:
+  debug_cc1101: true  # Show raw 200-byte payload (default: false)
+```
+
+This will output detailed hex dumps of the decoded frame, helping identify:
+
+- Wrong byte offsets for your meter variant
+- Regional/manufacturing differences in data layout
+- Specific bytes causing parsing errors
+
+**Complete troubleshooting guide:** [../docs/TROUBLESHOOTING_CORRUPTED_READINGS.md](../docs/TROUBLESHOOTING_CORRUPTED_READINGS.md)
+
+### No Meter Response
+
+1. **Check hardware connections** (see hardware setup section)
+2. **Verify frequency**: Try frequency scan button
+3. **Check wake window**: Meter may only respond during specific hours
+4. **Increase retries**: `max_retries: 15`
+
+### Signal Quality Issues
+
+- **Low RSSI (< −90 dBm)**: Move ESP closer or improve antenna
+- **Very high RSSI (> −50 dBm) + CRC failures**: Near-field saturation, the signal is **too strong**. Move the device at least 1–2 m away from the meter. When the device is too close, the CC1101 front-end clips and every frame fails CRC even though RSSI looks excellent. The log will show `*** NEAR-FIELD SATURATION DETECTED ***` to confirm this. If the device must be permanently mounted close to the meter, add `rx_attenuation: 6` (or `12` / `18`) to your YAML configuration to limit the CC1101 LNA gain:
+
+  ```yaml
+  everblu_meter:
+    rx_attenuation: 6  # dB, values: 0 (default), 6, 12, 18
+  ```
+
+- **Enable auto_scan**: `auto_scan: true` (opt-in; enables startup Deep scan for extreme frequency drift)
+- **Try different times**: Signal quality varies by time of day
+
+---
+
 ## Quick Troubleshooting
 
 ### Quick Fixes
@@ -722,7 +729,7 @@ Based on the EverBlu Meters ESP8266 project with architectural improvements for 
 ## Links
 
 - **Main Project**: [Main README](../README.md)
-- **GitHub Repository**: <https://github.com/yourusername/everblu-meters-esp8266-improved>
+- **GitHub Repository**: <https://github.com/genestealer/everblu-meters-esp8266-improved>
 - **ESPHome Documentation**: <https://esphome.io/>
 - **Home Assistant**: <https://www.home-assistant.io/>
 
