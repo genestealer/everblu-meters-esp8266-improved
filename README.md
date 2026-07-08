@@ -40,74 +40,95 @@ Two independent deployment targets share the same core radio/protocol logic:
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**
 
-  - [**ESPHome** - Release V3.0.0](#esphome---release-v300)
-- [Features](#features)
-  - [Full feature list](#full-feature-list)
-  - [Advanced Frame Validation](#advanced-frame-validation)
-- [Integration Options](#integration-options)
-  - [Option 1: ESPHome Component (Recommended)](#option-1-esphome-component-recommended)
-  - [Option 2: Standalone with MQTT](#option-2-standalone-with-mqtt)
-  - [Quick Start: First Successful Reading](#quick-start-first-successful-reading)
-- [Hardware](#hardware)
-  - [Connections (ESP32/ESP8266 to CC1101)](#connections-esp32esp8266-to-cc1101)
-  - [CC1101](#cc1101)
-- [MQTT Integration](#mqtt-integration)
-- [Multiple Devices](#multiple-devices)
-- [Home Assistant Best Practice: Utility Meter Helper](#home-assistant-best-practice-utility-meter-helper)
-  - [Migrating Sensor History Between Platforms](#migrating-sensor-history-between-platforms)
-  - [Historical Data from Meter](#historical-data-from-meter)
-- [Configuration](#configuration)
-  - [Local Development Setup](#local-development-setup)
-  - [Reading Schedule](#reading-schedule)
-  - [Time zone offset and wake-up window (simple)](#time-zone-offset-and-wake-up-window-simple)
-  - [Home Assistant Discovery Toggle (MQTT mode)](#home-assistant-discovery-toggle-mqtt-mode)
-  - [Radio and frequency (advanced)](#radio-and-frequency-advanced)
-  - [Frequency Configuration](#frequency-configuration)
-  - [Adaptive Frequency Management](#adaptive-frequency-management)
-- [Troubleshooting](#troubleshooting)
-  - [Meter reads fail: near-field RF saturation (device too close to meter)](#meter-reads-fail-near-field-rf-saturation-device-too-close-to-meter)
-  - [Corrupted or Invalid Volume Readings](#corrupted-or-invalid-volume-readings)
-  - [ESP32 build: ModuleNotFoundError: No module named 'intelhex'](#esp32-build-modulenotfounderror-no-module-named-intelhex)
-  - [ESP32 compile errors about ESP8266 headers](#esp32-compile-errors-about-esp8266-headers)
-  - [Frequency Adjustment](#frequency-adjustment)
-  - [Business Hours](#business-hours)
-  - [Serial Number Starting with 0](#serial-number-starting-with-0)
-  - [Distance Between Device and Meter](#distance-between-device-and-meter)
-- [Important: Utility Read Counter Compatibility](#important-utility-read-counter-compatibility)
-  - [Recommended Actions](#recommended-actions)
-- [Credits](#credits)
-- [Legal Notice](#legal-notice)
-  - [Community Resources](#community-resources)
+- [Itron EverBlu Cyble Enhanced RF RADIAN Water/Gas Usage Data for MQTT Home Assistant \& ESPHome External Component](#itron-everblu-cyble-enhanced-rf-radian-watergas-usage-data-for-mqtt-home-assistant--esphome-external-component)
+  - [Build \& QA](#build--qa)
+  - [Platforms \& Capabilities](#platforms--capabilities)
+    - [**ESPHome** - Release V3.0.0](#esphome---release-v300)
+  - [Features](#features)
+    - [Full feature list](#full-feature-list)
+    - [Advanced Frame Validation](#advanced-frame-validation)
+  - [Integration Options](#integration-options)
+    - [Option 1: ESPHome Component (Recommended)](#option-1-esphome-component-recommended)
+    - [Option 2: Standalone with MQTT](#option-2-standalone-with-mqtt)
+    - [Quick Start: First Successful Reading](#quick-start-first-successful-reading)
+      - [1. Hardware you need](#1-hardware-you-need)
+      - [2. Files you must edit](#2-files-you-must-edit)
+      - [Meter Type Configuration](#meter-type-configuration)
+        - [Gas Meter Volume Divisor](#gas-meter-volume-divisor)
+          - [How We Determined the Correct Divisor](#how-we-determined-the-correct-divisor)
+      - [3. Build and upload the firmware](#3-build-and-upload-the-firmware)
+        - [First-time USB Upload](#first-time-usb-upload)
+        - [Over-The-Air (OTA) Updates](#over-the-air-ota-updates)
+  - [Hardware](#hardware)
+    - [Connections (ESP32/ESP8266 to CC1101)](#connections-esp32esp8266-to-cc1101)
+      - [Pin Mapping Reference](#pin-mapping-reference)
+      - [Important Notes](#important-notes)
+      - [Wiring Table](#wiring-table)
+      - [Regulatory Notes](#regulatory-notes)
+      - [Quick Reference: Wemos D1 Mini](#quick-reference-wemos-d1-mini)
+      - [Quick Reference: Adafruit Feather HUZZAH ESP8266](#quick-reference-adafruit-feather-huzzah-esp8266)
+      - [Quick Reference: ESP32 DevKit (esp32dev)](#quick-reference-esp32-devkit-esp32dev)
+      - [Adafruit Feather HUZZAH Silkscreen Labels](#adafruit-feather-huzzah-silkscreen-labels)
+      - [HUZZAH Boot-Strap Pins and Red LED (GPIO #0)](#huzzah-boot-strap-pins-and-red-led-gpio-0)
+    - [CC1101](#cc1101)
+  - [MQTT Integration](#mqtt-integration)
+  - [Multiple Devices](#multiple-devices)
+  - [Home Assistant Best Practice: Utility Meter Helper](#home-assistant-best-practice-utility-meter-helper)
+    - [Migrating Sensor History Between Platforms](#migrating-sensor-history-between-platforms)
+    - [Historical Data from Meter](#historical-data-from-meter)
+  - [Configuration](#configuration)
+    - [Local Development Setup](#local-development-setup)
+    - [Reading Schedule](#reading-schedule)
+    - [Time zone offset and wake-up window (simple)](#time-zone-offset-and-wake-up-window-simple)
+    - [Home Assistant Discovery Toggle (MQTT mode)](#home-assistant-discovery-toggle-mqtt-mode)
+    - [Radio and frequency (advanced)](#radio-and-frequency-advanced)
+    - [Frequency Configuration](#frequency-configuration)
+      - [How it works](#how-it-works)
+      - [Example](#example)
+    - [Adaptive Frequency Management](#adaptive-frequency-management)
+      - [When to clear EEPROM](#when-to-clear-eeprom)
+  - [Troubleshooting](#troubleshooting)
+    - [Meter reads fail: near-field RF saturation (device too close to meter)](#meter-reads-fail-near-field-rf-saturation-device-too-close-to-meter)
+    - [Corrupted or Invalid Volume Readings](#corrupted-or-invalid-volume-readings)
+    - [ESP32 build: ModuleNotFoundError: No module named 'intelhex'](#esp32-build-modulenotfounderror-no-module-named-intelhex)
+    - [ESP32 compile errors about ESP8266 headers](#esp32-compile-errors-about-esp8266-headers)
+    - [Frequency Adjustment](#frequency-adjustment)
+    - [Business Hours](#business-hours)
+    - [Serial Number Starting with 0](#serial-number-starting-with-0)
+    - [Distance Between Device and Meter](#distance-between-device-and-meter)
+  - [Important: Utility Read Counter Compatibility](#important-utility-read-counter-compatibility)
+    - [Recommended Actions](#recommended-actions)
+  - [Credits](#credits)
+  - [Legal Notice](#legal-notice)
+    - [Community Resources](#community-resources)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 </details>
 
-
-
-
 ---
 
 ### **ESPHome** - Release V3.0.0
 
-ESPHome integration is stable and recommended. **Start here for ESPHome:**
+The ESPHome integration is stable and is the recommended way to get started. It ships as a versioned external component in `ESPHOME-release` that tracks the same code as the main firmware, and it is tested on both ESP8266 and ESP32 with water and gas meters (the same sensors and calibration logic apply). Configuration stays simple: drop in the component, set `meter_code`, `meter_type` and `gdo2_pin`, and you are done.
 
-- **[ESPHOME/README.md](ESPHOME/README.md)** - ESPHome setup, wiring, and configuration reference
+Start here:
+
+- **[ESPHOME/README.md](ESPHOME/README.md)** - ESPHome setup, wiring and configuration reference
 - **[ESPHOME/ESPHOME_INTEGRATION_GUIDE.md](ESPHOME/ESPHOME_INTEGRATION_GUIDE.md)** - complete step-by-step installation guide
 - Ready-made configs: [water](ESPHOME/example-water-meter.yaml) · [gas](ESPHOME/example-gas-meter-minimal.yaml) · [advanced](ESPHOME/example-advanced.yaml) · [multi-meter](ESPHOME/example-multi-meter.yaml)
+
+A couple of things to know before you flash:
+
+- Build with the Arduino framework (set `esp32.framework.type: arduino`); ESP-IDF is not supported for this component.
+- Migrating from the MQTT firmware? Keep the same meter serial values so your topics and entities stay aligned.
 
 > [!WARNING]
 > **Breaking change in v3.0.0:** GDO2 hardware FIFO management is now enabled by default. You must wire CC1101 GDO2 and set `gdo2_pin:` (or opt out with `disable_gdo2_fifo_management: true`). See the [Hardware](#hardware) section and [ESPHOME/README.md](ESPHOME/README.md).
 
-- Versioned external component in `ESPHOME-release` with the same 3.0.0 code as the main firmware
-- Tested on ESP8266 and ESP32 with water and gas meters; supports the same sensors and calibration logic
-- YAML stays simple: drop in the component, set `meter_code`, `meter_type`, and `gdo2_pin`, and go
-- Build with the Arduino framework (set `esp32.framework.type: arduino`; ESP-IDF is not supported for this component)
-- Migration tip: if you move from MQTT firmware, keep the same meter serial values so your topics/entities stay aligned
-
 ---
 
-Based on regulatory paperwork, this may also work with the following models (untested):
+The firmware is developed and tested against the [Itron EverBlu Cyble Enhanced](https://multipartirtaanugra.com/wp-content/uploads/2020/09/09.-Cyble-RF.pdf). Based on the regulatory paperwork for this meter family, it is likely to work with these related models too, although they are untested:
 
 - AnyQuest Cyble Enhanced
 - EverBlu Cyble
@@ -116,35 +137,29 @@ Based on regulatory paperwork, this may also work with the following models (unt
 ![Home Assistant MQTT autodiscovery](docs/images/MQTT_HASS2.jpg)
 ![ESPHOME](docs/images/esphome.jpg)
 
-Supported meters:
-
-- [Itron EverBlu Cyble Enhanced](https://multipartirtaanugra.com/wp-content/uploads/2020/09/09.-Cyble-RF.pdf)
-
 ![Itron EverBlu Cyble Enhanced](docs/images/meter.jpg)
 
 ## Features
 
-- Home Assistant integration via MQTT AutoDiscovery **or** native ESPHome component.
-- Daily scheduled readings (with configurable reading days).
-- Built-in frame validation (CRC-16/KERMIT) plus signal diagnostics (RSSI/LQI).
-- Automatic CC1101 frequency calibration plus first-boot wide scan.
-- Hardware-assisted CC1101 FIFO threshold management via GDO2, **enabled by default (v3.0.0+)** for improved TX/RX reliability (opt out to use legacy SPI polling). See [Hardware](#hardware).
+A quick overview of what the firmware does:
+
+- Reads water or gas usage from Itron EverBlu Cyble Enhanced RF meters over 433 MHz.
+- Integrates with Home Assistant through MQTT AutoDiscovery **or** the native ESPHome component (same core code).
+- Runs daily scheduled readings on the days you choose.
+- Validates every frame with CRC-16/KERMIT and reports signal diagnostics (RSSI/LQI).
+- Calibrates the CC1101 frequency automatically, including a wide scan on first boot.
+- Manages the CC1101 FIFO in hardware via GDO2, **enabled by default (v3.0.0+)** for more reliable TX/RX (opt out to use legacy SPI polling). See [Hardware](#hardware).
 
 ### Full feature list
 
-- Fetch water or gas usage data from Itron EverBlu Cyble Enhanced RF meters.
-- **Water meter mode**: Readings in litres (L) with water device class
-- **Gas meter mode**: Readings in cubic metres (m³) with gas device class
-- Includes RSSI (Radio Signal Strength Indicator), LQI (Link Quality) and Signal Strength for the meter for diagnostics.
-- Time Start and Time End sensors to indicate when the meter wakes and sleeps.
-- MQTT integration for Home Assistant with AutoDiscovery.
-- **Native ESPHome component** for direct integration.
-- Automatic CC1101 frequency calibration with manual fallback.
-- **Hardware-assisted CC1101 FIFO threshold management via GDO2 - enabled by default (v3.0.0+)**: per-phase reconfiguration prevents TX FIFO underflows and reduces unnecessary RX SPI reads. Requires wiring GDO2 to a free GPIO (or explicitly opt out to use legacy SPI polling) - see [Hardware](#hardware) for wiring and the opt-out.
-- Wi-Fi diagnostics and OTA updates.
-- Built-in CRC-16/KERMIT verification to discard corrupted RADIAN frames before publishing data.
-- Reading Schedule Configuration: Configure reading days using presets (Monday-Friday, Monday-Saturday, Monday-Sunday) or a specific day (Monday-Sunday).
-- Daily scheduled meter readings.
+- **Meter data**: fetches usage from Itron EverBlu Cyble Enhanced RF meters, in litres (L, water device class) or cubic metres (m³, gas device class).
+- **Diagnostics**: exposes RSSI (raw, dBm and %), LQI and signal strength, plus Time Start and Time End sensors that show when the meter wakes and sleeps.
+- **Home Assistant**: MQTT AutoDiscovery for the standalone firmware, or a native ESPHome component for direct integration.
+- **Frequency handling**: automatic CC1101 calibration, with a manual fallback.
+- **Hardware FIFO management (GDO2, enabled by default in v3.0.0+)**: per-phase reconfiguration prevents TX FIFO underflows and skips unnecessary RX SPI reads. Wire GDO2 to a free GPIO, or opt out to keep legacy SPI polling. See [Hardware](#hardware) for wiring and the opt-out.
+- **Frame integrity**: CRC-16/KERMIT verification discards corrupted RADIAN frames before any data is published.
+- **Scheduling**: daily readings, with days set by preset (Monday-Friday, Monday-Saturday, Monday-Sunday) or a single named day.
+- **Connectivity**: Wi-Fi diagnostics and OTA updates.
 
 ### Advanced Frame Validation
 
@@ -185,9 +200,7 @@ The firmware implements multiple layers of validation to ensure data integrity:
 
 ## Integration Options
 
-This project supports two integration methods:
-
-**Note:** The ESPHome component uses the **same core codebase** as the MQTT firmware. The CC1101 radio handling, RADIAN protocol decoding, frequency calibration, and frame validation logic are shared between both implementations.
+You can integrate with Home Assistant in one of two ways. Both share the **same core codebase**: the CC1101 radio handling, RADIAN protocol decoding, frequency calibration and frame validation are identical, so choose whichever suits your setup.
 
 ### Option 1: ESPHome Component (Recommended)
 
@@ -349,14 +362,13 @@ Once your device is running and connected to Wi-Fi, you can update it wirelessly
 
 ## Hardware
 
-Runs on ESP8266/ESP32 with a CC1101 RF transceiver. Any ESP8266/ESP32 + CC1101 combo works with the correct wiring.
+The firmware runs on any ESP8266 or ESP32 paired with a CC1101 433 MHz transceiver. Any such combination works, as long as the wiring is correct.
 ![ESP8266 with CC1101](docs/images/board2.jpg)
 ![ESP8266 with CC1101](docs/images/board.jpg)
 
 ### Connections (ESP32/ESP8266 to CC1101)
 
-The project uses the ESP8266/ESP32's **hardware SPI pins** to communicate with the CC1101 radio module.
-Below are the wiring diagrams for common ESP8266 boards and ESP32 DevKit.
+The project talks to the CC1101 over the ESP8266/ESP32 **hardware SPI pins**. The wiring diagrams below cover the common ESP8266 boards and the ESP32 DevKit.
 
 #### Pin Mapping Reference
 
@@ -507,7 +519,7 @@ Some modules are not labelled on the PCB. Below is the pinout for one:
 
 ## MQTT Integration
 
-Home Assistant integration is provided via MQTT AutoDiscovery.
+In standalone mode, the firmware integrates with Home Assistant through MQTT AutoDiscovery, so entities appear automatically once the device connects to your broker.
 
 <details>
 <summary>MQTT topics</summary>
@@ -516,7 +528,7 @@ The following MQTT topics are used to integrate the device with Home Assistant v
 
 | **Sensor**         | **MQTT Topic**                         | **Description**                                               |
 | ------------------ | -------------------------------------- | ------------------------------------------------------------- |
-| `Liters`           | `everblu/cyble/liters`                 | Total water usage in litres.                                 |
+| `Liters`           | `everblu/cyble/liters`                 | Total water usage in litres.                                  |
 | `Battery`          | `everblu/cyble/battery`                | Remaining battery life in months.                             |
 | `Counter`          | `everblu/cyble/counter`                | Number of times the meter has been read (wraps around 255→1). |
 | `RSSI`             | `everblu/cyble/rssi`                   | Raw RSSI value of the meter's signal.                         |
@@ -539,7 +551,7 @@ The following MQTT topics are used to integrate the device with Home Assistant v
 
 ## Multiple Devices
 
-When running multiple ESP devices on the same MQTT broker, the firmware automatically appends the meter serial number to the MQTT Client ID to ensure uniqueness. This prevents connection conflicts and proper Home Assistant availability tracking.
+When several ESP devices share one MQTT broker, the firmware appends the meter serial number to the MQTT Client ID so that each client is unique. This avoids connection conflicts and keeps Home Assistant availability tracking accurate.
 
 **Example:** With `SECRET_MQTT_CLIENT_ID = "EverblueCyble"` and `METER_CODE = "23-1234567-234"`, the parsed serial is `1234567` and the final Client ID becomes `"EverblueCyble-1234567"`.
 
@@ -810,7 +822,7 @@ The firmware auto-calibrates the CC1101 frequency. The base frequency is configu
 
 1. **Base frequency**: Set with `FREQUENCY` in `private.h` (e.g., `#define FREQUENCY 433.82`).
 2. **Default**: If `FREQUENCY` is not defined, it defaults to **433.82 MHz** (RADIAN centre frequency for EverBlu). A warning is logged.
-3. **Calibration**: CC1101 synthesizer calibration runs automatically; the firmware also triggers a manual calibration during init.
+3. **Calibration**: CC1101 synthesiser calibration runs automatically; the firmware also triggers a manual calibration during init.
 4. **FOC**: Frequency Offset Compensation is enabled to handle small drift during reception.
 5. **Not published to MQTT**: It’s a low-level setting and already visible in the serial startup log.
 
@@ -931,9 +943,7 @@ This outputs detailed byte-by-byte data to help identify:
 
 ### ESP32 build: ModuleNotFoundError: No module named 'intelhex'
 
-This is a PlatformIO tooling dependency used by `esptool.py` to build ESP32 bootloader/partition images.
-It is not a project file and isn’t committed to the repo.
-PlatformIO usually manages it automatically, but on some Windows setups it can be missing.
+This is a PlatformIO tooling dependency that `esptool.py` uses to build the ESP32 bootloader and partition images. It is not part of this project and is not committed to the repo. PlatformIO usually installs it automatically, but on some Windows setups it can be missing.
 
 Try the following in order:
 
@@ -969,9 +979,7 @@ If you still see includes like `ESP8266WiFi.h` during an ESP32 build, ensure you
 
 ### Frequency Adjustment
 
-Your transceiver module may not be calibrated correctly.
-Adjust the frequency slightly lower or higher and try again.
-You may use an RTL-SDR to measure the required offset and rerun the Frequency Discovery code.
+Your transceiver module may not be calibrated correctly. Adjust the frequency slightly lower or higher and try again, or use an RTL-SDR to measure the required offset and rerun the frequency discovery.
 
 ### Business Hours
 
@@ -987,9 +995,7 @@ Ignore the leading 0 and provide the serial number in the configuration without 
 
 ### Distance Between Device and Meter
 
-Typically, a CC1101 433 MHz module with an external wire coil antenna has a maximum range of 300–500 m.
-SMA CC1101 boards with high-gain antennas may increase or even double this range.
-However, be mindful of the distance for effective use.
+A CC1101 433 MHz module with an external wire-coil antenna typically reaches 300 to 500 m, and SMA boards with high-gain antennas can extend that further. In practice, keep the radio close enough to the meter for a reliable link rather than chasing maximum range.
 
 ---
 
@@ -1024,14 +1030,13 @@ This project builds on reverse engineering efforts by:
 
 The original software (and much of the foundational work) was initially developed [on the La Maison Simon wiki](http://www.lamaisonsimon.fr/wiki/doku.php?id=maison2:compteur_d_eau:compteur_d_eau), later published on GitHub by @neutrinus [in the everblu-meters repository](https://github.com/neutrinus/everblu-meters), and subsequently forked by [psykokwak](https://github.com/psykokwak-com/everblu-meters-esp8266).
 
-Their original projects did not include an open-source license.
-If you reuse or modify their specific code portions, please review their repositories and respect any stated limitations or intentions.
+Their original projects did not include an open-source licence. If you reuse or modify their specific code, please review their repositories and respect any stated limitations or intentions.
 
 ---
 
 ## Legal Notice
 
-**Radio Licensing**: The 433 MHz ISM band is license-exempt in UK/EU for low-power (<10 mW) use under ETSI EN 300-220.
+**Radio Licensing**: The 433 MHz ISM band is licence-exempt in UK/EU for low-power (<10 mW) use under ETSI EN 300-220.
 
 **Communications Law**: Under UK Wireless Telegraphy Act 2006 Section 48, intercepting radio communications not intended for you may be unlawful, even if it's your own meter.
 The transmission is technically between the meter and utility.
