@@ -1,6 +1,6 @@
 # ESPHome Integration for EverBlu Cyble Enhanced Meters
 
-Native ESPHome external component for reading EverBlu Cyble Enhanced water and gas meters (RADIAN protocol, 433 MHz) with an ESP8266/ESP32 + CC1101. It integrates directly with Home Assistant via the ESPHome API — no MQTT broker required — and shares the same core radio/protocol code as the standalone MQTT firmware.
+Native ESPHome external component for reading EverBlu Cyble Enhanced water and gas meters (RADIAN protocol, 433 MHz) with an ESP8266/ESP32 + CC1101. It integrates directly with Home Assistant via the ESPHome API (no MQTT broker required) and shares the same core radio/protocol code as the standalone MQTT firmware.
 
 <details>
 <summary>Table of Contents</summary>
@@ -101,10 +101,10 @@ This will output detailed hex dumps of the decoded frame, helping identify:
 ### Signal Quality Issues
 
 - **Low RSSI (< −90 dBm)**: Move ESP closer or improve antenna
-- **Very high RSSI (> −50 dBm) + CRC failures**: Near-field saturation — the signal is **too strong**. Move the device at least 1–2 m away from the meter. When the device is too close, the CC1101 front-end clips and every frame fails CRC even though RSSI looks excellent. The log will show `*** NEAR-FIELD SATURATION DETECTED ***` to confirm this. If the device must be permanently mounted close to the meter, add `rx_attenuation: 6` (or `12` / `18`) to your YAML configuration to limit the CC1101 LNA gain:
+- **Very high RSSI (> −50 dBm) + CRC failures**: Near-field saturation, the signal is **too strong**. Move the device at least 1–2 m away from the meter. When the device is too close, the CC1101 front-end clips and every frame fails CRC even though RSSI looks excellent. The log will show `*** NEAR-FIELD SATURATION DETECTED ***` to confirm this. If the device must be permanently mounted close to the meter, add `rx_attenuation: 6` (or `12` / `18`) to your YAML configuration to limit the CC1101 LNA gain:
   ```yaml
   everblu_meter:
-    rx_attenuation: 6  # dB — values: 0 (default), 6, 12, 18
+    rx_attenuation: 6  # dB, values: 0 (default), 6, 12, 18
   ```
 - **Enable auto_scan**: `auto_scan: true` (opt-in; enables startup Deep scan for extreme frequency drift)
 - **Try different times**: Signal quality varies by time of day
@@ -141,7 +141,7 @@ This will output detailed hex dumps of the decoded frame, helping identify:
   - Dependency injection pattern
   - ESPHome integration patterns
   - How to extend the component
-  - Advanced customization
+  - Advanced customisation
 
 - **[Component README](components/everblu_meter/README.md)** - Component structure and development
   - Component file structure
@@ -390,7 +390,7 @@ logger:
 ```yaml
 everblu_meter:
   timezone_offset: -300  # Minutes from UTC (e.g. UTC-5 = -300). Range: -720 to +720.
-                         # ⚠️ Does NOT auto-adjust for DST — update manually when clocks change.
+                         # ⚠️ Does NOT auto-adjust for DST. Update manually when clocks change.
 ```
 
 ## Features
@@ -398,11 +398,11 @@ everblu_meter:
 - **Native ESPHome Integration**: Works with Home Assistant via the ESPHome API
 - **Automatic Discovery**: Sensors appear automatically in Home Assistant
 - **Scheduled Readings**: Configure when and how often to read the meter
-- **Frequency Management**: Automatic frequency scanning and optimization
+- **Frequency Management**: Automatic frequency scanning and optimisation
 - **Comprehensive Monitoring**: Track signal quality, battery life, and reading statistics
 - **Multiple Meter Types**: Supports both water and gas meters
 - **Retry Logic**: Configurable retry attempts with cooldown periods
-- **Low Power**: Efficient reading schedule minimizes power consumption
+- **Low Power**: Efficient reading schedule minimises power consumption
 
 ## Example Configurations
 
@@ -537,7 +537,7 @@ The ESPHome component exposes a **history text sensor** containing 12 months of 
 **Use Cases:**
 
 - Bootstrap Home Assistant with 12 months of existing data on first setup
-- Analyze historical consumption patterns
+- Analyse historical consumption patterns
 - Compare current vs. previous month usage
 - Verify readings against utility bills
 - Pre-populate energy dashboards
@@ -575,11 +575,11 @@ The component uses a clean adapter pattern to separate platform-specific code fr
 ```text
 EverbluMeterComponent (ESPHome)
 ├── ESPHomeConfigProvider    → Configuration from YAML
-├── ESPHomeTimeProvider      → Time synchronization
+├── ESPHomeTimeProvider      → Time synchronisation
 ├── ESPHomeDataPublisher     → Sensor publishing
 └── MeterReader (shared)
     ├── CC1101               → Radio hardware
-    ├── FrequencyManager     → Frequency optimization
+    ├── FrequencyManager     → Frequency optimisation
     └── ScheduleManager      → Reading schedule
 ```
 
@@ -727,7 +727,7 @@ Based on the EverBlu Meters ESP8266 project with architectural improvements for 
 ## Links
 
 - **Main Project**: [Main README](../README.md)
-- **GitHub Repository**: <https://github.com/yourusername/everblu-meters-esp8266-improved>
+- **GitHub Repository**: <https://github.com/genestealer/everblu-meters-esp8266-improved>
 - **ESPHome Documentation**: <https://esphome.io/>
 - **Home Assistant**: <https://www.home-assistant.io/>
 

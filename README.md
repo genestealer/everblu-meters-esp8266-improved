@@ -26,10 +26,10 @@ Read Itron/Actaris EverBlu Cyble Enhanced RF water and gas meters (RADIAN protoc
 
 Two independent deployment targets share the same core radio/protocol logic:
 
-- **ESPHome external component** (recommended) — native Home Assistant integration, no MQTT broker.
-- **Standalone firmware with MQTT** — PlatformIO/Arduino build with MQTT AutoDiscovery.
+- **ESPHome external component** (recommended): native Home Assistant integration, no MQTT broker.
+- **Standalone firmware with MQTT**: PlatformIO/Arduino build with MQTT AutoDiscovery.
 
-**Supports both water meters (readings in liters) and gas meters (readings in cubic meters)**.
+**Supports both water meters (readings in litres) and gas meters (readings in cubic metres)**.
 
 ---
 
@@ -65,7 +65,7 @@ Two independent deployment targets share the same core radio/protocol logic:
   - [Frequency Configuration](#frequency-configuration)
   - [Adaptive Frequency Management](#adaptive-frequency-management)
 - [Troubleshooting](#troubleshooting)
-  - [Meter reads fail — near-field RF saturation (device too close to meter)](#meter-reads-fail--near-field-rf-saturation-device-too-close-to-meter)
+  - [Meter reads fail: near-field RF saturation (device too close to meter)](#meter-reads-fail-near-field-rf-saturation-device-too-close-to-meter)
   - [Corrupted or Invalid Volume Readings](#corrupted-or-invalid-volume-readings)
   - [ESP32 build: ModuleNotFoundError: No module named 'intelhex'](#esp32-build-modulenotfounderror-no-module-named-intelhex)
   - [ESP32 compile errors about ESP8266 headers](#esp32-compile-errors-about-esp8266-headers)
@@ -133,8 +133,8 @@ Supported meters:
 ### Full feature list
 
 - Fetch water or gas usage data from Itron EverBlu Cyble Enhanced RF meters.
-- **Water meter mode**: Readings in liters (L) with water device class
-- **Gas meter mode**: Readings in cubic meters (m³) with gas device class
+- **Water meter mode**: Readings in litres (L) with water device class
+- **Gas meter mode**: Readings in cubic metres (m³) with gas device class
 - Includes RSSI (Radio Signal Strength Indicator), LQI (Link Quality) and Signal Strength for the meter for diagnostics.
 - Time Start and Time End sensors to indicate when the meter wakes and sleeps.
 - MQTT integration for Home Assistant with AutoDiscovery.
@@ -174,7 +174,7 @@ The firmware implements multiple layers of validation to ensure data integrity:
    - Frequency error estimation for adaptive tuning
 
 6. **Reading Plausibility (History Cross-Check)**:
-   - The frame carries up to 13 months of historical volume snapshots. The firmware rejects the whole reading when the implied **current-month usage** (current volume minus the newest history snapshot) exceeds **100× the largest historical monthly usage** — a corrupted current volume shows up as an absurd jump versus the meter's own history.
+   - The frame carries up to 13 months of historical volume snapshots. The firmware rejects the whole reading when the implied **current-month usage** (current volume minus the newest history snapshot) exceeds **100× the largest historical monthly usage**. A corrupted current volume shows up as an absurd jump versus the meter's own history.
    - The check is skipped (the reading is accepted) when there is insufficient history to judge: fewer than 2 valid months, a flat history with no recorded usage, or a current volume that predates the newest snapshot. First reads and no-consumption meters are therefore unaffected.
 
 **Result**: Data is only published after passing every check above, so corrupted or partial frames are discarded rather than reported to Home Assistant.
@@ -217,7 +217,7 @@ Examples: use the ready-made ESPHome configs:
 - Full control over firmware
 - PlatformIO-based development
 - MQTT AutoDiscovery for Home Assistant
-- Extensive customization options
+- Extensive customisation options
 
 **Quick start**: Edit `include/private.h` and build with PlatformIO (see below).
 
@@ -252,8 +252,8 @@ This project supports both **water meters** and **gas meters**. The main differe
 
 | Meter Type          | Unit of Measurement | Device Class | Icon            |
 | ------------------- | ------------------- | ------------ | --------------- |
-| **Water** (default) | Liters (L)          | `water`      | `mdi:water`     |
-| **Gas**             | Cubic meters (m³)   | `gas`        | `mdi:meter-gas` |
+| **Water** (default) | Litres (L)          | `water`      | `mdi:water`     |
+| **Gas**             | Cubic metres (m³)   | `gas`        | `mdi:meter-gas` |
 
 To configure your meter type, set `METER_TYPE` in `include/private.h`:
 
@@ -265,7 +265,7 @@ To configure your meter type, set `METER_TYPE` in `include/private.h`:
 
 ##### Gas Meter Volume Divisor
 
-For gas meters, this firmware assumes an internal count in liter-equivalents and converts those values to cubic meters (m³) before publishing to Home Assistant. If your gas meter uses a different base unit or scaling, you may need to adjust the meter configuration or conversion logic accordingly.
+For gas meters, this firmware assumes an internal count in litre-equivalents and converts those values to cubic metres (m³) before publishing to Home Assistant. If your gas meter uses a different base unit or scaling, you may need to adjust the meter configuration or conversion logic accordingly.
 
 The conversion uses a configurable **gas volume divisor** that can be set in `include/private.h`:
 
@@ -284,7 +284,7 @@ The conversion uses a configurable **gas volume divisor** that can be set in `in
 <details>
 <summary>Background: empirical derivation of the 0.01 m³/unit pulse weight</summary>
 
-Through empirical testing with an actual EverBlu Cyble gas meter, we discovered that many gas modules are configured with a pulse weight of **0.01 m³ per unit**, not the 0.001 m³ that might be expected from a naive "liters to cubic meters" conversion.
+Through empirical testing with an actual EverBlu Cyble gas meter, we discovered that many gas modules are configured with a pulse weight of **0.01 m³ per unit**, not the 0.001 m³ that might be expected from a naive "litres to cubic metres" conversion.
 
 **Real-world example:**
 
@@ -387,7 +387,7 @@ Pin wiring for the [Wemos D1 Mini](https://www.wemos.cc/en/latest/d1/index.html)
 | **VCC**        | Power        | 3.3V             | 3V3               | 3V                 | 3.3V           | 3V3              | **Important:** Use 3.3V only!                       |
 | **GND**        | Ground       | GND              | G                 | GND                | GND            | GND              | Common ground                                       |
 | **SCK**        | SPI Clock    | GPIO 14          | D5                | #14                | GPIO 18        | SCK              | Hardware SPI clock                                  |
-| **MISO**       | SPI Data In  | GPIO 12          | D6                | #12                | GPIO 19        | MISO             | Also labeled as GDO1 on some CC1101 modules         |
+| **MISO**       | SPI Data In  | GPIO 12          | D6                | #12                | GPIO 19        | MISO             | Also labelled as GDO1 on some CC1101 modules        |
 | **MOSI**       | SPI Data Out | GPIO 13          | D7                | #13                | GPIO 23        | MOSI             | Hardware SPI MOSI                                   |
 | **CSN/CS**     | Chip Select  | GPIO 15          | D8                | #15                | GPIO 25        | GPIO 25          | SPI chip select (ESP32: GPIO 25 avoids the GPIO 5 strapping pin) |
 | **GDO0**       | Data Ready   | GPIO 5           | D1                | #5                 | GPIO 4         | GPIO 4           | Digital interrupt pin (configurable in `private.h`) |
@@ -497,7 +497,7 @@ Don’t force it HIGH during reset.
 
 ### CC1101
 
-Some modules are not labeled on the PCB. Below is the pinout for one:
+Some modules are not labelled on the PCB. Below is the pinout for one:
 ![CC1101 pinout diagram](docs/images/cc1101-mapping.png)
 ![CC1101 example](docs/images/cc1101.jpg)
 
@@ -516,7 +516,7 @@ The following MQTT topics are used to integrate the device with Home Assistant v
 
 | **Sensor**         | **MQTT Topic**                         | **Description**                                               |
 | ------------------ | -------------------------------------- | ------------------------------------------------------------- |
-| `Liters`           | `everblu/cyble/liters`                 | Total water usage in liters.                                  |
+| `Liters`           | `everblu/cyble/liters`                 | Total water usage in litres.                                 |
 | `Battery`          | `everblu/cyble/battery`                | Remaining battery life in months.                             |
 | `Counter`          | `everblu/cyble/counter`                | Number of times the meter has been read (wraps around 255→1). |
 | `RSSI`             | `everblu/cyble/rssi`                   | Raw RSSI value of the meter's signal.                         |
@@ -602,7 +602,7 @@ Both MQTT and ESPHome modes expose a **history sensor** containing 12 months of 
 
 **Fields:**
 
-- `history`: Array of 12 monthly readings (oldest to newest) in liters or m³
+- `history`: Array of 12 monthly readings (oldest to newest) in litres or m³
 - `monthly_usage`: Array of 12 monthly consumption values (first value is the oldest reading, subsequent values are differences)
 - `current_month_usage`: Current month's consumption so far
 - `months_available`: Number of months of data available (typically 12)
@@ -610,7 +610,7 @@ Both MQTT and ESPHome modes expose a **history sensor** containing 12 months of 
 **Use Cases:**
 
 - Import historical consumption into Home Assistant on first setup
-- Analyze past usage patterns
+- Analyse past usage patterns
 - Compare current usage to previous months
 - Bootstrap energy dashboards with existing data
 - Verify meter readings against utility bills
@@ -688,7 +688,7 @@ Both MQTT and ESPHome modes expose a **history sensor** containing 12 months of 
    - **Keep the device connected to your computer during this process.** The serial monitor will display debug output as the device scans frequencies in the 433 MHz range.
    - **Important**: During the initial scan (first boot with no stored frequency offset), the device performs a wide frequency scan that takes approximately 2 minutes **before** connecting to MQTT. You will see no MQTT/Home Assistant activity during this time - this is normal. Monitor the serial output to see the scan progress. Once the scan completes and the optimal frequency is found, the device will connect to MQTT and publish telemetry data.
    - Once the correct frequency is identified, update the `FREQUENCY` value in `private.h` if needed (the automatic scan stores the offset, so manual adjustment is usually not required).
-   - To re-run the deep scan later, either set `CLEAR_EEPROM_ON_BOOT` to `1` for a single boot cycle, re-enable `AUTO_SCAN_ENABLED`, or press the **Deep Frequency Scan** button (`mdi:radar`) exposed in Home Assistant to trigger a full ±150 kHz fine-step sweep on demand. A faster **Fast Frequency Scan** button (`mdi:magnify-scan`) is also available for a quicker ±150 kHz coarse-step recalibration. **Note**: Both on-demand scan buttons can block for 1–2 minutes during which Wi-Fi/MQTT may temporarily disconnect and reconnect — this is expected and Home Assistant will reconnect automatically once the scan completes.
+   - To re-run the deep scan later, either set `CLEAR_EEPROM_ON_BOOT` to `1` for a single boot cycle, re-enable `AUTO_SCAN_ENABLED`, or press the **Deep Frequency Scan** button (`mdi:radar`) exposed in Home Assistant to trigger a full ±150 kHz fine-step sweep on demand. A faster **Fast Frequency Scan** button (`mdi:magnify-scan`) is also available for a quicker ±150 kHz coarse-step recalibration. **Note**: Both on-demand scan buttons can block for 1–2 minutes during which Wi-Fi/MQTT may temporarily disconnect and reconnect. This is expected, and Home Assistant will reconnect automatically once the scan completes.
    - **Automatic recovery on failure**: Separately from the first-boot scan, when a full streak of read attempts fails (`MAX_RETRIES` reached) and the firmware enters its cooldown period, it automatically runs a frequency scan once to check for meter carrier-frequency (crystal) drift. This is controlled by `AUTO_SCAN_ON_FAILURE_ENABLED` (default `1`) and helps users who never trigger a manual scan recover unattended. It runs at most once per failure streak (reset after the next successful read). Set `#define AUTO_SCAN_ON_FAILURE_ENABLED 0` in `include/private.h` to disable it.
    - For best results, perform this step during local business hours when the meter is most likely to transmit. Refer to the "Frequency Adjustment" section below for additional guidance.
 
@@ -757,14 +757,14 @@ Configuration (in `include/private.h`):
 
 ```
 
-Behavior:
+Behaviour:
 
 - The device schedules reads using UTC+offset (your local time). The default read time is 10:00 (local by offset).
 - Auto-align can shift the read hour to the meter's wake window (midpoint by default) in local-offset time; the UTC publish is derived from that.
 
 MQTT topics exposed:
 
-- `everblu/cyble/reading_time` – scheduled time in UTC (HH:MM)
+- `everblu/cyble/reading_time`: scheduled time in UTC (HH:MM)
 
 In serial logs at startup you’ll see:
 
@@ -784,7 +784,7 @@ If you only want raw MQTT topics and do not use Home Assistant discovery, set th
 #define ENABLE_HA_DISCOVERY 0
 ```
 
-Default behavior (if not defined) is enabled:
+Default behaviour (if not defined) is enabled:
 
 ```cpp
 #define ENABLE_HA_DISCOVERY 1
@@ -809,7 +809,7 @@ The firmware auto-calibrates the CC1101 frequency. The base frequency is configu
 #### How it works
 
 1. **Base frequency**: Set with `FREQUENCY` in `private.h` (e.g., `#define FREQUENCY 433.82`).
-2. **Default**: If `FREQUENCY` is not defined, it defaults to **433.82 MHz** (RADIAN center frequency for EverBlu). A warning is logged.
+2. **Default**: If `FREQUENCY` is not defined, it defaults to **433.82 MHz** (RADIAN centre frequency for EverBlu). A warning is logged.
 3. **Calibration**: CC1101 synthesizer calibration runs automatically; the firmware also triggers a manual calibration during init.
 4. **FOC**: Frequency Offset Compensation is enabled to handle small drift during reception.
 5. **Not published to MQTT**: It’s a low-level setting and already visible in the serial startup log.
@@ -877,7 +877,7 @@ See `ADAPTIVE_FREQUENCY_FEATURES.md` for deeper technical notes.
 
 ## Troubleshooting
 
-### Meter reads fail — near-field RF saturation (device too close to meter)
+### Meter reads fail: near-field RF saturation (device too close to meter)
 
 **Symptoms:**
 
@@ -960,7 +960,7 @@ Notes
 
 - Only ESP32 builds use this dependency; ESP8266 builds do not require `intelhex`.
 - Prefer the PlatformIO terminal over a global Python to avoid installing into the wrong environment.
-- If `pio` is not recognized in PowerShell, use the full executable path above instead of `pio run ...`.
+- If `pio` is not recognised in PowerShell, use the full executable path above instead of `pio run ...`.
 
 ### ESP32 compile errors about ESP8266 headers
 
@@ -1045,7 +1045,7 @@ Consider obtaining utility permission. Never use on meters you don't own. Procee
 
 ### Community Resources
 
-- [Maison Simon Wiki (FR) – RADIAN protocol explained](https://lamaisonsimon.fr/wiki/doku.php?id=eau:sonde_eau_radio)
+- [Maison Simon Wiki (FR): RADIAN protocol explained](https://lamaisonsimon.fr/wiki/doku.php?id=eau:sonde_eau_radio)
 - [ESP8266/ESP32 + CC1101 decoder](https://github.com/neutrinus/everblu-meters)
 
 ---
