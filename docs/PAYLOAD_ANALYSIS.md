@@ -155,14 +155,32 @@ Example: EE 01 0B 00
 = 721,390
 ```
 
-### ASCII Text
+### ASCII Text (meter type / identifier)
 
-Bytes [32-42] contain null-terminated ASCII text:
+Bytes [32-42] contain a null-terminated ASCII string that identifies the meter type:
 
 ```
 31 33 33 32 39 30 41 4C 30 32 00
-= "13329 0AL02\0"
+=  1  3  3  2  9  0  A  L  0  2 \0
+= "133290AL02"
 ```
+
+Observed across three meters of the same model (captured together):
+
+| Meter serial | Type string |
+| ------------ | ----------- |
+| 257750       | `133290AL02` |
+| 259301       | `047290AL02` |
+| 259298       | `837290AL02` |
+
+All three share the suffix `290AL02` and differ only in the leading three
+digits. Because these were confirmed to be the same meter model, `290AL02` is
+the shared model/family code and the leading `NNN` distinguishes the individual
+meter (most likely a calibre / pulse-weight or factory variant index). The exact
+sub-field breakdown is not documented in any datasheet, so the string is treated
+as an opaque identifier and passed through verbatim. It is distinct from the
+serial number (which comes from `meter_code` / frame bytes [9-13]) and is stable
+across reads, which makes it a useful fingerprint in the test fixtures.
 
 ### Reserved Fields
 

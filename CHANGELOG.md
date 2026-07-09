@@ -28,6 +28,7 @@ scope_summary:
   - "First working end-to-end RADIAN CRC-16/KERMIT validation on live frames"
   - "Full 124-byte frame decode: recovers the 13th history month, meter real-time clock and meter type/identifier"
   - "New ESPHome Meter Clock and Meter Type sensors, Stop Reading button, best-effort deep-scan cancel"
+  - "Offline decoder replay tests driven by raw pre-decode RF captures"
 ```
 
 ### Added
@@ -36,10 +37,13 @@ scope_summary:
 - **13th (most recent) monthly history value**: the frame carries 13 months of history, not 12. The final month was previously truncated by the short capture and is now decoded.
 - **Stop Reading button** (ESPHome `stop_reading_button`): cancels the current read/retry sequence and requests best-effort cancellation of an in-progress deep frequency scan (it bails at the next scan step; see [#133](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/133)).
 - **Diagnostics under `debug_cc1101`**: a raw pre-decode RX buffer dump and a CRC-boundary scan that reports the true frame length and CRC convention.
+- **Offline decoder replay tests**: `extract-meter-fixture.py` now also emits raw pre-decode captures to `test/fixtures/meter_frames/raw_frames.lst`, and the new `test_replay_raw_meter_fixtures` native test replays them through the real decoder (`radian_decode_4bitpbit()` → CRC → parse). This covers the 4x-oversampled bit-recovery path offline, not just the parser. Seeded with three meters read twice each.
 
 ### Fixed
 
 - **RADIAN CRC now validates end-to-end on live frames for the first time.** Two stacked defects meant the CRC was never actually checked: the raw capture truncated the frame so the CRC trailer was never received, and `radian_validate_crc()` computed the checksum over the wrong range (it skipped the length byte). The frame is 124 bytes; the CRC-16/KERMIT is computed over bytes [0..121] (including the length byte) with the trailer at [122-123]. Verified against multiple live captures.
+- **`extract-meter-fixture.py` CRC check used the wrong convention**: it computed the CRC over bytes [1..], skipping the length byte, so captured fixtures were marked `crc_valid=0`. It now matches the firmware and covers bytes [0..].
+
 
 ## [v3.1.1] - 2026-07-08
 

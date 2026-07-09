@@ -31,6 +31,12 @@ import re
 HEX_LINE_RE = re.compile(r"\[(\d+)-(\d+)\]:\s+(.*)$")
 HEX_BYTE_RE = re.compile(r"\b[0-9A-Fa-f]{2}\b")
 
+# Matches the raw pre-decode dump header emitted before decoding, e.g.
+#   [CC1101] Raw pre-decode RX buffer (748 oversampled bytes):
+RAW_HEADER_RE = re.compile(r"Raw pre-decode RX buffer \((\d+) oversampled bytes\)")
+# Raw dump rows are comma-separated 0x-prefixed samples: 0x00, 0xFF, 0xF0, ...
+RAW_BYTE_RE = re.compile(r"0x([0-9A-Fa-f]{2})")
+
 # ESPHome logger format: [timestamp][level][component:line]: message
 # Strip all leading [...][ groups to expose the bare message.
 _ESPHOME_PREFIX_RE = re.compile(r"^(?:\[[^\]]*\]\s*)+:\s*")
@@ -62,6 +68,21 @@ def crc_kermit(data: bytes) -> int:
 class ParsedFrame:
     name: str
     decoded: bytes
+    volume: int
+    battery: int
+    counter: int
+    time_start: int
+    time_end: int
+    history_available: int
+    crc_valid: int
+
+
+@dataclass
+class RawFrame:
+    """A raw (pre-decode) oversampled capture paired with its decoded fields."""
+
+    name: str
+    raw: bytes
     volume: int
     battery: int
     counter: int
@@ -116,7 +137,10 @@ def validate_crc(decoded: bytes) -> int:
         return 1
 
     received = (decoded[crc_offset] << 8) | decoded[crc_offset + 1]
-    computed = crc_kermit(decoded[1 : expected_len - 2])
+    # CRC-16/KERMIT covers bytes [0 .. expected_len-3], INCLUDING the length
+    # byte, matching the RADIAN reference and radian_validate_crc() in the
+    # firmware. The trailer at [expected_len-2, expected_len-1] is big-endian.
+    computed = crc_kermit(decoded[0 : expected_len - 2])
     return 1 if computed == received else 0
 
 
@@ -171,10 +195,89 @@ def collect_frames(log_text: str, prefix: str) -> list[ParsedFrame]:
     return frames
 
 
+def collect_raw_frames(log_text: str, prefix: str) -> list[RawFrame]:
+    """Pair each raw pre-decode dump with the decoded frame that follows it.
+
+    The firmware prints the raw oversampled RX buffer, then decodes it and
+    prints the decoded frame. Pairing the two lets the native tests replay the
+    *decoder* against a real capture (raw -> decode -> CRC -> parse), not just
+    the parser.
+    """
+    lines = log_text.splitlines()
+    frames: list[RawFrame] = []
+    i = 0
+    idx = 1
+    pending_raw: bytes | None = None
+
+    while i < len(lines):
+        stripped = _strip_esphome_prefix(lines[i].strip())
+
+        if RAW_HEADER_RE.search(stripped):
+            i += 1
+            raw_out: list[int] = []
+            while i < len(lines):
+                row = _strip_esphome_prefix(lines[i].strip())
+                tokens = RAW_BYTE_RE.findall(row)
+                if not tokens:
+                    break
+                raw_out.extend(int(t, 16) for t in tokens)
+                i += 1
+            pending_raw = bytes(raw_out) if raw_out else None
+            continue
+
+        if "Full hex dump of decoded frame" in stripped:
+            i += 1
+            bytes_out: list[int] = []
+            while i < len(lines):
+                row = _strip_esphome_prefix(lines[i].strip())
+                m = HEX_LINE_RE.match(row)
+                if not m:
+                    if not bytes_out:
+                        i += 1
+                        continue
+                    break
+                bytes_out.extend(int(hb, 16) for hb in HEX_BYTE_RE.findall(m.group(3)))
+                i += 1
+
+            if bytes_out and pending_raw is not None:
+                decoded = bytes(bytes_out)
+                volume, battery, counter, time_start, time_end, history_available = (
+                    parse_fields(decoded)
+                )
+                frames.append(
+                    RawFrame(
+                        name=f"{prefix}_{idx:03d}",
+                        raw=pending_raw,
+                        volume=volume,
+                        battery=battery,
+                        counter=counter,
+                        time_start=time_start,
+                        time_end=time_end,
+                        history_available=history_available,
+                        crc_valid=validate_crc(decoded),
+                    )
+                )
+                idx += 1
+            pending_raw = None
+            continue
+
+        i += 1
+
+    return frames
+
+
 def to_fixture_line(frame: ParsedFrame) -> str:
     decoded_hex = " ".join(f"{b:02X}" for b in frame.decoded)
     return (
         f"{frame.name}|{decoded_hex}|{frame.volume}|{frame.battery}|{frame.counter}|"
+        f"{frame.time_start}|{frame.time_end}|{frame.history_available}|{frame.crc_valid}"
+    )
+
+
+def to_raw_fixture_line(frame: RawFrame) -> str:
+    raw_hex = " ".join(f"{b:02X}" for b in frame.raw)
+    return (
+        f"{frame.name}|{raw_hex}|{frame.volume}|{frame.battery}|{frame.counter}|"
         f"{frame.time_start}|{frame.time_end}|{frame.history_available}|{frame.crc_valid}"
     )
 
@@ -192,6 +295,11 @@ def main() -> int:
         "--output",
         default="test/fixtures/meter_frames/fixtures.lst",
         help="Fixture list output path",
+    )
+    parser.add_argument(
+        "--raw-output",
+        default="test/fixtures/meter_frames/raw_frames.lst",
+        help="Raw (pre-decode) fixture list output path",
     )
     parser.add_argument(
         "--name-prefix",
@@ -235,6 +343,24 @@ def main() -> int:
             f.write(to_fixture_line(frame) + "\n")
 
     print(f"Extracted {len(frames)} frame(s) into {out_path}")
+
+    # Raw pre-decode captures are optional: only emitted when the log contains
+    # the "Raw pre-decode RX buffer" dump (debug_cc1101 builds). These replay
+    # the decoder itself against real RF, not just the parser.
+    raw_frames = collect_raw_frames(log_text, args.name_prefix)
+    if raw_frames:
+        raw_out_path = pathlib.Path(args.raw_output)
+        raw_out_path.parent.mkdir(parents=True, exist_ok=True)
+        raw_mode = "a" if args.append and raw_out_path.exists() else "w"
+        with raw_out_path.open(raw_mode, encoding="utf-8") as f:
+            if raw_mode == "w":
+                f.write(
+                    "# fixture_name|raw_oversampled_hex|volume|battery|counter|time_start|time_end|history_available|crc_valid\n"
+                )
+            for raw_frame in raw_frames:
+                f.write(to_raw_fixture_line(raw_frame) + "\n")
+        print(f"Extracted {len(raw_frames)} raw capture(s) into {raw_out_path}")
+
     return 0
 
 

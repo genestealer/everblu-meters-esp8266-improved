@@ -188,6 +188,109 @@ static FixtureLoadResult load_fixtures()
     return result;
 }
 
+// ---------------------------------------------------------------------------
+// Raw (pre-decode) fixtures: the oversampled CC1101 RX buffer captured BEFORE
+// software decode. Replaying these through radian_decode_4bitpbit() exercises
+// the decoder itself against real RF, then CRC + parse, all offline.
+// ---------------------------------------------------------------------------
+struct RawFixture
+{
+    std::string name;
+    std::vector<uint8_t> raw;
+    uint32_t expected_volume;
+    uint32_t expected_battery;
+    uint32_t expected_counter;
+    uint32_t expected_time_start;
+    uint32_t expected_time_end;
+    bool expected_history_available;
+    bool expected_crc_valid;
+};
+
+struct RawFixtureLoadResult
+{
+    std::vector<RawFixture> fixtures;
+    bool fixture_file_found;
+    size_t data_line_count;
+    size_t parse_error_count;
+};
+
+static std::ifstream open_raw_fixture_list()
+{
+    const char *candidates[] = {
+        "test/fixtures/meter_frames/raw_frames.lst",
+        "../test/fixtures/meter_frames/raw_frames.lst",
+        "../../test/fixtures/meter_frames/raw_frames.lst",
+        "../../../test/fixtures/meter_frames/raw_frames.lst",
+    };
+
+    for (const char *path : candidates)
+    {
+        std::ifstream file(path);
+        if (file.good())
+        {
+            return file;
+        }
+    }
+
+    return std::ifstream();
+}
+
+static RawFixtureLoadResult load_raw_fixtures()
+{
+    RawFixtureLoadResult result{};
+    std::ifstream in = open_raw_fixture_list();
+    if (!in.good())
+    {
+        result.fixture_file_found = false;
+        return result;
+    }
+    result.fixture_file_found = true;
+
+    std::string line;
+    while (std::getline(in, line))
+    {
+        line = trim(line);
+        if (line.empty() || line[0] == '#')
+        {
+            continue;
+        }
+        result.data_line_count++;
+
+        std::vector<std::string> parts = split(line, '|');
+        if (parts.size() != 9)
+        {
+            result.parse_error_count++;
+            continue;
+        }
+
+        RawFixture fx;
+        fx.name = trim(parts[0]);
+        uint32_t history_u32 = 0;
+        uint32_t crc_u32 = 0;
+        bool ok = true;
+        ok = ok && parse_hex_bytes(parts[1], fx.raw);
+        ok = ok && parse_u32_field(parts[2], fx.expected_volume);
+        ok = ok && parse_u32_field(parts[3], fx.expected_battery);
+        ok = ok && parse_u32_field(parts[4], fx.expected_counter);
+        ok = ok && parse_u32_field(parts[5], fx.expected_time_start);
+        ok = ok && parse_u32_field(parts[6], fx.expected_time_end);
+        ok = ok && parse_u32_field(parts[7], history_u32);
+        ok = ok && parse_u32_field(parts[8], crc_u32);
+
+        if (!ok)
+        {
+            result.parse_error_count++;
+            continue;
+        }
+
+        fx.expected_history_available = history_u32 != 0;
+        fx.expected_crc_valid = crc_u32 != 0;
+        result.fixtures.push_back(fx);
+    }
+
+    return result;
+}
+
 void setUp(void) {}
 
 void tearDown(void) {}
@@ -479,6 +582,63 @@ void test_replay_meter_fixtures(void)
 
         struct radian_primary_data parsed;
         bool parsed_ok = radian_parse_primary_data(fx.decoded.data(), fx.decoded.size(), &parsed);
+        TEST_ASSERT_TRUE_MESSAGE(parsed_ok, fx.name.c_str());
+
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(fx.expected_volume, parsed.volume, fx.name.c_str());
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(fx.expected_battery, parsed.battery_left, fx.name.c_str());
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(fx.expected_counter, parsed.reads_counter, fx.name.c_str());
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(fx.expected_time_start, parsed.time_start, fx.name.c_str());
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(fx.expected_time_end, parsed.time_end, fx.name.c_str());
+        TEST_ASSERT_EQUAL_INT_MESSAGE(
+            fx.expected_history_available ? 1 : 0,
+            parsed.history_available ? 1 : 0,
+            fx.name.c_str());
+    }
+}
+
+// Replay raw pre-decode RF captures through the full offline pipeline:
+//   raw oversampled buffer -> radian_decode_4bitpbit() -> CRC -> parse.
+// Unlike test_replay_meter_fixtures (which starts from already-decoded bytes),
+// this exercises the decoder against real on-air captures, so the decode path
+// can be refactored with confidence while the meter is asleep.
+void test_replay_raw_meter_fixtures(void)
+{
+    RawFixtureLoadResult loaded = load_raw_fixtures();
+
+    TEST_ASSERT_EQUAL_UINT32_MESSAGE(
+        0,
+        static_cast<uint32_t>(loaded.parse_error_count),
+        "Malformed fixture line(s) found in raw_frames.lst");
+
+    if (!loaded.fixture_file_found || loaded.fixtures.empty())
+    {
+        TEST_PASS_MESSAGE("No raw meter captures present yet. Capture with debug_cc1101 and append raw_frames.lst.");
+        return;
+    }
+
+    for (const RawFixture &fx : loaded.fixtures)
+    {
+        TEST_ASSERT_TRUE_MESSAGE(!fx.raw.empty(), fx.name.c_str());
+
+        // Decode the oversampled buffer exactly as the firmware does.
+        uint8_t decoded[256];
+        uint8_t decoded_len = radian_decode_4bitpbit(
+            fx.raw.data(), static_cast<int>(fx.raw.size()), decoded, sizeof(decoded));
+        TEST_ASSERT_TRUE_MESSAGE(decoded_len > 0, fx.name.c_str());
+
+        bool crc_ok = radian_validate_crc(decoded, decoded_len);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(
+            fx.expected_crc_valid ? 1 : 0,
+            crc_ok ? 1 : 0,
+            fx.name.c_str());
+
+        if (!crc_ok)
+        {
+            continue;
+        }
+
+        struct radian_primary_data parsed;
+        bool parsed_ok = radian_parse_primary_data(decoded, decoded_len, &parsed);
         TEST_ASSERT_TRUE_MESSAGE(parsed_ok, fx.name.c_str());
 
         TEST_ASSERT_EQUAL_UINT32_MESSAGE(fx.expected_volume, parsed.volume, fx.name.c_str());
@@ -864,5 +1024,6 @@ int main(int argc, char **argv)
     RUN_TEST(test_radian_parse_extended_fields_home001);
     RUN_TEST(test_radian_parse_extended_fields_absent_when_short);
     RUN_TEST(test_replay_meter_fixtures);
+    RUN_TEST(test_replay_raw_meter_fixtures);
     return UNITY_END();
 }
