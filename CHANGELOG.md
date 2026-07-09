@@ -15,6 +15,32 @@ Releases are created manually by tagging commits with version tags matching `v*.
 
 ## [Unreleased]
 
+### AI Metadata
+
+```yaml
+release_type: minor
+base_branch: main
+release_branch: radian-decode-improvements
+includes_prs: []
+notable_superseded_work:
+  - "capture-to-end-of-transmission RX experiment added then reverted: it lingered on RF noise until timeout and broke the ACK->data transition; fixed-length capture restored"
+scope_summary:
+  - "First working end-to-end RADIAN CRC-16/KERMIT validation on live frames"
+  - "Full 124-byte frame decode: recovers the 13th history month, meter real-time clock and meter type/identifier"
+  - "New ESPHome Meter Clock and Meter Type sensors, Stop Reading button, best-effort deep-scan cancel"
+```
+
+### Added
+
+- **Meter real-time clock and type/identifier decode**, with matching ESPHome sensors (`meter_clock_sensor`, `meter_model_sensor`) and MQTT topics plus Home Assistant discovery. The clock is decoded from frame bytes [24-26, 28-30] and the ASCII identifier from [32-42], following the RADIAN reference.
+- **13th (most recent) monthly history value**: the frame carries 13 months of history, not 12. The final month was previously truncated by the short capture and is now decoded.
+- **Stop Reading button** (ESPHome `stop_reading_button`): cancels the current read/retry sequence and requests best-effort cancellation of an in-progress deep frequency scan (it bails at the next scan step; see [#133](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/133)).
+- **Diagnostics under `debug_cc1101`**: a raw pre-decode RX buffer dump and a CRC-boundary scan that reports the true frame length and CRC convention.
+
+### Fixed
+
+- **RADIAN CRC now validates end-to-end on live frames for the first time.** Two stacked defects meant the CRC was never actually checked: the raw capture truncated the frame so the CRC trailer was never received, and `radian_validate_crc()` computed the checksum over the wrong range (it skipped the length byte). The frame is 124 bytes; the CRC-16/KERMIT is computed over bytes [0..121] (including the length byte) with the trailer at [122-123]. Verified against multiple live captures.
+
 ## [v3.1.1] - 2026-07-08
 
 ### AI Metadata

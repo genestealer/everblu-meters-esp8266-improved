@@ -1090,13 +1090,13 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
     echo_debug(1, "[WARN] Buffer size %d < 49, extended data unavailable\n", size);
   }
 
-  // Extract 12 months of historical volume data if buffer is large enough
+  // Extract up to 13 months of historical volume data if buffer is large enough
   // Historical data is stored as consecutive uint32_t values (LSB first) starting at byte 70
   // Each represents the total volume reading at the end of that month
-  // Buffer is typically 120 bytes, which gives us 12 complete historical values (70 + 12*4 = 118)
-  // Index 0 = oldest month (12 months ago), Index 11 = most recent month boundary
+  // A full 124-byte frame carries 13 complete historical values (70 + 13*4 = 122)
+  // Index 0 = oldest month (13 months ago), Index 12 = most recent month boundary
   if (size >= 118)
-  { // Need at least 118 bytes for 12 complete historical values
+  { // Need at least 118 bytes for 12 complete historical values (a full frame gives 13)
     // Determine how many complete 4-byte values we can safely read
     int available_bytes = size - 70;
     int max_values = available_bytes / 4;
