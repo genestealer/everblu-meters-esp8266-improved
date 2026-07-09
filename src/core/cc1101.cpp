@@ -975,6 +975,49 @@ uint8_t cc1101_wait_for_packet(int milliseconds)
   return TRUE;
 }
 
+// Diagnostic: the RADIAN frame length is not assumed. Scan every candidate
+// total length L and report where a CRC-16/KERMIT trailer actually closes.
+// The authoritative convention (proven against the reference Make_Radian_Master_req
+// and the wiki's known-good master frame) is that the CRC covers bytes [0..L-3],
+// i.e. it INCLUDES the length byte, and the 2 CRC bytes sit at [L-2],[L-1].
+// For comparison it also tests the legacy convention that skips byte 0 (which is
+// what validate_radian_crc currently does) and both trailer byte orders, so a
+// clean capture tells us both the true frame length and the correct convention.
+static void crc_boundary_search(const uint8_t *buf, int size)
+{
+  if (buf == NULL || size < 6)
+  {
+    echo_debug(debug_out, "[CRC-SCAN] Only %d decoded bytes - too few to search\n", size);
+    return;
+  }
+
+  int matches = 0;
+  for (int L = 6; L <= size; L++)
+  {
+    const uint16_t trailer_be = ((uint16_t)buf[L - 2] << 8) | buf[L - 1];
+    const uint16_t trailer_le = ((uint16_t)buf[L - 1] << 8) | buf[L - 2];
+    const uint16_t crc_incl = radian_crc_kermit(&buf[0], (size_t)(L - 2)); // includes length byte [0]
+    const uint16_t crc_excl = radian_crc_kermit(&buf[1], (size_t)(L - 3)); // legacy: skips byte [0]
+
+    if (crc_incl == trailer_be)
+      echo_debug(debug_out, "[CRC-SCAN] MATCH len=%d  incl-byte0  BE-trailer  (len byte[0]=%u)\n", L, buf[0]);
+    else if (crc_incl == trailer_le)
+      echo_debug(debug_out, "[CRC-SCAN] MATCH len=%d  incl-byte0  LE-trailer  (len byte[0]=%u)\n", L, buf[0]);
+    else if (crc_excl == trailer_be)
+      echo_debug(debug_out, "[CRC-SCAN] MATCH len=%d  legacy(excl-byte0)  BE-trailer  (len byte[0]=%u)\n", L, buf[0]);
+    else if (crc_excl == trailer_le)
+      echo_debug(debug_out, "[CRC-SCAN] MATCH len=%d  legacy(excl-byte0)  LE-trailer  (len byte[0]=%u)\n", L, buf[0]);
+    else
+      continue;
+    matches++;
+  }
+
+  if (matches == 0)
+    echo_debug(debug_out, "[CRC-SCAN] No CRC boundary in %d decoded bytes (frame corrupt, or longer than captured)\n", size);
+  else
+    echo_debug(debug_out, "[CRC-SCAN] %d candidate boundary/boundaries found across %d decoded bytes\n", matches, size);
+}
+
 static bool validate_radian_crc(const uint8_t *decoded_buffer, size_t size)
 {
   if (size < 4)
@@ -1020,6 +1063,22 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
   data.time_end = primary.time_end;
   data.history_available = primary.history_available;
 
+  // Meter real-time clock and identifier string, decoded per the RADIAN
+  // reference field map (display_meter_report). Logged for diagnostics; these
+  // extras never gate acceptance of the reading.
+  if (primary.clock_valid)
+  {
+    echo_debug(debug_out,
+               "[CC1101] Meter clock %02u/%02u/20%02u %02u:%02u:%02u type='%s'\n",
+               primary.clock_day, primary.clock_month, primary.clock_year,
+               primary.clock_hour, primary.clock_minute, primary.clock_second,
+               primary.meter_type);
+    snprintf(data.meter_time, sizeof(data.meter_time), "20%02u-%02u-%02u %02u:%02u:%02u",
+             primary.clock_year, primary.clock_month, primary.clock_day,
+             primary.clock_hour, primary.clock_minute, primary.clock_second);
+  }
+  snprintf(data.meter_type, sizeof(data.meter_type), "%s", primary.meter_type);
+
   // Extract extended data if buffer is large enough
   if (size >= 49)
   { // Need at least 49 bytes to safely access decoded_buffer[48]
@@ -1031,13 +1090,13 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
     echo_debug(1, "[WARN] Buffer size %d < 49, extended data unavailable\n", size);
   }
 
-  // Extract 12 months of historical volume data if buffer is large enough
+  // Extract up to 13 months of historical volume data if buffer is large enough
   // Historical data is stored as consecutive uint32_t values (LSB first) starting at byte 70
   // Each represents the total volume reading at the end of that month
-  // Buffer is typically 120 bytes, which gives us 12 complete historical values (70 + 12*4 = 118)
-  // Index 0 = oldest month (12 months ago), Index 11 = most recent month boundary
+  // A full 124-byte frame carries 13 complete historical values (70 + 13*4 = 122)
+  // Index 0 = oldest month (13 months ago), Index 12 = most recent month boundary
   if (size >= 118)
-  { // Need at least 118 bytes for 12 complete historical values
+  { // Need at least 118 bytes for 12 complete historical values (a full frame gives 13)
     // Determine how many complete 4-byte values we can safely read
     int available_bytes = size - 70;
     int max_values = available_bytes / 4;
@@ -1349,7 +1408,12 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
 {
   uint8_t l_byte_in_rx = 0;
   uint16_t l_total_byte = 0;
-  uint16_t l_radian_frame_size_byte = ((size_byte * (8 + 3)) / 8) + 1;
+  // On-air framing per byte is 1 start + 8 data + 3 stop = 12 bits (see
+  // encode2serial_1_3). The previous (8 + 3) = 11-bit estimate under-counted the
+  // raw capture length, so the hard cap l_expected_bytes stopped ~60 raw bytes
+  // early and the last ~4 decoded bytes (13th history month + CRC trailer) were
+  // lost. (8 + 4) = 12 bits sizes the capture to cover the whole frame.
+  uint16_t l_radian_frame_size_byte = ((size_byte * (8 + 4)) / 8) + 1;
   int l_tmo = 0;
   int8_t l_Rssi_dbm;
   uint8_t l_lqi, l_freq_est;
@@ -1482,6 +1546,10 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
     echo_debug(debug_out, "[ERROR] Timeout waiting for GDO0 (frame start)\n");
     return 0;
   }
+  // Fixed-length capture sized from the expected frame (4x oversampled). This
+  // reads exactly one frame's worth and returns promptly, which keeps the tight
+  // ACK-then-data reply timing the meter expects. (An earlier capture-to-end
+  // experiment lingered on noise and broke reads - see git history.)
   uint16_t l_expected_bytes = l_radian_frame_size_byte * 4;
   bool l_use_gdo2 = (GET_GDO2_PIN() >= 0);
   while ((l_total_byte < l_expected_bytes) && (l_tmo < rx_tmo_ms))
@@ -1491,13 +1559,10 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
     if (l_tmo % 50 == 0)
       FEED_WDT(); // Feed watchdog every 50ms during frame receive
 
-    // GDO2 fast path (IOCFG2 = RX FIFO threshold / EOP): GDO2 is HIGH only once the
-    // RX FIFO holds at least RX_FIFO_THRESHOLD_BYTES. While it is LOW the FIFO is
-    // below threshold, so an RXBYTES SPI read would return little or nothing - skip
-    // it to avoid needless SPI traffic. Exception: the final tail of the frame
-    // (< threshold bytes) never raises GDO2 under infinite packet length (there is
-    // no end-of-packet), so once we are within one threshold of the expected total
-    // we must resume RXBYTES polling to drain those last bytes.
+    // GDO2 fast path (IOCFG2 = RX FIFO threshold / EOP): while GDO2 is LOW the
+    // FIFO is below threshold, so skip the RXBYTES read. The final tail
+    // (< threshold) never raises GDO2 under infinite packet length, so resume
+    // polling once we are within one threshold of the expected total.
     if (l_use_gdo2 && digitalRead(GET_GDO2_PIN()) == LOW &&
         (l_expected_bytes - l_total_byte) > RX_FIFO_THRESHOLD_BYTES)
     {
@@ -1507,8 +1572,8 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
     l_byte_in_rx = (halRfReadReg(RXBYTES_ADDR) & RXBYTES_MASK);
     if (l_byte_in_rx)
     {
-      // Do not pull more than we expect; excess bytes are noise and will
-      // skew CRC. Clamp the burst to the remaining expected length.
+      // Do not pull more than we expect; excess bytes are noise and would skew
+      // the decode. Clamp the burst to the remaining expected length.
       if (l_byte_in_rx + l_total_byte > l_expected_bytes)
         l_byte_in_rx = l_expected_bytes - l_total_byte;
 
@@ -1633,9 +1698,9 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
   uint8_t wupbuffer[] = {0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55};
   uint8_t wup2send = 77;
   uint16_t tmo = 0;
-  static uint8_t rxBuffer[1000]; // Make static to avoid stack overflow
+  static uint8_t rxBuffer[1500]; // Make static to avoid stack overflow
   int rxBuffer_size;
-  static uint8_t meter_data[200]; // Make static to avoid stack overflow
+  static uint8_t meter_data[300]; // Make static to avoid stack overflow
   uint8_t meter_data_size = 0;
 
   memset(&sdata, 0, sizeof(sdata));
@@ -1889,15 +1954,17 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
   }
   // delay(30); //50ms de 111111  , mais on a 7+3ms de printf et xxms calculs
   /*34ms 0101...01  14.25ms 000...000  14ms 1111...11111  582ms de data avec l'index */
-  echo_debug(1, "[METER] Waiting for data frame (124-byte frame, 700ms timeout)...\n");
-  rxBuffer_size = receive_radian_frame(0x7C, 700, rxBuffer, sizeof(rxBuffer)); // 700ms timeout matches working 91jj ESPHome implementation
+  echo_debug(1, "[METER] Waiting for data frame (124-byte frame, 1000ms timeout)...\n");
+  rxBuffer_size = receive_radian_frame(0x7C, 1000, rxBuffer, sizeof(rxBuffer));
   if (rxBuffer_size)
   {
     echo_debug(1, "[METER] Data frame received - decoding %d raw bytes...\n", rxBuffer_size);
     if (debug_out)
     {
-      //  echo_debug(debug_out, "rxBuffer:\n");
-      //  show_in_hex_array(rxBuffer, rxBuffer_size);
+      // Raw pre-decode oversampled buffer, for offline analysis of the full
+      // frame (captured to end of transmission, not a fixed 124-byte window).
+      echo_debug(debug_out, "[CC1101] Raw pre-decode RX buffer (%d oversampled bytes):\n", rxBuffer_size);
+      show_in_hex_array(rxBuffer, rxBuffer_size);
     }
 
     meter_data_size = decode_4bitpbit_serial(rxBuffer, rxBuffer_size, meter_data);
@@ -1932,6 +1999,11 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
       show_in_hex_one_line(meter_data, (meter_data_size < 32) ? meter_data_size : 32);
     }
 
+    // Diagnostic: find where a valid CRC actually closes rather than trusting
+    // the 0x7C length byte. Reveals the true frame length + CRC convention.
+    if (debug_out)
+      crc_boundary_search(meter_data, meter_data_size);
+
     echo_debug(1, "[METER] Validating CRC...\n");
     // Read RSSI now while the channel is still active so we can use it to
     // diagnose the cause of a CRC failure (saturation vs. weak signal).
@@ -1944,6 +2016,7 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
     else
     {
       echo_debug(1, "[METER] CRC check failed: a frame was received but arrived corrupted, so this reading was discarded.\n");
+      echo_debug(1, "[METER] (diag) decoded %d bytes; see the [CRC-SCAN] lines above (enable debug_cc1101) for the true CRC boundary/length.\n", meter_data_size);
       if (frame_rssi_dbm > -50)
       {
         // Very strong signal: near-field RF saturation is the likely cause.

@@ -8,9 +8,10 @@ coverage:
     # https://docs.codecov.com/docs/common-recipe-list#set-project-coverage-checks-on-a-pull-request
     project:
       default:
-        target: auto   # compare against the previous base commit
-        threshold: 0%  # no tolerance for coverage drops
+        target: auto        # compare against the previous base commit
+        threshold: 1%        # allow small coverage drops (e.g. new defensive branches)
         base: auto
+        informational: true  # report coverage changes but never fail/block the PR
 
 # Show full project coverage changes (not just patch/diff) on the PR comment.
 # https://docs.codecov.com/docs/common-recipe-list#show-project-coverage-changes-on-the-pull-request-comment

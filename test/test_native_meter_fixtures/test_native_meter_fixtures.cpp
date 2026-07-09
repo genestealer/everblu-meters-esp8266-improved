@@ -188,6 +188,109 @@ static FixtureLoadResult load_fixtures()
     return result;
 }
 
+// ---------------------------------------------------------------------------
+// Raw (pre-decode) fixtures: the oversampled CC1101 RX buffer captured BEFORE
+// software decode. Replaying these through radian_decode_4bitpbit() exercises
+// the decoder itself against real RF, then CRC + parse, all offline.
+// ---------------------------------------------------------------------------
+struct RawFixture
+{
+    std::string name;
+    std::vector<uint8_t> raw;
+    uint32_t expected_volume;
+    uint32_t expected_battery;
+    uint32_t expected_counter;
+    uint32_t expected_time_start;
+    uint32_t expected_time_end;
+    bool expected_history_available;
+    bool expected_crc_valid;
+};
+
+struct RawFixtureLoadResult
+{
+    std::vector<RawFixture> fixtures;
+    bool fixture_file_found;
+    size_t data_line_count;
+    size_t parse_error_count;
+};
+
+static std::ifstream open_raw_fixture_list()
+{
+    const char *candidates[] = {
+        "test/fixtures/meter_frames/raw_frames.lst",
+        "../test/fixtures/meter_frames/raw_frames.lst",
+        "../../test/fixtures/meter_frames/raw_frames.lst",
+        "../../../test/fixtures/meter_frames/raw_frames.lst",
+    };
+
+    for (const char *path : candidates)
+    {
+        std::ifstream file(path);
+        if (file.good())
+        {
+            return file;
+        }
+    }
+
+    return std::ifstream();
+}
+
+static RawFixtureLoadResult load_raw_fixtures()
+{
+    RawFixtureLoadResult result{};
+    std::ifstream in = open_raw_fixture_list();
+    if (!in.good())
+    {
+        result.fixture_file_found = false;
+        return result;
+    }
+    result.fixture_file_found = true;
+
+    std::string line;
+    while (std::getline(in, line))
+    {
+        line = trim(line);
+        if (line.empty() || line[0] == '#')
+        {
+            continue;
+        }
+        result.data_line_count++;
+
+        std::vector<std::string> parts = split(line, '|');
+        if (parts.size() != 9)
+        {
+            result.parse_error_count++;
+            continue;
+        }
+
+        RawFixture fx;
+        fx.name = trim(parts[0]);
+        uint32_t history_u32 = 0;
+        uint32_t crc_u32 = 0;
+        bool ok = true;
+        ok = ok && parse_hex_bytes(parts[1], fx.raw);
+        ok = ok && parse_u32_field(parts[2], fx.expected_volume);
+        ok = ok && parse_u32_field(parts[3], fx.expected_battery);
+        ok = ok && parse_u32_field(parts[4], fx.expected_counter);
+        ok = ok && parse_u32_field(parts[5], fx.expected_time_start);
+        ok = ok && parse_u32_field(parts[6], fx.expected_time_end);
+        ok = ok && parse_u32_field(parts[7], history_u32);
+        ok = ok && parse_u32_field(parts[8], crc_u32);
+
+        if (!ok)
+        {
+            result.parse_error_count++;
+            continue;
+        }
+
+        fx.expected_history_available = history_u32 != 0;
+        fx.expected_crc_valid = crc_u32 != 0;
+        result.fixtures.push_back(fx);
+    }
+
+    return result;
+}
+
 void setUp(void) {}
 
 void tearDown(void) {}
@@ -313,10 +416,11 @@ void test_radian_parse_primary_data_edge_cases(void)
 // ---------------------------------------------------------------------------
 void test_radian_validate_crc(void)
 {
-    // Build a well-formed frame: buf[0] = length, buf[1..len-3] = payload,
-    // buf[len-2..len-1] = CRC-16/KERMIT (big-endian) over the payload.
+    // Build a well-formed frame: buf[0] = length, buf[len-2..len-1] =
+    // CRC-16/KERMIT (big-endian) over bytes [0 .. len-3] (INCLUDING the length
+    // byte, per the RADIAN reference and known-good captures).
     uint8_t buf[8] = {8, 0x11, 0x22, 0x33, 0x44, 0x55, 0, 0};
-    const uint16_t crc = radian_crc_kermit(&buf[1], 5);
+    const uint16_t crc = radian_crc_kermit(&buf[0], 6);
     buf[6] = static_cast<uint8_t>(crc >> 8);
     buf[7] = static_cast<uint8_t>(crc & 0xFF);
     TEST_ASSERT_TRUE(radian_validate_crc(buf, sizeof(buf)));
@@ -342,10 +446,106 @@ void test_radian_validate_crc(void)
 
     // length_field == 0 falls back to the actual buffer size.
     uint8_t implicit[8] = {0, 0xDE, 0xAD, 0xBE, 0xEF, 0x01, 0, 0};
-    const uint16_t crc2 = radian_crc_kermit(&implicit[1], sizeof(implicit) - 3);
+    const uint16_t crc2 = radian_crc_kermit(&implicit[0], sizeof(implicit) - 2);
     implicit[6] = static_cast<uint8_t>(crc2 >> 8);
     implicit[7] = static_cast<uint8_t>(crc2 & 0xFF);
     TEST_ASSERT_TRUE(radian_validate_crc(implicit, sizeof(implicit)));
+}
+
+// A real, CRC-valid 124-byte EverBlu response captured on device (meter 257750,
+// clock 09/07/2026 13:03:04). Locks in the include-byte-0 CRC convention: the
+// CRC-16/KERMIT over bytes [0..121] equals the trailer at [122..123] = 0x7A60.
+void test_radian_validate_crc_real_frame(void)
+{
+    static const uint8_t frame[] = {
+        0x7C, 0x11, 0x00, 0x45, 0x20, 0x0A, 0x50, 0x14, 0x00, 0x45, 0x14, 0x03,
+        0xEE, 0xD6, 0x00, 0x01, 0x08, 0x00, 0x98, 0x33, 0x0C, 0x00, 0x40, 0x06,
+        0x09, 0x07, 0x1A, 0x04, 0x0D, 0x03, 0x04, 0x5C, 0x31, 0x33, 0x33, 0x32,
+        0x39, 0x30, 0x41, 0x4C, 0x30, 0x32, 0x00, 0x00, 0x06, 0x12, 0x04, 0x01,
+        0xA4, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x80, 0x80, 0x80,
+        0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x84, 0x80, 0x80, 0x80, 0x31, 0x2F,
+        0x0A, 0x00, 0xB6, 0x70, 0x0A, 0x00, 0xF5, 0xB1, 0x0A, 0x00, 0x10, 0xE0,
+        0x0A, 0x00, 0x8D, 0x02, 0x0B, 0x00, 0x04, 0x1F, 0x0B, 0x00, 0xBD, 0x3E,
+        0x0B, 0x00, 0xFF, 0x5D, 0x0B, 0x00, 0x9A, 0x79, 0x0B, 0x00, 0x07, 0x97,
+        0x0B, 0x00, 0x75, 0xC0, 0x0B, 0x00, 0x0D, 0xE6, 0x0B, 0x00, 0x2C, 0x17,
+        0x0C, 0x00, 0x7A, 0x60};
+
+    // Full 124-byte frame validates.
+    TEST_ASSERT_TRUE(radian_validate_crc(frame, sizeof(frame)));
+
+    // Real decodes carry trailing decoder noise past the frame; validation must
+    // still pass because it uses the length byte to locate the CRC at [122-123].
+    uint8_t padded[160];
+    memset(padded, 0xAA, sizeof(padded));
+    memcpy(padded, frame, sizeof(frame));
+    TEST_ASSERT_TRUE(radian_validate_crc(padded, sizeof(padded)));
+
+    // A single corrupted payload byte must fail.
+    uint8_t bad[sizeof(frame)];
+    memcpy(bad, frame, sizeof(frame));
+    bad[18] ^= 0x01; // flip a volume bit
+    TEST_ASSERT_FALSE(radian_validate_crc(bad, sizeof(bad)));
+}
+
+// ---------------------------------------------------------------------------
+// Extended field decode: meter real-time clock and identifier string.
+//
+// Byte offsets confirmed against the RADIAN reference implementation
+// (display_meter_report in the radianprotocol.com sources) and verified
+// against the captured home_001 fixture:
+//   [24]=day [25]=month [26]=year(20xx) [28]=hour [29]=minute [30]=second
+//   [32..42]=ASCII meter type/identifier
+// ---------------------------------------------------------------------------
+void test_radian_parse_extended_fields_home001(void)
+{
+    // Captured EverBlu Cyble response (test/fixtures/meter_frames/fixtures.lst,
+    // fixture "home_001"). This is the real 120-byte decoded frame.
+    static const uint8_t frame[] = {
+        0x7C, 0x11, 0x00, 0x45, 0x20, 0x0A, 0x50, 0x14, 0x00, 0x45, 0x14, 0x03,
+        0xEE, 0xD6, 0x00, 0x01, 0x08, 0x00, 0x45, 0xBB, 0x0B, 0x00, 0x40, 0x06,
+        0x1B, 0x04, 0x1A, 0x01, 0x09, 0x3B, 0x31, 0x5F, 0x31, 0x33, 0x33, 0x32,
+        0x39, 0x30, 0x41, 0x4C, 0x30, 0x32, 0x00, 0x00, 0x06, 0x12, 0x04, 0x01,
+        0xD7, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x80, 0x80, 0x80,
+        0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x84, 0xCB, 0x9D,
+        0x09, 0x00, 0x36, 0xC4, 0x09, 0x00, 0xF5, 0xF5, 0x09, 0x00, 0x31, 0x2F,
+        0x0A, 0x00, 0xB6, 0x70, 0x0A, 0x00, 0xF5, 0xB1, 0x0A, 0x00, 0x10, 0xE0,
+        0x0A, 0x00, 0x8D, 0x02, 0x0B, 0x00, 0x04, 0x1F, 0x0B, 0x00, 0xBD, 0x3E,
+        0x0B, 0x00, 0xFF, 0x5D, 0x0B, 0x00, 0x9A, 0x79, 0x0B, 0x00, 0x07, 0x97};
+
+    struct radian_primary_data out;
+    TEST_ASSERT_TRUE(radian_parse_primary_data(frame, sizeof(frame), &out));
+
+    // Sanity: the already-supported fields still decode as expected.
+    TEST_ASSERT_EQUAL_UINT32(768837UL, out.volume);
+    TEST_ASSERT_EQUAL_UINT8(6, out.time_start);
+    TEST_ASSERT_EQUAL_UINT8(18, out.time_end);
+
+    // Meter real-time clock: 27/04/2026 09:59:49.
+    TEST_ASSERT_TRUE(out.clock_valid);
+    TEST_ASSERT_EQUAL_UINT8(27, out.clock_day);
+    TEST_ASSERT_EQUAL_UINT8(4, out.clock_month);
+    TEST_ASSERT_EQUAL_UINT8(26, out.clock_year); // 2000 + 26 = 2026
+    TEST_ASSERT_EQUAL_UINT8(9, out.clock_hour);
+    TEST_ASSERT_EQUAL_UINT8(59, out.clock_minute);
+    TEST_ASSERT_EQUAL_UINT8(49, out.clock_second);
+
+    // ASCII meter type / identifier string (bytes [32..42]).
+    TEST_ASSERT_EQUAL_STRING("133290AL02", out.meter_type);
+}
+
+// A frame large enough for the primary fields but too short to reach the
+// clock/identifier bytes must decode cleanly with those extras left blank.
+void test_radian_parse_extended_fields_absent_when_short(void)
+{
+    // Full-size backing buffer (make_test_buf writes up to index 48), but the
+    // reading is parsed with a logical size of 30 so the clock/type bytes are
+    // out of range.
+    uint8_t buf[120];
+    make_test_buf(buf, sizeof(buf), 774431UL, 6, 18);
+    struct radian_primary_data out;
+    TEST_ASSERT_TRUE(radian_parse_primary_data(buf, 30, &out));
+    TEST_ASSERT_FALSE(out.clock_valid);
+    TEST_ASSERT_EQUAL_STRING("", out.meter_type);
 }
 
 void test_replay_meter_fixtures(void)
@@ -382,6 +582,63 @@ void test_replay_meter_fixtures(void)
 
         struct radian_primary_data parsed;
         bool parsed_ok = radian_parse_primary_data(fx.decoded.data(), fx.decoded.size(), &parsed);
+        TEST_ASSERT_TRUE_MESSAGE(parsed_ok, fx.name.c_str());
+
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(fx.expected_volume, parsed.volume, fx.name.c_str());
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(fx.expected_battery, parsed.battery_left, fx.name.c_str());
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(fx.expected_counter, parsed.reads_counter, fx.name.c_str());
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(fx.expected_time_start, parsed.time_start, fx.name.c_str());
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(fx.expected_time_end, parsed.time_end, fx.name.c_str());
+        TEST_ASSERT_EQUAL_INT_MESSAGE(
+            fx.expected_history_available ? 1 : 0,
+            parsed.history_available ? 1 : 0,
+            fx.name.c_str());
+    }
+}
+
+// Replay raw pre-decode RF captures through the full offline pipeline:
+//   raw oversampled buffer -> radian_decode_4bitpbit() -> CRC -> parse.
+// Unlike test_replay_meter_fixtures (which starts from already-decoded bytes),
+// this exercises the decoder against real on-air captures, so the decode path
+// can be refactored with confidence while the meter is asleep.
+void test_replay_raw_meter_fixtures(void)
+{
+    RawFixtureLoadResult loaded = load_raw_fixtures();
+
+    TEST_ASSERT_EQUAL_UINT32_MESSAGE(
+        0,
+        static_cast<uint32_t>(loaded.parse_error_count),
+        "Malformed fixture line(s) found in raw_frames.lst");
+
+    if (!loaded.fixture_file_found || loaded.fixtures.empty())
+    {
+        TEST_PASS_MESSAGE("No raw meter captures present yet. Capture with debug_cc1101 and append raw_frames.lst.");
+        return;
+    }
+
+    for (const RawFixture &fx : loaded.fixtures)
+    {
+        TEST_ASSERT_TRUE_MESSAGE(!fx.raw.empty(), fx.name.c_str());
+
+        // Decode the oversampled buffer exactly as the firmware does.
+        uint8_t decoded[256];
+        uint8_t decoded_len = radian_decode_4bitpbit(
+            fx.raw.data(), static_cast<int>(fx.raw.size()), decoded, sizeof(decoded));
+        TEST_ASSERT_TRUE_MESSAGE(decoded_len > 0, fx.name.c_str());
+
+        bool crc_ok = radian_validate_crc(decoded, decoded_len);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(
+            fx.expected_crc_valid ? 1 : 0,
+            crc_ok ? 1 : 0,
+            fx.name.c_str());
+
+        if (!crc_ok)
+        {
+            continue;
+        }
+
+        struct radian_primary_data parsed;
+        bool parsed_ok = radian_parse_primary_data(decoded, decoded_len, &parsed);
         TEST_ASSERT_TRUE_MESSAGE(parsed_ok, fx.name.c_str());
 
         TEST_ASSERT_EQUAL_UINT32_MESSAGE(fx.expected_volume, parsed.volume, fx.name.c_str());
@@ -754,6 +1011,7 @@ int main(int argc, char **argv)
     RUN_TEST(test_radian_parse_primary_time_rejection);
     RUN_TEST(test_radian_parse_primary_data_edge_cases);
     RUN_TEST(test_radian_validate_crc);
+    RUN_TEST(test_radian_validate_crc_real_frame);
     RUN_TEST(test_radian_decode_roundtrip);
     RUN_TEST(test_radian_decode_rejects_empty_and_null);
     RUN_TEST(test_radian_decode_tolerates_single_sample_glitch);
@@ -763,6 +1021,9 @@ int main(int argc, char **argv)
     RUN_TEST(test_radian_decode_framing_error_truncates);
     RUN_TEST(test_radian_reading_within_history_bounds);
     RUN_TEST(test_radian_reading_within_history_bounds_skips_when_insufficient);
+    RUN_TEST(test_radian_parse_extended_fields_home001);
+    RUN_TEST(test_radian_parse_extended_fields_absent_when_short);
     RUN_TEST(test_replay_meter_fixtures);
+    RUN_TEST(test_replay_raw_meter_fixtures);
     return UNITY_END();
 }

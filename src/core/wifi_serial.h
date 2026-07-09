@@ -26,7 +26,7 @@ extern WifiSerialStream WiFiSerial;
  */
 // Async transmit ring-buffer size (bytes).  Must be a power of two.
 // 8192 gives ~8 KB of headroom to absorb a full meter read sequence
-// (WUP + RX + hex dump + 12-month history ≈ 3.5 KB) while loop() is
+// (WUP + RX + hex dump + 13-month history ≈ 3.5 KB) while loop() is
 // not being called during the CC1101 TX/RX phase.
 // Lowering saves RAM at the cost of more frequent drop events.
 #ifndef WIFI_SERIAL_TX_BUF_SIZE

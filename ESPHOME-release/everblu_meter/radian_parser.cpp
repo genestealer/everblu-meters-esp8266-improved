@@ -45,7 +45,10 @@ bool radian_validate_crc(const uint8_t *decoded_buffer, size_t size)
     const size_t crc_offset = expected_len - 2;
     const uint16_t received_crc = ((uint16_t)decoded_buffer[crc_offset] << 8) |
                                   (uint16_t)decoded_buffer[crc_offset + 1];
-    const uint16_t computed_crc = radian_crc_kermit(&decoded_buffer[1], expected_len - 3);
+    // CRC-16/KERMIT covers the whole frame up to the trailer, INCLUDING the
+    // length byte [0] (proven against known-good captures: crc over [0..L-3]
+    // matches the [L-2],[L-1] trailer). expected_len - 2 = bytes [0 .. L-3].
+    const uint16_t computed_crc = radian_crc_kermit(&decoded_buffer[0], expected_len - 2);
     return computed_crc == received_crc;
 }
 
@@ -100,6 +103,57 @@ bool radian_parse_primary_data(const uint8_t *decoded_buffer, size_t size, struc
             memset(out, 0, sizeof(*out));
             return false;
         }
+    }
+
+    // Meter real-time clock and identifier string. Byte offsets are taken
+    // directly from the RADIAN reference display_meter_report():
+    //   [24]=day [25]=month [26]=year(20xx) [28]=hour [29]=minute [30]=second
+    //   [32..42]=ASCII meter type/identifier (NUL-terminated)
+    // Both are best-effort extras: a meter with an unset clock or a blank
+    // identifier must not cause an otherwise valid reading to be discarded, so
+    // failures only leave clock_valid false / meter_type empty.
+    if (size >= 31)
+    {
+        const uint8_t day = decoded_buffer[24];
+        const uint8_t month = decoded_buffer[25];
+        const uint8_t year = decoded_buffer[26];
+        const uint8_t hour = decoded_buffer[28];
+        const uint8_t minute = decoded_buffer[29];
+        const uint8_t second = decoded_buffer[30];
+
+        if (day >= 1 && day <= 31 && month >= 1 && month <= 12 &&
+            hour <= 23 && minute <= 59 && second <= 59)
+        {
+            out->clock_day = day;
+            out->clock_month = month;
+            out->clock_year = year;
+            out->clock_hour = hour;
+            out->clock_minute = minute;
+            out->clock_second = second;
+            out->clock_valid = true;
+        }
+    }
+
+    if (size >= 33)
+    {
+        size_t n = 0;
+        const size_t max_chars = sizeof(out->meter_type) - 1;
+        for (size_t idx = 32; idx < size && idx <= 42 && n < max_chars; idx++)
+        {
+            const uint8_t c = decoded_buffer[idx];
+            if (c == 0x00)
+            {
+                break; // NUL terminates the string
+            }
+            if (c < 0x20 || c > 0x7E)
+            {
+                // Non-printable byte: not a real identifier, discard partial.
+                n = 0;
+                break;
+            }
+            out->meter_type[n++] = (char)c;
+        }
+        out->meter_type[n] = '\0';
     }
 
     out->history_available = size >= 118;

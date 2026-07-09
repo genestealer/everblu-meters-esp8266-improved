@@ -469,29 +469,29 @@ When changing platforms or meters, update only the `source` - your history stays
 
 ### Historical Data from Meter
 
-The ESPHome component exposes a **history text sensor** containing 12 months of historical readings stored directly in the meter. This data is retrieved from the meter itself and provided in JSON format.
+The ESPHome component exposes a **history text sensor** containing up to 13 months of historical readings stored directly in the meter. This data is retrieved from the meter itself and provided in JSON format.
 
 **Example JSON payload:**
 
 ```json
 {
-  "history": [605696, 614107, 621401, 630219, 640054, 652789, 667441, 684214, 700917, 712720, 721549, 728836],
-  "monthly_usage": [605696, 8411, 7294, 8818, 9835, 12735, 14652, 16773, 16703, 11803, 8829, 7287],
-  "current_month_usage": 13043,
-  "months_available": 12
+  "history": [667441, 684214, 700917, 712720, 721549, 728836, 736957, 744959, 752026, 759559, 770165, 779789, 792364],
+  "monthly_usage": [16773, 16703, 11803, 8829, 7287, 8121, 8002, 7067, 7533, 10606, 9624, 12575],
+  "current_month_usage": 7276,
+  "months_available": 13
 }
 ```
 
 **Data Structure:**
 
-- `history`: 12 monthly readings (oldest to newest) in L or m³
-- `monthly_usage`: 12 monthly consumption values (first is oldest reading, rest are differences)
+- `history`: up to 13 monthly readings (oldest to newest) in L or m³
+- `monthly_usage`: monthly consumption values (differences between successive history snapshots)
 - `current_month_usage`: Current month consumption
-- `months_available`: Months of data (typically 12)
+- `months_available`: Months of data (typically 13)
 
 **Use Cases:**
 
-- Bootstrap Home Assistant with 12 months of existing data on first setup
+- Bootstrap Home Assistant with up to 13 months of existing data on first setup
 - Analyse historical consumption patterns
 - Compare current vs. previous month usage
 - Verify readings against utility bills
@@ -570,6 +570,8 @@ EverbluMeterComponent (ESPHome)
 - **firmware_version** - Firmware version string
 - **meter_serial_sensor** - Parsed serial section from `meter_code`
 - **meter_year_sensor** - Parsed year (`YY`) from `meter_code`
+- **meter_clock_sensor** - The meter's own real-time clock, decoded from the frame (`YYYY-MM-DD HH:MM:SS`)
+- **meter_model_sensor** - The meter's type/identifier string, decoded from the frame
 - **reading_schedule_sensor** - Active reading schedule
 - **reading_time_utc_sensor** - Configured reading time (UTC)
 
@@ -581,6 +583,7 @@ EverbluMeterComponent (ESPHome)
 ### Control Buttons
 
 - **request_reading_button** - Trigger a manual reading
+- **stop_reading_button** - Cancel the current read/retry sequence. Also requests best-effort cancellation of an in-progress deep frequency scan (it bails at the next step; see [#133](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/133))
 - **deep_scan_button** - Trigger a Deep frequency scan (±150 kHz, fine 2.5 kHz steps, maps the response window then zooms to the carrier centre)
 - **reset_frequency_button** - Reset the frequency offset
 

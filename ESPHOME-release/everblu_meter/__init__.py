@@ -91,6 +91,8 @@ CONF_HISTORY_JSON = "history_json"
 CONF_FIRMWARE_VERSION = "firmware_version"
 CONF_METER_SERIAL_SENSOR = "meter_serial_sensor"
 CONF_METER_YEAR_SENSOR = "meter_year_sensor"
+CONF_METER_CLOCK_SENSOR = "meter_clock_sensor"
+CONF_METER_MODEL_SENSOR = "meter_model_sensor"
 CONF_READING_SCHEDULE_SENSOR = "reading_schedule_sensor"
 CONF_READING_TIME_UTC_SENSOR = "reading_time_utc_sensor"
 CONF_ACTIVE_READING = "active_reading"
@@ -105,6 +107,7 @@ CONF_FREQUENCY_ESTIMATE = "frequency_estimate"
 CONF_REQUEST_READING_BUTTON = "request_reading_button"
 CONF_DEEP_SCAN_BUTTON = "deep_scan_button"
 CONF_RESET_FREQUENCY_BUTTON = "reset_frequency_button"
+CONF_STOP_READING_BUTTON = "stop_reading_button"
 CONF_RX_ATTENUATION = "rx_attenuation"
 
 # Meter types
@@ -380,6 +383,14 @@ CONFIG_SCHEMA = (
                 icon="mdi:calendar",
                 entity_category="diagnostic",
             ),
+            cv.Optional(CONF_METER_CLOCK_SENSOR): text_sensor.text_sensor_schema(
+                icon="mdi:clock-digital",
+                entity_category="diagnostic",
+            ),
+            cv.Optional(CONF_METER_MODEL_SENSOR): text_sensor.text_sensor_schema(
+                icon="mdi:barcode",
+                entity_category="diagnostic",
+            ),
             cv.Optional(CONF_READING_SCHEDULE_SENSOR): text_sensor.text_sensor_schema(
                 icon="mdi:calendar-clock",
                 entity_category="diagnostic",
@@ -407,6 +418,11 @@ CONFIG_SCHEMA = (
             ),
             cv.Optional(CONF_RESET_FREQUENCY_BUTTON): button.button_schema(
                 EverbluMeterTriggerButton, icon="mdi:restore", entity_category="config"
+            ),
+            cv.Optional(CONF_STOP_READING_BUTTON): button.button_schema(
+                EverbluMeterTriggerButton,
+                icon="mdi:stop-circle-outline",
+                entity_category="config",
             ),
         }
     )
@@ -682,6 +698,14 @@ async def to_code(config):
         sens = await text_sensor.new_text_sensor(config[CONF_METER_YEAR_SENSOR])
         cg.add(var.set_meter_year_sensor(sens))
 
+    if CONF_METER_CLOCK_SENSOR in config:
+        sens = await text_sensor.new_text_sensor(config[CONF_METER_CLOCK_SENSOR])
+        cg.add(var.set_meter_clock_sensor(sens))
+
+    if CONF_METER_MODEL_SENSOR in config:
+        sens = await text_sensor.new_text_sensor(config[CONF_METER_MODEL_SENSOR])
+        cg.add(var.set_meter_model_sensor(sens))
+
     if CONF_READING_SCHEDULE_SENSOR in config:
         sens = await text_sensor.new_text_sensor(config[CONF_READING_SCHEDULE_SENSOR])
         cg.add(var.set_reading_schedule_sensor(sens))
@@ -716,3 +740,8 @@ async def to_code(config):
         cg.add(btn.set_parent(var))
         cg.add(btn.set_deep_scan(False))
         cg.add(btn.set_reset_frequency(True))
+
+    if CONF_STOP_READING_BUTTON in config:
+        btn = await button.new_button(config[CONF_STOP_READING_BUTTON])
+        cg.add(btn.set_parent(var))
+        cg.add(btn.set_stop(True))

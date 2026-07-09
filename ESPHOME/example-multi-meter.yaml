@@ -109,6 +109,9 @@ everblu_meter:
       name: "Radio Deep Frequency Scan"
     reset_frequency_button:
       name: "Radio Reset Frequency Offset"
+    stop_reading_button:
+      name: "${meter_1_prefix} Stop Reading"
+      device_id: water_meter_device_1
 
     volume:
       name: "${meter_1_prefix} Water Volume"
@@ -154,6 +157,12 @@ everblu_meter:
       device_id: water_meter_device_1
     meter_year_sensor:
       name: "${meter_1_prefix} Meter Year"
+      device_id: water_meter_device_1
+    meter_clock_sensor:
+      name: "${meter_1_prefix} Meter Clock"
+      device_id: water_meter_device_1
+    meter_model_sensor:
+      name: "${meter_1_prefix} Meter Type"
       device_id: water_meter_device_1
     reading_schedule_sensor:
       name: "${meter_1_prefix} Reading Schedule"
@@ -215,6 +224,9 @@ everblu_meter:
     request_reading_button:
       name: "${meter_2_prefix} Read Meter Now"
       device_id: water_meter_device_2
+    stop_reading_button:
+      name: "${meter_2_prefix} Stop Reading"
+      device_id: water_meter_device_2
     # Frequency calibration buttons/sensors are radio-global and declared on the
     # first meter only (see water_meter_1 above); they act on the shared CC1101.
 
@@ -255,6 +267,12 @@ everblu_meter:
       device_id: water_meter_device_2
     meter_year_sensor:
       name: "${meter_2_prefix} Meter Year"
+      device_id: water_meter_device_2
+    meter_clock_sensor:
+      name: "${meter_2_prefix} Meter Clock"
+      device_id: water_meter_device_2
+    meter_model_sensor:
+      name: "${meter_2_prefix} Meter Type"
       device_id: water_meter_device_2
     reading_schedule_sensor:
       name: "${meter_2_prefix} Reading Schedule"

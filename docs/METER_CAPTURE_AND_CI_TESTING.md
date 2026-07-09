@@ -55,19 +55,46 @@ Each fixture line format:
 fixture_name|decoded_hex|volume|battery|counter|time_start|time_end|history_available|crc_valid
 ```
 
+### Raw pre-decode captures (decoder coverage)
+
+When the log was captured with `debug_cc1101` enabled, it also contains the raw
+oversampled RX buffer printed *before* software decode:
+
+```text
+[CC1101] Raw pre-decode RX buffer (748 oversampled bytes):
+```
+
+The extractor detects these and also writes a second file:
+
+- test/fixtures/meter_frames/raw_frames.lst
+
+These fixtures are replayed through the real decoder
+(`radian_decode_4bitpbit()`), so the decode path itself is covered offline, not
+just the parser. This is what lets the 4x-oversampled bit-recovery code be
+refactored with confidence while the meter is asleep. The raw file uses the same
+field layout, with the second column holding the raw oversampled bytes instead
+of the decoded frame:
+
+```text
+fixture_name|raw_oversampled_hex|volume|battery|counter|time_start|time_end|history_available|crc_valid
+```
+
 ## 3) Run replay tests locally
 
 ```powershell
 pio test -e native -v
 ```
 
-The replay test validates each captured frame for:
+The replay tests validate each captured frame for:
 
 - CRC result expectation
 - Parsed volume
 - Parsed battery/counter
 - Parsed wake window
 - History presence flag
+
+`test_replay_meter_fixtures` starts from decoded bytes; `test_replay_raw_meter_fixtures`
+starts from the raw oversampled buffer and runs decode + CRC + parse.
 
 ## 4) Automatic GitHub testing
 

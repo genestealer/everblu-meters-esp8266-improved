@@ -130,11 +130,12 @@ A quick overview of what the firmware does:
 ### Full feature list
 
 - **Meter data**: fetches usage from Itron EverBlu Cyble Enhanced RF meters, in litres (L, water device class) or cubic metres (m³, gas device class).
+- **Extra meter fields**: decodes the meter's own real-time clock and its type/identifier string, alongside the read counter, battery months and up to 13 monthly historical volumes.
 - **Diagnostics**: exposes RSSI (raw, dBm and %), LQI and signal strength, plus Time Start and Time End sensors that show when the meter wakes and sleeps.
 - **Home Assistant**: MQTT AutoDiscovery for the standalone firmware, or a native ESPHome component for direct integration.
 - **Frequency handling**: automatic CC1101 calibration, with a manual fallback.
 - **Hardware FIFO management (GDO2, enabled by default in v3.0.0+)**: per-phase reconfiguration prevents TX FIFO underflows and skips unnecessary RX SPI reads. Wire GDO2 to a free GPIO, or opt out to keep legacy SPI polling. See [Hardware](#hardware) for wiring and the opt-out.
-- **Frame integrity**: CRC-16/KERMIT verification discards corrupted RADIAN frames before any data is published.
+- **Frame integrity**: every frame is verified end-to-end with CRC-16/KERMIT (computed over the full 124-byte frame, including the length byte, with the trailer in the last two bytes) and corrupted RADIAN frames are discarded before any data is published.
 - **Scheduling**: daily readings, with days set by preset (Monday-Friday, Monday-Saturday, Monday-Sunday) or a single named day.
 - **Connectivity**: Wi-Fi diagnostics and OTA updates.
 
@@ -147,7 +148,7 @@ The firmware implements multiple layers of validation to ensure data integrity:
 
 1. **Custom Serial Decoding**: RADIAN protocol uses a proprietary serial encoding with 1 start bit + 8 data bits (LSB first) + 3 stop bits per byte. Each bit is oversampled 4x for noise immunity (logical '1' = 0xF0, logical '0' = 0x0F). The decoder verifies bit-level transitions, counts consecutive samples, validates start/stop bits, and extracts clean data bytes. This is NOT standard Manchester encoding-it's custom serial framing that must be decoded in software.
 
-2. **CRC-16/KERMIT Checksum**: Each RADIAN frame includes a 16-bit checksum (polynomial 0x8408, init 0x0000). Technically this is a Frame Check Sequence (FCS), not a true CRC, but it's highly effective at catching transmission errors and corrupted frames. The firmware rejects any frame that fails this check.
+2. **CRC-16/KERMIT Checksum**: Each RADIAN frame includes a 16-bit checksum (polynomial 0x8408, init 0x0000). Technically this is a Frame Check Sequence (FCS), not a true CRC, but it's highly effective at catching transmission errors and corrupted frames. The checksum is computed over the full 124-byte frame (bytes [0..121], including the length byte) and compared against the trailer in the last two bytes [122-123]. The firmware rejects any frame that fails this check.
 
 3. **Frame Structure Validation**:
    - Preamble pattern matching (0xAAAAAAAA sync word)
@@ -576,25 +577,25 @@ When you change platforms or meters, simply update the `source` to point to the 
 
 ### Historical Data from Meter
 
-Both MQTT and ESPHome modes expose a **history sensor** containing 12 months of historical readings stored in the meter itself. This data is retrieved directly from the meter and provided in JSON format.
+Both MQTT and ESPHome modes expose a **history sensor** containing up to 13 months of historical readings stored in the meter itself. This data is retrieved directly from the meter and provided in JSON format.
 
 **Example JSON payload:**
 
 ```json
 {
-  "history": [605696, 614107, 621401, 630219, 640054, 652789, 667441, 684214, 700917, 712720, 721549, 728836],
-  "monthly_usage": [605696, 8411, 7294, 8818, 9835, 12735, 14652, 16773, 16703, 11803, 8829, 7287],
-  "current_month_usage": 13043,
-  "months_available": 12
+  "history": [667441, 684214, 700917, 712720, 721549, 728836, 736957, 744959, 752026, 759559, 770165, 779789, 792364],
+  "monthly_usage": [16773, 16703, 11803, 8829, 7287, 8121, 8002, 7067, 7533, 10606, 9624, 12575],
+  "current_month_usage": 7276,
+  "months_available": 13
 }
 ```
 
 **Fields:**
 
-- `history`: Array of 12 monthly readings (oldest to newest) in litres or m³
-- `monthly_usage`: Array of 12 monthly consumption values (first value is the oldest reading, subsequent values are differences)
+- `history`: Array of up to 13 monthly readings (oldest to newest) in litres or m³
+- `monthly_usage`: Array of monthly consumption values (differences between successive history snapshots)
 - `current_month_usage`: Current month's consumption so far
-- `months_available`: Number of months of data available (typically 12)
+- `months_available`: Number of months of data available (typically 13)
 
 **Use Cases:**
 

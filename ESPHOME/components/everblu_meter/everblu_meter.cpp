@@ -43,7 +43,9 @@ void EverbluMeterTriggerButton::press_action() {
     return;
   }
 
-  if (this->is_deep_scan_) {
+  if (this->is_stop_) {
+    this->parent_->request_stop_reading();
+  } else if (this->is_deep_scan_) {
     this->parent_->request_deep_scan();
   } else if (this->is_reset_frequency_) {
     this->parent_->request_reset_frequency();
@@ -113,6 +115,8 @@ void EverbluMeterComponent::setup() {
   this->data_publisher_->set_version_sensor(this->version_sensor_);
   this->data_publisher_->set_meter_serial_sensor(this->meter_serial_sensor_);
   this->data_publisher_->set_meter_year_sensor(this->meter_year_sensor_);
+  this->data_publisher_->set_meter_clock_sensor(this->meter_clock_sensor_);
+  this->data_publisher_->set_meter_model_sensor(this->meter_model_sensor_);
   this->data_publisher_->set_reading_schedule_sensor(this->reading_schedule_sensor_);
   this->data_publisher_->set_reading_time_utc_sensor(this->reading_time_utc_sensor_);
   this->data_publisher_->set_active_reading_sensor(this->active_reading_sensor_);
@@ -351,6 +355,16 @@ void EverbluMeterComponent::request_reset_frequency() {
   this->apply_radio_context();
   this->meter_reader_->resetFrequencyOffset();
   ESP_LOGI(TAG, "Frequency offset reset to 0.000 kHz");
+}
+
+void EverbluMeterComponent::request_stop_reading() {
+  if (this->meter_reader_ == nullptr) {
+    ESP_LOGW(TAG, "Stop ignored: meter reader not ready");
+    return;
+  }
+
+  ESP_LOGI(TAG, "Stop reading requested via button");
+  this->meter_reader_->stopReading();
 }
 
 void EverbluMeterComponent::apply_radio_context() {

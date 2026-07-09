@@ -16,6 +16,7 @@ float FrequencyManager::s_baseFrequency = 0.0;
 float FrequencyManager::s_storedOffset = 0.0;
 bool FrequencyManager::s_autoScanEnabled = true;
 bool FrequencyManager::s_hasStoredCalibration = false;
+volatile bool FrequencyManager::s_scanCancelRequested = false;
 int FrequencyManager::s_adaptiveThreshold = 10;
 int FrequencyManager::s_successfulReadsCount = 0;
 float FrequencyManager::s_cumulativeFreqError = 0.0;
@@ -150,6 +151,10 @@ void FrequencyManager::performDeepFrequencyScan(float scanRangeMHz, float scanSt
 {
     TS_PRINTLN("[FREQ] Performing Deep frequency scan...");
 
+    // Fresh scan starts uncancelled. requestScanCancel() sets this flag; the
+    // step loops below check it and bail at the next step boundary.
+    s_scanCancelRequested = false;
+
     // Suppress the verbose per-attempt radio/meter read logging for the whole
     // scan. Each frequency step performs a full read sequence whose detailed
     // output is irrelevant noise here; high-level scan progress (LOG_*) remains.
@@ -188,6 +193,14 @@ void FrequencyManager::performDeepFrequencyScan(float scanRangeMHz, float scanSt
     for (float freq = scanStart; freq <= scanEnd; freq += scanStep)
     {
         feedWatchdog();
+
+        if (s_scanCancelRequested)
+        {
+            LOG_W("everblu_meter", "Deep scan cancelled by user (window map)");
+            s_radioInitCallback(s_baseFrequency + s_storedOffset); // restore known-good tuning
+            if (statusCallback) statusCallback("Idle", "Deep scan cancelled");
+            return;
+        }
 
         if (!s_radioInitCallback(freq))
         {
@@ -256,6 +269,13 @@ void FrequencyManager::performDeepFrequencyScan(float scanRangeMHz, float scanSt
         for (float zfreq = zoomStart; zfreq <= zoomEnd + zoomStep * 0.5f; zfreq += zoomStep)
         {
             feedWatchdog();
+            if (s_scanCancelRequested)
+            {
+                LOG_W("everblu_meter", "Deep scan cancelled by user (zoom pass)");
+                s_radioInitCallback(s_baseFrequency + s_storedOffset); // restore known-good tuning
+                if (statusCallback) statusCallback("Idle", "Deep scan cancelled");
+                return;
+            }
             if (!s_radioInitCallback(zfreq)) break;
             delay(50);
             struct tmeter_data zdata = s_meterReadCallback();
@@ -419,6 +439,11 @@ void FrequencyManager::resetAdaptiveTracking()
     s_cumulativeFreqError = 0.0;
     s_successfulReadsCount = 0;
     LOG_I("everblu_meter", "Adaptive frequency tracking reset");
+}
+
+void FrequencyManager::requestScanCancel()
+{
+    s_scanCancelRequested = true;
 }
 
 bool FrequencyManager::shouldPerformAutoScan()

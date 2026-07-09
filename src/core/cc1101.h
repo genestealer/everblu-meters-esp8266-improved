@@ -103,6 +103,8 @@ struct tmeter_data
   int8_t freqest;         // Frequency offset estimate from CC1101 for adaptive tracking
   uint32_t history[13];   // Monthly historical readings (13 months), index 0 = oldest, 12 = most recent
   bool history_available; // True if historical data was successfully extracted
+  char meter_time[32];    // Meter real-time clock "YYYY-MM-DD HH:MM:SS" (empty if not decoded)
+  char meter_type[12];    // Meter type/identifier ASCII string, e.g. "133290AL02" (empty if not decoded)
 };
 
 /**

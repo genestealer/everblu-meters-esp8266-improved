@@ -103,6 +103,15 @@ public:
     void resetFrequencyOffset();
 
     /**
+     * @brief Stop the current reading sequence
+     *
+     * Cancels any pending retry and returns the reader to idle so it stops
+     * retrying and does not start the next queued read. A blocking RF transfer
+     * that is already in flight cannot be interrupted mid-transaction.
+     */
+    void stopReading();
+
+    /**
      * @brief Get current read statistics
      * @param totalAttempts Output: total read attempts
      * @param successfulReads Output: successful reads

@@ -1,0 +1,1836 @@
+From: <Saved by Blink>
+Snapshot-Content-Location: https://web.archive.org/web/20010604094756/http://www.radianprotocol.com/protocol.htm
+Subject: RADIAN: standard radio protocol
+Date: Thu, 9 Jul 2026 14:33:39 +0100
+MIME-Version: 1.0
+Content-Type: multipart/related;
+	type="text/html";
+	boundary="----MultipartBoundary--PQT90S9kCXYybyiAf4PWqxnLEbDWUahpICe4eqMWoX----"
+
+
+------MultipartBoundary--PQT90S9kCXYybyiAf4PWqxnLEbDWUahpICe4eqMWoX----
+Content-Type: text/html
+Content-ID: <frame-457443A3652C6776ADC7771BEE60C307@mhtml.blink>
+Content-Transfer-Encoding: quoted-printable
+Content-Location: https://web.archive.org/web/20010604094756/http://www.radianprotocol.com/protocol.htm
+
+<html style=3D"--wm-toolbar-height: 67px;"><head><meta http-equiv=3D"Conten=
+t-Type" content=3D"text/html; charset=3Dwindows-1252">
+
+
+
+
+
+
+<link rel=3D"stylesheet" type=3D"text/css" href=3D"https://web-static.archi=
+ve.org/_static/css/banner-styles.css?v=3D1utQkbB3">
+<link rel=3D"stylesheet" type=3D"text/css" href=3D"https://web-static.archi=
+ve.org/_static/css/iconochive.css?v=3D3PDvdIFv">
+<!-- End Wayback Rewrite JS Include -->
+
+
+<meta name=3D"Author" content=3D"Immonet">
+<meta name=3D"Content-Language" content=3D"en-FR">
+<meta name=3D"Coverage" content=3D"Worlwide">
+<meta name=3D"Description" content=3D"RADIAN is the first European independ=
+ent association formed to develop, share and promote a common low power rad=
+io protocol for data transmission in the utility industry (gas,electricity,=
+water,heat) established by its members from different countries in Europe r=
+epresenting meter and hardware manufacturers,service companies and utilitie=
+s.">
+<meta name=3D"Keywords" lang=3D"EN" content=3D" radian,RADIAN,RADIO,radio,p=
+rotocol,PROTOCOL,automatic,meter,MFD,reading,gas,electricity,water,heat,uti=
+lity,service,network,data,transmission,communication,standard,interoperabil=
+ity,telecommunication,handheld,frequency,concentrator,modules,hardware,itro=
+n">
+<meta name=3D"Identifier-URL" content=3D"http://www.radian-protocol.com">
+<meta name=3D"Reply-to" content=3D"radian@radianprotocol.com">
+<meta name=3D"Date-Creation-yyyymmdd" content=3D"20000601">
+<meta name=3D"revisit-after" content=3D"31">
+<meta name=3D"Publisher" content=3D"Immonet">
+<meta name=3D"Copyright" content=3D"Immonet">
+<meta name=3D"Category" content=3D"association">
+<meta name=3D"robots" content=3D"All">
+<title>RADIAN: standard radio protocol</title>
+</head>
+
+
+<body background=3D"https://web.archive.org/web/20010604094756im_/http://ww=
+w.radianprotocol.com/images/fond4.jpg"><!-- BEGIN WAYBACK TOOLBAR INSERT --=
+>
+
+<div id=3D"wm-ipp-base" lang=3D"en" style=3D"display: block; direction: ltr=
+; height: 67px;" toolbar-mode=3D"auto"><template shadowmode=3D"closed"><div=
+ id=3D"wm-ipp" style=3D"position:fixed;left:0;top:0;right:0;">
+<div id=3D"donato" style=3D"position:relative;width:100%;height:0;">
+  <div id=3D"donato-base">
+    <iframe id=3D"donato-if" src=3D"cid:frame-A3F978D5117B3E2A6F86E1CC6D9EF=
+A2F@mhtml.blink" scrolling=3D"no" frameborder=3D"0" style=3D"width:100%; he=
+ight:100%">
+    </iframe>
+  </div>
+</div><div id=3D"wm-ipp-inside">
+  <div id=3D"wm-toolbar" style=3D"position:relative;display:flex;flex-flow:=
+row nowrap;justify-content:space-between;" nav=3D"async">
+    <div id=3D"wm-logo" style=3D"/*width:110px;*/padding-top:12px;">
+      <a href=3D"https://web.archive.org/web/" title=3D"Wayback Machine hom=
+e page"><img src=3D"https://web-static.archive.org/_static/images/toolbar/w=
+ayback-toolbar-logo-200.png" alt=3D"Wayback Machine" style=3D"width:100px" =
+border=3D"0" width=3D"100" height=3D"35"></a>
+    </div>
+    <div class=3D"c" style=3D"display:flex;flex-flow:column nowrap;justify-=
+content:space-between;flex:1;">
+      <form class=3D"u" style=3D"display:flex;flex-direction:row;flex-wrap:=
+nowrap;" target=3D"_top" method=3D"get" action=3D"https://web.archive.org/w=
+eb/submit" name=3D"wmtb" id=3D"wmtb"><input type=3D"text" name=3D"url" id=
+=3D"wmtbURL" value=3D"http://www.radianprotocol.com/protocol.htm" style=3D"=
+flex:1;" autocomplete=3D"off"><input type=3D"submit" value=3D"Go">
+      </form>
+      <div style=3D"display:flex;flex-flow:row nowrap;align-items:flex-end;=
+">
+                <div class=3D"s" id=3D"wm-nav-captures" style=3D"flex:1;"><=
+a class=3D"t" href=3D"https://web.archive.org/web/*/http://www.radianprotoc=
+ol.com/protocol.htm" title=3D"See a list of every capture for this URL">2 c=
+aptures</a><div class=3D"r" title=3D"Timespan for captures of this URL">6 A=
+pr 2001 - 4 Jun 2001</div></div>
+        <div class=3D"k">
+          <a href=3D"https://web.archive.org/web/20010604094756/http://www.=
+radianprotocol.com/protocol.htm" id=3D"wm-graph-anchor">
+            <div id=3D"wm-ipp-sparkline" title=3D"Explore captures for this=
+ URL" style=3D"position: relative">
+              <canvas id=3D"wm-sparkline-canvas" width=3D"775" height=3D"27=
+" border=3D"0"></canvas>
+            <div class=3D"yt" style=3D"display: none; width: 25px; height: =
+27px;"></div><div class=3D"mt" style=3D"display: none; width: 2px; height: =
+27px;"></div></div>
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class=3D"n">
+      <table>
+        <tbody>
+          <!-- NEXT/PREV MONTH NAV AND MONTH INDICATOR -->
+          <tr class=3D"m">
+            <td class=3D"b" nowrap=3D"nowrap"><a href=3D"https://web.archiv=
+e.org/web/20010406171439/http://www.radianprotocol.com/protocol.htm" title=
+=3D"17:14:39 Apr 6, 2001">Apr</a></td>
+            <td class=3D"c" id=3D"displayMonthEl" title=3D"You are here: 09=
+:47:56 Jun 04, 2001">JUN</td>
+            <td class=3D"f" nowrap=3D"nowrap">Jul</td>
+          </tr>
+          <!-- NEXT/PREV CAPTURE NAV AND DAY OF MONTH INDICATOR -->
+          <tr class=3D"d">
+            <td class=3D"b" nowrap=3D"nowrap"><a href=3D"https://web.archiv=
+e.org/web/20010406171439/http://www.radianprotocol.com/protocol.htm" title=
+=3D"17:14:39 Apr 6, 2001"><span class=3D"ta"></span></a></td>
+            <td class=3D"c" id=3D"displayDayEl" style=3D"width:34px;font-si=
+ze:22px;white-space:nowrap;" title=3D"You are here: 09:47:56 Jun 04, 2001">=
+04</td>
+            <td class=3D"f" nowrap=3D"nowrap"><span class=3D"ta"></span></t=
+d>
+          </tr>
+          <!-- NEXT/PREV YEAR NAV AND YEAR INDICATOR -->
+          <tr class=3D"y">
+            <td class=3D"b" nowrap=3D"nowrap">2000</td>
+            <td class=3D"c" id=3D"displayYearEl" title=3D"You are here: 09:=
+47:56 Jun 04, 2001">2001</td>
+            <td class=3D"f" nowrap=3D"nowrap">2002</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class=3D"r" style=3D"display:flex;flex-flow:column nowrap;align-it=
+ems:flex-end;justify-content:space-between;">
+      <div id=3D"wm-btns" style=3D"text-align:right;height:23px;">
+                <span class=3D"xxs">
+          <div id=3D"wm-save-snapshot-success">success</div>
+          <div id=3D"wm-save-snapshot-fail">fail</div>
+          <a id=3D"wm-save-snapshot-open" href=3D"https://web.archive.org/w=
+eb/20010604094756/http://www.radianprotocol.com/protocol.htm#" title=3D"Sha=
+re via My Web Archive" style=3D"display: none;">
+            <span class=3D"iconochive-web"></span>
+          </a>
+          <a href=3D"https://archive.org/account/login.php" title=3D"Sign I=
+n" id=3D"wm-sign-in" style=3D"display: inline-block;">
+            <span class=3D"iconochive-person"></span>
+          </a>
+          <span id=3D"wm-save-snapshot-in-progress" class=3D"iconochive-web=
+" style=3D"display: none;"></span>
+        </span>
+                <a class=3D"xxs" href=3D"https://help.archive.org/help/cate=
+gory/the-wayback-machine/" title=3D"Get some help using the Wayback Machine=
+" style=3D"top:-6px;"><span class=3D"iconochive-question" style=3D"color:rg=
+b(87,186,244);font-size:160%;"></span></a>
+        <a id=3D"wm-tb-close" href=3D"https://web.archive.org/web/200106040=
+94756/http://www.radianprotocol.com/protocol.htm#close" style=3D"top:-2px;"=
+ title=3D"Close the toolbar"><span class=3D"iconochive-remove-circle" style=
+=3D"color:#888888;font-size:240%;"></span></a>
+      </div>
+      <div id=3D"wm-share" class=3D"xxs">
+        <a href=3D"https://web.archive.org/web/20010604094756/http://web.ar=
+chive.org/screenshot/http://www.radianprotocol.com/protocol.htm" id=3D"wm-s=
+creenshot" title=3D"screenshot" style=3D"visibility: hidden;">
+          <span class=3D"wm-icon-screen-shot"></span>
+        </a>
+        <a href=3D"https://web.archive.org/web/20010604094756/http://www.ra=
+dianprotocol.com/protocol.htm#" id=3D"wm-video" title=3D"video">
+          <span class=3D"iconochive-movies"></span>
+        </a>
+        <a id=3D"wm-share-facebook" href=3D"https://web.archive.org/web/200=
+10604094756/http://www.radianprotocol.com/protocol.htm#" data-url=3D"https:=
+//web.archive.org/web/20010604094756/http://www.radianprotocol.com:80/proto=
+col.htm" title=3D"Share on Facebook" style=3D"margin-right:5px;" target=3D"=
+_blank"><span class=3D"iconochive-facebook" style=3D"color:#3b5998;font-siz=
+e:160%;"></span></a>
+        <a id=3D"wm-share-twitter" href=3D"https://web.archive.org/web/2001=
+0604094756/http://www.radianprotocol.com/protocol.htm#" data-url=3D"https:/=
+/web.archive.org/web/20010604094756/http://www.radianprotocol.com:80/protoc=
+ol.htm" title=3D"Share on Twitter" style=3D"margin-right:5px;" target=3D"_b=
+lank"><span class=3D"iconochive-twitter" style=3D"color:#1dcaff;font-size:1=
+60%;"></span></a>
+      </div>
+      <div style=3D"padding-right:2px;text-align:right;white-space:nowrap;"=
+>
+        <a id=3D"wm-expand" class=3D"wm-btn wm-closed" href=3D"https://web.=
+archive.org/web/20010604094756/http://www.radianprotocol.com/protocol.htm#e=
+xpand"><span id=3D"wm-expand-icon" class=3D"iconochive-down-solid"></span> =
+<span class=3D"xxs" style=3D"font-size:80%;">About this capture</span></a>
+      </div>
+    </div>
+  </div>
+    <div id=3D"wm-capinfo" style=3D"border-top:1px solid #777;display:none;=
+ overflow: hidden">
+        <div id=3D"wm-capinfo-notice" source=3D"api"></div>
+                <div id=3D"wm-capinfo-collected-by">
+    <div style=3D"background-color:#666;color:#fff;font-weight:bold;text-al=
+ign:center;padding:2px 0;">COLLECTED BY</div>
+    <div style=3D"padding:3px;position:relative" id=3D"wm-collected-by-cont=
+ent">
+            <div style=3D"display:inline-block;vertical-align:top;width:50%=
+;">
+			<span class=3D"c-logo" style=3D"background-image:url(https://archive.org=
+/services/img/alexacrawls);"></span>
+		Organization: <a style=3D"color:#33f;" href=3D"https://archive.org/detail=
+s/alexacrawls" target=3D"_new"><span class=3D"wm-title">Alexa Crawls</span>=
+</a>
+		<div style=3D"max-height:75px;overflow:hidden;position:relative;">
+	  <div style=3D"position:absolute;top:0;left:0;width:100%;height:75px;back=
+ground:linear-gradient(to bottom,rgba(255,255,255,0) 0%,rgba(255,255,255,0)=
+ 90%,rgba(255,255,255,255) 100%);"></div>
+	  Starting in 1996, <a href=3D"http://www.alexa.com/">Alexa Internet</a> h=
+as been donating their crawl data to the Internet Archive.  Flowing in ever=
+y day, these data are added to the <a href=3D"http://web.archive.org/">Wayb=
+ack Machine</a> after an embargo period.
+	</div>
+	      </div>
+      <div style=3D"display:inline-block;vertical-align:top;width:49%;">
+			<span class=3D"c-logo" style=3D"background-image:url(https://archive.org=
+/services/img/alexa_df)"></span>
+		<div>Collection: <a style=3D"color:#33f;" href=3D"https://archive.org/det=
+ails/alexa_df" target=3D"_new"><span class=3D"wm-title">Alexa Crawls DF</sp=
+an></a></div>
+		<div style=3D"max-height:75px;overflow:hidden;position:relative;">
+	  <div style=3D"position:absolute;top:0;left:0;width:100%;height:75px;back=
+ground:linear-gradient(to bottom,rgba(255,255,255,0) 0%,rgba(255,255,255,0)=
+ 90%,rgba(255,255,255,255) 100%);"></div>
+	  Crawl data donated by Alexa Internet. This data is currently not publicl=
+y accessible
+	</div>
+	      </div>
+    </div>
+    </div>
+    <div id=3D"wm-capinfo-timestamps">
+    <div style=3D"background-color:#666;color:#fff;font-weight:bold;text-al=
+ign:center;padding:2px 0;" title=3D"Timestamps for the elements of this pag=
+e">TIMESTAMPS</div>
+    <div>
+      <div id=3D"wm-capresources" style=3D"margin:0 5px 5px 5px;max-height:=
+250px;overflow-y:scroll !important"></div>
+      <div id=3D"wm-capresources-loading" style=3D"text-align:left;margin:0=
+ 20px 5px 5px;display:none"><img src=3D"https://web-static.archive.org/_sta=
+tic/images/loading.gif" alt=3D"loading"></div>
+    </div>
+    </div>
+  </div></div></div><link rel=3D"stylesheet" type=3D"text/css" href=3D"http=
+s://web-static.archive.org/_static/css/banner-styles.css?v=3D1utQkbB3"><lin=
+k rel=3D"stylesheet" type=3D"text/css" href=3D"https://web-static.archive.o=
+rg/_static/css/iconochive.css?v=3D3PDvdIFv"><div class=3D"wb-autocomplete-s=
+uggestions "></div></template>
+</div><div id=3D"wm-ipp-print">The Wayback Machine - https://web.archive.or=
+g/web/20010604094756/http://www.radianprotocol.com:80/protocol.htm</div>
+
+<!-- END WAYBACK TOOLBAR INSERT -->
+=20
+
+<div align=3D"left">
+  <table border=3D"0" cellpadding=3D"0" cellspacing=3D"0" width=3D"750">
+    <tbody><tr>
+      <td width=3D"175" height=3D"600" valign=3D"top">
+<!-- URL's used in the movie-->
+<a href=3D"https://web.archive.org/web/20010604094756/http://www.radianprot=
+ocol.com/achievments.htm"></a> <a href=3D"https://web.archive.org/web/20010=
+604094756/http://www.radianprotocol.com/protocol.htm"></a> <a href=3D"https=
+://web.archive.org/web/20010604094756/http://www.radianprotocol.com/founder=
+s.htm"></a> <a href=3D"https://web.archive.org/web/20010604094756/http://ww=
+w.radianprotocol.com/members.htm"></a> <a href=3D"https://web.archive.org/w=
+eb/20010604094756/http://www.radianprotocol.com/rules.htm"></a> <a href=3D"=
+https://web.archive.org/web/20010604094756/http://www.radianprotocol.com/pr=
+otocol.htm"></a> <a href=3D"https://web.archive.org/web/20010604094756/http=
+://www.radianprotocol.com/promotion.htm"></a> <a href=3D"https://web.archiv=
+e.org/web/20010604094756/http://www.radianprotocol.com/join.htm"></a> <a hr=
+ef=3D"https://web.archive.org/web/20010604094756/mailto:radian@club-interne=
+t.fr"></a> <!-- text used in the movie-->
+<!--Radian... Radian... Radian... Radian... Radian... Radian... Radian... R=
+adian... Radian... Radian... Radian... Radian... Radian... Radian... Radian=
+... Radian... Radian... Radian... Radian... Radian... --><object classid=3D=
+"clsid:D27CDB6E-AE6D-11cf-96B8-444553540000" codebase=3D"https://web.archiv=
+e.org/web/20010604094756oe_/http://active.macromedia.com/flash2/cabs/swflas=
+h.cab#version=3D4,0,0,0" id=3D"B2hv9" width=3D"150" height=3D"550">
+ <param name=3D"movie" value=3D"B2hv9.swf"> <param name=3D"loop" value=3D"f=
+alse"> <param name=3D"quality" value=3D"high"> <param name=3D"salign" value=
+=3D"LT"> <param name=3D"wmode" value=3D"opaque"> <param name=3D"bgcolor" va=
+lue=3D"#FFFFFF"> <ruffle-embed src=3D"/web/20010604094756mp_/http://www.rad=
+ianprotocol.com/B2hv9.swf" loop=3D"false" quality=3D"high" salign=3D"LT" wm=
+ode=3D"opaque" bgcolor=3D"#FFFFFF" width=3D"150" height=3D"550" type=3D"app=
+lication/x-shockwave-flash" pluginspage=3D"http://www.macromedia.com/shockw=
+ave/download/index.cgi?P1_Prod_Version=3DShockwaveFlash"><template shadowmo=
+de=3D"open" shadowdelegatesfocus=3D""><div id=3D"container" class=3D"" tabi=
+ndex=3D"-1" style=3D"background-color: rgb(255, 255, 255);"><div id=3D"pani=
+c"><div id=3D"panic-title">Something went wrong :(</div><div id=3D"panic-bo=
+dy"><div><p>Ruffle failed to load the Flash SWF file.</p><p>Access to fetch=
+ has likely been blocked by CORS policy.</p><p>If you are the server admini=
+strator, please consult the Ruffle wiki for help.</p></div></div><div id=3D=
+"panic-footer"><ul><li><a href=3D"https://web.archive.org/web/2001060409475=
+6mp_/https://github.com/ruffle-rs/ruffle/wiki/Using-Ruffle#configure-cors-h=
+eader" target=3D"_top">View Ruffle Wiki</a></li><li><a href=3D"https://web.=
+archive.org/web/20010604094756/http://www.radianprotocol.com/protocol.htm#"=
+ id=3D"panic-view-details">View Error Details</a></li></ul></div></div></di=
+v><div id=3D"splash-screen" class=3D"hidden"><svg xmlns=3D"http://www.w3.or=
+g/2000/svg" class=3D"logo" preserveAspectRatio=3D"xMidYMid" viewBox=3D"0 0 =
+380 150"><g xmlns=3D"http://www.w3.org/2000/svg"><path xmlns=3D"http://www.=
+w3.org/2000/svg" fill=3D"#966214" d=3D"M58.75 85.6q.75-.1 1.5-.35.85-.25 1.=
+65-.75.55-.35 1.05-.8.5-.45.95-1 .5-.5.75-1.2-.05.05-.15.1-.1.15-.25.25l-.1=
+.2q-.15.05-.25.1-.4 0-.8.05-.5-.25-.9-.5-.3-.1-.55-.3l-.6-.6-4.25-6.45-1.5 =
+11.25h3.45m83.15-.2h3.45q.75-.1 1.5-.35.25-.05.45-.15.35-.15.65-.3l.5-.3q.2=
+5-.15.5-.35.45-.35.9-.75.45-.35.75-.85l.1-.1q.1-.2.2-.35.2-.3.35-.6l-.3.4-.=
+15.15q-.5.15-1.1.1-.25 0-.4-.05-.5-.15-.8-.4-.15-.1-.25-.25-.3-.3-.55-.6l-.=
+05-.05v-.05l-4.25-6.4-1.5 11.25m-21.15-3.95q-.3-.3-.55-.6l-.05-.05v-.05l-4.=
+25-6.4-1.5 11.25h3.45q.75-.1 1.5-.35.85-.25 1.6-.75.75-.5 1.4-1.1.45-.35.75=
+-.85.35-.5.65-1.05l-.45.55q-.5.15-1.1.1-.9 0-1.45-.7m59.15.3q-.75-.5-1.4-1-=
+3.15-2.55-3.5-6.4l-1.5 11.25h21q-3.1-.25-5.7-.75-5.6-1.05-8.9-3.1m94.2 3.85=
+h3.45q.6-.1 1.2-.3.4-.1.75-.2.35-.15.65-.3.7-.35 1.35-.8.75-.55 1.3-1.25.1-=
+.15.25-.3-2.55-.25-3.25-1.8l-4.2-6.3-1.5 11.25m-45.3-4.85q-.5-.4-.9-.8-2.3-=
+2.35-2.6-5.6l-1.5 11.25h21q-11.25-.95-16-4.85m97.7 4.85q-.3-.05-.6-.05-10.8=
+-1-15.4-4.8-3.15-2.55-3.5-6.35l-1.5 11.2h21Z"></path><path xmlns=3D"http://=
+www.w3.org/2000/svg" fill=3D"var(--ruffle-orange)" d=3D"M92.6 54.8q-1.95-1.=
+4-4.5-1.4H60.35q-1.35 0-2.6.45-1.65.55-3.15 1.8-2.75 2.25-3.25 5.25l-1.65 1=
+2h.05v.3l5.85 1.15h-9.5q-.5.05-1 .15-.5.15-1 .35-.5.2-.95.45-.5.3-.95.7-.45=
+.35-.85.8-.35.4-.65.85-.3.45-.5.9-.15.45-.3.95l-5.85 41.6H50.3l5-35.5 1.5-1=
+1.25 4.25 6.45.6.6q.25.2.55.3.4.25.9.5.4-.05.8-.05.1-.05.25-.1l.1-.2q.15-.1=
+.25-.25.1-.05.15-.1l.3-1.05 1.75-12.3h11.15L75.8 82.6h16.5l2.3-16.25h-.05l.=
+8-5.7q.4-2.45-1-4.2-.35-.4-.75-.8-.25-.25-.55-.5-.2-.2-.45-.35m16.2 18.1h.0=
+5l-.05.3 5.85 1.15H105.2q-.5.05-1 .15-.5.15-1 .35-.5.2-.95.45-.5.3-1 .65-.4=
+.4-.8.85-.25.3-.55.65-.05.1-.15.2-.25.45-.4.9-.2.45-.3.95-.1.65-.2 1.25-.2 =
+1.15-.4 2.25l-4.3 30.6q-.25 3 1.75 5.25 1.6 1.8 4 2.15.6.1 1.25.1h27.35q3.2=
+5 0 6-2.25.35-.35.7-.55l.3-.2q2-2 2.25-4.5l1.65-11.6q.05-.05.1-.05l1.65-11.=
+35h.05l.7-5.2 1.5-11.25 4.25 6.4v.05l.05.05q.25.3.55.6.1.15.25.25.3.25.8.4.=
+15.05.4.05.6.05 1.1-.1l.15-.15.3-.4.3-1.05 1.3-9.05h-.05l.7-5.05h-.05l.15-1=
+.25h-.05l1.65-11.7h-16.25l-2.65 19.5h.05v.2l-.05.1h.05l5.8 1.15H132.7q-.5.0=
+5-1 .15-.5.15-1 .35-.15.05-.3.15-.3.1-.55.25-.05 0-.1.05-.5.3-1 .65-.4.35-.=
+7.7-.55.7-.95 1.45-.35.65-.55 1.4-.15.7-.25 1.4v.05q-.15 1.05-.35 2.05l-1.2=
+ 8.75v.1l-2.1 14.7H111.4l2.25-15.55h.05l.7-5.2 1.5-11.25 4.25 6.4v.05l.05.0=
+5q.25.3.55.6.55.7 1.45.7.6.05 1.1-.1l.45-.55.3-1.05 1.3-9.05h-.05l.7-5.05h-=
+.05l.15-1.25h-.05l1.65-11.7h-16.25l-2.65 19.5m106.5-41.75q-2.25-2.25-5.5-2.=
+25h-27.75q-3 0-5.75 2.25-1.3.95-2.05 2.1-.45.6-.7 1.2-.2.5-.35 1-.1.45-.15.=
+95l-4.15 29.95h-.05l-.7 5.2h-.05l-.2 1.35h.05l-.05.3 5.85 1.15h-9.45q-2.1.0=
+5-3.95 1.6-1.9 1.55-2.25 3.55l-.5 3.5h-.05l-5.3 38.1h16.25l5-35.5 1.5-11.25=
+q.35 3.85 3.5 6.4.65.5 1.4 1 3.3 2.05 8.9 3.1 2.6.5 5.7.75l1.75-11.25h-12.2=
+l.4-2.95h-.05l.7-5.05h-.05q.1-.9.3-1.9.1-.75.2-1.6.85-5.9 2.15-14.9 0-.15.0=
+5-.25l.1-.9q.2-1.55.45-3.15h11.25l-3.1 20.8h16.5l4.1-28.05q.15-1.7-.4-3.15-=
+.5-1.1-1.35-2.1m46.65 44.15q-.5.3-1 .65-.4.4-.8.85-.35.4-.7.85-.25.45-.45.9=
+-.15.45-.3.95l-5.85 41.6h16.25l5-35.5 1.5-11.25 4.2 6.3q.7 1.55 3.25 1.8l.0=
+5-.1q.25-.4.35-.85l.3-1.05 1.8-14.05v-.05l5.35-37.45h-16.25l-6.15 44.3 5.85=
+ 1.15h-9.45q-.5.05-1 .15-.5.15-1 .35-.5.2-.95.45m5.4-38.9q.15-1.7-.4-3.15-.=
+5-1.1-1.35-2.1-2.25-2.25-5.5-2.25h-27.75q-2.3 0-4.45 1.35-.65.35-1.3.9-1.3.=
+95-2.05 2.1-.45.6-.7 1.2-.4.9-.5 1.95l-4.15 29.95h-.05l-.7 5.2h-.05l-.2 1.3=
+5h.05l-.05.3 5.85 1.15h-9.45q-2.1.05-3.95 1.6-1.9 1.55-2.25 3.55l-.5 3.5h-.=
+05l-1.2 8.75v.1l-4.1 29.25h16.25l5-35.5 1.5-11.25q.3 3.25 2.6 5.6.4.4.9.8 4=
+.75 3.9 16 4.85l1.75-11.25h-12.2l.4-2.95h-.05l.7-5.05h-.05q.15-.9.3-1.9.1-.=
+75.25-1.6.15-1.25.35-2.65v-.05q.95-6.7 2.35-16.5h11.25l-3.1 20.8h16.5l4.1-2=
+8.05M345 66.35h-.05l1.15-8.2q.5-3-1.75-5.25-1.25-1.25-3-1.75-1-.5-2.25-.5h-=
+27.95q-.65 0-1.3.1-2.5.35-4.7 2.15-2.75 2.25-3.25 5.25l-1.95 14.7v.05l-.05.=
+3 5.85 1.15h-9.45q-1.9.05-3.6 1.35-.2.1-.35.25-1.9 1.55-2.25 3.55l-4.85 34.=
+1q-.25 3 1.75 5.25 1.25 1.4 3 1.95 1.05.3 2.25.3H320q3.25 0 6-2.25 2.75-2 3=
+.25-5l2.75-18.5h-16.5l-1.75 11H302.5l2.1-14.75h.05l.85-6 1.5-11.2q.35 3.8 3=
+.5 6.35 4.6 3.8 15.4 4.8.3 0 .6.05h15.75L345 66.35m-16.4-.95-1.25 8.95h-11.=
+3l.4-2.95h-.05l.7-5.05h-.1l.15-.95h11.45Z"></path></g></svg><svg xmlns=3D"h=
+ttp://www.w3.org/2000/svg" class=3D"loading-animation" viewBox=3D"0 0 66 66=
+"><circle xmlns=3D"http://www.w3.org/2000/svg" class=3D"spinner" fill=3D"no=
+ne" stroke-width=3D"6" stroke-linecap=3D"round" cx=3D"33" cy=3D"33" r=3D"30=
+"></circle></svg><div class=3D"loadbar"><div class=3D"loadbar-inner" style=
+=3D"width: 100%;"></div></div></div><div id=3D"save-manager" class=3D"modal=
+ hidden"><div id=3D"modal-area" class=3D"modal-area"><span class=3D"close-m=
+odal"></span><div class=3D"general-save-options"><span class=3D"modal-butto=
+n">Download all save files</span></div><table id=3D"local-saves"></table></=
+div></div><div id=3D"volume-controls-modal" class=3D"modal hidden"><div cla=
+ss=3D"modal-area"><div id=3D"volume-controls"><input id=3D"mute-checkbox" t=
+ype=3D"checkbox"><label id=3D"volume-mute" for=3D"mute-checkbox" title=3D"U=
+nmute" style=3D"display: none;"></label><label id=3D"volume-min" for=3D"mut=
+e-checkbox" title=3D"Mute" style=3D"display: none;"></label><label id=3D"vo=
+lume-mid" for=3D"mute-checkbox" title=3D"Mute" style=3D"display: none;"></l=
+abel><label id=3D"volume-max" for=3D"mute-checkbox" title=3D"Mute" style=3D=
+"display: inline;"></label><input id=3D"volume-slider" type=3D"range" min=
+=3D"0" max=3D"100" step=3D"1"><span id=3D"volume-slider-text">100%</span><s=
+pan class=3D"close-modal"></span></div></div></div><div id=3D"video-modal" =
+class=3D"modal hidden"><div class=3D"modal-area"><span class=3D"close-modal=
+"></span><div id=3D"video-holder"></div></div></div><div id=3D"hardware-acc=
+eleration-modal" class=3D"modal hidden"><div class=3D"modal-area"><span cla=
+ss=3D"close-modal"></span><span id=3D"acceleration-text">It looks like hard=
+ware acceleration is disabled. While Ruffle may work, it could be very slow=
+. You can find out how to enable hardware acceleration by following the lin=
+k below:</span><a href=3D"https://web.archive.org/web/20010604094756mp_/htt=
+ps://github.com/ruffle-rs/ruffle/wiki/Frequently-Asked-Questions-For-Users#=
+chrome-hardware-acceleration" target=3D"_blank" class=3D"modal-button">FAQ =
+- Chrome Hardware Acceleration</a></div></div><div id=3D"clipboard-modal" c=
+lass=3D"modal hidden"><div class=3D"modal-area"><span class=3D"close-modal"=
+></span><h2>Copying and pasting in Ruffle</h2><p id=3D"clipboard-modal-desc=
+ription"></p><p><b>Ctrl+C</b><span>&#8296; &#8297; for copy</span></p><p><b=
+>Ctrl+X</b><span>&#8296; &#8297; for cut</span></p><p><b>Ctrl+V</b><span>&#=
+8296; &#8297; for paste</span></p></div></div><div id=3D"context-menu-overl=
+ay" class=3D"hidden"><ul id=3D"context-menu" dir=3D"ltr"></ul></div></templ=
+ate></ruffle-embed>
+</object>
+
+      </td>
+      <td valign=3D"top" width=3D"575">
+        <div align=3D"left">
+          <table border=3D"0" cellpadding=3D"0" cellspacing=3D"0" width=3D"=
+100%">
+            <tbody><tr>
+              <td width=3D"100%" colspan=3D"3">
+                <p class=3D"MsoNormal"><b style=3D"mso-bidi-font-weight:nor=
+mal"><span lang=3D"DE" style=3D"font-size:20.0pt;mso-bidi-font-size:10.0pt;=
+font-family:Tahoma;
+mso-bidi-font-family:&quot;Times New Roman&quot;;mso-ansi-language:DE">The
+                Radian Protocol<o:p>
+                </o:p>
+                </span></b></p>
+                <p class=3D"MsoNormal"><b style=3D"mso-bidi-font-weight:nor=
+mal"><span lang=3D"DE" style=3D"font-family:Tahoma;mso-bidi-font-family:&qu=
+ot;Times New Roman&quot;;mso-ansi-language:
+DE">A two-way 433 Mhz Radio Protocol<o:p>
+                </o:p>
+                </span></b></p>
+                <p class=3D"MsoNormal"><span lang=3D"DE" style=3D"font-fami=
+ly:Tahoma;mso-bidi-font-family:
+&quot;Times New Roman&quot;;mso-ansi-language:DE">Radian Protocol is design=
+ed
+                for all applications in water, electricity, gas and heat me=
+ter
+                reading and data transmitting.<o:p>
+                </o:p>
+                </span></p>
+                <span lang=3D"DE" style=3D"font-size:10.0pt;font-family:Tah=
+oma;mso-fareast-font-family:
+&quot;Times New Roman&quot;;mso-bidi-font-family:&quot;Times New Roman&quot=
+;;mso-ansi-language:
+DE;mso-fareast-language:FR;mso-bidi-language:AR-SA">Its two way caracterist=
+ics
+                allows developed service solutions, including information
+                exchange with final user.</span></td>
+            </tr>
+            <tr>
+              <td width=3D"10%" valign=3D"top">
+<object classid=3D"clsid:D27CDB6E-AE6D-11cf-96B8-444553540000" codebase=3D"=
+https://web.archive.org/web/20010604094756oe_/http://active.macromedia.com/=
+flash2/cabs/swflash.cab#version=3D4,0,0,0" id=3D"puce" width=3D"40" height=
+=3D"24">
+ <param name=3D"movie" value=3D"puce.swf"> <param name=3D"quality" value=3D=
+"high"> <param name=3D"bgcolor" value=3D"#FFFFFF"> <ruffle-embed src=3D"/we=
+b/20010604094756mp_/http://www.radianprotocol.com/puce.swf" quality=3D"high=
+" bgcolor=3D"#FFFFFF" width=3D"40" height=3D"24" type=3D"application/x-shoc=
+kwave-flash" pluginspage=3D"http://www.macromedia.com/shockwave/download/in=
+dex.cgi?P1_Prod_Version=3DShockwaveFlash"><template shadowmode=3D"open" sha=
+dowdelegatesfocus=3D""><div id=3D"container" class=3D"" tabindex=3D"-1" sty=
+le=3D"background-color: rgb(255, 255, 255);"><div id=3D"panic"><div id=3D"p=
+anic-title">Something went wrong :(</div><div id=3D"panic-body"><div><p>Ruf=
+fle failed to load the Flash SWF file.</p><p>Access to fetch has likely bee=
+n blocked by CORS policy.</p><p>If you are the server administrator, please=
+ consult the Ruffle wiki for help.</p></div></div><div id=3D"panic-footer">=
+<ul><li><a href=3D"https://web.archive.org/web/20010604094756mp_/https://gi=
+thub.com/ruffle-rs/ruffle/wiki/Using-Ruffle#configure-cors-header" target=
+=3D"_top">View Ruffle Wiki</a></li><li><a href=3D"https://web.archive.org/w=
+eb/20010604094756/http://www.radianprotocol.com/protocol.htm#" id=3D"panic-=
+view-details">View Error Details</a></li></ul></div></div></div><div id=3D"=
+splash-screen" class=3D"hidden"><svg xmlns=3D"http://www.w3.org/2000/svg" c=
+lass=3D"logo" preserveAspectRatio=3D"xMidYMid" viewBox=3D"0 0 380 150"><g x=
+mlns=3D"http://www.w3.org/2000/svg"><path xmlns=3D"http://www.w3.org/2000/s=
+vg" fill=3D"#966214" d=3D"M58.75 85.6q.75-.1 1.5-.35.85-.25 1.65-.75.55-.35=
+ 1.05-.8.5-.45.95-1 .5-.5.75-1.2-.05.05-.15.1-.1.15-.25.25l-.1.2q-.15.05-.2=
+5.1-.4 0-.8.05-.5-.25-.9-.5-.3-.1-.55-.3l-.6-.6-4.25-6.45-1.5 11.25h3.45m83=
+.15-.2h3.45q.75-.1 1.5-.35.25-.05.45-.15.35-.15.65-.3l.5-.3q.25-.15.5-.35.4=
+5-.35.9-.75.45-.35.75-.85l.1-.1q.1-.2.2-.35.2-.3.35-.6l-.3.4-.15.15q-.5.15-=
+1.1.1-.25 0-.4-.05-.5-.15-.8-.4-.15-.1-.25-.25-.3-.3-.55-.6l-.05-.05v-.05l-=
+4.25-6.4-1.5 11.25m-21.15-3.95q-.3-.3-.55-.6l-.05-.05v-.05l-4.25-6.4-1.5 11=
+.25h3.45q.75-.1 1.5-.35.85-.25 1.6-.75.75-.5 1.4-1.1.45-.35.75-.85.35-.5.65=
+-1.05l-.45.55q-.5.15-1.1.1-.9 0-1.45-.7m59.15.3q-.75-.5-1.4-1-3.15-2.55-3.5=
+-6.4l-1.5 11.25h21q-3.1-.25-5.7-.75-5.6-1.05-8.9-3.1m94.2 3.85h3.45q.6-.1 1=
+.2-.3.4-.1.75-.2.35-.15.65-.3.7-.35 1.35-.8.75-.55 1.3-1.25.1-.15.25-.3-2.5=
+5-.25-3.25-1.8l-4.2-6.3-1.5 11.25m-45.3-4.85q-.5-.4-.9-.8-2.3-2.35-2.6-5.6l=
+-1.5 11.25h21q-11.25-.95-16-4.85m97.7 4.85q-.3-.05-.6-.05-10.8-1-15.4-4.8-3=
+.15-2.55-3.5-6.35l-1.5 11.2h21Z"></path><path xmlns=3D"http://www.w3.org/20=
+00/svg" fill=3D"var(--ruffle-orange)" d=3D"M92.6 54.8q-1.95-1.4-4.5-1.4H60.=
+35q-1.35 0-2.6.45-1.65.55-3.15 1.8-2.75 2.25-3.25 5.25l-1.65 12h.05v.3l5.85=
+ 1.15h-9.5q-.5.05-1 .15-.5.15-1 .35-.5.2-.95.45-.5.3-.95.7-.45.35-.85.8-.35=
+.4-.65.85-.3.45-.5.9-.15.45-.3.95l-5.85 41.6H50.3l5-35.5 1.5-11.25 4.25 6.4=
+5.6.6q.25.2.55.3.4.25.9.5.4-.05.8-.05.1-.05.25-.1l.1-.2q.15-.1.25-.25.1-.05=
+.15-.1l.3-1.05 1.75-12.3h11.15L75.8 82.6h16.5l2.3-16.25h-.05l.8-5.7q.4-2.45=
+-1-4.2-.35-.4-.75-.8-.25-.25-.55-.5-.2-.2-.45-.35m16.2 18.1h.05l-.05.3 5.85=
+ 1.15H105.2q-.5.05-1 .15-.5.15-1 .35-.5.2-.95.45-.5.3-1 .65-.4.4-.8.85-.25.=
+3-.55.65-.05.1-.15.2-.25.45-.4.9-.2.45-.3.95-.1.65-.2 1.25-.2 1.15-.4 2.25l=
+-4.3 30.6q-.25 3 1.75 5.25 1.6 1.8 4 2.15.6.1 1.25.1h27.35q3.25 0 6-2.25.35=
+-.35.7-.55l.3-.2q2-2 2.25-4.5l1.65-11.6q.05-.05.1-.05l1.65-11.35h.05l.7-5.2=
+ 1.5-11.25 4.25 6.4v.05l.05.05q.25.3.55.6.1.15.25.25.3.25.8.4.15.05.4.05.6.=
+05 1.1-.1l.15-.15.3-.4.3-1.05 1.3-9.05h-.05l.7-5.05h-.05l.15-1.25h-.05l1.65=
+-11.7h-16.25l-2.65 19.5h.05v.2l-.05.1h.05l5.8 1.15H132.7q-.5.05-1 .15-.5.15=
+-1 .35-.15.05-.3.15-.3.1-.55.25-.05 0-.1.05-.5.3-1 .65-.4.35-.7.7-.55.7-.95=
+ 1.45-.35.65-.55 1.4-.15.7-.25 1.4v.05q-.15 1.05-.35 2.05l-1.2 8.75v.1l-2.1=
+ 14.7H111.4l2.25-15.55h.05l.7-5.2 1.5-11.25 4.25 6.4v.05l.05.05q.25.3.55.6.=
+55.7 1.45.7.6.05 1.1-.1l.45-.55.3-1.05 1.3-9.05h-.05l.7-5.05h-.05l.15-1.25h=
+-.05l1.65-11.7h-16.25l-2.65 19.5m106.5-41.75q-2.25-2.25-5.5-2.25h-27.75q-3 =
+0-5.75 2.25-1.3.95-2.05 2.1-.45.6-.7 1.2-.2.5-.35 1-.1.45-.15.95l-4.15 29.9=
+5h-.05l-.7 5.2h-.05l-.2 1.35h.05l-.05.3 5.85 1.15h-9.45q-2.1.05-3.95 1.6-1.=
+9 1.55-2.25 3.55l-.5 3.5h-.05l-5.3 38.1h16.25l5-35.5 1.5-11.25q.35 3.85 3.5=
+ 6.4.65.5 1.4 1 3.3 2.05 8.9 3.1 2.6.5 5.7.75l1.75-11.25h-12.2l.4-2.95h-.05=
+l.7-5.05h-.05q.1-.9.3-1.9.1-.75.2-1.6.85-5.9 2.15-14.9 0-.15.05-.25l.1-.9q.=
+2-1.55.45-3.15h11.25l-3.1 20.8h16.5l4.1-28.05q.15-1.7-.4-3.15-.5-1.1-1.35-2=
+.1m46.65 44.15q-.5.3-1 .65-.4.4-.8.85-.35.4-.7.85-.25.45-.45.9-.15.45-.3.95=
+l-5.85 41.6h16.25l5-35.5 1.5-11.25 4.2 6.3q.7 1.55 3.25 1.8l.05-.1q.25-.4.3=
+5-.85l.3-1.05 1.8-14.05v-.05l5.35-37.45h-16.25l-6.15 44.3 5.85 1.15h-9.45q-=
+.5.05-1 .15-.5.15-1 .35-.5.2-.95.45m5.4-38.9q.15-1.7-.4-3.15-.5-1.1-1.35-2.=
+1-2.25-2.25-5.5-2.25h-27.75q-2.3 0-4.45 1.35-.65.35-1.3.9-1.3.95-2.05 2.1-.=
+45.6-.7 1.2-.4.9-.5 1.95l-4.15 29.95h-.05l-.7 5.2h-.05l-.2 1.35h.05l-.05.3 =
+5.85 1.15h-9.45q-2.1.05-3.95 1.6-1.9 1.55-2.25 3.55l-.5 3.5h-.05l-1.2 8.75v=
+.1l-4.1 29.25h16.25l5-35.5 1.5-11.25q.3 3.25 2.6 5.6.4.4.9.8 4.75 3.9 16 4.=
+85l1.75-11.25h-12.2l.4-2.95h-.05l.7-5.05h-.05q.15-.9.3-1.9.1-.75.25-1.6.15-=
+1.25.35-2.65v-.05q.95-6.7 2.35-16.5h11.25l-3.1 20.8h16.5l4.1-28.05M345 66.3=
+5h-.05l1.15-8.2q.5-3-1.75-5.25-1.25-1.25-3-1.75-1-.5-2.25-.5h-27.95q-.65 0-=
+1.3.1-2.5.35-4.7 2.15-2.75 2.25-3.25 5.25l-1.95 14.7v.05l-.05.3 5.85 1.15h-=
+9.45q-1.9.05-3.6 1.35-.2.1-.35.25-1.9 1.55-2.25 3.55l-4.85 34.1q-.25 3 1.75=
+ 5.25 1.25 1.4 3 1.95 1.05.3 2.25.3H320q3.25 0 6-2.25 2.75-2 3.25-5l2.75-18=
+.5h-16.5l-1.75 11H302.5l2.1-14.75h.05l.85-6 1.5-11.2q.35 3.8 3.5 6.35 4.6 3=
+.8 15.4 4.8.3 0 .6.05h15.75L345 66.35m-16.4-.95-1.25 8.95h-11.3l.4-2.95h-.0=
+5l.7-5.05h-.1l.15-.95h11.45Z"></path></g></svg><svg xmlns=3D"http://www.w3.=
+org/2000/svg" class=3D"loading-animation" viewBox=3D"0 0 66 66"><circle xml=
+ns=3D"http://www.w3.org/2000/svg" class=3D"spinner" fill=3D"none" stroke-wi=
+dth=3D"6" stroke-linecap=3D"round" cx=3D"33" cy=3D"33" r=3D"30"></circle></=
+svg><div class=3D"loadbar"><div class=3D"loadbar-inner"></div></div></div><=
+div id=3D"save-manager" class=3D"modal hidden"><div id=3D"modal-area" class=
+=3D"modal-area"><span class=3D"close-modal"></span><div class=3D"general-sa=
+ve-options"><span class=3D"modal-button">Download all save files</span></di=
+v><table id=3D"local-saves"></table></div></div><div id=3D"volume-controls-=
+modal" class=3D"modal hidden"><div class=3D"modal-area"><div id=3D"volume-c=
+ontrols"><input id=3D"mute-checkbox" type=3D"checkbox"><label id=3D"volume-=
+mute" for=3D"mute-checkbox" title=3D"Unmute" style=3D"display: none;"></lab=
+el><label id=3D"volume-min" for=3D"mute-checkbox" title=3D"Mute" style=3D"d=
+isplay: none;"></label><label id=3D"volume-mid" for=3D"mute-checkbox" title=
+=3D"Mute" style=3D"display: none;"></label><label id=3D"volume-max" for=3D"=
+mute-checkbox" title=3D"Mute" style=3D"display: inline;"></label><input id=
+=3D"volume-slider" type=3D"range" min=3D"0" max=3D"100" step=3D"1"><span id=
+=3D"volume-slider-text">100%</span><span class=3D"close-modal"></span></div=
+></div></div><div id=3D"video-modal" class=3D"modal hidden"><div class=3D"m=
+odal-area"><span class=3D"close-modal"></span><div id=3D"video-holder"></di=
+v></div></div><div id=3D"hardware-acceleration-modal" class=3D"modal hidden=
+"><div class=3D"modal-area"><span class=3D"close-modal"></span><span id=3D"=
+acceleration-text">It looks like hardware acceleration is disabled. While R=
+uffle may work, it could be very slow. You can find out how to enable hardw=
+are acceleration by following the link below:</span><a href=3D"https://web.=
+archive.org/web/20010604094756mp_/https://github.com/ruffle-rs/ruffle/wiki/=
+Frequently-Asked-Questions-For-Users#chrome-hardware-acceleration" target=
+=3D"_blank" class=3D"modal-button">FAQ - Chrome Hardware Acceleration</a></=
+div></div><div id=3D"clipboard-modal" class=3D"modal hidden"><div class=3D"=
+modal-area"><span class=3D"close-modal"></span><h2>Copying and pasting in R=
+uffle</h2><p id=3D"clipboard-modal-description"></p><p><b>Ctrl+C</b><span>&=
+#8296; &#8297; for copy</span></p><p><b>Ctrl+X</b><span>&#8296; &#8297; for=
+ cut</span></p><p><b>Ctrl+V</b><span>&#8296; &#8297; for paste</span></p></=
+div></div><div id=3D"context-menu-overlay" class=3D"hidden"><ul id=3D"conte=
+xt-menu" dir=3D"ltr"></ul></div></template></ruffle-embed>
+</object>
+              </td>
+              <td width=3D"50%" valign=3D"top">
+                <b><font face=3D"Tahoma" color=3D"#FF0000" size=3D"3">relia=
+bility</font></b>
+              </td>
+              <td width=3D"40%">
+                        <ol>
+                          <li><font face=3D"Tahoma" color=3D"#000000" size=
+=3D"2"><b>physical
+                            layer : FSK modulation, narrow band</b></font><=
+/li>
+                          <li><font face=3D"Tahoma" color=3D"#000000" size=
+=3D"2"><b>Logical
+                            Link Layer : packet numbering</b></font></li>
+                        </ol>
+              </td>
+            </tr>
+            <tr>
+              <td width=3D"10%" valign=3D"top">
+<object classid=3D"clsid:D27CDB6E-AE6D-11cf-96B8-444553540000" codebase=3D"=
+https://web.archive.org/web/20010604094756oe_/http://active.macromedia.com/=
+flash2/cabs/swflash.cab#version=3D4,0,0,0" id=3D"puce0" width=3D"40" height=
+=3D"24">
+ <param name=3D"movie" value=3D"puce.swf"> <param name=3D"quality" value=3D=
+"high"> <param name=3D"bgcolor" value=3D"#FFFFFF"> <ruffle-embed src=3D"/we=
+b/20010604094756mp_/http://www.radianprotocol.com/puce.swf" quality=3D"high=
+" bgcolor=3D"#FFFFFF" width=3D"40" height=3D"24" type=3D"application/x-shoc=
+kwave-flash" pluginspage=3D"http://www.macromedia.com/shockwave/download/in=
+dex.cgi?P1_Prod_Version=3DShockwaveFlash"><template shadowmode=3D"open" sha=
+dowdelegatesfocus=3D""><div id=3D"container" class=3D"" tabindex=3D"-1" sty=
+le=3D"background-color: rgb(255, 255, 255);"><div id=3D"panic"><div id=3D"p=
+anic-title">Something went wrong :(</div><div id=3D"panic-body"><div><p>Ruf=
+fle failed to load the Flash SWF file.</p><p>Access to fetch has likely bee=
+n blocked by CORS policy.</p><p>If you are the server administrator, please=
+ consult the Ruffle wiki for help.</p></div></div><div id=3D"panic-footer">=
+<ul><li><a href=3D"https://web.archive.org/web/20010604094756mp_/https://gi=
+thub.com/ruffle-rs/ruffle/wiki/Using-Ruffle#configure-cors-header" target=
+=3D"_top">View Ruffle Wiki</a></li><li><a href=3D"https://web.archive.org/w=
+eb/20010604094756/http://www.radianprotocol.com/protocol.htm#" id=3D"panic-=
+view-details">View Error Details</a></li></ul></div></div></div><div id=3D"=
+splash-screen" class=3D"hidden"><svg xmlns=3D"http://www.w3.org/2000/svg" c=
+lass=3D"logo" preserveAspectRatio=3D"xMidYMid" viewBox=3D"0 0 380 150"><g x=
+mlns=3D"http://www.w3.org/2000/svg"><path xmlns=3D"http://www.w3.org/2000/s=
+vg" fill=3D"#966214" d=3D"M58.75 85.6q.75-.1 1.5-.35.85-.25 1.65-.75.55-.35=
+ 1.05-.8.5-.45.95-1 .5-.5.75-1.2-.05.05-.15.1-.1.15-.25.25l-.1.2q-.15.05-.2=
+5.1-.4 0-.8.05-.5-.25-.9-.5-.3-.1-.55-.3l-.6-.6-4.25-6.45-1.5 11.25h3.45m83=
+.15-.2h3.45q.75-.1 1.5-.35.25-.05.45-.15.35-.15.65-.3l.5-.3q.25-.15.5-.35.4=
+5-.35.9-.75.45-.35.75-.85l.1-.1q.1-.2.2-.35.2-.3.35-.6l-.3.4-.15.15q-.5.15-=
+1.1.1-.25 0-.4-.05-.5-.15-.8-.4-.15-.1-.25-.25-.3-.3-.55-.6l-.05-.05v-.05l-=
+4.25-6.4-1.5 11.25m-21.15-3.95q-.3-.3-.55-.6l-.05-.05v-.05l-4.25-6.4-1.5 11=
+.25h3.45q.75-.1 1.5-.35.85-.25 1.6-.75.75-.5 1.4-1.1.45-.35.75-.85.35-.5.65=
+-1.05l-.45.55q-.5.15-1.1.1-.9 0-1.45-.7m59.15.3q-.75-.5-1.4-1-3.15-2.55-3.5=
+-6.4l-1.5 11.25h21q-3.1-.25-5.7-.75-5.6-1.05-8.9-3.1m94.2 3.85h3.45q.6-.1 1=
+.2-.3.4-.1.75-.2.35-.15.65-.3.7-.35 1.35-.8.75-.55 1.3-1.25.1-.15.25-.3-2.5=
+5-.25-3.25-1.8l-4.2-6.3-1.5 11.25m-45.3-4.85q-.5-.4-.9-.8-2.3-2.35-2.6-5.6l=
+-1.5 11.25h21q-11.25-.95-16-4.85m97.7 4.85q-.3-.05-.6-.05-10.8-1-15.4-4.8-3=
+.15-2.55-3.5-6.35l-1.5 11.2h21Z"></path><path xmlns=3D"http://www.w3.org/20=
+00/svg" fill=3D"var(--ruffle-orange)" d=3D"M92.6 54.8q-1.95-1.4-4.5-1.4H60.=
+35q-1.35 0-2.6.45-1.65.55-3.15 1.8-2.75 2.25-3.25 5.25l-1.65 12h.05v.3l5.85=
+ 1.15h-9.5q-.5.05-1 .15-.5.15-1 .35-.5.2-.95.45-.5.3-.95.7-.45.35-.85.8-.35=
+.4-.65.85-.3.45-.5.9-.15.45-.3.95l-5.85 41.6H50.3l5-35.5 1.5-11.25 4.25 6.4=
+5.6.6q.25.2.55.3.4.25.9.5.4-.05.8-.05.1-.05.25-.1l.1-.2q.15-.1.25-.25.1-.05=
+.15-.1l.3-1.05 1.75-12.3h11.15L75.8 82.6h16.5l2.3-16.25h-.05l.8-5.7q.4-2.45=
+-1-4.2-.35-.4-.75-.8-.25-.25-.55-.5-.2-.2-.45-.35m16.2 18.1h.05l-.05.3 5.85=
+ 1.15H105.2q-.5.05-1 .15-.5.15-1 .35-.5.2-.95.45-.5.3-1 .65-.4.4-.8.85-.25.=
+3-.55.65-.05.1-.15.2-.25.45-.4.9-.2.45-.3.95-.1.65-.2 1.25-.2 1.15-.4 2.25l=
+-4.3 30.6q-.25 3 1.75 5.25 1.6 1.8 4 2.15.6.1 1.25.1h27.35q3.25 0 6-2.25.35=
+-.35.7-.55l.3-.2q2-2 2.25-4.5l1.65-11.6q.05-.05.1-.05l1.65-11.35h.05l.7-5.2=
+ 1.5-11.25 4.25 6.4v.05l.05.05q.25.3.55.6.1.15.25.25.3.25.8.4.15.05.4.05.6.=
+05 1.1-.1l.15-.15.3-.4.3-1.05 1.3-9.05h-.05l.7-5.05h-.05l.15-1.25h-.05l1.65=
+-11.7h-16.25l-2.65 19.5h.05v.2l-.05.1h.05l5.8 1.15H132.7q-.5.05-1 .15-.5.15=
+-1 .35-.15.05-.3.15-.3.1-.55.25-.05 0-.1.05-.5.3-1 .65-.4.35-.7.7-.55.7-.95=
+ 1.45-.35.65-.55 1.4-.15.7-.25 1.4v.05q-.15 1.05-.35 2.05l-1.2 8.75v.1l-2.1=
+ 14.7H111.4l2.25-15.55h.05l.7-5.2 1.5-11.25 4.25 6.4v.05l.05.05q.25.3.55.6.=
+55.7 1.45.7.6.05 1.1-.1l.45-.55.3-1.05 1.3-9.05h-.05l.7-5.05h-.05l.15-1.25h=
+-.05l1.65-11.7h-16.25l-2.65 19.5m106.5-41.75q-2.25-2.25-5.5-2.25h-27.75q-3 =
+0-5.75 2.25-1.3.95-2.05 2.1-.45.6-.7 1.2-.2.5-.35 1-.1.45-.15.95l-4.15 29.9=
+5h-.05l-.7 5.2h-.05l-.2 1.35h.05l-.05.3 5.85 1.15h-9.45q-2.1.05-3.95 1.6-1.=
+9 1.55-2.25 3.55l-.5 3.5h-.05l-5.3 38.1h16.25l5-35.5 1.5-11.25q.35 3.85 3.5=
+ 6.4.65.5 1.4 1 3.3 2.05 8.9 3.1 2.6.5 5.7.75l1.75-11.25h-12.2l.4-2.95h-.05=
+l.7-5.05h-.05q.1-.9.3-1.9.1-.75.2-1.6.85-5.9 2.15-14.9 0-.15.05-.25l.1-.9q.=
+2-1.55.45-3.15h11.25l-3.1 20.8h16.5l4.1-28.05q.15-1.7-.4-3.15-.5-1.1-1.35-2=
+.1m46.65 44.15q-.5.3-1 .65-.4.4-.8.85-.35.4-.7.85-.25.45-.45.9-.15.45-.3.95=
+l-5.85 41.6h16.25l5-35.5 1.5-11.25 4.2 6.3q.7 1.55 3.25 1.8l.05-.1q.25-.4.3=
+5-.85l.3-1.05 1.8-14.05v-.05l5.35-37.45h-16.25l-6.15 44.3 5.85 1.15h-9.45q-=
+.5.05-1 .15-.5.15-1 .35-.5.2-.95.45m5.4-38.9q.15-1.7-.4-3.15-.5-1.1-1.35-2.=
+1-2.25-2.25-5.5-2.25h-27.75q-2.3 0-4.45 1.35-.65.35-1.3.9-1.3.95-2.05 2.1-.=
+45.6-.7 1.2-.4.9-.5 1.95l-4.15 29.95h-.05l-.7 5.2h-.05l-.2 1.35h.05l-.05.3 =
+5.85 1.15h-9.45q-2.1.05-3.95 1.6-1.9 1.55-2.25 3.55l-.5 3.5h-.05l-1.2 8.75v=
+.1l-4.1 29.25h16.25l5-35.5 1.5-11.25q.3 3.25 2.6 5.6.4.4.9.8 4.75 3.9 16 4.=
+85l1.75-11.25h-12.2l.4-2.95h-.05l.7-5.05h-.05q.15-.9.3-1.9.1-.75.25-1.6.15-=
+1.25.35-2.65v-.05q.95-6.7 2.35-16.5h11.25l-3.1 20.8h16.5l4.1-28.05M345 66.3=
+5h-.05l1.15-8.2q.5-3-1.75-5.25-1.25-1.25-3-1.75-1-.5-2.25-.5h-27.95q-.65 0-=
+1.3.1-2.5.35-4.7 2.15-2.75 2.25-3.25 5.25l-1.95 14.7v.05l-.05.3 5.85 1.15h-=
+9.45q-1.9.05-3.6 1.35-.2.1-.35.25-1.9 1.55-2.25 3.55l-4.85 34.1q-.25 3 1.75=
+ 5.25 1.25 1.4 3 1.95 1.05.3 2.25.3H320q3.25 0 6-2.25 2.75-2 3.25-5l2.75-18=
+.5h-16.5l-1.75 11H302.5l2.1-14.75h.05l.85-6 1.5-11.2q.35 3.8 3.5 6.35 4.6 3=
+.8 15.4 4.8.3 0 .6.05h15.75L345 66.35m-16.4-.95-1.25 8.95h-11.3l.4-2.95h-.0=
+5l.7-5.05h-.1l.15-.95h11.45Z"></path></g></svg><svg xmlns=3D"http://www.w3.=
+org/2000/svg" class=3D"loading-animation" viewBox=3D"0 0 66 66"><circle xml=
+ns=3D"http://www.w3.org/2000/svg" class=3D"spinner" fill=3D"none" stroke-wi=
+dth=3D"6" stroke-linecap=3D"round" cx=3D"33" cy=3D"33" r=3D"30"></circle></=
+svg><div class=3D"loadbar"><div class=3D"loadbar-inner"></div></div></div><=
+div id=3D"save-manager" class=3D"modal hidden"><div id=3D"modal-area" class=
+=3D"modal-area"><span class=3D"close-modal"></span><div class=3D"general-sa=
+ve-options"><span class=3D"modal-button">Download all save files</span></di=
+v><table id=3D"local-saves"></table></div></div><div id=3D"volume-controls-=
+modal" class=3D"modal hidden"><div class=3D"modal-area"><div id=3D"volume-c=
+ontrols"><input id=3D"mute-checkbox" type=3D"checkbox"><label id=3D"volume-=
+mute" for=3D"mute-checkbox" title=3D"Unmute" style=3D"display: none;"></lab=
+el><label id=3D"volume-min" for=3D"mute-checkbox" title=3D"Mute" style=3D"d=
+isplay: none;"></label><label id=3D"volume-mid" for=3D"mute-checkbox" title=
+=3D"Mute" style=3D"display: none;"></label><label id=3D"volume-max" for=3D"=
+mute-checkbox" title=3D"Mute" style=3D"display: inline;"></label><input id=
+=3D"volume-slider" type=3D"range" min=3D"0" max=3D"100" step=3D"1"><span id=
+=3D"volume-slider-text">100%</span><span class=3D"close-modal"></span></div=
+></div></div><div id=3D"video-modal" class=3D"modal hidden"><div class=3D"m=
+odal-area"><span class=3D"close-modal"></span><div id=3D"video-holder"></di=
+v></div></div><div id=3D"hardware-acceleration-modal" class=3D"modal hidden=
+"><div class=3D"modal-area"><span class=3D"close-modal"></span><span id=3D"=
+acceleration-text">It looks like hardware acceleration is disabled. While R=
+uffle may work, it could be very slow. You can find out how to enable hardw=
+are acceleration by following the link below:</span><a href=3D"https://web.=
+archive.org/web/20010604094756mp_/https://github.com/ruffle-rs/ruffle/wiki/=
+Frequently-Asked-Questions-For-Users#chrome-hardware-acceleration" target=
+=3D"_blank" class=3D"modal-button">FAQ - Chrome Hardware Acceleration</a></=
+div></div><div id=3D"clipboard-modal" class=3D"modal hidden"><div class=3D"=
+modal-area"><span class=3D"close-modal"></span><h2>Copying and pasting in R=
+uffle</h2><p id=3D"clipboard-modal-description"></p><p><b>Ctrl+C</b><span>&=
+#8296; &#8297; for copy</span></p><p><b>Ctrl+X</b><span>&#8296; &#8297; for=
+ cut</span></p><p><b>Ctrl+V</b><span>&#8296; &#8297; for paste</span></p></=
+div></div><div id=3D"context-menu-overlay" class=3D"hidden"><ul id=3D"conte=
+xt-menu" dir=3D"ltr"></ul></div></template></ruffle-embed>
+</object>
+              </td>
+              <td width=3D"50%" valign=3D"top">
+                <b><font face=3D"Tahoma" color=3D"#FF0000" size=3D"3">two
+                            ways, half duplex, data transmission</font></b>
+              </td>
+              <td width=3D"40%" valign=3D"top">
+<object classid=3D"clsid:D27CDB6E-AE6D-11cf-96B8-444553540000" codebase=3D"=
+https://web.archive.org/web/20010604094756oe_/http://active.macromedia.com/=
+flash2/cabs/swflash.cab#version=3D4,0,0,0" id=3D"nodes" width=3D"200" heigh=
+t=3D"75">
+ <param name=3D"movie" value=3D"nodes.swf"> <param name=3D"loop" value=3D"f=
+alse"> <param name=3D"quality" value=3D"high"> <param name=3D"salign" value=
+=3D"T"> <param name=3D"bgcolor" value=3D"#FFFFFF"> <ruffle-embed src=3D"/we=
+b/20010604094756mp_/http://www.radianprotocol.com/nodes.swf" loop=3D"false"=
+ quality=3D"high" salign=3D"T" bgcolor=3D"#FFFFFF" width=3D"400" height=3D"=
+150" type=3D"application/x-shockwave-flash" pluginspage=3D"http://www.macro=
+media.com/shockwave/download/index.cgi?P1_Prod_Version=3DShockwaveFlash"><t=
+emplate shadowmode=3D"open" shadowdelegatesfocus=3D""><div id=3D"container"=
+ class=3D"" tabindex=3D"-1" style=3D"background-color: rgb(255, 255, 255);"=
+><div id=3D"panic"><div id=3D"panic-title">Something went wrong :(</div><di=
+v id=3D"panic-body"><div><p>Ruffle failed to load the Flash SWF file.</p><p=
+>Access to fetch has likely been blocked by CORS policy.</p><p>If you are t=
+he server administrator, please consult the Ruffle wiki for help.</p></div>=
+</div><div id=3D"panic-footer"><ul><li><a href=3D"https://web.archive.org/w=
+eb/20010604094756mp_/https://github.com/ruffle-rs/ruffle/wiki/Using-Ruffle#=
+configure-cors-header" target=3D"_top">View Ruffle Wiki</a></li><li><a href=
+=3D"https://web.archive.org/web/20010604094756/http://www.radianprotocol.co=
+m/protocol.htm#" id=3D"panic-view-details">View Error Details</a></li></ul>=
+</div></div></div><div id=3D"splash-screen" class=3D"hidden"><svg xmlns=3D"=
+http://www.w3.org/2000/svg" class=3D"logo" preserveAspectRatio=3D"xMidYMid"=
+ viewBox=3D"0 0 380 150"><g xmlns=3D"http://www.w3.org/2000/svg"><path xmln=
+s=3D"http://www.w3.org/2000/svg" fill=3D"#966214" d=3D"M58.75 85.6q.75-.1 1=
+.5-.35.85-.25 1.65-.75.55-.35 1.05-.8.5-.45.95-1 .5-.5.75-1.2-.05.05-.15.1-=
+.1.15-.25.25l-.1.2q-.15.05-.25.1-.4 0-.8.05-.5-.25-.9-.5-.3-.1-.55-.3l-.6-.=
+6-4.25-6.45-1.5 11.25h3.45m83.15-.2h3.45q.75-.1 1.5-.35.25-.05.45-.15.35-.1=
+5.65-.3l.5-.3q.25-.15.5-.35.45-.35.9-.75.45-.35.75-.85l.1-.1q.1-.2.2-.35.2-=
+.3.35-.6l-.3.4-.15.15q-.5.15-1.1.1-.25 0-.4-.05-.5-.15-.8-.4-.15-.1-.25-.25=
+-.3-.3-.55-.6l-.05-.05v-.05l-4.25-6.4-1.5 11.25m-21.15-3.95q-.3-.3-.55-.6l-=
+.05-.05v-.05l-4.25-6.4-1.5 11.25h3.45q.75-.1 1.5-.35.85-.25 1.6-.75.75-.5 1=
+.4-1.1.45-.35.75-.85.35-.5.65-1.05l-.45.55q-.5.15-1.1.1-.9 0-1.45-.7m59.15.=
+3q-.75-.5-1.4-1-3.15-2.55-3.5-6.4l-1.5 11.25h21q-3.1-.25-5.7-.75-5.6-1.05-8=
+.9-3.1m94.2 3.85h3.45q.6-.1 1.2-.3.4-.1.75-.2.35-.15.65-.3.7-.35 1.35-.8.75=
+-.55 1.3-1.25.1-.15.25-.3-2.55-.25-3.25-1.8l-4.2-6.3-1.5 11.25m-45.3-4.85q-=
+.5-.4-.9-.8-2.3-2.35-2.6-5.6l-1.5 11.25h21q-11.25-.95-16-4.85m97.7 4.85q-.3=
+-.05-.6-.05-10.8-1-15.4-4.8-3.15-2.55-3.5-6.35l-1.5 11.2h21Z"></path><path =
+xmlns=3D"http://www.w3.org/2000/svg" fill=3D"var(--ruffle-orange)" d=3D"M92=
+.6 54.8q-1.95-1.4-4.5-1.4H60.35q-1.35 0-2.6.45-1.65.55-3.15 1.8-2.75 2.25-3=
+.25 5.25l-1.65 12h.05v.3l5.85 1.15h-9.5q-.5.05-1 .15-.5.15-1 .35-.5.2-.95.4=
+5-.5.3-.95.7-.45.35-.85.8-.35.4-.65.85-.3.45-.5.9-.15.45-.3.95l-5.85 41.6H5=
+0.3l5-35.5 1.5-11.25 4.25 6.45.6.6q.25.2.55.3.4.25.9.5.4-.05.8-.05.1-.05.25=
+-.1l.1-.2q.15-.1.25-.25.1-.05.15-.1l.3-1.05 1.75-12.3h11.15L75.8 82.6h16.5l=
+2.3-16.25h-.05l.8-5.7q.4-2.45-1-4.2-.35-.4-.75-.8-.25-.25-.55-.5-.2-.2-.45-=
+.35m16.2 18.1h.05l-.05.3 5.85 1.15H105.2q-.5.05-1 .15-.5.15-1 .35-.5.2-.95.=
+45-.5.3-1 .65-.4.4-.8.85-.25.3-.55.65-.05.1-.15.2-.25.45-.4.9-.2.45-.3.95-.=
+1.65-.2 1.25-.2 1.15-.4 2.25l-4.3 30.6q-.25 3 1.75 5.25 1.6 1.8 4 2.15.6.1 =
+1.25.1h27.35q3.25 0 6-2.25.35-.35.7-.55l.3-.2q2-2 2.25-4.5l1.65-11.6q.05-.0=
+5.1-.05l1.65-11.35h.05l.7-5.2 1.5-11.25 4.25 6.4v.05l.05.05q.25.3.55.6.1.15=
+.25.25.3.25.8.4.15.05.4.05.6.05 1.1-.1l.15-.15.3-.4.3-1.05 1.3-9.05h-.05l.7=
+-5.05h-.05l.15-1.25h-.05l1.65-11.7h-16.25l-2.65 19.5h.05v.2l-.05.1h.05l5.8 =
+1.15H132.7q-.5.05-1 .15-.5.15-1 .35-.15.05-.3.15-.3.1-.55.25-.05 0-.1.05-.5=
+.3-1 .65-.4.35-.7.7-.55.7-.95 1.45-.35.65-.55 1.4-.15.7-.25 1.4v.05q-.15 1.=
+05-.35 2.05l-1.2 8.75v.1l-2.1 14.7H111.4l2.25-15.55h.05l.7-5.2 1.5-11.25 4.=
+25 6.4v.05l.05.05q.25.3.55.6.55.7 1.45.7.6.05 1.1-.1l.45-.55.3-1.05 1.3-9.0=
+5h-.05l.7-5.05h-.05l.15-1.25h-.05l1.65-11.7h-16.25l-2.65 19.5m106.5-41.75q-=
+2.25-2.25-5.5-2.25h-27.75q-3 0-5.75 2.25-1.3.95-2.05 2.1-.45.6-.7 1.2-.2.5-=
+.35 1-.1.45-.15.95l-4.15 29.95h-.05l-.7 5.2h-.05l-.2 1.35h.05l-.05.3 5.85 1=
+.15h-9.45q-2.1.05-3.95 1.6-1.9 1.55-2.25 3.55l-.5 3.5h-.05l-5.3 38.1h16.25l=
+5-35.5 1.5-11.25q.35 3.85 3.5 6.4.65.5 1.4 1 3.3 2.05 8.9 3.1 2.6.5 5.7.75l=
+1.75-11.25h-12.2l.4-2.95h-.05l.7-5.05h-.05q.1-.9.3-1.9.1-.75.2-1.6.85-5.9 2=
+.15-14.9 0-.15.05-.25l.1-.9q.2-1.55.45-3.15h11.25l-3.1 20.8h16.5l4.1-28.05q=
+.15-1.7-.4-3.15-.5-1.1-1.35-2.1m46.65 44.15q-.5.3-1 .65-.4.4-.8.85-.35.4-.7=
+.85-.25.45-.45.9-.15.45-.3.95l-5.85 41.6h16.25l5-35.5 1.5-11.25 4.2 6.3q.7 =
+1.55 3.25 1.8l.05-.1q.25-.4.35-.85l.3-1.05 1.8-14.05v-.05l5.35-37.45h-16.25=
+l-6.15 44.3 5.85 1.15h-9.45q-.5.05-1 .15-.5.15-1 .35-.5.2-.95.45m5.4-38.9q.=
+15-1.7-.4-3.15-.5-1.1-1.35-2.1-2.25-2.25-5.5-2.25h-27.75q-2.3 0-4.45 1.35-.=
+65.35-1.3.9-1.3.95-2.05 2.1-.45.6-.7 1.2-.4.9-.5 1.95l-4.15 29.95h-.05l-.7 =
+5.2h-.05l-.2 1.35h.05l-.05.3 5.85 1.15h-9.45q-2.1.05-3.95 1.6-1.9 1.55-2.25=
+ 3.55l-.5 3.5h-.05l-1.2 8.75v.1l-4.1 29.25h16.25l5-35.5 1.5-11.25q.3 3.25 2=
+.6 5.6.4.4.9.8 4.75 3.9 16 4.85l1.75-11.25h-12.2l.4-2.95h-.05l.7-5.05h-.05q=
+.15-.9.3-1.9.1-.75.25-1.6.15-1.25.35-2.65v-.05q.95-6.7 2.35-16.5h11.25l-3.1=
+ 20.8h16.5l4.1-28.05M345 66.35h-.05l1.15-8.2q.5-3-1.75-5.25-1.25-1.25-3-1.7=
+5-1-.5-2.25-.5h-27.95q-.65 0-1.3.1-2.5.35-4.7 2.15-2.75 2.25-3.25 5.25l-1.9=
+5 14.7v.05l-.05.3 5.85 1.15h-9.45q-1.9.05-3.6 1.35-.2.1-.35.25-1.9 1.55-2.2=
+5 3.55l-4.85 34.1q-.25 3 1.75 5.25 1.25 1.4 3 1.95 1.05.3 2.25.3H320q3.25 0=
+ 6-2.25 2.75-2 3.25-5l2.75-18.5h-16.5l-1.75 11H302.5l2.1-14.75h.05l.85-6 1.=
+5-11.2q.35 3.8 3.5 6.35 4.6 3.8 15.4 4.8.3 0 .6.05h15.75L345 66.35m-16.4-.9=
+5-1.25 8.95h-11.3l.4-2.95h-.05l.7-5.05h-.1l.15-.95h11.45Z"></path></g></svg=
+><svg xmlns=3D"http://www.w3.org/2000/svg" class=3D"loading-animation" view=
+Box=3D"0 0 66 66"><circle xmlns=3D"http://www.w3.org/2000/svg" class=3D"spi=
+nner" fill=3D"none" stroke-width=3D"6" stroke-linecap=3D"round" cx=3D"33" c=
+y=3D"33" r=3D"30"></circle></svg><div class=3D"loadbar"><div class=3D"loadb=
+ar-inner"></div></div></div><div id=3D"save-manager" class=3D"modal hidden"=
+><div id=3D"modal-area" class=3D"modal-area"><span class=3D"close-modal"></=
+span><div class=3D"general-save-options"><span class=3D"modal-button">Downl=
+oad all save files</span></div><table id=3D"local-saves"></table></div></di=
+v><div id=3D"volume-controls-modal" class=3D"modal hidden"><div class=3D"mo=
+dal-area"><div id=3D"volume-controls"><input id=3D"mute-checkbox" type=3D"c=
+heckbox"><label id=3D"volume-mute" for=3D"mute-checkbox" title=3D"Unmute" s=
+tyle=3D"display: none;"></label><label id=3D"volume-min" for=3D"mute-checkb=
+ox" title=3D"Mute" style=3D"display: none;"></label><label id=3D"volume-mid=
+" for=3D"mute-checkbox" title=3D"Mute" style=3D"display: none;"></label><la=
+bel id=3D"volume-max" for=3D"mute-checkbox" title=3D"Mute" style=3D"display=
+: inline;"></label><input id=3D"volume-slider" type=3D"range" min=3D"0" max=
+=3D"100" step=3D"1"><span id=3D"volume-slider-text">100%</span><span class=
+=3D"close-modal"></span></div></div></div><div id=3D"video-modal" class=3D"=
+modal hidden"><div class=3D"modal-area"><span class=3D"close-modal"></span>=
+<div id=3D"video-holder"></div></div></div><div id=3D"hardware-acceleration=
+-modal" class=3D"modal hidden"><div class=3D"modal-area"><span class=3D"clo=
+se-modal"></span><span id=3D"acceleration-text">It looks like hardware acce=
+leration is disabled. While Ruffle may work, it could be very slow. You can=
+ find out how to enable hardware acceleration by following the link below:<=
+/span><a href=3D"https://web.archive.org/web/20010604094756mp_/https://gith=
+ub.com/ruffle-rs/ruffle/wiki/Frequently-Asked-Questions-For-Users#chrome-ha=
+rdware-acceleration" target=3D"_blank" class=3D"modal-button">FAQ - Chrome =
+Hardware Acceleration</a></div></div><div id=3D"clipboard-modal" class=3D"m=
+odal hidden"><div class=3D"modal-area"><span class=3D"close-modal"></span><=
+h2>Copying and pasting in Ruffle</h2><p id=3D"clipboard-modal-description">=
+</p><p><b>Ctrl+C</b><span>&#8296; &#8297; for copy</span></p><p><b>Ctrl+X</=
+b><span>&#8296; &#8297; for cut</span></p><p><b>Ctrl+V</b><span>&#8296; &#8=
+297; for paste</span></p></div></div><div id=3D"context-menu-overlay" class=
+=3D"hidden"><ul id=3D"context-menu" dir=3D"ltr"></ul></div></template></ruf=
+fle-embed>
+</object>
+              </td>
+            </tr>
+            <tr>
+              <td width=3D"10%" valign=3D"top">
+<object classid=3D"clsid:D27CDB6E-AE6D-11cf-96B8-444553540000" codebase=3D"=
+https://web.archive.org/web/20010604094756oe_/http://active.macromedia.com/=
+flash2/cabs/swflash.cab#version=3D4,0,0,0" id=3D"puce1" width=3D"40" height=
+=3D"24">
+ <param name=3D"movie" value=3D"puce.swf"> <param name=3D"quality" value=3D=
+"high"> <param name=3D"bgcolor" value=3D"#FFFFFF"> <ruffle-embed src=3D"/we=
+b/20010604094756mp_/http://www.radianprotocol.com/puce.swf" quality=3D"high=
+" bgcolor=3D"#FFFFFF" width=3D"40" height=3D"24" type=3D"application/x-shoc=
+kwave-flash" pluginspage=3D"http://www.macromedia.com/shockwave/download/in=
+dex.cgi?P1_Prod_Version=3DShockwaveFlash"><template shadowmode=3D"open" sha=
+dowdelegatesfocus=3D""><div id=3D"container" class=3D"" tabindex=3D"-1" sty=
+le=3D"background-color: rgb(255, 255, 255);"><div id=3D"panic"><div id=3D"p=
+anic-title">Something went wrong :(</div><div id=3D"panic-body"><div><p>Ruf=
+fle failed to load the Flash SWF file.</p><p>Access to fetch has likely bee=
+n blocked by CORS policy.</p><p>If you are the server administrator, please=
+ consult the Ruffle wiki for help.</p></div></div><div id=3D"panic-footer">=
+<ul><li><a href=3D"https://web.archive.org/web/20010604094756mp_/https://gi=
+thub.com/ruffle-rs/ruffle/wiki/Using-Ruffle#configure-cors-header" target=
+=3D"_top">View Ruffle Wiki</a></li><li><a href=3D"https://web.archive.org/w=
+eb/20010604094756/http://www.radianprotocol.com/protocol.htm#" id=3D"panic-=
+view-details">View Error Details</a></li></ul></div></div></div><div id=3D"=
+splash-screen" class=3D"hidden"><svg xmlns=3D"http://www.w3.org/2000/svg" c=
+lass=3D"logo" preserveAspectRatio=3D"xMidYMid" viewBox=3D"0 0 380 150"><g x=
+mlns=3D"http://www.w3.org/2000/svg"><path xmlns=3D"http://www.w3.org/2000/s=
+vg" fill=3D"#966214" d=3D"M58.75 85.6q.75-.1 1.5-.35.85-.25 1.65-.75.55-.35=
+ 1.05-.8.5-.45.95-1 .5-.5.75-1.2-.05.05-.15.1-.1.15-.25.25l-.1.2q-.15.05-.2=
+5.1-.4 0-.8.05-.5-.25-.9-.5-.3-.1-.55-.3l-.6-.6-4.25-6.45-1.5 11.25h3.45m83=
+.15-.2h3.45q.75-.1 1.5-.35.25-.05.45-.15.35-.15.65-.3l.5-.3q.25-.15.5-.35.4=
+5-.35.9-.75.45-.35.75-.85l.1-.1q.1-.2.2-.35.2-.3.35-.6l-.3.4-.15.15q-.5.15-=
+1.1.1-.25 0-.4-.05-.5-.15-.8-.4-.15-.1-.25-.25-.3-.3-.55-.6l-.05-.05v-.05l-=
+4.25-6.4-1.5 11.25m-21.15-3.95q-.3-.3-.55-.6l-.05-.05v-.05l-4.25-6.4-1.5 11=
+.25h3.45q.75-.1 1.5-.35.85-.25 1.6-.75.75-.5 1.4-1.1.45-.35.75-.85.35-.5.65=
+-1.05l-.45.55q-.5.15-1.1.1-.9 0-1.45-.7m59.15.3q-.75-.5-1.4-1-3.15-2.55-3.5=
+-6.4l-1.5 11.25h21q-3.1-.25-5.7-.75-5.6-1.05-8.9-3.1m94.2 3.85h3.45q.6-.1 1=
+.2-.3.4-.1.75-.2.35-.15.65-.3.7-.35 1.35-.8.75-.55 1.3-1.25.1-.15.25-.3-2.5=
+5-.25-3.25-1.8l-4.2-6.3-1.5 11.25m-45.3-4.85q-.5-.4-.9-.8-2.3-2.35-2.6-5.6l=
+-1.5 11.25h21q-11.25-.95-16-4.85m97.7 4.85q-.3-.05-.6-.05-10.8-1-15.4-4.8-3=
+.15-2.55-3.5-6.35l-1.5 11.2h21Z"></path><path xmlns=3D"http://www.w3.org/20=
+00/svg" fill=3D"var(--ruffle-orange)" d=3D"M92.6 54.8q-1.95-1.4-4.5-1.4H60.=
+35q-1.35 0-2.6.45-1.65.55-3.15 1.8-2.75 2.25-3.25 5.25l-1.65 12h.05v.3l5.85=
+ 1.15h-9.5q-.5.05-1 .15-.5.15-1 .35-.5.2-.95.45-.5.3-.95.7-.45.35-.85.8-.35=
+.4-.65.85-.3.45-.5.9-.15.45-.3.95l-5.85 41.6H50.3l5-35.5 1.5-11.25 4.25 6.4=
+5.6.6q.25.2.55.3.4.25.9.5.4-.05.8-.05.1-.05.25-.1l.1-.2q.15-.1.25-.25.1-.05=
+.15-.1l.3-1.05 1.75-12.3h11.15L75.8 82.6h16.5l2.3-16.25h-.05l.8-5.7q.4-2.45=
+-1-4.2-.35-.4-.75-.8-.25-.25-.55-.5-.2-.2-.45-.35m16.2 18.1h.05l-.05.3 5.85=
+ 1.15H105.2q-.5.05-1 .15-.5.15-1 .35-.5.2-.95.45-.5.3-1 .65-.4.4-.8.85-.25.=
+3-.55.65-.05.1-.15.2-.25.45-.4.9-.2.45-.3.95-.1.65-.2 1.25-.2 1.15-.4 2.25l=
+-4.3 30.6q-.25 3 1.75 5.25 1.6 1.8 4 2.15.6.1 1.25.1h27.35q3.25 0 6-2.25.35=
+-.35.7-.55l.3-.2q2-2 2.25-4.5l1.65-11.6q.05-.05.1-.05l1.65-11.35h.05l.7-5.2=
+ 1.5-11.25 4.25 6.4v.05l.05.05q.25.3.55.6.1.15.25.25.3.25.8.4.15.05.4.05.6.=
+05 1.1-.1l.15-.15.3-.4.3-1.05 1.3-9.05h-.05l.7-5.05h-.05l.15-1.25h-.05l1.65=
+-11.7h-16.25l-2.65 19.5h.05v.2l-.05.1h.05l5.8 1.15H132.7q-.5.05-1 .15-.5.15=
+-1 .35-.15.05-.3.15-.3.1-.55.25-.05 0-.1.05-.5.3-1 .65-.4.35-.7.7-.55.7-.95=
+ 1.45-.35.65-.55 1.4-.15.7-.25 1.4v.05q-.15 1.05-.35 2.05l-1.2 8.75v.1l-2.1=
+ 14.7H111.4l2.25-15.55h.05l.7-5.2 1.5-11.25 4.25 6.4v.05l.05.05q.25.3.55.6.=
+55.7 1.45.7.6.05 1.1-.1l.45-.55.3-1.05 1.3-9.05h-.05l.7-5.05h-.05l.15-1.25h=
+-.05l1.65-11.7h-16.25l-2.65 19.5m106.5-41.75q-2.25-2.25-5.5-2.25h-27.75q-3 =
+0-5.75 2.25-1.3.95-2.05 2.1-.45.6-.7 1.2-.2.5-.35 1-.1.45-.15.95l-4.15 29.9=
+5h-.05l-.7 5.2h-.05l-.2 1.35h.05l-.05.3 5.85 1.15h-9.45q-2.1.05-3.95 1.6-1.=
+9 1.55-2.25 3.55l-.5 3.5h-.05l-5.3 38.1h16.25l5-35.5 1.5-11.25q.35 3.85 3.5=
+ 6.4.65.5 1.4 1 3.3 2.05 8.9 3.1 2.6.5 5.7.75l1.75-11.25h-12.2l.4-2.95h-.05=
+l.7-5.05h-.05q.1-.9.3-1.9.1-.75.2-1.6.85-5.9 2.15-14.9 0-.15.05-.25l.1-.9q.=
+2-1.55.45-3.15h11.25l-3.1 20.8h16.5l4.1-28.05q.15-1.7-.4-3.15-.5-1.1-1.35-2=
+.1m46.65 44.15q-.5.3-1 .65-.4.4-.8.85-.35.4-.7.85-.25.45-.45.9-.15.45-.3.95=
+l-5.85 41.6h16.25l5-35.5 1.5-11.25 4.2 6.3q.7 1.55 3.25 1.8l.05-.1q.25-.4.3=
+5-.85l.3-1.05 1.8-14.05v-.05l5.35-37.45h-16.25l-6.15 44.3 5.85 1.15h-9.45q-=
+.5.05-1 .15-.5.15-1 .35-.5.2-.95.45m5.4-38.9q.15-1.7-.4-3.15-.5-1.1-1.35-2.=
+1-2.25-2.25-5.5-2.25h-27.75q-2.3 0-4.45 1.35-.65.35-1.3.9-1.3.95-2.05 2.1-.=
+45.6-.7 1.2-.4.9-.5 1.95l-4.15 29.95h-.05l-.7 5.2h-.05l-.2 1.35h.05l-.05.3 =
+5.85 1.15h-9.45q-2.1.05-3.95 1.6-1.9 1.55-2.25 3.55l-.5 3.5h-.05l-1.2 8.75v=
+.1l-4.1 29.25h16.25l5-35.5 1.5-11.25q.3 3.25 2.6 5.6.4.4.9.8 4.75 3.9 16 4.=
+85l1.75-11.25h-12.2l.4-2.95h-.05l.7-5.05h-.05q.15-.9.3-1.9.1-.75.25-1.6.15-=
+1.25.35-2.65v-.05q.95-6.7 2.35-16.5h11.25l-3.1 20.8h16.5l4.1-28.05M345 66.3=
+5h-.05l1.15-8.2q.5-3-1.75-5.25-1.25-1.25-3-1.75-1-.5-2.25-.5h-27.95q-.65 0-=
+1.3.1-2.5.35-4.7 2.15-2.75 2.25-3.25 5.25l-1.95 14.7v.05l-.05.3 5.85 1.15h-=
+9.45q-1.9.05-3.6 1.35-.2.1-.35.25-1.9 1.55-2.25 3.55l-4.85 34.1q-.25 3 1.75=
+ 5.25 1.25 1.4 3 1.95 1.05.3 2.25.3H320q3.25 0 6-2.25 2.75-2 3.25-5l2.75-18=
+.5h-16.5l-1.75 11H302.5l2.1-14.75h.05l.85-6 1.5-11.2q.35 3.8 3.5 6.35 4.6 3=
+.8 15.4 4.8.3 0 .6.05h15.75L345 66.35m-16.4-.95-1.25 8.95h-11.3l.4-2.95h-.0=
+5l.7-5.05h-.1l.15-.95h11.45Z"></path></g></svg><svg xmlns=3D"http://www.w3.=
+org/2000/svg" class=3D"loading-animation" viewBox=3D"0 0 66 66"><circle xml=
+ns=3D"http://www.w3.org/2000/svg" class=3D"spinner" fill=3D"none" stroke-wi=
+dth=3D"6" stroke-linecap=3D"round" cx=3D"33" cy=3D"33" r=3D"30"></circle></=
+svg><div class=3D"loadbar"><div class=3D"loadbar-inner"></div></div></div><=
+div id=3D"save-manager" class=3D"modal hidden"><div id=3D"modal-area" class=
+=3D"modal-area"><span class=3D"close-modal"></span><div class=3D"general-sa=
+ve-options"><span class=3D"modal-button">Download all save files</span></di=
+v><table id=3D"local-saves"></table></div></div><div id=3D"volume-controls-=
+modal" class=3D"modal hidden"><div class=3D"modal-area"><div id=3D"volume-c=
+ontrols"><input id=3D"mute-checkbox" type=3D"checkbox"><label id=3D"volume-=
+mute" for=3D"mute-checkbox" title=3D"Unmute" style=3D"display: none;"></lab=
+el><label id=3D"volume-min" for=3D"mute-checkbox" title=3D"Mute" style=3D"d=
+isplay: none;"></label><label id=3D"volume-mid" for=3D"mute-checkbox" title=
+=3D"Mute" style=3D"display: none;"></label><label id=3D"volume-max" for=3D"=
+mute-checkbox" title=3D"Mute" style=3D"display: inline;"></label><input id=
+=3D"volume-slider" type=3D"range" min=3D"0" max=3D"100" step=3D"1"><span id=
+=3D"volume-slider-text">100%</span><span class=3D"close-modal"></span></div=
+></div></div><div id=3D"video-modal" class=3D"modal hidden"><div class=3D"m=
+odal-area"><span class=3D"close-modal"></span><div id=3D"video-holder"></di=
+v></div></div><div id=3D"hardware-acceleration-modal" class=3D"modal hidden=
+"><div class=3D"modal-area"><span class=3D"close-modal"></span><span id=3D"=
+acceleration-text">It looks like hardware acceleration is disabled. While R=
+uffle may work, it could be very slow. You can find out how to enable hardw=
+are acceleration by following the link below:</span><a href=3D"https://web.=
+archive.org/web/20010604094756mp_/https://github.com/ruffle-rs/ruffle/wiki/=
+Frequently-Asked-Questions-For-Users#chrome-hardware-acceleration" target=
+=3D"_blank" class=3D"modal-button">FAQ - Chrome Hardware Acceleration</a></=
+div></div><div id=3D"clipboard-modal" class=3D"modal hidden"><div class=3D"=
+modal-area"><span class=3D"close-modal"></span><h2>Copying and pasting in R=
+uffle</h2><p id=3D"clipboard-modal-description"></p><p><b>Ctrl+C</b><span>&=
+#8296; &#8297; for copy</span></p><p><b>Ctrl+X</b><span>&#8296; &#8297; for=
+ cut</span></p><p><b>Ctrl+V</b><span>&#8296; &#8297; for paste</span></p></=
+div></div><div id=3D"context-menu-overlay" class=3D"hidden"><ul id=3D"conte=
+xt-menu" dir=3D"ltr"></ul></div></template></ruffle-embed>
+</object>
+              </td>
+              <td width=3D"50%" valign=3D"top">
+                <b><font face=3D"Tahoma" color=3D"#FF0000" size=3D"3">relay=
+ing
+                            capability</font></b>
+              </td>
+              <td width=3D"40%" valign=3D"top">
+                        <ol>
+                          <li><font face=3D"Tahoma" color=3D"#000000" size=
+=3D"2"><b>receive
+                            an repeat datagrams</b></font></li>
+                          <li><font face=3D"Tahoma" color=3D"#000000" size=
+=3D"2"><b>up
+                            to 7 nodes forward</b></font></li>
+                        </ol>
+              </td>
+            </tr>
+            <tr>
+              <td width=3D"10%" valign=3D"top">
+<object classid=3D"clsid:D27CDB6E-AE6D-11cf-96B8-444553540000" codebase=3D"=
+https://web.archive.org/web/20010604094756oe_/http://active.macromedia.com/=
+flash2/cabs/swflash.cab#version=3D4,0,0,0" id=3D"puce2" width=3D"40" height=
+=3D"24">
+ <param name=3D"movie" value=3D"puce.swf"> <param name=3D"quality" value=3D=
+"high"> <param name=3D"bgcolor" value=3D"#FFFFFF"> <ruffle-embed src=3D"/we=
+b/20010604094756mp_/http://www.radianprotocol.com/puce.swf" quality=3D"high=
+" bgcolor=3D"#FFFFFF" width=3D"40" height=3D"24" type=3D"application/x-shoc=
+kwave-flash" pluginspage=3D"http://www.macromedia.com/shockwave/download/in=
+dex.cgi?P1_Prod_Version=3DShockwaveFlash"><template shadowmode=3D"open" sha=
+dowdelegatesfocus=3D""><div id=3D"container" class=3D"" tabindex=3D"-1" sty=
+le=3D"background-color: rgb(255, 255, 255);"><div id=3D"panic"><div id=3D"p=
+anic-title">Something went wrong :(</div><div id=3D"panic-body"><div><p>Ruf=
+fle failed to load the Flash SWF file.</p><p>Access to fetch has likely bee=
+n blocked by CORS policy.</p><p>If you are the server administrator, please=
+ consult the Ruffle wiki for help.</p></div></div><div id=3D"panic-footer">=
+<ul><li><a href=3D"https://web.archive.org/web/20010604094756mp_/https://gi=
+thub.com/ruffle-rs/ruffle/wiki/Using-Ruffle#configure-cors-header" target=
+=3D"_top">View Ruffle Wiki</a></li><li><a href=3D"https://web.archive.org/w=
+eb/20010604094756/http://www.radianprotocol.com/protocol.htm#" id=3D"panic-=
+view-details">View Error Details</a></li></ul></div></div></div><div id=3D"=
+splash-screen" class=3D"hidden"><svg xmlns=3D"http://www.w3.org/2000/svg" c=
+lass=3D"logo" preserveAspectRatio=3D"xMidYMid" viewBox=3D"0 0 380 150"><g x=
+mlns=3D"http://www.w3.org/2000/svg"><path xmlns=3D"http://www.w3.org/2000/s=
+vg" fill=3D"#966214" d=3D"M58.75 85.6q.75-.1 1.5-.35.85-.25 1.65-.75.55-.35=
+ 1.05-.8.5-.45.95-1 .5-.5.75-1.2-.05.05-.15.1-.1.15-.25.25l-.1.2q-.15.05-.2=
+5.1-.4 0-.8.05-.5-.25-.9-.5-.3-.1-.55-.3l-.6-.6-4.25-6.45-1.5 11.25h3.45m83=
+.15-.2h3.45q.75-.1 1.5-.35.25-.05.45-.15.35-.15.65-.3l.5-.3q.25-.15.5-.35.4=
+5-.35.9-.75.45-.35.75-.85l.1-.1q.1-.2.2-.35.2-.3.35-.6l-.3.4-.15.15q-.5.15-=
+1.1.1-.25 0-.4-.05-.5-.15-.8-.4-.15-.1-.25-.25-.3-.3-.55-.6l-.05-.05v-.05l-=
+4.25-6.4-1.5 11.25m-21.15-3.95q-.3-.3-.55-.6l-.05-.05v-.05l-4.25-6.4-1.5 11=
+.25h3.45q.75-.1 1.5-.35.85-.25 1.6-.75.75-.5 1.4-1.1.45-.35.75-.85.35-.5.65=
+-1.05l-.45.55q-.5.15-1.1.1-.9 0-1.45-.7m59.15.3q-.75-.5-1.4-1-3.15-2.55-3.5=
+-6.4l-1.5 11.25h21q-3.1-.25-5.7-.75-5.6-1.05-8.9-3.1m94.2 3.85h3.45q.6-.1 1=
+.2-.3.4-.1.75-.2.35-.15.65-.3.7-.35 1.35-.8.75-.55 1.3-1.25.1-.15.25-.3-2.5=
+5-.25-3.25-1.8l-4.2-6.3-1.5 11.25m-45.3-4.85q-.5-.4-.9-.8-2.3-2.35-2.6-5.6l=
+-1.5 11.25h21q-11.25-.95-16-4.85m97.7 4.85q-.3-.05-.6-.05-10.8-1-15.4-4.8-3=
+.15-2.55-3.5-6.35l-1.5 11.2h21Z"></path><path xmlns=3D"http://www.w3.org/20=
+00/svg" fill=3D"var(--ruffle-orange)" d=3D"M92.6 54.8q-1.95-1.4-4.5-1.4H60.=
+35q-1.35 0-2.6.45-1.65.55-3.15 1.8-2.75 2.25-3.25 5.25l-1.65 12h.05v.3l5.85=
+ 1.15h-9.5q-.5.05-1 .15-.5.15-1 .35-.5.2-.95.45-.5.3-.95.7-.45.35-.85.8-.35=
+.4-.65.85-.3.45-.5.9-.15.45-.3.95l-5.85 41.6H50.3l5-35.5 1.5-11.25 4.25 6.4=
+5.6.6q.25.2.55.3.4.25.9.5.4-.05.8-.05.1-.05.25-.1l.1-.2q.15-.1.25-.25.1-.05=
+.15-.1l.3-1.05 1.75-12.3h11.15L75.8 82.6h16.5l2.3-16.25h-.05l.8-5.7q.4-2.45=
+-1-4.2-.35-.4-.75-.8-.25-.25-.55-.5-.2-.2-.45-.35m16.2 18.1h.05l-.05.3 5.85=
+ 1.15H105.2q-.5.05-1 .15-.5.15-1 .35-.5.2-.95.45-.5.3-1 .65-.4.4-.8.85-.25.=
+3-.55.65-.05.1-.15.2-.25.45-.4.9-.2.45-.3.95-.1.65-.2 1.25-.2 1.15-.4 2.25l=
+-4.3 30.6q-.25 3 1.75 5.25 1.6 1.8 4 2.15.6.1 1.25.1h27.35q3.25 0 6-2.25.35=
+-.35.7-.55l.3-.2q2-2 2.25-4.5l1.65-11.6q.05-.05.1-.05l1.65-11.35h.05l.7-5.2=
+ 1.5-11.25 4.25 6.4v.05l.05.05q.25.3.55.6.1.15.25.25.3.25.8.4.15.05.4.05.6.=
+05 1.1-.1l.15-.15.3-.4.3-1.05 1.3-9.05h-.05l.7-5.05h-.05l.15-1.25h-.05l1.65=
+-11.7h-16.25l-2.65 19.5h.05v.2l-.05.1h.05l5.8 1.15H132.7q-.5.05-1 .15-.5.15=
+-1 .35-.15.05-.3.15-.3.1-.55.25-.05 0-.1.05-.5.3-1 .65-.4.35-.7.7-.55.7-.95=
+ 1.45-.35.65-.55 1.4-.15.7-.25 1.4v.05q-.15 1.05-.35 2.05l-1.2 8.75v.1l-2.1=
+ 14.7H111.4l2.25-15.55h.05l.7-5.2 1.5-11.25 4.25 6.4v.05l.05.05q.25.3.55.6.=
+55.7 1.45.7.6.05 1.1-.1l.45-.55.3-1.05 1.3-9.05h-.05l.7-5.05h-.05l.15-1.25h=
+-.05l1.65-11.7h-16.25l-2.65 19.5m106.5-41.75q-2.25-2.25-5.5-2.25h-27.75q-3 =
+0-5.75 2.25-1.3.95-2.05 2.1-.45.6-.7 1.2-.2.5-.35 1-.1.45-.15.95l-4.15 29.9=
+5h-.05l-.7 5.2h-.05l-.2 1.35h.05l-.05.3 5.85 1.15h-9.45q-2.1.05-3.95 1.6-1.=
+9 1.55-2.25 3.55l-.5 3.5h-.05l-5.3 38.1h16.25l5-35.5 1.5-11.25q.35 3.85 3.5=
+ 6.4.65.5 1.4 1 3.3 2.05 8.9 3.1 2.6.5 5.7.75l1.75-11.25h-12.2l.4-2.95h-.05=
+l.7-5.05h-.05q.1-.9.3-1.9.1-.75.2-1.6.85-5.9 2.15-14.9 0-.15.05-.25l.1-.9q.=
+2-1.55.45-3.15h11.25l-3.1 20.8h16.5l4.1-28.05q.15-1.7-.4-3.15-.5-1.1-1.35-2=
+.1m46.65 44.15q-.5.3-1 .65-.4.4-.8.85-.35.4-.7.85-.25.45-.45.9-.15.45-.3.95=
+l-5.85 41.6h16.25l5-35.5 1.5-11.25 4.2 6.3q.7 1.55 3.25 1.8l.05-.1q.25-.4.3=
+5-.85l.3-1.05 1.8-14.05v-.05l5.35-37.45h-16.25l-6.15 44.3 5.85 1.15h-9.45q-=
+.5.05-1 .15-.5.15-1 .35-.5.2-.95.45m5.4-38.9q.15-1.7-.4-3.15-.5-1.1-1.35-2.=
+1-2.25-2.25-5.5-2.25h-27.75q-2.3 0-4.45 1.35-.65.35-1.3.9-1.3.95-2.05 2.1-.=
+45.6-.7 1.2-.4.9-.5 1.95l-4.15 29.95h-.05l-.7 5.2h-.05l-.2 1.35h.05l-.05.3 =
+5.85 1.15h-9.45q-2.1.05-3.95 1.6-1.9 1.55-2.25 3.55l-.5 3.5h-.05l-1.2 8.75v=
+.1l-4.1 29.25h16.25l5-35.5 1.5-11.25q.3 3.25 2.6 5.6.4.4.9.8 4.75 3.9 16 4.=
+85l1.75-11.25h-12.2l.4-2.95h-.05l.7-5.05h-.05q.15-.9.3-1.9.1-.75.25-1.6.15-=
+1.25.35-2.65v-.05q.95-6.7 2.35-16.5h11.25l-3.1 20.8h16.5l4.1-28.05M345 66.3=
+5h-.05l1.15-8.2q.5-3-1.75-5.25-1.25-1.25-3-1.75-1-.5-2.25-.5h-27.95q-.65 0-=
+1.3.1-2.5.35-4.7 2.15-2.75 2.25-3.25 5.25l-1.95 14.7v.05l-.05.3 5.85 1.15h-=
+9.45q-1.9.05-3.6 1.35-.2.1-.35.25-1.9 1.55-2.25 3.55l-4.85 34.1q-.25 3 1.75=
+ 5.25 1.25 1.4 3 1.95 1.05.3 2.25.3H320q3.25 0 6-2.25 2.75-2 3.25-5l2.75-18=
+.5h-16.5l-1.75 11H302.5l2.1-14.75h.05l.85-6 1.5-11.2q.35 3.8 3.5 6.35 4.6 3=
+.8 15.4 4.8.3 0 .6.05h15.75L345 66.35m-16.4-.95-1.25 8.95h-11.3l.4-2.95h-.0=
+5l.7-5.05h-.1l.15-.95h11.45Z"></path></g></svg><svg xmlns=3D"http://www.w3.=
+org/2000/svg" class=3D"loading-animation" viewBox=3D"0 0 66 66"><circle xml=
+ns=3D"http://www.w3.org/2000/svg" class=3D"spinner" fill=3D"none" stroke-wi=
+dth=3D"6" stroke-linecap=3D"round" cx=3D"33" cy=3D"33" r=3D"30"></circle></=
+svg><div class=3D"loadbar"><div class=3D"loadbar-inner"></div></div></div><=
+div id=3D"save-manager" class=3D"modal hidden"><div id=3D"modal-area" class=
+=3D"modal-area"><span class=3D"close-modal"></span><div class=3D"general-sa=
+ve-options"><span class=3D"modal-button">Download all save files</span></di=
+v><table id=3D"local-saves"></table></div></div><div id=3D"volume-controls-=
+modal" class=3D"modal hidden"><div class=3D"modal-area"><div id=3D"volume-c=
+ontrols"><input id=3D"mute-checkbox" type=3D"checkbox"><label id=3D"volume-=
+mute" for=3D"mute-checkbox" title=3D"Unmute" style=3D"display: none;"></lab=
+el><label id=3D"volume-min" for=3D"mute-checkbox" title=3D"Mute" style=3D"d=
+isplay: none;"></label><label id=3D"volume-mid" for=3D"mute-checkbox" title=
+=3D"Mute" style=3D"display: none;"></label><label id=3D"volume-max" for=3D"=
+mute-checkbox" title=3D"Mute" style=3D"display: inline;"></label><input id=
+=3D"volume-slider" type=3D"range" min=3D"0" max=3D"100" step=3D"1"><span id=
+=3D"volume-slider-text">100%</span><span class=3D"close-modal"></span></div=
+></div></div><div id=3D"video-modal" class=3D"modal hidden"><div class=3D"m=
+odal-area"><span class=3D"close-modal"></span><div id=3D"video-holder"></di=
+v></div></div><div id=3D"hardware-acceleration-modal" class=3D"modal hidden=
+"><div class=3D"modal-area"><span class=3D"close-modal"></span><span id=3D"=
+acceleration-text">It looks like hardware acceleration is disabled. While R=
+uffle may work, it could be very slow. You can find out how to enable hardw=
+are acceleration by following the link below:</span><a href=3D"https://web.=
+archive.org/web/20010604094756mp_/https://github.com/ruffle-rs/ruffle/wiki/=
+Frequently-Asked-Questions-For-Users#chrome-hardware-acceleration" target=
+=3D"_blank" class=3D"modal-button">FAQ - Chrome Hardware Acceleration</a></=
+div></div><div id=3D"clipboard-modal" class=3D"modal hidden"><div class=3D"=
+modal-area"><span class=3D"close-modal"></span><h2>Copying and pasting in R=
+uffle</h2><p id=3D"clipboard-modal-description"></p><p><b>Ctrl+C</b><span>&=
+#8296; &#8297; for copy</span></p><p><b>Ctrl+X</b><span>&#8296; &#8297; for=
+ cut</span></p><p><b>Ctrl+V</b><span>&#8296; &#8297; for paste</span></p></=
+div></div><div id=3D"context-menu-overlay" class=3D"hidden"><ul id=3D"conte=
+xt-menu" dir=3D"ltr"></ul></div></template></ruffle-embed>
+</object>
+              </td>
+              <td width=3D"50%" valign=3D"top">
+                <b><font face=3D"Tahoma" color=3D"#FF0000" size=3D"3">sophi=
+sticated
+                            wake up mechanism</font></b>
+              </td>
+              <td width=3D"40%" valign=3D"top">
+                        <ol>
+                          <li><font face=3D"Tahoma" color=3D"#000000" size=
+=3D"2"><b>standby
+                            mode</b></font></li>
+                          <li><font face=3D"Tahoma" color=3D"#000000" size=
+=3D"2"><b>wake-up
+                            signal =3D&gt; awaken mode</b></font></li>
+                        </ol>
+                        <p><font face=3D"Tahoma" color=3D"#000000" size=3D"=
+2"><b>my
+                        address ?</b></font></p>
+                        <p><font face=3D"Tahoma" color=3D"#000000" size=3D"=
+2"><b>&nbsp;&nbsp;
+                        yes =3D&gt; let=92s communicate !</b></font></p>
+                        <p><font face=3D"Tahoma" color=3D"#000000" size=3D"=
+2"><b>&nbsp;&nbsp;&nbsp;
+                        no =3D&gt; back to stand by</b></font></p>
+                        <p align=3D"center"><b><font face=3D"Tahoma" color=
+=3D"#FF0000" size=3D"1">time
+                        to get data from a node : 2-3 s</font></b>
+              </p></td>
+            </tr>
+            <tr>
+              <td width=3D"10%" valign=3D"top">
+              </td>
+              <td width=3D"90%" valign=3D"top" colspan=3D"2">
+                <b><font face=3D"Tahoma" color=3D"#FF0000" size=3D"3">both
+                            master - slave control and CSMA asynchronous
+                            communications</font></b>
+              </td>
+            </tr>
+          </tbody></table>
+        </div>
+      </td>
+    </tr>
+  </tbody></table>
+</div>
+
+
+
+
+
+<div id=3D"gtx-trans" style=3D"position: absolute; left: 175px; top: 46.991=
+9px;"><div class=3D"gtx-trans-icon"></div></div></body></html><!--
+     FILE ARCHIVED ON 09:47:56 Jun 04, 2001 AND RETRIEVED FROM THE
+     INTERNET ARCHIVE ON 13:30:45 Jul 09, 2026.
+     JAVASCRIPT APPENDED BY WAYBACK MACHINE, COPYRIGHT INTERNET ARCHIVE.
+
+     ALL OTHER CONTENT MAY ALSO BE PROTECTED BY COPYRIGHT (17 U.S.C.
+     SECTION 108(a)(3)).
+--><!--
+playback timings (ms):
+  captures_list: 0.757
+  exclusion.robots: 0.069
+  exclusion.robots.policy: 0.049
+  esindex: 0.013
+  cdx.remote: 7.691
+  LoadShardBlock: 90.648 (3)
+  PetaboxLoader3.datanode: 57.401 (4)
+  PetaboxLoader3.resolve: 86.301 (3)
+  load_resource: 77.88
+  nav: 0.17 (6)
+-->
+------MultipartBoundary--PQT90S9kCXYybyiAf4PWqxnLEbDWUahpICe4eqMWoX----
+Content-Type: image/gif
+Content-Transfer-Encoding: base64
+Content-Location: https://web-static.archive.org/_static/images/loading.gif
+
+R0lGODlhFAAUAOMIAAAAABoaGjMzM0xMTGZmZoCAgJmZmbKysv//////////////////////////
+/////yH/C05FVFNDQVBFMi4wAwEAAAAh+QQBCgAIACwAAAAAFAAUAAAEUxDJSau9CADMteZTEEje
+hhzHJYqkiaLWOlZvGs8WDO6UIPAGw8TnAwWDEuKPcxQml0YnjzcYYAqFS7VqwWItWyuCQJB4s2Ax
+mWxGg9bl6YQtl0cAACH5BAEKAA8ALAAAAAAUABQAAART8MlJq70vBMy15pMgSN72AMAliqSJotY6
+Vm8azxYM7tQw8IfDxOcDBYMS4o9zFCaXRiePRyBgDIZLtWrBYi1b66NQkHizYDGZbEaD1uXphC2X
+RwAAIfkEAQoADwAsAAAAABQAFAAABFPwyUmrvU8IzLXm0zBI3vYEwSWKpImi1jpWbxrPFgzuFEHw
+AMDE5wMFgxLij3MUJpdGJ49XKGAOh0u1asFiLVvrw2CQeLNgMZlsRoPW5emELZdHAAAh+QQBCgAP
+ACwAAAAAFAAUAAAEU/DJSau9bwzMteYTQUje9gjCJYqkiaLWOlZvGs8WDO5UUfCBwMTnAwWDEuKP
+cxQml0Ynj2cwYACAS7VqwWItW+vjcJB4s2AxmWxGg9bl6YQtl0cAACH5BAEKAA8ALAAAAAAUABQA
+AART8MlJq72PEMy15lNRSN72DMMliqSJotY6Vm8azxYM7pRh8ALBxOcDBYMS4o9zFCaXRiePdzhg
+AoFLtWrBYi1b6wMAkHizYDGZbEaD1uXphC2XRwAAIfkEAQoADwAsAAAAABQAFAAABFPwyUmrva8U
+zLXmk2FI3vYQxCWKpImi1jpWbxrPFgzu1HHwg8HE5wMFgxLij3MUJpdGJ48HAGAEgku1asFiLVvr
+IxCQeLNgMZlsRoPW5emELZdHAAAh+QQBCgAPACwAAAAAFAAUAAAEU/DJSau9zxjMtebTcUje9hTF
+JYqkiaLWOlZvGs8WDO4UAPAEwsTnAwWDEuKPcxQml0YnjxcIYAaDS7VqwWItW+tDIJB4s2AxmWxG
+g9bl6YQtl0cAACH5BAEKAA8ALAAAAAAUABQAAART8MlJq73vHMy15hMASN72GMYliqSJotY6Vm8a
+zxYM7lQQ8IXCxOcDBYMS4o9zFCaXRiePJxBgCIRLtWrBYi1b62MwkHizYDGZbEaD1uXphC2XRwAA
+Ow==
+
+------MultipartBoundary--PQT90S9kCXYybyiAf4PWqxnLEbDWUahpICe4eqMWoX----
+Content-Type: image/png
+Content-Transfer-Encoding: base64
+Content-Location: https://web-static.archive.org/_static/images/toolbar/wayback-toolbar-logo-200.png
+
+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
+
+------MultipartBoundary--PQT90S9kCXYybyiAf4PWqxnLEbDWUahpICe4eqMWoX----
+Content-Type: text/css
+Content-Transfer-Encoding: quoted-printable
+Content-Location: https://web-static.archive.org/_static/css/iconochive.css?v=3PDvdIFv
+
+@charset "utf-8";
+
+@font-face { font-family: Iconochive-Regular; src: url("../fonts/Iconochive=
+-Regular.woff") format("woff"), url("../fonts/Iconochive-Regular.ttf") form=
+at("truetype"); font-weight: normal; font-style: normal; }
+
+[class^=3D"iconochive-"], [class*=3D" iconochive-"] { speak: none; font-sty=
+le: normal; font-weight: normal; font-variant: normal; text-transform: none=
+; line-height: 1; -webkit-font-smoothing: antialiased; font-family: Iconoch=
+ive-Regular !important; }
+
+.iconochive-Uplevel::before { content: "=E2=86=B5"; }
+
+.iconochive-exit::before { content: "=F0=9F=9A=A3"; }
+
+.iconochive-beta::before { content: "=CE=B2"; }
+
+.iconochive-logo::before { content: "=F0=9F=8F=9B"; }
+
+.iconochive-audio::before { content: "=F0=9F=95=A8"; }
+
+.iconochive-movies::before { content: "=F0=9F=8E=9E"; }
+
+.iconochive-software::before { content: "=F0=9F=92=BE"; }
+
+.iconochive-texts::before { content: "=F0=9F=95=AE"; }
+
+.iconochive-etree::before { content: "=F0=9F=8E=A4"; }
+
+.iconochive-image::before { content: "=F0=9F=96=BC"; }
+
+.iconochive-web::before { content: "=F0=9F=97=94"; }
+
+.iconochive-collection::before { content: "=E2=88=91"; }
+
+.iconochive-folder::before { content: "=F0=9F=93=82"; }
+
+.iconochive-data::before { content: "=F0=9F=97=83"; }
+
+.iconochive-tv::before { content: "=F0=9F=93=BA"; }
+
+.iconochive-article::before { content: "=F0=9F=97=8F"; }
+
+.iconochive-question::before { content: "=E2=8D=B0"; }
+
+.iconochive-question-dark::before { content: "?"; }
+
+.iconochive-info::before { content: "i"; }
+
+.iconochive-info-small::before { content: "=E2=93=98"; }
+
+.iconochive-comment::before { content: "=F0=9F=97=A9"; }
+
+.iconochive-comments::before { content: "=F0=9F=97=AA"; }
+
+.iconochive-person::before { content: "=F0=9F=91=A4"; }
+
+.iconochive-people::before { content: "=F0=9F=91=A5"; }
+
+.iconochive-eye::before { content: "=F0=9F=91=81"; }
+
+.iconochive-rss::before { content: "=E2=88=9E"; }
+
+.iconochive-time::before { content: "=F0=9F=95=91"; }
+
+.iconochive-quote::before { content: "=E2=9D=9D"; }
+
+.iconochive-disc::before { content: "=F0=9F=92=BF"; }
+
+.iconochive-tv-commercial::before { content: "=F0=9F=92=B0"; }
+
+.iconochive-search::before { content: "=F0=9F=94=8D"; }
+
+.iconochive-search-star::before { content: "=E2=9C=BD"; }
+
+.iconochive-tiles::before { content: "=E2=8A=9E"; }
+
+.iconochive-list::before { content: "=E2=87=B6"; }
+
+.iconochive-list-bulleted::before { content: "=E2=8C=97"; }
+
+.iconochive-latest::before { content: "=E2=88=88"; }
+
+.iconochive-left::before { content: "=CB=82"; }
+
+.iconochive-right::before { content: "=CB=83"; }
+
+.iconochive-left-solid::before { content: "=E2=97=82"; }
+
+.iconochive-right-solid::before { content: "=E2=96=B8"; }
+
+.iconochive-up-solid::before { content: "=E2=96=B4"; }
+
+.iconochive-down-solid::before { content: "=E2=96=BE"; }
+
+.iconochive-dot::before { content: "=E2=8F=A4"; }
+
+.iconochive-dots::before { content: "=E2=96=A6"; }
+
+.iconochive-columns::before { content: "=E2=96=AF"; }
+
+.iconochive-sort::before { content: "=E2=87=95"; }
+
+.iconochive-atoz::before { content: "=F0=9F=94=A4"; }
+
+.iconochive-ztoa::before { content: "=F0=9F=94=A5"; }
+
+.iconochive-upload::before { content: "=F0=9F=93=A4"; }
+
+.iconochive-download::before { content: "=F0=9F=93=A5"; }
+
+.iconochive-favorite::before { content: "=E2=98=85"; }
+
+.iconochive-heart::before { content: "=E2=99=A5"; }
+
+.iconochive-play::before { content: "=E2=96=B6"; }
+
+.iconochive-play-framed::before { content: "=F0=9F=8E=AC"; }
+
+.iconochive-fullscreen::before { content: "=E2=9B=B6"; }
+
+.iconochive-mute::before { content: "=F0=9F=94=87"; }
+
+.iconochive-unmute::before { content: "=F0=9F=94=8A"; }
+
+.iconochive-share::before { content: "=F0=9F=8E=81"; }
+
+.iconochive-edit::before { content: "=E2=9C=8E"; }
+
+.iconochive-reedit::before { content: "=E2=9C=90"; }
+
+.iconochive-gear::before { content: "=E2=9A=99"; }
+
+.iconochive-remove-circle::before { content: "=E2=9D=8E"; }
+
+.iconochive-plus-circle::before { content: "=F0=9F=97=96"; }
+
+.iconochive-minus-circle::before { content: "=F0=9F=97=95"; }
+
+.iconochive-x::before { content: "=F0=9F=97=99"; }
+
+.iconochive-fork::before { content: "=E2=8B=94"; }
+
+.iconochive-trash::before { content: "=F0=9F=97=91"; }
+
+.iconochive-warning::before { content: "=E2=9A=A0"; }
+
+.iconochive-flash::before { content: "=F0=9F=97=B2"; }
+
+.iconochive-world::before { content: "=F0=9F=97=BA"; }
+
+.iconochive-lock::before { content: "=F0=9F=94=92"; }
+
+.iconochive-unlock::before { content: "=F0=9F=94=93"; }
+
+.iconochive-twitter::before { content: "=F0=9F=90=A6"; }
+
+.iconochive-facebook::before { content: "f"; }
+
+.iconochive-googleplus::before { content: "g"; }
+
+.iconochive-reddit::before { content: "=F0=9F=91=BD"; }
+
+.iconochive-tumblr::before { content: "T"; }
+
+.iconochive-pinterest::before { content: "=F0=9D=93=9F"; }
+
+.iconochive-popcorn::before { content: "=F0=9F=92=A5"; }
+
+.iconochive-email::before { content: "=F0=9F=93=A7"; }
+
+.iconochive-embed::before { content: "=F0=9F=94=97"; }
+
+.iconochive-gamepad::before { content: "=F0=9F=95=B9"; }
+
+.iconochive-Zoom_In::before { content: "+"; }
+
+.iconochive-Zoom_Out::before { content: "-"; }
+
+.iconochive-RSS::before { content: "=F0=9F=93=A8"; }
+
+.iconochive-Light_Bulb::before { content: "=F0=9F=92=A1"; }
+
+.iconochive-Add::before { content: "=E2=8A=95"; }
+
+.iconochive-Tab_Activity::before { content: "=E2=8C=98"; }
+
+.iconochive-Forward::before { content: "=E2=8F=A9"; }
+
+.iconochive-Backward::before { content: "=E2=8F=AA"; }
+
+.iconochive-No_Audio::before { content: "=F0=9F=94=88"; }
+
+.iconochive-Pause::before { content: "=E2=8F=B8"; }
+
+.iconochive-No_Favorite::before { content: "=E2=98=86"; }
+
+.iconochive-Unike::before { content: "=E2=99=A1"; }
+
+.iconochive-Song::before { content: "=E2=99=AB"; }
+
+.iconochive-No_Flag::before { content: "=E2=9A=90"; }
+
+.iconochive-Flag::before { content: "=E2=9A=91"; }
+
+.iconochive-Done::before { content: "=E2=9C=93"; }
+
+.iconochive-Check::before { content: "=E2=9C=94"; }
+
+.iconochive-Refresh::before { content: "=E2=9F=B3"; }
+
+.iconochive-Headphones::before { content: "=F0=9F=8E=A7"; }
+
+.iconochive-Chart::before { content: "=F0=9F=93=88"; }
+
+.iconochive-Bookmark::before { content: "=F0=9F=93=91"; }
+
+.iconochive-Documents::before { content: "=F0=9F=93=9A"; }
+
+.iconochive-Newspaper::before { content: "=F0=9F=93=B0"; }
+
+.iconochive-Podcast::before { content: "=F0=9F=93=B6"; }
+
+.iconochive-Radio::before { content: "=F0=9F=93=BB"; }
+
+.iconochive-Cassette::before { content: "=F0=9F=93=BC"; }
+
+.iconochive-Shuffle::before { content: "=F0=9F=94=80"; }
+
+.iconochive-Loop::before { content: "=F0=9F=94=81"; }
+
+.iconochive-Low_Audio::before { content: "=F0=9F=94=89"; }
+
+.iconochive-First::before { content: "=F0=9F=8E=96"; }
+
+.iconochive-Invisible::before { content: "=F0=9F=95=B6"; }
+
+.iconochive-Computer::before { content: "=F0=9F=96=B3"; }
+------MultipartBoundary--PQT90S9kCXYybyiAf4PWqxnLEbDWUahpICe4eqMWoX----
+Content-Type: image/svg+xml
+Content-Transfer-Encoding: quoted-printable
+Content-Location: https://web-static.archive.org/_static/images/web-screenshot.svg
+
+<svg height=3D"20" viewBox=3D"0 0 24 20" width=3D"24" xmlns=3D"http://www.w=
+3.org/2000/svg"><g fill=3D"none" fill-rule=3D"evenodd"><path d=3D"m0 0h24v2=
+0h-24z" fill=3D"#fff"/><path d=3D"m18.5721525 15.8731314h-2.213751v-2.16100=
+43h2.213751zm-3.2647703 0h-2.2149026v-2.1610043h2.2149026zm3.1265692-11.569=
+96429v5.82540599 1.5252793h-16.86629045v-1.5252793-5.82540599zm-6.4790971 1=
+1.56996429h-10.35448576v-2.1160889h10.35448576zm-11.9548543-13.0731314v6.74=
+421283 7.72244617h20v-7.72244617-6.74421283z" fill=3D"#333" fill-rule=3D"no=
+nzero" transform=3D"matrix(1 0 0 -1 0 18.067)"/><rect fill=3D"#333" height=
+=3D"10" rx=3D"1" stroke=3D"#333" width=3D"14.906" x=3D"8" y=3D"9"/><circle =
+cx=3D"15.453" cy=3D"14" fill=3D"#fff" r=3D"3.491"/><circle cx=3D"15.453" cy=
+=3D"14" fill=3D"#333" r=3D"1.604"/></g></svg>
+------MultipartBoundary--PQT90S9kCXYybyiAf4PWqxnLEbDWUahpICe4eqMWoX----
+Content-Type: text/css
+Content-Transfer-Encoding: quoted-printable
+Content-Location: https://web-static.archive.org/_static/css/banner-styles.css?v=1utQkbB3
+
+@charset "utf-8";
+
+:root { --wm-toolbar-height: 65px; }
+
+#wm-ipp-base { height: 65px; padding: 0px; margin: 0px; border-width: mediu=
+m; border-style: none; border-color: currentcolor; border-image: initial; b=
+ackground: none transparent; }
+
+#wm-ipp { z-index: 2147483647; }
+
+#wm-ipp, #wm-ipp * { font-family: "Lucida Grande", Helvetica, Arial, sans-s=
+erif; font-size: 12px; line-height: 1.2; letter-spacing: 0px; width: auto; =
+height: auto; max-width: none; max-height: none; min-height: 0px; outline: =
+none; float: none; text-align: left; border-width: medium; border-style: no=
+ne; border-color: currentcolor; border-image: initial; color: rgb(0, 0, 0);=
+ text-indent: 0px; position: initial; background: none; min-width: 0px !imp=
+ortant; }
+
+#wm-ipp div, #wm-ipp canvas { display: block; }
+
+#wm-ipp div, #wm-ipp tr, #wm-ipp td, #wm-ipp a, #wm-ipp form { padding: 0px=
+; margin: 0px; border-width: medium; border-style: none; border-color: curr=
+entcolor; border-image: initial; border-radius: 0px; background-color: tran=
+sparent; background-image: none; height: auto; }
+
+#wm-ipp table { border-width: medium; border-style: none; border-color: cur=
+rentcolor; border-image: initial; border-collapse: collapse; margin: 0px; p=
+adding: 0px; width: auto; font-size: inherit; }
+
+#wm-ipp form input { height: auto; display: inline; margin: 0px; color: rgb=
+(0, 0, 0); background: none rgb(255, 255, 255); border: 1px solid rgb(102, =
+102, 102); padding: 1px !important; }
+
+#wm-ipp form input[type=3D"submit"] { padding: 0px 8px !important; margin: =
+1px 0px 1px 5px !important; width: auto !important; border: 1px solid rgb(0=
+, 0, 0) !important; background: rgb(255, 255, 255) !important; color: rgb(0=
+, 0, 0) !important; }
+
+#wm-ipp form input[type=3D"submit"]:hover { background: rgb(238, 238, 238) =
+!important; cursor: pointer !important; }
+
+#wm-ipp form input[type=3D"submit"]:active { transform: translateY(1px); }
+
+#wm-ipp a { display: inline; }
+
+#wm-ipp a:hover { text-decoration: underline; }
+
+#wm-ipp a.wm-btn:hover { text-decoration: none; color: rgb(255, 255, 0) !im=
+portant; }
+
+#wm-ipp a.wm-btn:hover span { color: rgb(255, 255, 0) !important; }
+
+#wm-ipp #wm-ipp-inside { margin: 0px 6px; border-width: medium 5px 5px; bor=
+der-style: none solid solid; border-color: currentcolor rgb(0, 0, 0) rgb(0,=
+ 0, 0); border-image: initial; background-color: rgba(255, 255, 255, 0.9); =
+box-shadow: rgb(51, 51, 51) 1px 1px 4px; border-radius: 0px 0px 8px 8px; }
+
+#wm-ipp #wm-logo { padding: 0px 10px; vertical-align: middle; min-width: 10=
+0px; flex: 0 0 100px; }
+
+#wm-ipp .c { padding-left: 4px; }
+
+#wm-ipp .c .u { margin-top: 4px !important; }
+
+#wm-ipp .n { vertical-align: bottom; padding: 0px 0px 0px 5px !important; }
+
+#wm-ipp .n a { text-decoration: none; color: rgb(51, 51, 255); font-weight:=
+ bold; }
+
+#wm-ipp .n .b { overflow: visible; white-space: nowrap; color: rgb(153, 153=
+, 170); vertical-align: middle; padding: 0px 6px 0px 0px !important; text-a=
+lign: right !important; }
+
+#wm-ipp .n .y .b { padding: 0px 6px 2px 0px !important; }
+
+#wm-ipp .n .c { background: rgb(0, 0, 0); color: rgb(255, 255, 0); font-wei=
+ght: bold; text-align: center; padding: 0px !important; }
+
+#wm-ipp .n .d span.ta { display: inline-block; width: 0px; height: 0px; bor=
+der-color: transparent rgb(153, 153, 170); border-style: solid; }
+
+#wm-ipp .n .d .b span.ta { border-width: 8px 14px 8px 0px; }
+
+#wm-ipp .n .d .f span.ta { border-width: 8px 0px 8px 14px; }
+
+#wm-ipp .n .d a span.ta { border-color: transparent rgb(51, 51, 255); }
+
+#wm-ipp .n .d a span.ta:hover { border-color: transparent rgb(119, 119, 255=
+); }
+
+#wm-ipp.hi .n td.c { color: rgb(236, 0, 140); }
+
+#wm-ipp .n td.f { overflow: visible; white-space: nowrap; color: rgb(153, 1=
+53, 170); vertical-align: middle; padding: 0px 0px 0px 6px !important; text=
+-align: left !important; }
+
+#wm-ipp .n tr.m td { text-transform: uppercase; white-space: nowrap; paddin=
+g: 2px 0px; }
+
+#wm-ipp .c .s { vertical-align: bottom; padding: 0px 5px 0px 0px !important=
+; }
+
+#wm-ipp #wm-nav-captures { white-space: nowrap; }
+
+#wm-ipp .c .s a.t { color: rgb(51, 51, 255); font-weight: bold; line-height=
+: 1.8; }
+
+#wm-ipp .c .s div.r { color: rgb(102, 102, 102); font-size: 9px; white-spac=
+e: nowrap; }
+
+#wm-ipp .c .k { padding-bottom: 1px; }
+
+#wm-ipp .c .s { padding: 0px 5px 2px 0px !important; }
+
+#wm-ipp td#displayMonthEl { padding: 2px 0px !important; }
+
+#wm-ipp td#displayYearEl { padding: 0px 0px 2px !important; }
+
+div#wm-ipp-sparkline { position: relative; white-space: nowrap; background-=
+color: rgb(255, 255, 255); cursor: pointer; line-height: 0.9; }
+
+#sparklineImgId, #wm-sparkline-canvas { position: relative; z-index: 9012; =
+max-width: none; }
+
+#wm-ipp-sparkline div.yt { position: absolute; top: 0px; z-index: 9010 !imp=
+ortant; background-color: rgb(255, 255, 0) !important; }
+
+#wm-ipp-sparkline div.mt { position: absolute; top: 0px; z-index: 9013 !imp=
+ortant; background-color: rgb(236, 0, 140) !important; }
+
+#wm-ipp .r { margin-left: 4px; }
+
+#wm-ipp .r a { color: rgb(51, 51, 255); border-width: medium; border-style:=
+ none; border-color: currentcolor; border-image: initial; position: relativ=
+e; background-color: transparent; text-decoration: none; background-repeat:=
+ no-repeat !important; background-position: 100% 100% !important; }
+
+#wm-ipp #wm-capinfo { border-radius: 0px 0px 4px 4px; }
+
+#wm-ipp #wm-capinfo .c-logo { display: block; float: left; margin-right: 3p=
+x; width: 90px; min-height: 90px; max-height: 290px; border-radius: 45px; o=
+verflow: hidden; background-position: 50% center; background-size: auto 90p=
+x; box-shadow: rgb(208, 208, 208) 0px 0px 2px 2px inset; }
+
+#wm-ipp #wm-capinfo .c-logo span { display: inline-block; }
+
+#wm-ipp #wm-capinfo .c-logo img { height: 90px; position: relative; left: -=
+50%; }
+
+#wm-ipp #wm-capinfo .wm-title { font-size: 130%; }
+
+#wm-ipp #wm-capinfo a.wm-selector { display: inline-block; color: rgb(170, =
+170, 170); padding: 2px 8px; text-decoration: none !important; }
+
+#wm-ipp #wm-capinfo a.wm-selector.selected { background-color: rgb(102, 102=
+, 102); }
+
+#wm-ipp #wm-capinfo a.wm-selector:hover { color: rgb(255, 255, 255); }
+
+#wm-ipp #wm-capinfo.notice-only #wm-capinfo-collected-by, #wm-ipp #wm-capin=
+fo.notice-only #wm-capinfo-timestamps { display: none; }
+
+#wm-ipp #wm-capinfo #wm-capinfo-notice .wm-capinfo-content { background-col=
+or: rgb(255, 255, 0); padding: 5px; font-size: 14px; text-align: center; }
+
+#wm-ipp #wm-capinfo #wm-capinfo-notice .wm-capinfo-content * { font-size: 1=
+4px; text-align: center; }
+
+#wm-ipp #wm-expand { right: 1px; bottom: -1px; color: rgb(255, 255, 255); b=
+ackground-color: rgb(102, 102, 102) !important; padding: 0px 5px 0px 3px !i=
+mportant; border-radius: 3px 3px 0px 0px !important; }
+
+#wm-ipp #wm-expand span { color: rgb(255, 255, 255); }
+
+#wm-ipp #wm-expand #wm-expand-icon { display: inline-block; transition: tra=
+nsform 0.5s; transform-origin: 50% 45%; }
+
+#wm-ipp #wm-expand.wm-open #wm-expand-icon { transform: rotate(180deg); }
+
+#wm-ipp #wmtb { text-align: right; }
+
+#wm-ipp #wmtb #wmtbURL { width: calc(100% - 45px); }
+
+#wm-ipp #wm-graph-anchor { border-right: 1px solid rgb(204, 204, 204); }
+
+html.wb-highlight { box-shadow: rgb(165, 14, 58) 0px 0px 0px 3px inset !imp=
+ortant; }
+
+.wb-highlight { outline: rgb(165, 14, 58) solid 3px !important; }
+
+#wm-ipp-print { display: none !important; }
+
+@media print {
+  #wm-ipp-base { display: none !important; }
+  #wm-ipp-print { white-space: nowrap; overflow: hidden; text-overflow: ell=
+ipsis; display: block !important; }
+}
+
+@media (max-width: 414px) {
+  #wm-ipp .xxs { display: none !important; }
+}
+
+@media (min-width: 1055px) {
+  #wm-ipp #wm-graph-anchor { display: block !important; }
+}
+
+@media (max-width: 1054px) {
+  #wm-ipp #wm-graph-anchor { display: none !important; }
+}
+
+@media (max-width: 1163px) {
+  #wm-logo { display: none !important; }
+}
+
+#wm-btns { white-space: nowrap; margin-top: -2px; }
+
+#wm-btns #wm-save-snapshot-open { margin-right: 7px; top: -6px; }
+
+#wm-btns #wm-sign-in { box-sizing: content-box; display: none; margin-right=
+: 7px; top: -8px; border: 2px solid rgb(0, 0, 0); border-radius: 14px; padd=
+ing-right: 2px; padding-bottom: 2px; width: 11px; height: 11px; }
+
+#wm-btns #wm-sign-in > .iconochive-person { font-size: 12.5px; }
+
+#wm-save-snapshot-open > .iconochive-web { color: rgb(0, 0, 0); font-size: =
+160%; }
+
+#wm-ipp #wm-share { display: flex; align-items: flex-end; justify-content: =
+space-between; }
+
+#wm-share > #wm-screenshot { display: inline-block; margin-right: 3px; visi=
+bility: hidden; }
+
+#wm-screenshot > .iconochive-image { color: rgb(0, 0, 0); font-size: 160%; =
+}
+
+#wm-share > #wm-video { display: inline-block; margin-right: 3px; visibilit=
+y: hidden; }
+
+#wm-video > .iconochive-movies { color: rgb(0, 0, 0); display: inline-block=
+; font-size: 150%; margin-bottom: 2px; }
+
+#wm-btns #wm-save-snapshot-in-progress { display: none; font-size: 160%; op=
+acity: 0.5; position: relative; margin-right: 7px; top: -5px; }
+
+#wm-btns #wm-save-snapshot-success { display: none; color: green; position:=
+ relative; top: -7px; }
+
+#wm-btns #wm-save-snapshot-fail { display: none; color: red; position: rela=
+tive; top: -7px; }
+
+.wm-icon-screen-shot { display: inline-block; background: url("../images/we=
+b-screenshot.svg") 0% 0% / contain no-repeat !important; width: 22px !impor=
+tant; height: 19px !important; }
+
+#donato { height: 0px; margin: 0px; padding: 0px; border-bottom: 1px solid =
+rgb(153, 153, 153) !important; }
+
+body.wm-modal { height: auto !important; overflow: hidden !important; }
+
+#donato #donato-base { width: 100%; height: 100%; margin: 0px; padding: 0px=
+; position: absolute; z-index: 2147483639; }
+
+body.wm-modal #donato #donato-base { position: fixed; inset: 0px; z-index: =
+2147483640; }
+
+.wb-autocomplete-suggestions { font-family: "Lucida Grande", Helvetica, Ari=
+al, sans-serif; font-size: 12px; text-align: left; cursor: default; border-=
+width: 0px 1px 1px; border-style: none solid solid; border-color: currentco=
+lor rgb(204, 204, 204) rgb(204, 204, 204); border-image: initial; backgroun=
+d: rgb(255, 255, 255); box-shadow: rgba(0, 0, 0, 0.1) -1px 1px 3px; positio=
+n: absolute; display: none; z-index: 2147483647; max-height: 254px; overflo=
+w: hidden auto; box-sizing: border-box; }
+
+.wb-autocomplete-suggestion { position: relative; padding: 0px 0.6em; line-=
+height: 23px; white-space: nowrap; overflow: hidden; text-overflow: ellipsi=
+s; font-size: 1.02em; color: rgb(51, 51, 51); }
+
+.wb-autocomplete-suggestion b { font-weight: bold; }
+
+.wb-autocomplete-suggestion.selected { background: rgb(240, 240, 240); }
+------MultipartBoundary--PQT90S9kCXYybyiAf4PWqxnLEbDWUahpICe4eqMWoX----
+Content-Type: text/html
+Content-ID: <frame-A3F978D5117B3E2A6F86E1CC6D9EFA2F@mhtml.blink>
+Content-Transfer-Encoding: quoted-printable
+Content-Location: https://archive.org/includes/donate.php?as_page=1&platform=wb&referer=https%3A//web.archive.org/web/20010604094756/http%3A//www.radianprotocol.com/protocol.htm
+
+<html><head><meta http-equiv=3D"Content-Type" content=3D"text/html; charset=
+=3DUTF-8"></head><body></body></html>
+------MultipartBoundary--PQT90S9kCXYybyiAf4PWqxnLEbDWUahpICe4eqMWoX------
