@@ -1546,43 +1546,41 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
     echo_debug(debug_out, "[ERROR] Timeout waiting for GDO0 (frame start)\n");
     return 0;
   }
-  // Capture-to-end-of-transmission: the frame length is NOT assumed. Read the
-  // RX FIFO until the meter stops transmitting (a short quiet window with no new
-  // FIFO bytes) or the buffer fills, so the true frame length can be measured
-  // from what actually arrives rather than a hard-coded 124-byte expectation.
-  const int QUIET_POLLS_TO_END = 6; // ~30 ms with no new FIFO bytes => end of frame
-  int l_quiet_polls = 0;
-  while ((l_total_byte < rxBuffer_size) && (l_tmo < rx_tmo_ms))
+  // Fixed-length capture sized from the expected frame (4x oversampled). This
+  // reads exactly one frame's worth and returns promptly, which keeps the tight
+  // ACK-then-data reply timing the meter expects. (An earlier capture-to-end
+  // experiment lingered on noise and broke reads - see git history.)
+  uint16_t l_expected_bytes = l_radian_frame_size_byte * 4;
+  bool l_use_gdo2 = (GET_GDO2_PIN() >= 0);
+  while ((l_total_byte < l_expected_bytes) && (l_tmo < rx_tmo_ms))
   {
     delay(5);
     l_tmo += 5; // wait for some byte received
     if (l_tmo % 50 == 0)
       FEED_WDT(); // Feed watchdog every 50ms during frame receive
 
+    // GDO2 fast path (IOCFG2 = RX FIFO threshold / EOP): while GDO2 is LOW the
+    // FIFO is below threshold, so skip the RXBYTES read. The final tail
+    // (< threshold) never raises GDO2 under infinite packet length, so resume
+    // polling once we are within one threshold of the expected total.
+    if (l_use_gdo2 && digitalRead(GET_GDO2_PIN()) == LOW &&
+        (l_expected_bytes - l_total_byte) > RX_FIFO_THRESHOLD_BYTES)
+    {
+      continue; // not enough buffered yet; skip the unnecessary RXBYTES read
+    }
+
     l_byte_in_rx = (halRfReadReg(RXBYTES_ADDR) & RXBYTES_MASK);
     if (l_byte_in_rx)
     {
-      // Clamp only to the physical buffer, never to an assumed frame length.
-      if (l_byte_in_rx + l_total_byte > rxBuffer_size)
-        l_byte_in_rx = rxBuffer_size - l_total_byte;
+      // Do not pull more than we expect; excess bytes are noise and would skew
+      // the decode. Clamp the burst to the remaining expected length.
+      if (l_byte_in_rx + l_total_byte > l_expected_bytes)
+        l_byte_in_rx = l_expected_bytes - l_total_byte;
 
       if (l_byte_in_rx > 0)
       {
         SPIReadBurstReg(RX_FIFO_ADDR, &rxBuffer[l_total_byte], l_byte_in_rx); // Pull data
         l_total_byte += l_byte_in_rx;
-      }
-      l_quiet_polls = 0; // fresh data: reset the end-of-frame detector
-    }
-    else if (l_total_byte > 0)
-    {
-      // No new bytes after data has started arriving. Several consecutive quiet
-      // polls mean the meter has finished; one lone quiet poll can happen if we
-      // drained the FIFO faster than it refilled, so require QUIET_POLLS_TO_END.
-      if (++l_quiet_polls >= QUIET_POLLS_TO_END)
-      {
-        echo_debug(debug_out, "[RX] End of transmission after %u raw bytes (quiet %d ms)\n",
-                   l_total_byte, QUIET_POLLS_TO_END * 5);
-        break;
       }
     }
   }
@@ -1944,8 +1942,8 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
 
   // delay(30); //43ms de bruit
   /*34ms 0101...01  14.25ms 000...000  14ms 1111...11111  83.5ms de data acquitement*/
-  echo_debug(1, "[METER] Waiting for ACK frame (18-byte frame, 250ms timeout)...\n");
-  if (!receive_radian_frame(0x12, 250, rxBuffer, sizeof(rxBuffer)))
+  echo_debug(1, "[METER] Waiting for ACK frame (18-byte frame, 150ms timeout)...\n");
+  if (!receive_radian_frame(0x12, 150, rxBuffer, sizeof(rxBuffer)))
   {
     echo_debug(1, "[METER] No ACK frame received (meter may be asleep/out of range)\n");
     echo_debug(debug_out, "[METER] Meter acknowledgement frame timeout\n");
@@ -1956,11 +1954,8 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
   }
   // delay(30); //50ms de 111111  , mais on a 7+3ms de printf et xxms calculs
   /*34ms 0101...01  14.25ms 000...000  14ms 1111...11111  582ms de data avec l'index */
-  echo_debug(1, "[METER] Waiting for data frame (captured to end of transmission, 1500ms timeout)...\n");
-  // Capture-to-end-of-transmission: size_byte only sets a minimum-buffer sanity
-  // floor now; the receiver reads until the meter stops, so the true frame
-  // length is whatever actually arrives (see receive_radian_frame).
-  rxBuffer_size = receive_radian_frame(0x7C, 1500, rxBuffer, sizeof(rxBuffer));
+  echo_debug(1, "[METER] Waiting for data frame (124-byte frame, 1000ms timeout)...\n");
+  rxBuffer_size = receive_radian_frame(0x7C, 1000, rxBuffer, sizeof(rxBuffer));
   if (rxBuffer_size)
   {
     echo_debug(1, "[METER] Data frame received - decoding %d raw bytes...\n", rxBuffer_size);

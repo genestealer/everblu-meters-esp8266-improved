@@ -313,10 +313,11 @@ void test_radian_parse_primary_data_edge_cases(void)
 // ---------------------------------------------------------------------------
 void test_radian_validate_crc(void)
 {
-    // Build a well-formed frame: buf[0] = length, buf[1..len-3] = payload,
-    // buf[len-2..len-1] = CRC-16/KERMIT (big-endian) over the payload.
+    // Build a well-formed frame: buf[0] = length, buf[len-2..len-1] =
+    // CRC-16/KERMIT (big-endian) over bytes [0 .. len-3] (INCLUDING the length
+    // byte, per the RADIAN reference and known-good captures).
     uint8_t buf[8] = {8, 0x11, 0x22, 0x33, 0x44, 0x55, 0, 0};
-    const uint16_t crc = radian_crc_kermit(&buf[1], 5);
+    const uint16_t crc = radian_crc_kermit(&buf[0], 6);
     buf[6] = static_cast<uint8_t>(crc >> 8);
     buf[7] = static_cast<uint8_t>(crc & 0xFF);
     TEST_ASSERT_TRUE(radian_validate_crc(buf, sizeof(buf)));
@@ -342,10 +343,45 @@ void test_radian_validate_crc(void)
 
     // length_field == 0 falls back to the actual buffer size.
     uint8_t implicit[8] = {0, 0xDE, 0xAD, 0xBE, 0xEF, 0x01, 0, 0};
-    const uint16_t crc2 = radian_crc_kermit(&implicit[1], sizeof(implicit) - 3);
+    const uint16_t crc2 = radian_crc_kermit(&implicit[0], sizeof(implicit) - 2);
     implicit[6] = static_cast<uint8_t>(crc2 >> 8);
     implicit[7] = static_cast<uint8_t>(crc2 & 0xFF);
     TEST_ASSERT_TRUE(radian_validate_crc(implicit, sizeof(implicit)));
+}
+
+// A real, CRC-valid 124-byte EverBlu response captured on device (meter 257750,
+// clock 09/07/2026 13:03:04). Locks in the include-byte-0 CRC convention: the
+// CRC-16/KERMIT over bytes [0..121] equals the trailer at [122..123] = 0x7A60.
+void test_radian_validate_crc_real_frame(void)
+{
+    static const uint8_t frame[] = {
+        0x7C, 0x11, 0x00, 0x45, 0x20, 0x0A, 0x50, 0x14, 0x00, 0x45, 0x14, 0x03,
+        0xEE, 0xD6, 0x00, 0x01, 0x08, 0x00, 0x98, 0x33, 0x0C, 0x00, 0x40, 0x06,
+        0x09, 0x07, 0x1A, 0x04, 0x0D, 0x03, 0x04, 0x5C, 0x31, 0x33, 0x33, 0x32,
+        0x39, 0x30, 0x41, 0x4C, 0x30, 0x32, 0x00, 0x00, 0x06, 0x12, 0x04, 0x01,
+        0xA4, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x80, 0x80, 0x80,
+        0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x84, 0x80, 0x80, 0x80, 0x31, 0x2F,
+        0x0A, 0x00, 0xB6, 0x70, 0x0A, 0x00, 0xF5, 0xB1, 0x0A, 0x00, 0x10, 0xE0,
+        0x0A, 0x00, 0x8D, 0x02, 0x0B, 0x00, 0x04, 0x1F, 0x0B, 0x00, 0xBD, 0x3E,
+        0x0B, 0x00, 0xFF, 0x5D, 0x0B, 0x00, 0x9A, 0x79, 0x0B, 0x00, 0x07, 0x97,
+        0x0B, 0x00, 0x75, 0xC0, 0x0B, 0x00, 0x0D, 0xE6, 0x0B, 0x00, 0x2C, 0x17,
+        0x0C, 0x00, 0x7A, 0x60};
+
+    // Full 124-byte frame validates.
+    TEST_ASSERT_TRUE(radian_validate_crc(frame, sizeof(frame)));
+
+    // Real decodes carry trailing decoder noise past the frame; validation must
+    // still pass because it uses the length byte to locate the CRC at [122-123].
+    uint8_t padded[160];
+    memset(padded, 0xAA, sizeof(padded));
+    memcpy(padded, frame, sizeof(frame));
+    TEST_ASSERT_TRUE(radian_validate_crc(padded, sizeof(padded)));
+
+    // A single corrupted payload byte must fail.
+    uint8_t bad[sizeof(frame)];
+    memcpy(bad, frame, sizeof(frame));
+    bad[18] ^= 0x01; // flip a volume bit
+    TEST_ASSERT_FALSE(radian_validate_crc(bad, sizeof(bad)));
 }
 
 // ---------------------------------------------------------------------------
@@ -815,6 +851,7 @@ int main(int argc, char **argv)
     RUN_TEST(test_radian_parse_primary_time_rejection);
     RUN_TEST(test_radian_parse_primary_data_edge_cases);
     RUN_TEST(test_radian_validate_crc);
+    RUN_TEST(test_radian_validate_crc_real_frame);
     RUN_TEST(test_radian_decode_roundtrip);
     RUN_TEST(test_radian_decode_rejects_empty_and_null);
     RUN_TEST(test_radian_decode_tolerates_single_sample_glitch);
