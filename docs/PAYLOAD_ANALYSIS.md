@@ -4,7 +4,7 @@
 
 This document details the analysis of the response payload returned by the Itron EverBlu Cyble Enhanced water meter via the RADIAN protocol.
 
-The frame length byte advertises **124 bytes** (`0x7C`), but the firmware's 4x-oversampled decoder currently recovers only the first **120 bytes**: the final 4 bytes (the most recent history month and the CRC trailer) are lost to tail truncation. See [Frame truncation](#frame-truncation-124-vs-120-bytes) below.
+The frame length byte advertises **124 bytes** (`0x7C`), and this is the true total length (data + 2-byte CRC trailer). With 4x-oversampled capture sized for 12-bit framing the firmware recovers the whole frame, and the CRC validates. See [Frame length and CRC](#frame-length-and-crc) below.
 
 The byte offsets in the table are confirmed against two independent sources:
 
@@ -57,8 +57,8 @@ Example column values are the verified `home_001` capture (volume 768,837 L; met
 | [106-109]| BD 3E 0B 00         | ✓ **DECODED** | Historical volume = 736,957 L |
 | [110-113]| FF 5D 0B 00         | ✓ **DECODED** | Historical volume = 744,959 L |
 | [114-117]| 9A 79 0B 00         | ✓ **DECODED** | Historical volume - 12th month = 752,026 L |
-| [118-121]| 07 97 ?? ??         | ⚠ Truncated | **13th (most recent) history month** - only `07 97` survives decode |
-| [122-123]| ?? ??               | ⚠ Truncated | **CRC-16/KERMIT trailer** - lost to decoder tail truncation |
+| [118-121]| 07 97 0B 00         | ✓ **DECODED** | **13th (most recent) history month** = 759,559 L (home_002) |
+| [122-123]| 7A 60               | ✓ **DECODED** | **CRC-16/KERMIT** over bytes [0..121] (includes the length byte) |
 
 ## Successfully Decoded Fields
 
@@ -73,21 +73,16 @@ Example column values are the verified `home_001` capture (volume 768,837 L; met
 
 ### Historical data
 
-- **12 complete monthly volumes** [70-117] - Total volume at the end of each month, uint32 LSB first, oldest first. A 13th (most recent) month lives at [118-121] but is currently lost to truncation.
+- **13 complete monthly volumes** [70-121] - Total volume at the end of each month, uint32 LSB first, oldest first (`70 + 13 × 4 = 122`, immediately followed by the CRC).
 
-## Frame truncation (124 vs 120 bytes)
+## Frame length and CRC
 
-The meter advertises a 124-byte frame (`0x7C`), structured as:
+The frame is **124 bytes** total: `[0]` length (`0x7C`), `[1..121]` data (ending with the 13th history month at `[118-121]`), and the **CRC-16/KERMIT** at `[122-123]`.
 
-- history month #13 at bytes [118-121]
-- CRC-16/KERMIT trailer at bytes [122-123]
+- **Capture.** The on-air framing is 1 start + 8 data + 3 stop = 12 bits/byte at 4x oversampling, so a full 124-byte frame is ~748 raw bytes. Sizing the raw capture for 12-bit framing recovers the whole frame (a real decode also carries some trailing decoder noise past byte 123, which is ignored).
+- **CRC convention (verified).** The CRC covers bytes **[0..121] including the length byte**, and the 2 CRC bytes sit at `[122-123]` (MSB first). Proven against two known-good on-device captures: `crc_kermit([0..121])` equals the `[122-123]` trailer (`0x7A60` and `0x88B8`). Computing over `[1..121]` (skipping the length byte) does **not** match; that off-by-one was a long-standing bug in `radian_validate_crc`, previously masked by the `length > size` compatibility shim on truncated captures.
 
-The firmware decoder recovers only 120 bytes, so **both** of these are lost. Two consequences follow:
-
-1. **The most recent history month is missing.** The history block is 13 monthly `uint32` values starting at byte 70; only 12 fit in the truncated buffer (`70 + 12 × 4 = 118`).
-2. **The CRC is never actually validated on real meter frames.** Because the length byte (124) exceeds the decoded size (120), `radian_validate_crc()` takes its compatibility branch and returns `true` without checking. The surviving bytes `07 97` at [118-119] are history data, not the CRC (`crc_kermit(payload)` does not match them). This compatibility shim is therefore load-bearing: it must not be made strict until the decoder captures the full 124-byte frame, otherwise every real reading would be rejected.
-
-The proper fix is in the RX/decoder path (capturing the final 4 bytes), not in the parser. It cannot be validated from an already-truncated fixture, so it is documented here rather than changed speculatively.
+> Historical note: earlier captures decoded only 120 bytes (truncating the 13th month + CRC) because the raw capture was sized for 11-bit framing. That, plus the CRC skipping byte 0, is why the CRC "never validated" before. Both are now fixed.
 
 ## Unknown/Undecoded Fields
 
