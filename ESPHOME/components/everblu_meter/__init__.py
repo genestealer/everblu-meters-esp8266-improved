@@ -107,6 +107,7 @@ CONF_FREQUENCY_ESTIMATE = "frequency_estimate"
 CONF_REQUEST_READING_BUTTON = "request_reading_button"
 CONF_DEEP_SCAN_BUTTON = "deep_scan_button"
 CONF_RESET_FREQUENCY_BUTTON = "reset_frequency_button"
+CONF_STOP_READING_BUTTON = "stop_reading_button"
 CONF_RX_ATTENUATION = "rx_attenuation"
 
 # Meter types
@@ -417,6 +418,11 @@ CONFIG_SCHEMA = (
             ),
             cv.Optional(CONF_RESET_FREQUENCY_BUTTON): button.button_schema(
                 EverbluMeterTriggerButton, icon="mdi:restore", entity_category="config"
+            ),
+            cv.Optional(CONF_STOP_READING_BUTTON): button.button_schema(
+                EverbluMeterTriggerButton,
+                icon="mdi:stop-circle-outline",
+                entity_category="config",
             ),
         }
     )
@@ -734,3 +740,8 @@ async def to_code(config):
         cg.add(btn.set_parent(var))
         cg.add(btn.set_deep_scan(False))
         cg.add(btn.set_reset_frequency(True))
+
+    if CONF_STOP_READING_BUTTON in config:
+        btn = await button.new_button(config[CONF_STOP_READING_BUTTON])
+        cg.add(btn.set_parent(var))
+        cg.add(btn.set_stop(True))

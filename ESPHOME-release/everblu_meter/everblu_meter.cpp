@@ -43,7 +43,9 @@ void EverbluMeterTriggerButton::press_action() {
     return;
   }
 
-  if (this->is_deep_scan_) {
+  if (this->is_stop_) {
+    this->parent_->request_stop_reading();
+  } else if (this->is_deep_scan_) {
     this->parent_->request_deep_scan();
   } else if (this->is_reset_frequency_) {
     this->parent_->request_reset_frequency();
@@ -353,6 +355,16 @@ void EverbluMeterComponent::request_reset_frequency() {
   this->apply_radio_context();
   this->meter_reader_->resetFrequencyOffset();
   ESP_LOGI(TAG, "Frequency offset reset to 0.000 kHz");
+}
+
+void EverbluMeterComponent::request_stop_reading() {
+  if (this->meter_reader_ == nullptr) {
+    ESP_LOGW(TAG, "Stop ignored: meter reader not ready");
+    return;
+  }
+
+  ESP_LOGI(TAG, "Stop reading requested via button");
+  this->meter_reader_->stopReading();
 }
 
 void EverbluMeterComponent::apply_radio_context() {

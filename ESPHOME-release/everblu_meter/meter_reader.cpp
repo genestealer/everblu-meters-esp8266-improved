@@ -458,6 +458,29 @@ void MeterReader::resetRetryState()
     m_nextRetryTime = 0;
 }
 
+void MeterReader::stopReading()
+{
+    // A blocking RF transfer already in flight cannot be aborted mid-transaction;
+    // this cancels any pending retry sequence and returns the reader to idle so
+    // it stops retrying and won't start the next queued read.
+    const bool wasActive = m_readingInProgress || m_retryCount > 0 || m_nextRetryTime > 0;
+
+    resetRetryState();
+    m_readingInProgress = false;
+
+    if (wasActive)
+    {
+        m_publisher->publishActiveReading(false);
+        m_publisher->publishRadioState("Idle");
+        m_publisher->publishStatusMessage("Reading stopped");
+        LOG_I("everblu_meter", "Reading stopped by user; pending retries cancelled");
+    }
+    else
+    {
+        LOG_I("everblu_meter", "Stop requested but no reading was active");
+    }
+}
+
 void MeterReader::performFrequencyScan()
 {
     activateCallbackContext();

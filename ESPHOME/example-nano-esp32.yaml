@@ -113,6 +113,8 @@ everblu_meter:
     name: "Deep Frequency Scan"
   reset_frequency_button:
     name: "Reset Frequency Offset"
+  stop_reading_button:
+    name: "Stop Reading"
 
   # Volume sensors
   volume:
