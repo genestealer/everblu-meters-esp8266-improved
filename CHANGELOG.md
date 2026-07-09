@@ -15,13 +15,15 @@ Releases are created manually by tagging commits with version tags matching `v*.
 
 ## [Unreleased]
 
+## [v3.2.0] - 2026-07-09
+
 ### AI Metadata
 
 ```yaml
 release_type: minor
 base_branch: main
 release_branch: radian-decode-improvements
-includes_prs: []
+includes_prs: [134]
 notable_superseded_work:
   - "capture-to-end-of-transmission RX experiment added then reverted: it lingered on RF noise until timeout and broke the ACK->data transition; fixed-length capture restored"
 scope_summary:
