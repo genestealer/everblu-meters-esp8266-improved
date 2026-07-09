@@ -155,6 +155,12 @@ everblu_meter:
     meter_year_sensor:
       name: "${meter_1_prefix} Meter Year"
       device_id: water_meter_device_1
+    meter_clock_sensor:
+      name: "${meter_1_prefix} Meter Clock"
+      device_id: water_meter_device_1
+    meter_model_sensor:
+      name: "${meter_1_prefix} Meter Type"
+      device_id: water_meter_device_1
     reading_schedule_sensor:
       name: "${meter_1_prefix} Reading Schedule"
       device_id: water_meter_device_1
@@ -255,6 +261,12 @@ everblu_meter:
       device_id: water_meter_device_2
     meter_year_sensor:
       name: "${meter_2_prefix} Meter Year"
+      device_id: water_meter_device_2
+    meter_clock_sensor:
+      name: "${meter_2_prefix} Meter Clock"
+      device_id: water_meter_device_2
+    meter_model_sensor:
+      name: "${meter_2_prefix} Meter Type"
       device_id: water_meter_device_2
     reading_schedule_sensor:
       name: "${meter_2_prefix} Reading Schedule"

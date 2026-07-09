@@ -154,3 +154,9 @@ everblu_meter:
   # Last frequency offset used
   frequency_offset:
     name: "Frequency Offset"
+
+  # Meter-reported fields (decoded from the frame)
+  meter_clock_sensor:
+    name: "Meter Clock"
+  meter_model_sensor:
+    name: "Meter Type"
