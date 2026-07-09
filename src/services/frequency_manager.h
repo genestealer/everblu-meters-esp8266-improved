@@ -199,6 +199,15 @@ public:
     static void resetAdaptiveTracking();
 
     /**
+     * @brief Request cancellation of an in-progress deep frequency scan.
+     *
+     * The scan loop checks this between frequency steps and bails out at the
+     * next step boundary (it cannot interrupt the blocking read within a single
+     * step). Has no effect once the scan has already finished.
+     */
+    static void requestScanCancel();
+
+    /**
      * @brief Check if auto-scan should run on first boot
      *
      * @return true if auto-scan is enabled and no offset is saved
@@ -239,6 +248,7 @@ private:
     static float s_storedOffset;    // Current frequency offset in MHz
     static bool s_autoScanEnabled;      // Enable auto-scan on first boot
     static bool s_hasStoredCalibration;  // True when a non-default offset was loaded from storage
+    static volatile bool s_scanCancelRequested; // Set by requestScanCancel(), checked between deep-scan steps
     static int s_adaptiveThreshold; // Reads before adapting (default: 10)
 
     // Adaptive tracking state

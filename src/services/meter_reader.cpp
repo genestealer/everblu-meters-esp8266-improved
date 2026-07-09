@@ -468,6 +468,10 @@ void MeterReader::stopReading()
     resetRetryState();
     m_readingInProgress = false;
 
+    // Also ask any in-progress deep frequency scan to bail at its next step
+    // boundary (it cannot be interrupted within a single blocking step).
+    FrequencyManager::requestScanCancel();
+
     if (wasActive)
     {
         m_publisher->publishActiveReading(false);
