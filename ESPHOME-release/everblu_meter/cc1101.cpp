@@ -2031,6 +2031,9 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
       {
         echo_debug(1, "[METER] This points to a marginal/noisy RF link (weak signal or a slight frequency offset), not a code fault. Improving antenna placement or running a frequency scan usually fixes it.\n");
       }
+      // Record that a reply frame WAS received but failed CRC (corrupted), so
+      // the caller can report "corrupted frame" rather than "no response".
+      sdata.frame_corrupted = true;
       meter_data_size = 0;
     }
   }

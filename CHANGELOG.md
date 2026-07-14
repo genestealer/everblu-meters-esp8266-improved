@@ -15,6 +15,10 @@ Releases are created manually by tagging commits with version tags matching `v*.
 
 ## [Unreleased]
 
+### Changed
+
+- **Clearer failure reporting: distinguish a corrupted (CRC-failed) frame from no response.** When the meter replies but the frame fails CRC (a marginal/noisy RF link), the status and error now say `"Corrupted frame received - failed CRC ..."` instead of the misleading `"No meter response (asleep/out of range/wrong Year/Serial)"`. A new `frame_corrupted` flag on `tmeter_data` is set when a reply is received but rejected by CRC, and the retry/max-retry messages reflect it.
+
 ## [v3.2.0] - 2026-07-09
 
 ### AI Metadata

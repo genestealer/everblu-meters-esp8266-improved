@@ -105,6 +105,7 @@ struct tmeter_data
   bool history_available; // True if historical data was successfully extracted
   char meter_time[32];    // Meter real-time clock "YYYY-MM-DD HH:MM:SS" (empty if not decoded)
   char meter_type[12];    // Meter type/identifier ASCII string, e.g. "133290AL02" (empty if not decoded)
+  bool frame_corrupted;   // True if a reply frame WAS received but failed CRC (corrupted), vs no reply at all
 };
 
 /**

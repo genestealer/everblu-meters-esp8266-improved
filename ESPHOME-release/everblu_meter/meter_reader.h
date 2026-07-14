@@ -178,8 +178,10 @@ private:
 
     /**
      * @brief Handle failed reading attempt
+     * @param frameCorrupted true if a reply frame was received but failed CRC
+     *        (corrupted), false if no reply was received at all
      */
-    void handleFailedRead();
+    void handleFailedRead(bool frameCorrupted);
 
     /**
      * @brief Reset retry counter and cooldown

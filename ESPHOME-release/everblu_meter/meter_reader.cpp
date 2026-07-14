@@ -332,7 +332,7 @@ void MeterReader::performReading()
     // Validate data
     if (meter_data.reads_counter == 0 || meter_data.volume == 0)
     {
-        handleFailedRead();
+        handleFailedRead(meter_data.frame_corrupted);
         return;
     }
 
@@ -389,10 +389,11 @@ void MeterReader::handleSuccessfulRead(const tmeter_data &data)
     LOG_I("everblu_meter", "Data published successfully");
 }
 
-void MeterReader::handleFailedRead()
+void MeterReader::handleFailedRead(bool frameCorrupted)
 {
-    LOG_W("everblu_meter", "Read failed (attempt %d/%d)",
-          m_retryCount + 1, m_config->getMaxRetries());
+    LOG_W("everblu_meter", "Read failed (attempt %d/%d)%s",
+          m_retryCount + 1, m_config->getMaxRetries(),
+          frameCorrupted ? " - corrupted frame (failed CRC)" : "");
 
     if (m_retryCount < m_config->getMaxRetries() - 1)
     {
@@ -405,7 +406,9 @@ void MeterReader::handleFailedRead()
         // m_readingInProgress guard).
         m_retryCount++;
         m_nextRetryTime = millis() + RETRY_DELAY_MS;
-        m_lastErrorMessage = "No meter response (asleep/out of range/wrong Year/Serial) - retrying";
+        m_lastErrorMessage = frameCorrupted
+            ? "Corrupted frame received - failed CRC (weak signal or frequency offset) - retrying"
+            : "No meter response (asleep/out of range/wrong Year/Serial) - retrying";
 
         m_publisher->publishStatusMessage("Retry scheduled");
         m_publisher->publishError(m_lastErrorMessage);
@@ -418,7 +421,9 @@ void MeterReader::handleFailedRead()
         // Max retries reached
         m_failedReads++;
         m_lastFailedAttempt = millis();
-        m_lastErrorMessage = "No meter response after max retries - check distance and meter Year/Serial";
+        m_lastErrorMessage = frameCorrupted
+            ? "Corrupted frames after max retries - improve signal or run a frequency scan"
+            : "No meter response after max retries - check distance and meter Year/Serial";
 
         m_publisher->publishError(m_lastErrorMessage);
         m_publisher->publishStatusMessage("Failed after max retries");
