@@ -278,6 +278,7 @@ unsigned long lastFailedAttempt = 0;          // Timestamp of last failed attemp
 const unsigned long RETRY_COOLDOWN = 3600000; // 1 hour cooldown in milliseconds
 bool g_autoScanAfterFailureDone = false;      // Guards the failure-recovery frequency scan to once per failure streak
 bool g_postScanReadAttempted = false;         // Guards the single post-scan re-read to once per failure streak
+ReadFailure g_retryFailureReason = ReadFailure::None; // Most informative failure seen so far in the current retry sequence
 
 // Global variable to store the reading schedule (default from private.h)
 const char *readingSchedule = DEFAULT_READING_SCHEDULE;
@@ -544,12 +545,21 @@ void onUpdateData()
   {
     TS_PRINTF("[ERROR] Unable to retrieve data from meter (attempt %d/%d)\n", _retry + 1, max_retries);
 
+    // Remember the most informative symptom of the sequence: a run of corrupted
+    // frames ending in one silent timeout is still an RF quality problem, so the
+    // final message should not fall back to "no response".
+    if (meter_data.failure != ReadFailure::None && meter_data.failure != ReadFailure::NoReply)
+    {
+      g_retryFailureReason = meter_data.failure;
+    }
+
     if (_retry < max_retries - 1)
     {
       // Schedule retry using callback instead of recursion to prevent stack overflow
       _retry++;
-      static char errorMsg[64];
-      snprintf(errorMsg, sizeof(errorMsg), "Retry %d/%d - No data received", _retry, max_retries);
+      static char errorMsg[128];
+      snprintf(errorMsg, sizeof(errorMsg), "Retry %d/%d - %s", _retry, max_retries,
+               read_failure_message(meter_data.failure, true));
       lastErrorMessage = errorMsg;
       TS_PRINTF("[STATUS] Scheduling retry in 5 seconds... (next attempt %d/%d)\n", _retry + 1, max_retries);
       // Keep the "Active Reading" sensor true and the radio state as "Reading"
@@ -566,7 +576,8 @@ void onUpdateData()
       // Max retries reached, enter cooldown period
       lastFailedAttempt = millis();
       failedReads++;
-      lastErrorMessage = "Max retries reached - cooling down";
+      lastErrorMessage = read_failure_message(
+          g_retryFailureReason != ReadFailure::None ? g_retryFailureReason : meter_data.failure, false);
       TS_PRINTF("[ERROR] Max retries (%d) reached. Entering 1-hour cooldown period.\n", max_retries);
       mqtt.publish(String(mqttBaseTopic) + "/active_reading", "false", true);
       mqtt.publish(String(mqttBaseTopic) + "/cc1101_state", cc1101RadioConnected ? "Idle" : "unavailable", true);
@@ -581,6 +592,7 @@ void onUpdateData()
       mqtt.publish(String(mqttBaseTopic) + "/total_attempts", buffer, true);
       digitalWrite(LED_BUILTIN, HIGH); // Turn off LED
       _retry = 0;                      // Reset retry counter for next scheduled attempt
+      g_retryFailureReason = ReadFailure::None;
 
       // When the meter cannot be reached after all retries, a drifted carrier
       // frequency (crystal offset) is a common cause. Automatically run a
@@ -763,6 +775,7 @@ void onUpdateData()
   // Reset retry counter and cooldown on successful read
   _retry = 0;
   lastFailedAttempt = 0;
+  g_retryFailureReason = ReadFailure::None;
   g_autoScanAfterFailureDone = false; // Allow a fresh auto-scan on the next failure streak
   g_postScanReadAttempted = false;    // Allow a fresh post-scan re-read on the next failure streak
   successfulReads++;

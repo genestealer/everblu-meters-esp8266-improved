@@ -49,7 +49,7 @@ static void logReadableSummary(const tmeter_data &data, const IConfigProvider *c
 }
 
 MeterReader::MeterReader(IConfigProvider *config, ITimeProvider *timeProvider, IDataPublisher *publisher)
-    : m_config(config), m_timeProvider(timeProvider), m_publisher(publisher), m_initialized(false), m_readingInProgress(false), m_isScheduledRead(false), m_haConnected(false), m_radioConnected(false), m_retryCount(0), m_lastFailedAttempt(0), m_nextRetryTime(0), m_autoScanAfterFailureDone(false), m_totalReadAttempts(0), m_successfulReads(0), m_failedReads(0), m_lastErrorMessage("None"), m_lastScheduleCheck(0), m_lastStatsPublish(0), m_readHourLocal(10), m_readMinuteLocal(0), m_lastReadDayMatch(false), m_lastReadTimeMatch(false)
+    : m_config(config), m_timeProvider(timeProvider), m_publisher(publisher), m_initialized(false), m_readingInProgress(false), m_isScheduledRead(false), m_haConnected(false), m_radioConnected(false), m_retryCount(0), m_lastFailedAttempt(0), m_nextRetryTime(0), m_autoScanAfterFailureDone(false), m_retryFailureReason(ReadFailure::None), m_totalReadAttempts(0), m_successfulReads(0), m_failedReads(0), m_lastErrorMessage("None"), m_lastScheduleCheck(0), m_lastStatsPublish(0), m_readHourLocal(10), m_readMinuteLocal(0), m_lastReadDayMatch(false), m_lastReadTimeMatch(false)
 {
 }
 
@@ -332,7 +332,7 @@ void MeterReader::performReading()
     // Validate data
     if (meter_data.reads_counter == 0 || meter_data.volume == 0)
     {
-        handleFailedRead(meter_data.frame_corrupted);
+        handleFailedRead(meter_data.failure);
         return;
     }
 
@@ -389,11 +389,19 @@ void MeterReader::handleSuccessfulRead(const tmeter_data &data)
     LOG_I("everblu_meter", "Data published successfully");
 }
 
-void MeterReader::handleFailedRead(bool frameCorrupted)
+void MeterReader::handleFailedRead(ReadFailure reason)
 {
     LOG_W("everblu_meter", "Read failed (attempt %d/%d)%s",
           m_retryCount + 1, m_config->getMaxRetries(),
-          frameCorrupted ? " - corrupted frame (failed CRC)" : "");
+          read_failure_log_suffix(reason));
+
+    // Remember the most informative symptom of the sequence: a run of corrupted
+    // frames ending in one silent timeout is still an RF quality problem, so the
+    // final message should not fall back to "no response".
+    if (reason != ReadFailure::None && reason != ReadFailure::NoReply)
+    {
+        m_retryFailureReason = reason;
+    }
 
     if (m_retryCount < m_config->getMaxRetries() - 1)
     {
@@ -406,9 +414,7 @@ void MeterReader::handleFailedRead(bool frameCorrupted)
         // m_readingInProgress guard).
         m_retryCount++;
         m_nextRetryTime = millis() + RETRY_DELAY_MS;
-        m_lastErrorMessage = frameCorrupted
-            ? "Corrupted frame received - failed CRC (weak signal or frequency offset) - retrying"
-            : "No meter response (asleep/out of range/wrong Year/Serial) - retrying";
+        m_lastErrorMessage = read_failure_message(reason, true);
 
         m_publisher->publishStatusMessage("Retry scheduled");
         m_publisher->publishError(m_lastErrorMessage);
@@ -421,9 +427,8 @@ void MeterReader::handleFailedRead(bool frameCorrupted)
         // Max retries reached
         m_failedReads++;
         m_lastFailedAttempt = millis();
-        m_lastErrorMessage = frameCorrupted
-            ? "Corrupted frames after max retries - improve signal or run a frequency scan"
-            : "No meter response after max retries - check distance and meter Year/Serial";
+        m_lastErrorMessage = read_failure_message(
+            m_retryFailureReason != ReadFailure::None ? m_retryFailureReason : reason, false);
 
         m_publisher->publishError(m_lastErrorMessage);
         m_publisher->publishStatusMessage("Failed after max retries");
@@ -461,6 +466,7 @@ void MeterReader::resetRetryState()
 {
     m_retryCount = 0;
     m_nextRetryTime = 0;
+    m_retryFailureReason = ReadFailure::None;
 }
 
 void MeterReader::stopReading()

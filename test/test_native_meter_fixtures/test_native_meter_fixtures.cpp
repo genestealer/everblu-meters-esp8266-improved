@@ -13,6 +13,7 @@
 
 #include "core/radian_parser.h"
 #include "core/radian_decoder.h"
+#include "core/cc1101.h" // ReadFailure classification helpers
 
 struct Fixture
 {
@@ -1001,6 +1002,58 @@ void test_radian_reading_within_history_bounds_skips_when_insufficient(void)
     TEST_ASSERT_TRUE(radian_reading_within_history_bounds(11500, history, 3, 100UL));
 }
 
+// ---------------------------------------------------------------------------
+// Read failure classification: a silent meter, a corrupted frame and a frame
+// with invalid fields must each produce distinct, non-empty guidance so users
+// are not told to "check distance" when the real problem is RF quality.
+// ---------------------------------------------------------------------------
+void test_read_failure_messages_are_distinct(void)
+{
+    const ReadFailure reasons[] = {ReadFailure::None, ReadFailure::NoReply,
+                                   ReadFailure::CrcFailed, ReadFailure::ParseRejected};
+
+    for (ReadFailure reason : reasons)
+    {
+        TEST_ASSERT_NOT_NULL(read_failure_message(reason, true));
+        TEST_ASSERT_NOT_NULL(read_failure_message(reason, false));
+        TEST_ASSERT_TRUE(strlen(read_failure_message(reason, true)) > 0);
+        TEST_ASSERT_TRUE(strlen(read_failure_message(reason, false)) > 0);
+        TEST_ASSERT_NOT_NULL(read_failure_log_suffix(reason));
+    }
+
+    // A corrupted frame must not be reported as "no meter response".
+    TEST_ASSERT_NOT_EQUAL(0, strcmp(read_failure_message(ReadFailure::CrcFailed, true),
+                                    read_failure_message(ReadFailure::NoReply, true)));
+    TEST_ASSERT_NOT_EQUAL(0, strcmp(read_failure_message(ReadFailure::ParseRejected, true),
+                                    read_failure_message(ReadFailure::NoReply, true)));
+    TEST_ASSERT_NOT_EQUAL(0, strcmp(read_failure_message(ReadFailure::CrcFailed, true),
+                                    read_failure_message(ReadFailure::ParseRejected, true)));
+
+    // Retrying and final wording differ, so the log shows the sequence ending.
+    TEST_ASSERT_NOT_EQUAL(0, strcmp(read_failure_message(ReadFailure::CrcFailed, true),
+                                    read_failure_message(ReadFailure::CrcFailed, false)));
+
+    // None falls back to the no-response wording and adds no log suffix.
+    TEST_ASSERT_EQUAL_STRING(read_failure_message(ReadFailure::NoReply, true),
+                             read_failure_message(ReadFailure::None, true));
+    TEST_ASSERT_EQUAL_STRING("", read_failure_log_suffix(ReadFailure::None));
+    TEST_ASSERT_EQUAL_STRING("", read_failure_log_suffix(ReadFailure::NoReply));
+    TEST_ASSERT_TRUE(strlen(read_failure_log_suffix(ReadFailure::CrcFailed)) > 0);
+    TEST_ASSERT_TRUE(strlen(read_failure_log_suffix(ReadFailure::ParseRejected)) > 0);
+}
+
+// A default-constructed tmeter_data (the value returned when no read is
+// attempted) must classify as "no failure recorded", not as a corrupted frame.
+void test_tmeter_data_defaults_to_no_failure(void)
+{
+    tmeter_data data{};
+    TEST_ASSERT_TRUE(ReadFailure::None == data.failure);
+
+    tmeter_data zeroed;
+    memset(&zeroed, 0, sizeof(zeroed));
+    TEST_ASSERT_TRUE(ReadFailure::None == zeroed.failure);
+}
+
 int main(int argc, char **argv)
 {
     (void)argc;
@@ -1025,5 +1078,7 @@ int main(int argc, char **argv)
     RUN_TEST(test_radian_parse_extended_fields_absent_when_short);
     RUN_TEST(test_replay_meter_fixtures);
     RUN_TEST(test_replay_raw_meter_fixtures);
+    RUN_TEST(test_read_failure_messages_are_distinct);
+    RUN_TEST(test_tmeter_data_defaults_to_no_failure);
     return UNITY_END();
 }

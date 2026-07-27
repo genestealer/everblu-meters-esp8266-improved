@@ -178,10 +178,9 @@ private:
 
     /**
      * @brief Handle failed reading attempt
-     * @param frameCorrupted true if a reply frame was received but failed CRC
-     *        (corrupted), false if no reply was received at all
+     * @param reason Why the attempt produced no usable data
      */
-    void handleFailedRead(bool frameCorrupted);
+    void handleFailedRead(ReadFailure reason);
 
     /**
      * @brief Reset retry counter and cooldown
@@ -204,7 +203,8 @@ private:
     int m_retryCount;
     unsigned long m_lastFailedAttempt;
     unsigned long m_nextRetryTime;
-    bool m_autoScanAfterFailureDone; // Guards the failure-recovery frequency scan to once per failure streak
+    bool m_autoScanAfterFailureDone;  // Guards the failure-recovery frequency scan to once per failure streak
+    ReadFailure m_retryFailureReason; // Most informative failure seen so far in the current retry sequence
 
     // Statistics
     unsigned long m_totalReadAttempts;

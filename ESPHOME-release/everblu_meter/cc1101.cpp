@@ -1051,6 +1051,8 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
       echo_debug(1, "[ERROR] Buffer too small for meter data (size=%d, need>=30)\n", size);
     }
     echo_debug(1, "[ERROR] Invalid primary meter fields - discarding frame\n");
+    // The frame itself was intact (CRC passed); only its contents were rejected.
+    data.failure = ReadFailure::ParseRejected;
     return data;
   }
 
@@ -2033,7 +2035,7 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
       }
       // Record that a reply frame WAS received but failed CRC (corrupted), so
       // the caller can report "corrupted frame" rather than "no response".
-      sdata.frame_corrupted = true;
+      sdata.failure = ReadFailure::CrcFailed;
       meter_data_size = 0;
     }
   }
@@ -2044,6 +2046,7 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
     echo_debug(1, "[METER] If this persists, try improving antenna placement or running a frequency scan to recalibrate the radio.\n");
     echo_debug(1, "[METER] A scan runs automatically after repeated failures unless disabled (AUTO_SCAN_ON_FAILURE_ENABLED / auto_scan_on_failure); for a full re-scan see AUTO_SCAN_ENABLED / CLEAR_EEPROM_ON_BOOT.\n");
     echo_debug(debug_out, "[METER] Meter data frame timeout\n");
+    sdata.failure = ReadFailure::NoReply;
   }
   sdata.rssi = halRfReadReg(RSSI_ADDR);                              // Read RSSI value from CC1101
   sdata.rssi_dbm = cc1100_rssi_convert2dbm(halRfReadReg(RSSI_ADDR)); // Read RSSI value from CC1101 and convert to dBm

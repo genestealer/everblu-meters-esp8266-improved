@@ -17,7 +17,11 @@ Releases are created manually by tagging commits with version tags matching `v*.
 
 ### Changed
 
-- **Clearer failure reporting: distinguish a corrupted (CRC-failed) frame from no response.** When the meter replies but the frame fails CRC (a marginal/noisy RF link), the status and error now say `"Corrupted frame received - failed CRC ..."` instead of the misleading `"No meter response (asleep/out of range/wrong Year/Serial)"`. A new `frame_corrupted` flag on `tmeter_data` is set when a reply is received but rejected by CRC, and the retry/max-retry messages reflect it.
+- **Failed reads now report which of three causes applied**, instead of always reporting `"No meter response (asleep/out of range/wrong Year/Serial)"`: no reply at all, a reply that failed CRC (marginal RF link), or a reply that passed CRC but carried invalid meter fields. Status, error and log messages point at the matching remedy. `tmeter_data` gains a `failure` field (`ReadFailure` enum); the classification is sticky across a retry sequence, and both builds report it.
+
+### Fixed
+
+- **Stack corruption during a frequency scan.** `frequency_manager.h` carried a duplicate `struct tmeter_data` behind an `#ifndef __CC1101_H__` guard that never fired for `frequency_manager.cpp`, so that translation unit used a struct missing `meter_time` and `meter_type` (since v3.2.0). As the meter-read callback returns `tmeter_data` by value, every scan step wrote ~48 bytes past the caller's return slot. The duplicate is removed in favour of including `cc1101.h`.
 
 ## [v3.2.0] - 2026-07-09
 
