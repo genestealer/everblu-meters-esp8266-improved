@@ -54,6 +54,22 @@ void test_crc_deterministic(void);
 void test_crc_detects_single_bit_flip(void);
 void test_crc_is_order_sensitive(void);
 
+// --- test_meter_history.cpp ---
+void test_history_count_valid_months(void);
+void test_history_is_valid(void);
+void test_history_stats_typical(void);
+void test_history_stats_empty(void);
+void test_history_stats_handles_meter_reset(void);
+void test_history_stats_current_below_history(void);
+void test_history_json_exact_payload(void);
+void test_history_json_single_month(void);
+void test_history_json_full_thirteen_months(void);
+void test_history_json_empty_history(void);
+void test_history_json_rejects_undersized_buffer(void);
+void test_history_json_null_buffer(void);
+void test_history_month_labels(void);
+void test_history_print_to_serial_is_safe(void);
+
 void setUp(void) {}
 
 void tearDown(void) {}
@@ -104,6 +120,21 @@ int main(int argc, char **argv)
     RUN_TEST(test_crc_deterministic);
     RUN_TEST(test_crc_detects_single_bit_flip);
     RUN_TEST(test_crc_is_order_sensitive);
+
+    RUN_TEST(test_history_count_valid_months);
+    RUN_TEST(test_history_is_valid);
+    RUN_TEST(test_history_stats_typical);
+    RUN_TEST(test_history_stats_empty);
+    RUN_TEST(test_history_stats_handles_meter_reset);
+    RUN_TEST(test_history_stats_current_below_history);
+    RUN_TEST(test_history_json_exact_payload);
+    RUN_TEST(test_history_json_single_month);
+    RUN_TEST(test_history_json_full_thirteen_months);
+    RUN_TEST(test_history_json_empty_history);
+    RUN_TEST(test_history_json_rejects_undersized_buffer);
+    RUN_TEST(test_history_json_null_buffer);
+    RUN_TEST(test_history_month_labels);
+    RUN_TEST(test_history_print_to_serial_is_safe);
 
     return UNITY_END();
 }
