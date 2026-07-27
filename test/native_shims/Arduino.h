@@ -19,7 +19,6 @@
 #ifndef EVERBLU_NATIVE_ARDUINO_SHIM_H
 #define EVERBLU_NATIVE_ARDUINO_SHIM_H
 
-#include <chrono>
 #include <cstdarg>
 #include <cstdio>
 #include <cstdint>
@@ -27,27 +26,35 @@
 #include <cstring>
 #include <string>
 
+// The real Arduino core exposes the C maths library (NAN, isnan, roundf, fabs)
+// in the global namespace, and shared service code relies on that.
+#include <math.h>
+
 // ---------------------------------------------------------------------------
 // Timing
 // ---------------------------------------------------------------------------
+//
+// The host clock is virtual and starts at zero. Tests drive it explicitly with
+// nativeClockAdvance(), so timing-dependent code (retry delays, cooldowns,
+// scan step pacing) is exercised deterministically and instantly instead of
+// sleeping. delay() advances it, which mirrors what the firmware experiences.
 
-inline unsigned long millis()
+inline unsigned long &nativeClockMillisRef()
 {
-    using namespace std::chrono;
-    static const steady_clock::time_point start = steady_clock::now();
-    return (unsigned long)duration_cast<milliseconds>(steady_clock::now() - start).count();
+    static unsigned long ms = 0;
+    return ms;
 }
 
-inline unsigned long micros()
-{
-    using namespace std::chrono;
-    static const steady_clock::time_point start = steady_clock::now();
-    return (unsigned long)duration_cast<microseconds>(steady_clock::now() - start).count();
-}
+inline void nativeClockSet(unsigned long ms) { nativeClockMillisRef() = ms; }
+inline void nativeClockAdvance(unsigned long ms) { nativeClockMillisRef() += ms; }
+inline void nativeClockReset() { nativeClockMillisRef() = 0; }
 
-// No-ops on the host: unit tests must never actually sleep.
-inline void delay(unsigned long) {}
-inline void delayMicroseconds(unsigned int) {}
+inline unsigned long millis() { return nativeClockMillisRef(); }
+inline unsigned long micros() { return nativeClockMillisRef() * 1000UL; }
+
+// Unit tests must never actually sleep: advance the virtual clock instead.
+inline void delay(unsigned long ms) { nativeClockAdvance(ms); }
+inline void delayMicroseconds(unsigned int us) { nativeClockAdvance(us / 1000UL); }
 inline void yield() {}
 
 // ---------------------------------------------------------------------------
@@ -68,6 +75,66 @@ inline long map(long x, long in_min, long in_max, long out_min, long out_max)
 }
 
 // ---------------------------------------------------------------------------
+// Print / Stream
+// ---------------------------------------------------------------------------
+//
+// src/core/wifi_serial.h derives WifiSerialStream from Print and holds a
+// Stream reference, so both base classes have to exist for that header to
+// compile on the host.
+
+class Print
+{
+public:
+    virtual ~Print() = default;
+
+    virtual size_t write(uint8_t c) = 0;
+
+    virtual size_t write(const uint8_t *buffer, size_t size)
+    {
+        size_t written = 0;
+        for (size_t i = 0; i < size; i++)
+        {
+            written += write(buffer[i]);
+        }
+        return written;
+    }
+
+    size_t write(const char *s) { return s ? write((const uint8_t *)s, strlen(s)) : 0; }
+
+    size_t print(char c) { return write((uint8_t)c); }
+    size_t print(const char *s) { return write(s); }
+    size_t print(const std::string &s) { return write(s.c_str()); }
+
+    size_t println() { return write((uint8_t)'\n'); }
+    size_t println(const char *s) { return print(s) + println(); }
+    size_t println(const std::string &s) { return println(s.c_str()); }
+
+    size_t printf(const char *fmt, ...) __attribute__((format(printf, 2, 3)))
+    {
+        char buf[512];
+        va_list args;
+        va_start(args, fmt);
+        const int n = vsnprintf(buf, sizeof(buf), fmt, args);
+        va_end(args);
+        if (n <= 0)
+        {
+            return 0;
+        }
+        const size_t len = (size_t)n < sizeof(buf) ? (size_t)n : sizeof(buf) - 1;
+        return write((const uint8_t *)buf, len);
+    }
+};
+
+class Stream : public Print
+{
+public:
+    virtual int available() { return 0; }
+    virtual int read() { return -1; }
+    virtual int peek() { return -1; }
+    virtual void flush() {}
+};
+
+// ---------------------------------------------------------------------------
 // Serial
 // ---------------------------------------------------------------------------
 //
@@ -75,49 +142,23 @@ inline long map(long x, long in_min, long in_max, long out_min, long out_max)
 // environment variable EVERBLU_NATIVE_SERIAL=1 to mirror firmware log output to
 // stdout when debugging a failing test.
 
-class NativeSerial
+class NativeSerial : public Stream
 {
 public:
     void begin(unsigned long = 0) {}
-    void flush() {}
+    void setDebugOutput(bool) {}
+    void flush() override { fflush(stdout); }
     explicit operator bool() const { return true; }
 
-    int printf(const char *fmt, ...)
-    {
-        if (!enabled())
-        {
-            return 0;
-        }
-        va_list args;
-        va_start(args, fmt);
-        const int written = vfprintf(stdout, fmt, args);
-        va_end(args);
-        return written;
-    }
-
-    void print(const char *s)
-    {
-        if (enabled() && s)
-        {
-            fputs(s, stdout);
-        }
-    }
-
-    void print(const std::string &s) { print(s.c_str()); }
-
-    void println(const char *s)
+    size_t write(uint8_t c) override
     {
         if (enabled())
         {
-            fputs(s ? s : "", stdout);
-            fputc('\n', stdout);
+            fputc((int)c, stdout);
         }
+        return 1;
     }
 
-    void println(const std::string &s) { println(s.c_str()); }
-    void println() { println(""); }
-
-private:
     static bool enabled()
     {
         static const bool on = (std::getenv("EVERBLU_NATIVE_SERIAL") != nullptr);

@@ -8,8 +8,10 @@ on:
       - include/**
       - platformio.ini
       - test/fixtures/**
+      - test/native_fakes.*
       - test/native_shims/**
       - test/test_native_meter_fixtures/**
+      - test/test_native_meter_reader/**
       - test/test_embedded_unit/**
       - .github/workflows/coverage.yml
   pull_request:
@@ -19,8 +21,10 @@ on:
       - include/**
       - platformio.ini
       - test/fixtures/**
+      - test/native_fakes.*
       - test/native_shims/**
       - test/test_native_meter_fixtures/**
+      - test/test_native_meter_reader/**
       - test/test_embedded_unit/**
       - .github/workflows/coverage.yml
   workflow_dispatch:
@@ -78,6 +82,10 @@ jobs:
             --filter src/core/crc_kermit.cpp \
             --filter src/core/radian_parser.cpp \
             --filter src/core/radian_decoder.cpp \
+            --filter src/core/utils.cpp \
+            --filter src/services/frequency_manager.cpp \
+            --filter src/services/meter_history.cpp \
+            --filter src/services/meter_reader.cpp \
             --filter src/services/schedule_manager.cpp \
             --object-directory .pio/build/native/ \
             --xml coverage.xml \

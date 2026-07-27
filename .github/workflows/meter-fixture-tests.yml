@@ -8,8 +8,10 @@ on:
       - include/**
       - platformio.ini
       - test/fixtures/**
+      - test/native_fakes.*
       - test/native_shims/**
       - test/test_native_meter_fixtures/**
+      - test/test_native_meter_reader/**
       - test/test_embedded_unit/**
       - .github/workflows/meter-fixture-tests.yml
   pull_request:
@@ -19,8 +21,10 @@ on:
       - include/**
       - platformio.ini
       - test/fixtures/**
+      - test/native_fakes.*
       - test/native_shims/**
       - test/test_native_meter_fixtures/**
+      - test/test_native_meter_reader/**
       - test/test_embedded_unit/**
       - .github/workflows/meter-fixture-tests.yml
   workflow_dispatch:
