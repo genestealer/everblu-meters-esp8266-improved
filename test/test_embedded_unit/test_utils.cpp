@@ -1,42 +1,34 @@
 /**
  * @file test_utils.cpp
- * @brief Unit tests for utility functions (CRC, hex display, encoding)
+ * @brief Unit tests for the CRC-16/KERMIT checksum used by the RADIAN protocol
+ *
+ * Test registration lives in test_runner.cpp.
  */
 
 #include <unity.h>
-#include <Arduino.h>
-
-// Forward declarations
-extern unsigned long crc(unsigned char *data, int len);
-extern void display_hex(unsigned char *buf, int length);
-
-// Note: Global Unity setUp/tearDown hooks are defined in a single test runner
-// (see test_config_validation.cpp) to avoid multiple definition linker errors.
+#include <stdint.h>
+#include "core/crc_kermit.h"
 
 /**
  * Test: CRC calculation with known data
  */
 void test_crc_known_data(void)
 {
-    // Test with a simple known pattern
-    unsigned char testData[] = {0x01, 0x02, 0x03, 0x04};
-    unsigned long result = crc(testData, 4);
-
-    // CRC should be consistent for same data
-    unsigned long result2 = crc(testData, 4);
-    TEST_ASSERT_EQUAL_UINT32(result, result2);
+    // The standard CRC-16/KERMIT check value over the ASCII string "123456789"
+    // is 0x2189. crc_kermit() returns the bytes swapped, matching the order the
+    // checksum appears in on the wire, so the expected value here is 0x8921.
+    const uint8_t check[] = {'1', '2', '3', '4', '5', '6', '7', '8', '9'};
+    TEST_ASSERT_EQUAL_HEX16(0x8921, crc_kermit(check, sizeof(check)));
 }
 
 /**
- * Test: CRC with empty data
+ * Test: CRC over an empty buffer returns the init value
  */
 void test_crc_empty_data(void)
 {
-    unsigned char emptyData[] = {};
-    unsigned long result = crc(emptyData, 0);
-
-    // Empty data should produce a specific CRC value
-    TEST_ASSERT_NOT_EQUAL(0, result);
+    const uint8_t empty[1] = {0};
+    TEST_ASSERT_EQUAL_HEX16(0x0000, crc_kermit(empty, 0));
+    TEST_ASSERT_EQUAL_HEX16(0x0000, crc_kermit(nullptr, 0));
 }
 
 /**
@@ -44,14 +36,10 @@ void test_crc_empty_data(void)
  */
 void test_crc_different_data(void)
 {
-    unsigned char data1[] = {0x01, 0x02, 0x03};
-    unsigned char data2[] = {0x04, 0x05, 0x06};
+    const uint8_t data1[] = {0x01, 0x02, 0x03};
+    const uint8_t data2[] = {0x04, 0x05, 0x06};
 
-    unsigned long crc1 = crc(data1, 3);
-    unsigned long crc2 = crc(data2, 3);
-
-    // Different data should produce different CRCs
-    TEST_ASSERT_NOT_EQUAL(crc1, crc2);
+    TEST_ASSERT_NOT_EQUAL(crc_kermit(data1, sizeof(data1)), crc_kermit(data2, sizeof(data2)));
 }
 
 /**
@@ -59,42 +47,45 @@ void test_crc_different_data(void)
  */
 void test_crc_deterministic(void)
 {
-    unsigned char testData[] = {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF};
+    const uint8_t data[] = {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF};
+    const uint16_t expected = crc_kermit(data, sizeof(data));
 
-    // Run CRC multiple times
-    unsigned long results[5];
     for (int i = 0; i < 5; i++)
     {
-        results[i] = crc(testData, 6);
+        TEST_ASSERT_EQUAL_HEX16(expected, crc_kermit(data, sizeof(data)));
     }
+}
 
-    // All results should be identical
-    for (int i = 1; i < 5; i++)
+/**
+ * Test: a single flipped bit changes the checksum
+ *
+ * This is the property the meter frame validation relies on to reject
+ * corrupted receptions.
+ */
+void test_crc_detects_single_bit_flip(void)
+{
+    uint8_t frame[] = {0x2F, 0x2F, 0x1E, 0x11, 0x03, 0xF1, 0x39, 0x00};
+    const uint16_t original = crc_kermit(frame, sizeof(frame));
+
+    for (size_t byte = 0; byte < sizeof(frame); byte++)
     {
-        TEST_ASSERT_EQUAL_UINT32(results[0], results[i]);
+        for (int bit = 0; bit < 8; bit++)
+        {
+            frame[byte] ^= (uint8_t)(1u << bit);
+            TEST_ASSERT_NOT_EQUAL(original, crc_kermit(frame, sizeof(frame)));
+            frame[byte] ^= (uint8_t)(1u << bit); // restore
+        }
     }
 }
 
 /**
- * Test: Display hex doesn't crash with null pointer
+ * Test: byte order affects the checksum
  */
-void test_display_hex_null_safe(void)
+void test_crc_is_order_sensitive(void)
 {
-    // This should not crash
-    display_hex(NULL, 0);
-    TEST_PASS();
+    const uint8_t forward[] = {0x11, 0x22, 0x33, 0x44};
+    const uint8_t reversed[] = {0x44, 0x33, 0x22, 0x11};
+
+    TEST_ASSERT_NOT_EQUAL(crc_kermit(forward, sizeof(forward)),
+                          crc_kermit(reversed, sizeof(reversed)));
 }
-
-/**
- * Test: Display hex with valid data
- */
-void test_display_hex_valid_data(void)
-{
-    unsigned char testData[] = {0x12, 0x34, 0x56, 0x78};
-
-    // This should not crash
-    display_hex(testData, 4);
-    TEST_PASS();
-}
-
-// Test registration and Arduino hooks are centralized in test_config_validation.cpp.

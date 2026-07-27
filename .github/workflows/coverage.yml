@@ -8,7 +8,9 @@ on:
       - include/**
       - platformio.ini
       - test/fixtures/**
+      - test/native_shims/**
       - test/test_native_meter_fixtures/**
+      - test/test_embedded_unit/**
       - .github/workflows/coverage.yml
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
@@ -17,7 +19,9 @@ on:
       - include/**
       - platformio.ini
       - test/fixtures/**
+      - test/native_shims/**
       - test/test_native_meter_fixtures/**
+      - test/test_embedded_unit/**
       - .github/workflows/coverage.yml
   workflow_dispatch:
 
@@ -74,6 +78,7 @@ jobs:
             --filter src/core/crc_kermit.cpp \
             --filter src/core/radian_parser.cpp \
             --filter src/core/radian_decoder.cpp \
+            --filter src/services/schedule_manager.cpp \
             --object-directory .pio/build/native/ \
             --xml coverage.xml \
             --print-summary

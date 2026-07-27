@@ -1,118 +1,45 @@
 /**
  * @file test_config_validation.cpp
- * @brief Unit tests for configuration validation functions
+ * @brief Unit tests for configuration validation
+ *
+ * Test registration lives in test_runner.cpp.
  */
 
 #include <unity.h>
-#include <Arduino.h>
 #include <string.h>
 #include "core/meter_code_parser.h"
+#include "services/schedule_manager.h"
 
-// Mock configuration values for testing
-#define TEST_METER_YEAR 2020
-#define TEST_METER_SERIAL 12345678
 #define TEST_FREQUENCY 433.82
 
-// Local implementations of functions under test for now.
-// These can later be moved into shared application code if needed.
-
-bool isValidReadingSchedule(const char *schedule)
-{
-    // Reject null or empty schedules
-    if (schedule == nullptr || schedule[0] == '\0')
-    {
-        return false;
-    }
-
-    // Allowed values based on unit tests
-    if (strcmp(schedule, "Monday-Friday") == 0)
-        return true;
-    if (strcmp(schedule, "Monday-Saturday") == 0)
-        return true;
-    if (strcmp(schedule, "Monday-Sunday") == 0)
-        return true;
-    if (strcmp(schedule, "Monday") == 0)
-        return true;
-    if (strcmp(schedule, "Tuesday") == 0)
-        return true;
-    if (strcmp(schedule, "Wednesday") == 0)
-        return true;
-    if (strcmp(schedule, "Thursday") == 0)
-        return true;
-    if (strcmp(schedule, "Friday") == 0)
-        return true;
-    if (strcmp(schedule, "Saturday") == 0)
-        return true;
-    if (strcmp(schedule, "Sunday") == 0)
-        return true;
-
-    // Everything else is considered invalid for now
-    return false;
-}
-
-bool validateConfiguration()
-{
-    // Placeholder; not used by current tests
-    return true;
-}
-
-void setUp(void)
-{
-    // This runs before each test
-}
-
-void tearDown(void)
-{
-    // This runs after each test
-}
-
 /**
- * Test: isValidReadingSchedule with valid inputs
+ * Test: schedule strings accepted by ScheduleManager
  */
 void test_valid_reading_schedules(void)
 {
-    TEST_ASSERT_TRUE(isValidReadingSchedule("Monday-Friday"));
-    TEST_ASSERT_TRUE(isValidReadingSchedule("Monday-Saturday"));
-    TEST_ASSERT_TRUE(isValidReadingSchedule("Monday-Sunday"));
-    TEST_ASSERT_TRUE(isValidReadingSchedule("Monday"));
-    TEST_ASSERT_TRUE(isValidReadingSchedule("Tuesday"));
-    TEST_ASSERT_TRUE(isValidReadingSchedule("Wednesday"));
-    TEST_ASSERT_TRUE(isValidReadingSchedule("Thursday"));
-    TEST_ASSERT_TRUE(isValidReadingSchedule("Friday"));
-    TEST_ASSERT_TRUE(isValidReadingSchedule("Saturday"));
-    TEST_ASSERT_TRUE(isValidReadingSchedule("Sunday"));
+    TEST_ASSERT_TRUE(ScheduleManager::isValidSchedule("Monday-Friday"));
+    TEST_ASSERT_TRUE(ScheduleManager::isValidSchedule("Monday-Saturday"));
+    TEST_ASSERT_TRUE(ScheduleManager::isValidSchedule("Monday-Sunday"));
+    TEST_ASSERT_TRUE(ScheduleManager::isValidSchedule("Monday"));
+    TEST_ASSERT_TRUE(ScheduleManager::isValidSchedule("Tuesday"));
+    TEST_ASSERT_TRUE(ScheduleManager::isValidSchedule("Wednesday"));
+    TEST_ASSERT_TRUE(ScheduleManager::isValidSchedule("Thursday"));
+    TEST_ASSERT_TRUE(ScheduleManager::isValidSchedule("Friday"));
+    TEST_ASSERT_TRUE(ScheduleManager::isValidSchedule("Saturday"));
+    TEST_ASSERT_TRUE(ScheduleManager::isValidSchedule("Sunday"));
 }
 
 /**
- * Test: isValidReadingSchedule with invalid inputs
+ * Test: schedule strings rejected by ScheduleManager
  */
 void test_invalid_reading_schedules(void)
 {
-    TEST_ASSERT_FALSE(isValidReadingSchedule("Daily"));
-    TEST_ASSERT_FALSE(isValidReadingSchedule("Weekdays"));
-    TEST_ASSERT_FALSE(isValidReadingSchedule(""));
-    TEST_ASSERT_FALSE(isValidReadingSchedule(NULL));
-    TEST_ASSERT_FALSE(isValidReadingSchedule("Monday-Thursday"));
-}
-
-/**
- * Test: Meter year validation
- */
-void test_meter_year_validation(void)
-{
-    // Valid years (2009 onwards when RADIAN was introduced)
-    TEST_ASSERT_TRUE(TEST_METER_YEAR >= 2009);
-    TEST_ASSERT_TRUE(TEST_METER_YEAR <= 2025);
-}
-
-/**
- * Test: Meter serial validation
- */
-void test_meter_serial_validation(void)
-{
-    // Valid serial (non-zero, max 8 digits)
-    TEST_ASSERT_TRUE(TEST_METER_SERIAL > 0);
-    TEST_ASSERT_TRUE(TEST_METER_SERIAL <= 99999999);
+    TEST_ASSERT_FALSE(ScheduleManager::isValidSchedule("Daily"));
+    TEST_ASSERT_FALSE(ScheduleManager::isValidSchedule("Weekdays"));
+    TEST_ASSERT_FALSE(ScheduleManager::isValidSchedule(""));
+    TEST_ASSERT_FALSE(ScheduleManager::isValidSchedule(nullptr));
+    TEST_ASSERT_FALSE(ScheduleManager::isValidSchedule("Monday-Thursday"));
+    TEST_ASSERT_FALSE(ScheduleManager::isValidSchedule("monday-friday")); // case sensitive
 }
 
 /**
@@ -169,31 +96,4 @@ void test_meter_code_parse_rejects_short_serial(void)
 {
     // Fewer than 7 digits is invalid
     TEST_ASSERT_FALSE(everblu::core::parseMeterCode("20-257750-000", nullptr, nullptr));
-}
-
-void setup()
-{
-    delay(2000); // Wait for serial monitor
-
-    UNITY_BEGIN();
-
-    RUN_TEST(test_valid_reading_schedules);
-    RUN_TEST(test_invalid_reading_schedules);
-    RUN_TEST(test_meter_year_validation);
-    RUN_TEST(test_meter_serial_validation);
-    RUN_TEST(test_frequency_validation);
-    RUN_TEST(test_meter_code_parse_valid_dashed_with_suffix);
-    RUN_TEST(test_meter_code_parse_valid_dashed_without_suffix);
-    RUN_TEST(test_meter_code_parse_rejects_non_digit);
-    RUN_TEST(test_meter_code_parse_rejects_missing_dash_format);
-    RUN_TEST(test_meter_code_parse_rejects_zero_serial);
-    RUN_TEST(test_meter_code_parse_rejects_serial_over_24bit);
-    RUN_TEST(test_meter_code_parse_rejects_short_serial);
-
-    UNITY_END();
-}
-
-void loop()
-{
-    // Nothing to do here
 }

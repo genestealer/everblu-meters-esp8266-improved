@@ -26,6 +26,11 @@ void ScheduleManager::begin(const char *schedule, int readHourUtc, int readMinut
 
 bool ScheduleManager::isValidSchedule(const char *schedule)
 {
+    if (schedule == nullptr)
+    {
+        return false;
+    }
+
     return (strcmp(schedule, "Monday-Friday") == 0 ||
             strcmp(schedule, "Monday-Saturday") == 0 ||
             strcmp(schedule, "Monday-Sunday") == 0 ||
@@ -47,7 +52,8 @@ void ScheduleManager::setSchedule(const char *schedule)
     }
     else
     {
-        LOG_W("everblu_meter", "Invalid schedule '%s' - falling back to 'Monday-Friday'", schedule);
+        LOG_W("everblu_meter", "Invalid schedule '%s' - falling back to 'Monday-Friday'",
+              schedule ? schedule : "(null)");
         s_schedule = "Monday-Friday";
     }
 }
