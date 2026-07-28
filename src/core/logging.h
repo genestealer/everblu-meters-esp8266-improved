@@ -68,6 +68,13 @@
 #define TS_PRINTLN(msg) ESP_LOGI("everblu_meter", "%s", msg)
 #define TS_PRINTF(fmt, ...) ESP_LOGI("everblu_meter", fmt, ##__VA_ARGS__)
 
+// EVB_PRINTLN / EVB_PRINTF are the untimestamped equivalents, used for banner
+// lines that carry no [TAG] prefix. They exist here for the same reason as
+// TS_PRINTLN / TS_PRINTF above: a shared file that adopts them must still
+// compile in ESPHome mode.
+#define EVB_PRINTLN(msg) ESP_LOGI("everblu_meter", "%s", msg)
+#define EVB_PRINTF(fmt, ...) ESP_LOGI("everblu_meter", fmt, ##__VA_ARGS__)
+
 // Component TAG should be defined as: static const char *const TAG = "everblu_meter";
 // This ensures all logs appear under the "everblu_meter" component in ESPHome logs
 

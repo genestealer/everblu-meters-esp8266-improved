@@ -74,7 +74,7 @@ It replaces three things at link time:
 | --- | --- |
 | CC1101 free functions (`cc1101_init`, `get_meter_data_for_meter`, ...) | No radio on the host |
 | `StorageAbstraction` | No EEPROM or NVS on the host |
-| `WifiSerialStream` / `WiFiSerial` | No network stack; log output goes to stdout |
+| `WifiSerialStream` / `WiFiSerial` | No network stack; log output goes to stdout. Only compiled when `WIFI_SERIAL_MONITOR_ENABLED` is `1`, which `env:native` sets so the mirror path stays covered on the host |
 
 The fake radio answers in one of two modes. Scripted mode consumes a queue of
 `tmeter_data` outcomes, repeating the last entry once the script runs out.

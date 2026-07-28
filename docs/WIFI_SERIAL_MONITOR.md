@@ -67,9 +67,10 @@ With `WIFI_SERIAL_MONITOR_ENABLED 1`:
 
 - WiFi serial server running at all times
 - Continuous network output streaming
-- Roughly 9.9 KB of extra static RAM on ESP8266 (transmit ring buffer, `printf` buffer,
-  `WiFiServer`/`WiFiClient` objects and the associated strings), which is about 12% of the
-  81920-byte budget
+- 8904 bytes of extra static RAM on ESP8266 (transmit ring buffer, `printf` buffer,
+  `WiFiServer`/`WiFiClient` objects and the associated strings), which is 10.9 percentage
+  points of the 81920-byte budget: 58.6% used with the monitor off, 69.5% with it on
+  (measured on `env:huzzah`)
 - Slight impact on main application loop (non-blocking, but write operations may block)
 
 The ring buffer size can be tuned by defining `WIFI_SERIAL_TX_BUF_SIZE` (must be a power of

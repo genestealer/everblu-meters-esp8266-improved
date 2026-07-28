@@ -12,7 +12,7 @@
 #include "wifi_serial.h"
 
 // The whole translation unit collapses to nothing when the monitor is disabled
-// in include/private.h, which is what frees the ~9.2 KB of DRAM.
+// in include/private.h, which is what frees the 8904 bytes of DRAM.
 #if WIFI_SERIAL_MONITOR_ENABLED
 
 #include "version.h"
