@@ -135,6 +135,16 @@ void show_in_bin(const uint8_t *buffer, size_t len)
 
 int calculateMeterdBmToPercentage(int rssi_dbm)
 {
+	// NOTE: the -120..-40 dBm scale is an arbitrary display convenience, not a
+	// calibrated measurement. It exists so Home Assistant can show a signal bar;
+	// the percentage has no physical meaning and the endpoints were picked to
+	// span roughly "unusable" to "right next to the meter". Judge link quality
+	// from the dBm and LQI values instead. Any change to these endpoints shifts
+	// every historical value in Home Assistant, so treat it as user-visible.
+	//
+	// This is the single implementation for both builds: the ESPHome publisher
+	// delegates here so its sensor cannot drift away from the device log.
+
 	// Clamp RSSI to a reasonable range (e.g., -120 dBm to -40 dBm)
 	int clamped_rssi = constrain(rssi_dbm, -120, -40);
 

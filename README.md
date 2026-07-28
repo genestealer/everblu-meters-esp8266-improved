@@ -511,7 +511,7 @@ The following MQTT topics are used to integrate the device with Home Assistant v
 | `Counter`          | `everblu/cyble/counter`                | Number of times the meter has been read (wraps around 255→1). |
 | `RSSI`             | `everblu/cyble/rssi`                   | Raw RSSI value of the meter's signal.                         |
 | `RSSI (dBm)`       | `everblu/cyble/rssi_dbm`               | RSSI value converted to dBm.                                  |
-| `RSSI (%)`         | `everblu/cyble/rssi_percentage`        | RSSI value converted to a percentage.                         |
+| `RSSI (%)`         | `everblu/cyble/rssi_percentage`        | RSSI value converted to a percentage. See the note below.     |
 | `Time Start`       | `everblu/cyble/time_start`             | Time when the meter wakes up, formatted as `HH:MM`.           |
 | `Time End`         | `everblu/cyble/time_end`               | Time when the meter goes to sleep, formatted as `HH:MM`.      |
 | `Timestamp`        | `everblu/cyble/timestamp`              | ISO 8601 timestamp of the last reading.                       |
@@ -522,6 +522,8 @@ The following MQTT topics are used to integrate the device with Home Assistant v
 | `SSID`             | `everblu/cyble/ssid`                   | Wi-Fi SSID the device is connected to.                        |
 | `BSSID`            | `everblu/cyble/bssid`                  | Wi-Fi BSSID the device is connected to.                       |
 | `Uptime`           | `everblu/cyble/uptime`                 | Device uptime in ISO 8601 format.                             |
+
+> **Note on `RSSI (%)`.** The percentage is a display convenience, not a calibrated measurement. It maps the -120 to -40 dBm range onto 0-100% so Home Assistant can show a signal bar; the endpoints were chosen to span roughly "unusable" to "right next to the meter" and have no physical meaning. Judge link quality from the dBm and LQI values instead. The same scale is used by the ESPHome `rssi_percentage` sensor and by the device log.
 
 </details>
 
