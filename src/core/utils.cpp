@@ -11,8 +11,8 @@
 #include <Arduino.h>
 #include "crc_kermit.h"
 #include "cc1101.h"		 // For tmeter_data struct
-#include "wifi_serial.h" // Mirror Serial to WiFi
-#include "logging.h"	 // Cross-platform logging
+// private.h must come before wifi_serial.h: the latter reads
+// WIFI_SERIAL_MONITOR_ENABLED to decide whether to compile the mirror in at all.
 #if !defined(USE_ESPHOME)
 #if defined(__has_include)
 #if __has_include("private.h")
@@ -22,6 +22,8 @@
 /* No __has_include support; skip optional private.h */
 #endif
 #endif
+#include "wifi_serial.h" // Mirror Serial to WiFi
+#include "logging.h"	 // Cross-platform logging
 
 #include <string.h>
 

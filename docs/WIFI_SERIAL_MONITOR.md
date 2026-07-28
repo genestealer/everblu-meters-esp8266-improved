@@ -51,19 +51,29 @@ Only enable this feature:
 
 ### Performance Impact
 
+`WIFI_SERIAL_MONITOR_ENABLED` is a compile-time switch. When it is `0` the TCP server, the
+8 KB transmit ring buffer and the 1 KB `printf` scratch buffer are not compiled in at all,
+and `Serial` is left pointing at the hardware UART rather than being remapped through the
+mirror.
+
 With `WIFI_SERIAL_MONITOR_ENABLED 0` (default):
 
 - No WiFi serial server created
 - No network overhead
-- Minimal memory impact
+- No static memory cost: the whole subsystem is compiled out
 - Slightly improved device responsiveness
 
 With `WIFI_SERIAL_MONITOR_ENABLED 1`:
 
 - WiFi serial server running at all times
 - Continuous network output streaming
-- Memory overhead from WiFiServer and WiFiClient objects
+- Roughly 9.9 KB of extra static RAM on ESP8266 (transmit ring buffer, `printf` buffer,
+  `WiFiServer`/`WiFiClient` objects and the associated strings), which is about 12% of the
+  81920-byte budget
 - Slight impact on main application loop (non-blocking, but write operations may block)
+
+The ring buffer size can be tuned by defining `WIFI_SERIAL_TX_BUF_SIZE` (must be a power of
+two) if the default 8192 bytes is more headroom than you need.
 
 ## Usage
 
