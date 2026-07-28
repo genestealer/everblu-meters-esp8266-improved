@@ -33,12 +33,23 @@ jobs:
         environment:
           - name: huzzah
             board: Adafruit HUZZAH ESP8266
+            suffix: ""
+          # private.h defaults WIFI_SERIAL_MONITOR_ENABLED to 0, so without this
+          # variant the mirror, its ring buffer and the `Serial` remap are
+          # #ifdef'd out of every job and never compiled.
+          - name: huzzah
+            board: Adafruit HUZZAH ESP8266 (WiFi serial monitor)
+            suffix: "-wifi-serial"
+            wifi_serial: true
           - name: d1_mini_pro
             board: WeMos D1 Mini Pro
+            suffix: ""
           - name: d1_mini
             board: WeMos D1 Mini
+            suffix: ""
           - name: nodemcuv2
             board: NodeMCU v2
+            suffix: ""
 
     name: Build ${{ matrix.environment.board }}
 
@@ -82,6 +93,12 @@ jobs:
         run: |
           sed -i 's/#define METER_CODE "xx-xxxxxxx-xxx"/#define METER_CODE "99-1234567-000"/g' include/private.h
           echo "Injected dummy METER_CODE=99-1234567-000 for CI build"
+
+      - name: Enable the WiFi serial monitor
+        if: matrix.environment.wifi_serial
+        run: |
+          sed -i 's/#define WIFI_SERIAL_MONITOR_ENABLED 0/#define WIFI_SERIAL_MONITOR_ENABLED 1/' include/private.h
+          grep -n 'define WIFI_SERIAL_MONITOR_ENABLED' include/private.h
 
       - name: Register GCC problem matcher
         run: echo "::add-matcher::.github/workflows/matchers/gcc.json"
@@ -152,7 +169,7 @@ jobs:
       - name: Upload firmware artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: firmware-esp8266-${{ matrix.environment.name }}
+          name: firmware-esp8266-${{ matrix.environment.name }}${{ matrix.environment.suffix }}
           path: .pio/build/${{ matrix.environment.name }}/firmware.*
           retention-days: 30
 
@@ -160,7 +177,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: build-logs-esp8266-${{ matrix.environment.name }}
+          name: build-logs-esp8266-${{ matrix.environment.name }}${{ matrix.environment.suffix }}
           path: |
             build-output.log
             warnings.txt

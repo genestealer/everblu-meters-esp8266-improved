@@ -11,8 +11,10 @@
 #include <Arduino.h>
 #include "crc_kermit.h"
 #include "cc1101.h"		 // For tmeter_data struct
-#include "wifi_serial.h" // Mirror Serial to WiFi
-#include "logging.h"	 // Cross-platform logging
+// private.h is pulled in ahead of wifi_serial.h so WIFI_SERIAL_MONITOR_ENABLED is
+// already known when the mirror decides whether to compile itself in. Not strictly
+// required (wifi_serial.h falls back to including private.h itself), but it keeps
+// the dependency visible at the top of the file.
 #if !defined(USE_ESPHOME)
 #if defined(__has_include)
 #if __has_include("private.h")
@@ -22,6 +24,8 @@
 /* No __has_include support; skip optional private.h */
 #endif
 #endif
+#include "wifi_serial.h" // Mirror Serial to WiFi
+#include "logging.h"	 // Cross-platform logging
 
 #include <string.h>
 
@@ -238,7 +242,8 @@ void echo_debug(bool l_flag, const char *fmt, ...)
 	// Use INFO level so messages are always visible in WiFi logs
 	LOG_I("everblu_meter", "%s", buf);
 #else
-	// MQTT mode: Route through WiFiSerial for USB + WiFi visibility.
+	// MQTT mode: `Serial` is remapped to the WiFi mirror by wifi_serial.h when the
+	// monitor is enabled, and is the plain hardware UART when it is not.
 	// Colourise based on the leading "[TAG]" token (e.g. [METER], [FREQ]) so
 	// the VS Code terminal / PlatformIO monitor is easier to scan. The RESET is
 	// emitted before any trailing newline to avoid colouring blank line breaks.
@@ -250,17 +255,17 @@ void echo_debug(bool l_flag, const char *fmt, ...)
 		bool hasNewline = (len > 0 && buf[len - 1] == '\n');
 		if (hasNewline)
 			buf[len - 1] = '\0';
-		WiFiSerial.print(ts);
-		WiFiSerial.print(col);
-		WiFiSerial.print(buf);
-		WiFiSerial.print(EVB_ANSI_RESET);
+		Serial.print(ts);
+		Serial.print(col);
+		Serial.print(buf);
+		Serial.print(EVB_ANSI_RESET);
 		if (hasNewline)
-			WiFiSerial.print('\n');
+			Serial.print('\n');
 	}
 	else
 	{
-		WiFiSerial.print(ts);
-		WiFiSerial.print(buf);
+		Serial.print(ts);
+		Serial.print(buf);
 	}
 #endif
 

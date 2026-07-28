@@ -11,6 +11,27 @@
 
 #include <Arduino.h>
 
+// WIFI_SERIAL_MONITOR_ENABLED is a user setting in include/private.h. Pull that
+// file in here (unless the including translation unit already did, or this is an
+// ESPHome build where private.h does not exist) so the entire subsystem can be
+// compiled out when the monitor is disabled. Leaving it in costs 8904 bytes of
+// DRAM on ESP8266 (measured on env:huzzah) for the transmit ring buffer and the
+// printf scratch buffer, which is 10.9 percentage points of the 81920-byte
+// budget for a feature that is off by default.
+#if !defined(WIFI_SERIAL_MONITOR_ENABLED) && !defined(USE_ESPHOME)
+#if defined(__has_include)
+#if __has_include("private.h")
+#include "private.h"
+#endif
+#endif
+#endif
+
+#ifndef WIFI_SERIAL_MONITOR_ENABLED
+#define WIFI_SERIAL_MONITOR_ENABLED 0
+#endif
+
+#if WIFI_SERIAL_MONITOR_ENABLED
+
 // Default TCP port for WiFi serial (Telnet default)
 #ifndef WIFI_SERIAL_PORT
 #define WIFI_SERIAL_PORT 23
@@ -122,5 +143,15 @@ void wifiSerialPrintf(const char *format, ...);
 #ifndef WIFI_SERIAL_NO_REMAP
 #define Serial WiFiSerial
 #endif
+
+#else // !WIFI_SERIAL_MONITOR_ENABLED
+
+// Monitor disabled: the TCP server, the transmit ring buffer and the printf
+// scratch buffer are all compiled out, `Serial` is left pointing at the hardware
+// UART, and nothing named WiFiSerial is declared. Code that wants the mirror
+// when it is available should just use `Serial`, which this header remaps to the
+// mirror on the enabled path.
+
+#endif // WIFI_SERIAL_MONITOR_ENABLED
 
 #endif // WIFI_SERIAL_H

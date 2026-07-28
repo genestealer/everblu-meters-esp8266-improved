@@ -10,6 +10,11 @@
 #define WIFI_SERIAL_NO_REMAP
 #endif
 #include "wifi_serial.h"
+
+// The whole translation unit collapses to nothing when the monitor is disabled
+// in include/private.h, which is what frees the 8904 bytes of DRAM.
+#if WIFI_SERIAL_MONITOR_ENABLED
+
 #include "version.h"
 
 #if __has_include(<ESP8266WiFi.h>)
@@ -313,3 +318,5 @@ void wifiSerialPrintf(const char *format, ...)
 
     WiFiSerial.print(buffer);
 }
+
+#endif // WIFI_SERIAL_MONITOR_ENABLED

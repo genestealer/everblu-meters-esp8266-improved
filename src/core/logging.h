@@ -68,6 +68,13 @@
 #define TS_PRINTLN(msg) ESP_LOGI("everblu_meter", "%s", msg)
 #define TS_PRINTF(fmt, ...) ESP_LOGI("everblu_meter", fmt, ##__VA_ARGS__)
 
+// EVB_PRINTLN / EVB_PRINTF are the untimestamped equivalents, used for banner
+// lines that carry no [TAG] prefix. They exist here for the same reason as
+// TS_PRINTLN / TS_PRINTF above: a shared file that adopts them must still
+// compile in ESPHome mode.
+#define EVB_PRINTLN(msg) ESP_LOGI("everblu_meter", "%s", msg)
+#define EVB_PRINTF(fmt, ...) ESP_LOGI("everblu_meter", fmt, ##__VA_ARGS__)
+
 // Component TAG should be defined as: static const char *const TAG = "everblu_meter";
 // This ensures all logs appear under the "everblu_meter" component in ESPHome logs
 
@@ -182,12 +189,33 @@ inline const char *everblu_log_timestamp()
 // Timestamped Serial output helpers for tagged log lines (MQTT mode only).
 // Use TS_PRINTLN / TS_PRINTF in place of direct Serial.println / Serial.printf
 // for lines that carry a [TAG] prefix, so the output matches ESPHome log style.
-#define TS_PRINTLN(msg) do { Serial.print(everblu_log_timestamp()); Serial.println(msg); } while (0)
-#define TS_PRINTF(fmt, ...) do { Serial.print(everblu_log_timestamp()); Serial.printf(fmt, ##__VA_ARGS__); } while (0)
+//
+// FLASH-RESIDENT FORMAT STRINGS (ESP8266)
+// ---------------------------------------
+// On ESP8266 a plain string literal is emitted into .rodata, which is part of
+// the 81920-byte DRAM budget, not flash. Routing every log line through
+// printf_P(PSTR(...)) / println(F(...)) moves the literal into .irom.text so it
+// is read from the flash cache instead. Doing it here covers every TS_PRINTF,
+// TS_PRINTLN and LOG_* call site in the firmware from one place.
+//
+// Constraint: PSTR() and F() require a compile-time string literal. Passing a
+// `const char *` variable as the format will not compile on ESP8266. Use
+// TS_PRINTF("%s\n", var) instead. ESP32 and the native host build keep the
+// plain form, where PSTR is either a no-op or unavailable.
+#if defined(ESP8266)
+#define EVB_PRINTF(fmt, ...) Serial.printf_P(PSTR(fmt), ##__VA_ARGS__)
+#define EVB_PRINTLN(msg) Serial.println(F(msg))
+#else
+#define EVB_PRINTF(fmt, ...) Serial.printf(fmt, ##__VA_ARGS__)
+#define EVB_PRINTLN(msg) Serial.println(msg)
+#endif
 
-#define LOG_D(tag, format, ...) Serial.printf("%s" EVB_ANSI_GRAY "[D][%s]" EVB_ANSI_RESET " " format "\n", everblu_log_timestamp(), tag, ##__VA_ARGS__)
-#define LOG_I(tag, format, ...) Serial.printf("%s" EVB_ANSI_GREEN "[I]" EVB_ANSI_RESET "[%s] " format "\n", everblu_log_timestamp(), tag, ##__VA_ARGS__)
-#define LOG_W(tag, format, ...) Serial.printf("%s" EVB_ANSI_YELLOW "[W][%s] " format EVB_ANSI_RESET "\n", everblu_log_timestamp(), tag, ##__VA_ARGS__)
-#define LOG_E(tag, format, ...) Serial.printf("%s" EVB_ANSI_RED "[E][%s] " format EVB_ANSI_RESET "\n", everblu_log_timestamp(), tag, ##__VA_ARGS__)
-#define LOG_V(tag, format, ...) Serial.printf("%s" EVB_ANSI_GRAY "[V][%s] " format EVB_ANSI_RESET "\n", everblu_log_timestamp(), tag, ##__VA_ARGS__)
+#define TS_PRINTLN(msg) do { Serial.print(everblu_log_timestamp()); EVB_PRINTLN(msg); } while (0)
+#define TS_PRINTF(fmt, ...) do { Serial.print(everblu_log_timestamp()); EVB_PRINTF(fmt, ##__VA_ARGS__); } while (0)
+
+#define LOG_D(tag, format, ...) EVB_PRINTF("%s" EVB_ANSI_GRAY "[D][%s]" EVB_ANSI_RESET " " format "\n", everblu_log_timestamp(), tag, ##__VA_ARGS__)
+#define LOG_I(tag, format, ...) EVB_PRINTF("%s" EVB_ANSI_GREEN "[I]" EVB_ANSI_RESET "[%s] " format "\n", everblu_log_timestamp(), tag, ##__VA_ARGS__)
+#define LOG_W(tag, format, ...) EVB_PRINTF("%s" EVB_ANSI_YELLOW "[W][%s] " format EVB_ANSI_RESET "\n", everblu_log_timestamp(), tag, ##__VA_ARGS__)
+#define LOG_E(tag, format, ...) EVB_PRINTF("%s" EVB_ANSI_RED "[E][%s] " format EVB_ANSI_RESET "\n", everblu_log_timestamp(), tag, ##__VA_ARGS__)
+#define LOG_V(tag, format, ...) EVB_PRINTF("%s" EVB_ANSI_GRAY "[V][%s] " format EVB_ANSI_RESET "\n", everblu_log_timestamp(), tag, ##__VA_ARGS__)
 #endif

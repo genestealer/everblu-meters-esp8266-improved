@@ -237,6 +237,10 @@ bool StorageAbstraction::clearAll()
 // WiFi serial mirror: reduced to the local stdout stream
 // ---------------------------------------------------------------------------
 
+// Only needed when the monitor is compiled in; otherwise wifi_serial.h aliases
+// WiFiSerial straight to the native Serial shim and there is nothing to fake.
+#if WIFI_SERIAL_MONITOR_ENABLED
+
 WifiSerialStream WiFiSerial(::Serial);
 
 size_t WifiSerialStream::write(uint8_t c) { return _usb.write(c); }
@@ -277,6 +281,8 @@ void wifiSerialPrintf(const char *format, ...)
     va_end(args);
     WiFiSerial.print(buf);
 }
+
+#endif // WIFI_SERIAL_MONITOR_ENABLED
 
 // ---------------------------------------------------------------------------
 // FakeTime
