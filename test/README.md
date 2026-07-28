@@ -89,6 +89,16 @@ cooldowns are exercised instantly and deterministically. Nothing ever sleeps.
 
 ## Running
 
+```powershell
+# Everything CI runs, in the same order
+./scripts/run-tests.ps1            # host suites only (a few seconds)
+./scripts/run-tests.ps1 -Build     # also compile both firmware targets
+./scripts/run-tests.ps1 -All       # also collect coverage
+./scripts/run-tests.ps1 -Serial    # show the firmware log output
+```
+
+Or drive PlatformIO directly:
+
 ```bash
 # All MQTT-mode host suites
 pio test -e native
