@@ -456,6 +456,26 @@ void test_cooldown_blocks_scheduled_reads_until_it_expires(void)
     TEST_ASSERT_EQUAL(2, (int)fakeRadio().calls.size());
 }
 
+void test_cooldown_applies_to_a_failure_at_time_zero(void)
+{
+    // millis() legitimately returns 0 for the first millisecond after boot, so
+    // the cooldown must not be keyed on the timestamp being non-zero.
+    nativeClockSet(0);
+    g_config.maxRetries = 1;
+    g_config.retryCooldownMs = 60000;
+    fakeRadio().responses.push_back(FakeRadio::failure(ReadFailure::NoReply));
+
+    MeterReader reader = makeReader();
+    reader.triggerReading(false);
+    TEST_ASSERT_EQUAL(1, (int)fakeRadio().calls.size());
+
+    g_time.setUtc(2025, 6, 10, 10, 0, 0);
+    nativeClockAdvance(1000);
+    reader.loop();
+
+    TEST_ASSERT_EQUAL(1, (int)fakeRadio().calls.size());
+}
+
 void test_statistics_are_republished_periodically(void)
 {
     MeterReader reader = makeReader();

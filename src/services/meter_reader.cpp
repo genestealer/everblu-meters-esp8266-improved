@@ -49,7 +49,7 @@ static void logReadableSummary(const tmeter_data &data, const IConfigProvider *c
 }
 
 MeterReader::MeterReader(IConfigProvider *config, ITimeProvider *timeProvider, IDataPublisher *publisher)
-    : m_config(config), m_timeProvider(timeProvider), m_publisher(publisher), m_initialized(false), m_readingInProgress(false), m_isScheduledRead(false), m_haConnected(false), m_radioConnected(false), m_retryCount(0), m_lastFailedAttempt(0), m_nextRetryTime(0), m_autoScanAfterFailureDone(false), m_retryFailureReason(ReadFailure::None), m_totalReadAttempts(0), m_successfulReads(0), m_failedReads(0), m_lastErrorMessage("None"), m_lastScheduleCheck(0), m_lastStatsPublish(0), m_readHourLocal(10), m_readMinuteLocal(0), m_lastReadDayMatch(false), m_lastReadTimeMatch(false)
+    : m_config(config), m_timeProvider(timeProvider), m_publisher(publisher), m_initialized(false), m_readingInProgress(false), m_isScheduledRead(false), m_haConnected(false), m_radioConnected(false), m_retryCount(0), m_inCooldown(false), m_lastFailedAttempt(0), m_nextRetryTime(0), m_autoScanAfterFailureDone(false), m_retryFailureReason(ReadFailure::None), m_totalReadAttempts(0), m_successfulReads(0), m_failedReads(0), m_lastErrorMessage("None"), m_lastScheduleCheck(0), m_lastStatsPublish(0), m_readHourLocal(10), m_readMinuteLocal(0), m_lastReadDayMatch(false), m_lastReadTimeMatch(false)
 {
 }
 
@@ -249,8 +249,11 @@ bool MeterReader::shouldPerformScheduledRead()
         return false;
     }
 
-    // Check if in cooldown period after failures
-    if (m_lastFailedAttempt > 0)
+    // Check if in cooldown period after failures.
+    // The flag, rather than a non-zero timestamp, is what marks the cooldown as
+    // running: millis() legitimately returns 0 for the first millisecond after
+    // boot, and a failure landing there must not skip the cooldown entirely.
+    if (m_inCooldown)
     {
         unsigned long cooldown = m_config->getRetryCooldownMs();
         if (millis() - m_lastFailedAttempt < cooldown)
@@ -258,6 +261,7 @@ bool MeterReader::shouldPerformScheduledRead()
             return false;
         }
         // Cooldown expired, reset
+        m_inCooldown = false;
         m_lastFailedAttempt = 0;
     }
 
@@ -406,9 +410,10 @@ void MeterReader::handleFailedRead(ReadFailure reason)
     if (m_retryCount < m_config->getMaxRetries() - 1)
     {
         // Schedule retry after delay.
-        // Keep the "Active Reading" sensor true and the radio state as "Reading"
-        // for the whole retry sequence so they don't flicker running/idle between
-        // attempts. They are cleared only on final success or after max retries.
+        // The "Active Reading" sensor and the radio state are re-asserted on
+        // every attempt but never cleared between them, so they don't drop to
+        // idle mid-sequence and make the read look finished. They are cleared
+        // only on final success or after max retries.
         // m_readingInProgress also stays true to keep the sequence atomic (the
         // retry timer in loop() calls performReading() directly, bypassing the
         // m_readingInProgress guard).
@@ -426,6 +431,7 @@ void MeterReader::handleFailedRead(ReadFailure reason)
     {
         // Max retries reached
         m_failedReads++;
+        m_inCooldown = true;
         m_lastFailedAttempt = millis();
         m_lastErrorMessage = read_failure_message(
             m_retryFailureReason != ReadFailure::None ? m_retryFailureReason : reason, false);
