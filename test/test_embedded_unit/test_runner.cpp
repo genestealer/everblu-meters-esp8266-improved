@@ -70,6 +70,13 @@ void test_history_json_null_buffer(void);
 void test_history_month_labels(void);
 void test_history_print_to_serial_is_safe(void);
 
+// --- test_hex_dump.cpp ---
+void test_hex_dump_handles_a_full_radian_frame(void);
+void test_hex_dump_handles_an_oversized_buffer(void);
+void test_hex_dump_handles_empty_and_null(void);
+void test_hex_dump_handles_exact_line_boundaries(void);
+void test_binary_dump_handles_a_full_radian_frame(void);
+
 void setUp(void) {}
 
 void tearDown(void) {}
@@ -135,6 +142,12 @@ int main(int argc, char **argv)
     RUN_TEST(test_history_json_null_buffer);
     RUN_TEST(test_history_month_labels);
     RUN_TEST(test_history_print_to_serial_is_safe);
+
+    RUN_TEST(test_hex_dump_handles_a_full_radian_frame);
+    RUN_TEST(test_hex_dump_handles_an_oversized_buffer);
+    RUN_TEST(test_hex_dump_handles_empty_and_null);
+    RUN_TEST(test_hex_dump_handles_exact_line_boundaries);
+    RUN_TEST(test_binary_dump_handles_a_full_radian_frame);
 
     return UNITY_END();
 }
