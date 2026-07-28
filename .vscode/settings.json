@@ -1,4 +1,17 @@
 {
+	// This repository is a fork. The `upstream` remote points at the original
+	// project (psykokwak-com/everblu-meters-esp8266), so by default the GitHub
+	// Pull Requests extension treats that as the repository: it lists upstream's
+	// pull requests and defaults new ones to upstream's owner and base branch.
+	// Day-to-day work happens entirely within this fork, so restrict it to
+	// `origin`.
+	//
+	// To contribute a change back to the original project, temporarily add
+	// "upstream" to this list.
+	"githubPullRequests.remotes": [
+		"origin"
+	],
+
 	// // Keep the release folder out of search/watch
 	// "files.exclude": {
 	// 	"**/ESPHOME-release/**": true
