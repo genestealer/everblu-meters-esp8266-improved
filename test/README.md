@@ -90,6 +90,9 @@ cooldowns are exercised instantly and deterministically. Nothing ever sleeps.
 ## Running
 
 ```powershell
+# One-off: install the tooling (platformio, pytest, esphome, gcovr)
+pip install -r scripts/requirements-dev.txt
+
 # Everything CI runs, in the same order
 ./scripts/run-tests.ps1            # host suites only (a few seconds)
 ./scripts/run-tests.ps1 -Build     # also compile both firmware targets

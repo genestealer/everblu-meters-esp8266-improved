@@ -1,0 +1,17 @@
+# Development and test dependencies.
+#
+#   pip install -r scripts/requirements-dev.txt
+#
+# Everything needed to run ./scripts/run-tests.ps1, which mirrors CI. None of
+# it is required to build or flash the firmware from the PlatformIO IDE.
+
+# Firmware builds and the host unit test suites (pio run / pio test).
+platformio
+
+# tests/esphome validates the external component's YAML schema against the real
+# ESPHome config validators, so ESPHome itself has to be importable.
+esphome>=2025.0
+pytest
+
+# Coverage reporting over the host-tested sources (./scripts/run-tests.ps1 -Coverage).
+gcovr
