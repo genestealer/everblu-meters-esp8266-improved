@@ -1,13 +1,10 @@
 {
-	// This repository is a fork. The `upstream` remote points at the original
-	// project (psykokwak-com/everblu-meters-esp8266), so by default the GitHub
-	// Pull Requests extension treats that as the repository: it lists upstream's
-	// pull requests and defaults new ones to upstream's owner and base branch.
-	// Day-to-day work happens entirely within this fork, so restrict it to
-	// `origin`.
-	//
-	// To contribute a change back to the original project, temporarily add
-	// "upstream" to this list.
+	// This repository began as a fork but is no longer linked to the original
+	// project on GitHub, and it has its own default branch and release history.
+	// Other remotes may be present for pulling in work from sibling forks, so
+	// pin the GitHub Pull Requests extension to `origin`: otherwise it can treat
+	// one of those as the repository and default new pull requests to the wrong
+	// owner and base branch.
 	"githubPullRequests.remotes": [
 		"origin"
 	],
