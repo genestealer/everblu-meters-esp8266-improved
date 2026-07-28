@@ -81,7 +81,7 @@ function Invoke-Step {
     }
 }
 
-function Skip-Step {
+function Write-SkippedStep {
     param(
         [Parameter(Mandatory)][string]$Name,
         [Parameter(Mandatory)][string]$Reason
@@ -139,10 +139,10 @@ try {
     # ESPHome YAML schema validation. These import the real ESPHome validators,
     # so they need both esphome and pytest.
     if (-not (Test-PythonModule "pytest")) {
-        Skip-Step "ESPHome config tests" "pytest is not available to '$((Get-Command python).Source)'. Please $installHint"
+        Write-SkippedStep "ESPHome config tests" "pytest is not available to '$((Get-Command python).Source)'. Please $installHint"
     }
     elseif (-not (Test-PythonModule "esphome")) {
-        Skip-Step "ESPHome config tests" "esphome is not available to '$((Get-Command python).Source)'. Please $installHint"
+        Write-SkippedStep "ESPHome config tests" "esphome is not available to '$((Get-Command python).Source)'. Please $installHint"
     }
     else {
         Invoke-Step "ESPHome config tests" { python -m pytest tests/esphome -q }
@@ -154,6 +154,11 @@ try {
     }
 
     if ($Coverage) {
+        # .pio/build/ spans both native environments, which compile several of
+        # these sources twice under different preprocessor settings (USE_ESPHOME
+        # on and off). gcovr merges the two runs per source file, so the totals
+        # are sound but per-line figures in #ifdef-heavy files read as the union
+        # of both configurations.
         $gcovrArgs = @(
             "--root", ".",
             "--object-directory", ".pio/build/",
@@ -179,7 +184,7 @@ try {
             Invoke-Step "Coverage" { python -m gcovr @gcovrArgs }
         }
         else {
-            Skip-Step "Coverage" "gcovr is not available. Please $installHint"
+            Write-SkippedStep "Coverage" "gcovr is not available. Please $installHint"
         }
     }
 

@@ -81,6 +81,11 @@ jobs:
           pio test -e native_esphome -v
 
       - name: Collect coverage
+        # --object-directory spans both native environments, which compile several
+        # of these sources twice under different preprocessor settings (USE_ESPHOME
+        # on and off). gcovr merges the two runs per source file, so the totals are
+        # sound but per-line figures in #ifdef-heavy files read as the union of
+        # both configurations. Worth remembering when a coverage delta looks odd.
         run: |
           gcovr \
             --root . \

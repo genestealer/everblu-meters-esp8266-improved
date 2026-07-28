@@ -94,18 +94,21 @@ jobs:
           sed -i 's/#define METER_CODE "xx-xxxxxxx-xxx"/#define METER_CODE "99-1234567-000"/g' include/private.h
           echo "Injected dummy METER_CODE=99-1234567-000 for CI build"
 
-      - name: Enable the WiFi serial monitor
-        if: matrix.environment.wifi_serial
-        run: |
-          sed -i 's/#define WIFI_SERIAL_MONITOR_ENABLED 0/#define WIFI_SERIAL_MONITOR_ENABLED 1/' include/private.h
-          grep -n 'define WIFI_SERIAL_MONITOR_ENABLED' include/private.h
-
       - name: Register GCC problem matcher
         run: echo "::add-matcher::.github/workflows/matchers/gcc.json"
 
       - name: Build PlatformIO Project (${{ matrix.environment.board }})
+        # The WiFi serial monitor variant is selected with a compiler define rather
+        # than by rewriting private.h. A sed that no longer matches exits 0 having
+        # changed nothing, which would quietly build a duplicate of the default job
+        # and still report success. private.example.h wraps the define in #ifndef
+        # precisely so this override is possible. None of the ESP8266 environments
+        # set build_flags in platformio.ini, so replacing them here loses nothing.
+        env:
+          PLATFORMIO_BUILD_FLAGS: ${{ matrix.environment.wifi_serial && '-DWIFI_SERIAL_MONITOR_ENABLED=1' || '' }}
         run: |
           echo "Building with warning analysis..."
+          echo "Extra build flags: '${PLATFORMIO_BUILD_FLAGS}'"
           pio run -e ${{ matrix.environment.name }} -v 2>&1 | tee build-output.log
 
           # Check build status

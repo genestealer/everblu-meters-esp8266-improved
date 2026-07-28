@@ -5,9 +5,12 @@
 
 #include "esphome_data_publisher.h"
 #include "../../services/meter_history.h"
+// Shared RSSI/LQI percentage conversions. Included unconditionally: utils.h has
+// no ESPHome dependency, and this translation unit is compiled by the MQTT build
+// too, where guarding it would leave the helpers below returning a constant.
+#include "../../core/utils.h"
 
 #ifdef USE_ESPHOME
-#include "utils.h" // Shared RSSI/LQI percentage conversions
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/binary_sensor/binary_sensor.h"
@@ -380,20 +383,10 @@ bool ESPHomeDataPublisher::isReady() const
 // read several percent higher under ESPHome.
 int ESPHomeDataPublisher::calculateRssiPercentage(int rssi_dbm) const
 {
-#ifdef USE_ESPHOME
     return calculateMeterdBmToPercentage(rssi_dbm);
-#else
-    (void)rssi_dbm;
-    return 0;
-#endif
 }
 
 int ESPHomeDataPublisher::calculateLqiPercentage(int lqi) const
 {
-#ifdef USE_ESPHOME
     return calculateLQIToPercentage(lqi);
-#else
-    (void)lqi;
-    return 0;
-#endif
 }

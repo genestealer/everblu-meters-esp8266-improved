@@ -1003,14 +1003,16 @@ void test_radian_reading_within_history_bounds_skips_when_insufficient(void)
 }
 
 // ---------------------------------------------------------------------------
-// Read failure classification: a silent meter, a corrupted frame and a frame
-// with invalid fields must each produce distinct, non-empty guidance so users
-// are not told to "check distance" when the real problem is RF quality.
+// Read failure classification: a silent meter, a corrupted frame, a frame with
+// invalid fields and a read the radio never attempted must each produce
+// distinct, non-empty guidance so users are not told to "check distance" when
+// the real problem is RF quality or an unusable METER_CODE.
 // ---------------------------------------------------------------------------
 void test_read_failure_messages_are_distinct(void)
 {
-    const ReadFailure reasons[] = {ReadFailure::None, ReadFailure::NoReply,
-                                   ReadFailure::CrcFailed, ReadFailure::ParseRejected};
+    const ReadFailure reasons[] = {ReadFailure::None, ReadFailure::NotAttempted,
+                                   ReadFailure::NoReply, ReadFailure::CrcFailed,
+                                   ReadFailure::ParseRejected};
 
     for (ReadFailure reason : reasons)
     {
@@ -1028,6 +1030,17 @@ void test_read_failure_messages_are_distinct(void)
                                     read_failure_message(ReadFailure::NoReply, true)));
     TEST_ASSERT_NOT_EQUAL(0, strcmp(read_failure_message(ReadFailure::CrcFailed, true),
                                     read_failure_message(ReadFailure::ParseRejected, true)));
+
+    // A read the radio never attempted must not be reported as a radio symptom.
+    TEST_ASSERT_NOT_EQUAL(0, strcmp(read_failure_message(ReadFailure::NotAttempted, true),
+                                    read_failure_message(ReadFailure::NoReply, true)));
+    TEST_ASSERT_NOT_EQUAL(0, strcmp(read_failure_message(ReadFailure::NotAttempted, false),
+                                    read_failure_message(ReadFailure::NoReply, false)));
+    TEST_ASSERT_TRUE(strlen(read_failure_log_suffix(ReadFailure::NotAttempted)) > 0);
+
+    // Retrying cannot fix a configuration error, so both texts read the same.
+    TEST_ASSERT_EQUAL_STRING(read_failure_message(ReadFailure::NotAttempted, true),
+                             read_failure_message(ReadFailure::NotAttempted, false));
 
     // Retrying and final wording differ, so the log shows the sequence ending.
     TEST_ASSERT_NOT_EQUAL(0, strcmp(read_failure_message(ReadFailure::CrcFailed, true),
