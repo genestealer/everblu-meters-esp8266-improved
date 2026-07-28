@@ -197,11 +197,17 @@ void MeterReader::loop()
 
     // Drive the deep frequency scan one step per loop() so the host stays
     // responsive and a Stop request can still be delivered mid-scan (issue #133).
-    // The scan owns the radio while it runs, so nothing else is serviced here.
+    // FrequencyManager state is shared by every reader on the radio, so only the
+    // reader that started the scan steps it (stepping it from another instance
+    // would apply the wrong radio and meter identity); the rest stand down until
+    // it finishes rather than retuning the radio mid-sweep.
     if (FrequencyManager::isScanInProgress())
     {
-        activateCallbackContext();
-        FrequencyManager::loopScan();
+        if (m_scanInProgress)
+        {
+            activateCallbackContext();
+            FrequencyManager::loopScan();
+        }
         return;
     }
 

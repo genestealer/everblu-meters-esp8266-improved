@@ -560,6 +560,29 @@ void test_auto_scan_on_failure_stays_off_when_disabled(void)
     TEST_ASSERT_FALSE(g_publisher.sawStatus("Auto frequency scan after failed reads"));
 }
 
+void test_a_scan_is_only_stepped_by_the_reader_that_started_it(void)
+{
+    // FrequencyManager holds the calibration in static state shared by every
+    // reader on the radio. A second reader must stand down rather than step
+    // someone else's scan with its own radio context and meter identity.
+    g_config.frequency = 433.82f;
+
+    MeterReader owner = makeReader();
+    MeterReader other = makeReader();
+
+    owner.performFrequencyScan();
+    TEST_ASSERT_TRUE(FrequencyManager::isScanInProgress());
+
+    const int before = (int)fakeRadio().calls.size();
+    other.loop();
+    TEST_ASSERT_EQUAL(before, (int)fakeRadio().calls.size());
+
+    owner.loop();
+    TEST_ASSERT_EQUAL(before + 1, (int)fakeRadio().calls.size());
+
+    drainFrequencyScan(owner);
+}
+
 void test_reset_frequency_offset_clears_storage_and_retunes(void)
 {
     StorageAbstraction::saveFloat("freq_offset", 0.030f, 0xABCD);
