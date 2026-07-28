@@ -8,6 +8,7 @@
 #include <unity.h>
 #include <string.h>
 #include "core/meter_code_parser.h"
+#include "core/utils.h"
 #include "services/schedule_manager.h"
 
 #define TEST_FREQUENCY 433.82
@@ -40,6 +41,35 @@ void test_invalid_reading_schedules(void)
     TEST_ASSERT_FALSE(ScheduleManager::isValidSchedule(nullptr));
     TEST_ASSERT_FALSE(ScheduleManager::isValidSchedule("Monday-Thursday"));
     TEST_ASSERT_FALSE(ScheduleManager::isValidSchedule("monday-friday")); // case sensitive
+}
+
+/**
+ * Test: the two schedule validators agree
+ *
+ * isValidReadingSchedule() in core/utils.cpp is a second copy of the same rule,
+ * used by the standalone MQTT build, while ScheduleManager::isValidSchedule()
+ * is what the reader and the ESPHome component use. A YAML value accepted by
+ * one and rejected by the other would be reported as a configuration error on
+ * only one of the two builds, so pin them together.
+ */
+void test_both_schedule_validators_agree(void)
+{
+    static const char *const candidates[] = {
+        "Monday-Friday", "Monday-Saturday", "Monday-Sunday",
+        "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
+        "Daily", "Weekdays", "Weekend", "", " ", "monday", "MONDAY",
+        "Monday-Thursday", "Monday ", " Monday", "Sunday-Monday"};
+
+    for (const char *candidate : candidates)
+    {
+        TEST_ASSERT_EQUAL_MESSAGE(ScheduleManager::isValidSchedule(candidate),
+                                  isValidReadingSchedule(candidate),
+                                  candidate);
+    }
+
+    // Both must survive a null rather than reaching strcmp with it.
+    TEST_ASSERT_FALSE(isValidReadingSchedule(nullptr));
+    TEST_ASSERT_FALSE(ScheduleManager::isValidSchedule(nullptr));
 }
 
 /**

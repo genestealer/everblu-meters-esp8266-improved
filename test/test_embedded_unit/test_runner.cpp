@@ -14,6 +14,7 @@
 // --- test_config_validation.cpp ---
 void test_valid_reading_schedules(void);
 void test_invalid_reading_schedules(void);
+void test_both_schedule_validators_agree(void);
 void test_frequency_validation(void);
 void test_meter_code_parse_valid_dashed_with_suffix(void);
 void test_meter_code_parse_valid_dashed_without_suffix(void);
@@ -90,6 +91,7 @@ int main(int argc, char **argv)
 
     RUN_TEST(test_valid_reading_schedules);
     RUN_TEST(test_invalid_reading_schedules);
+    RUN_TEST(test_both_schedule_validators_agree);
     RUN_TEST(test_frequency_validation);
     RUN_TEST(test_meter_code_parse_valid_dashed_with_suffix);
     RUN_TEST(test_meter_code_parse_valid_dashed_without_suffix);
