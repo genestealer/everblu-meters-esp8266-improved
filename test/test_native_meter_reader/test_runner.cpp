@@ -62,6 +62,8 @@ void test_freq_scan_can_be_cancelled_and_restores_the_known_good_tuning(void);
 void test_freq_scan_keeps_a_good_stored_offset_when_the_candidate_is_worse(void);
 void test_freq_scan_replaces_a_stored_offset_that_no_longer_decodes(void);
 void test_freq_scan_narrow_range_visits_fewer_steps_than_a_deep_sweep(void);
+void test_freq_scan_advances_one_step_per_loop_and_stops_between_steps(void);
+void test_freq_scan_ignores_a_second_start_while_one_is_running(void);
 void test_freq_adaptive_tracking_waits_for_the_threshold(void);
 void test_freq_adaptive_tracking_applies_half_the_average_error(void);
 void test_freq_adaptive_tracking_cancels_symmetric_noise(void);
@@ -133,6 +135,8 @@ int main(int, char **)
     RUN_TEST(test_freq_scan_keeps_a_good_stored_offset_when_the_candidate_is_worse);
     RUN_TEST(test_freq_scan_replaces_a_stored_offset_that_no_longer_decodes);
     RUN_TEST(test_freq_scan_narrow_range_visits_fewer_steps_than_a_deep_sweep);
+    RUN_TEST(test_freq_scan_advances_one_step_per_loop_and_stops_between_steps);
+    RUN_TEST(test_freq_scan_ignores_a_second_start_while_one_is_running);
     RUN_TEST(test_freq_adaptive_tracking_waits_for_the_threshold);
     RUN_TEST(test_freq_adaptive_tracking_applies_half_the_average_error);
     RUN_TEST(test_freq_adaptive_tracking_cancels_symmetric_noise);

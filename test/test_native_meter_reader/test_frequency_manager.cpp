@@ -262,6 +262,48 @@ void test_freq_scan_narrow_range_visits_fewer_steps_than_a_deep_sweep(void)
     TEST_ASSERT_GREATER_THAN(narrowSteps, deepSteps);
 }
 
+void test_freq_scan_advances_one_step_per_loop_and_stops_between_steps(void)
+{
+    // Issue #133: the scan is stepped from the host loop, so a stop request
+    // raised between steps (as the Stop button does) is honoured immediately.
+    beginManager();
+    FrequencyManager::saveFrequencyOffset(0.012f);
+    placeCarrier(30.0f, 6.0f);
+
+    FrequencyManager::beginDeepFrequencyScan(0.050f, 0.0025f);
+    TEST_ASSERT_TRUE(FrequencyManager::isScanInProgress());
+    TEST_ASSERT_EQUAL(0, (int)fakeRadio().calls.size()); // Nothing swept yet
+
+    FrequencyManager::loopScan();
+    FrequencyManager::loopScan();
+    TEST_ASSERT_EQUAL(2, (int)fakeRadio().calls.size()); // Exactly one read per step
+    TEST_ASSERT_TRUE(FrequencyManager::isScanInProgress());
+
+    FrequencyManager::requestScanCancel();
+    FrequencyManager::loopScan();
+
+    TEST_ASSERT_FALSE(FrequencyManager::isScanInProgress());
+    TEST_ASSERT_EQUAL(2, (int)fakeRadio().calls.size()); // Aborted before the next read
+    TEST_ASSERT_FLOAT_WITHIN(0.000001f, 0.012f, FrequencyManager::getOffset());
+    TEST_ASSERT_FLOAT_WITHIN(0.000001f, BASE_FREQ + 0.012f, fakeRadio().lastInitFrequency());
+}
+
+void test_freq_scan_ignores_a_second_start_while_one_is_running(void)
+{
+    beginManager();
+    placeCarrier(30.0f, 6.0f);
+
+    FrequencyManager::beginDeepFrequencyScan(0.050f, 0.0025f);
+    FrequencyManager::loopScan();
+    const int stepsSoFar = (int)fakeRadio().calls.size();
+
+    // A second button press must not restart the sweep from the beginning.
+    FrequencyManager::beginDeepFrequencyScan(0.050f, 0.0025f);
+    FrequencyManager::loopScan();
+
+    TEST_ASSERT_EQUAL(stepsSoFar + 1, (int)fakeRadio().calls.size());
+}
+
 // ---------------------------------------------------------------------------
 // Adaptive tracking
 // ---------------------------------------------------------------------------

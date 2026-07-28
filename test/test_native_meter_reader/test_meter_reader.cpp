@@ -39,6 +39,17 @@ namespace
         nativeClockAdvance(ms);
         reader.loop();
     }
+
+    /// Step the auto-started frequency scan to completion, as the host loop does.
+    void drainFrequencyScan(MeterReader &reader)
+    {
+        int guard = 0;
+        while (FrequencyManager::isScanInProgress() && guard++ < 5000)
+        {
+            reader.loop();
+        }
+        reader.loop(); // One more pass so the reader publishes the resulting tuning
+    }
 }
 
 void meterReaderSetUp()
@@ -505,6 +516,9 @@ void test_auto_scan_on_failure_runs_once_per_failure_streak(void)
     reader.triggerReading(false);
     TEST_ASSERT_TRUE(g_publisher.sawStatus("Auto frequency scan after failed reads"));
 
+    // The scan is stepped from loop(), so it has to finish before the next read.
+    drainFrequencyScan(reader);
+
     g_publisher.reset();
     reader.triggerReading(false);
     TEST_ASSERT_FALSE(g_publisher.sawStatus("Auto frequency scan after failed reads"));
@@ -519,6 +533,7 @@ void test_auto_scan_on_failure_is_rearmed_by_a_success(void)
 
     MeterReader reader = makeReader();
     reader.triggerReading(false);
+    drainFrequencyScan(reader);
 
     fakeRadio().responses.clear();
     fakeRadio().responses.push_back(FakeRadio::success());
@@ -530,6 +545,7 @@ void test_auto_scan_on_failure_is_rearmed_by_a_success(void)
     reader.triggerReading(false);
 
     TEST_ASSERT_TRUE(g_publisher.sawStatus("Auto frequency scan after failed reads"));
+    drainFrequencyScan(reader);
 }
 
 void test_auto_scan_on_failure_stays_off_when_disabled(void)

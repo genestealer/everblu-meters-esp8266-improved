@@ -261,6 +261,14 @@ void test_esphome_frequency_scan_publishes_the_new_offset(void)
 
     reader.performFrequencyScan();
 
+    // The scan is stepped from loop() so the component stays responsive; drive
+    // it to completion and let the reader publish the resulting tuning.
+    int guard = 0;
+    while (reader.isScanInProgress() && guard++ < 5000)
+    {
+        reader.loop();
+    }
+
     TEST_ASSERT_FALSE(g_publisher.frequencyOffsets.empty());
     TEST_ASSERT_TRUE(FrequencyManager::getOffset() > 0.0f);
     TEST_ASSERT_FLOAT_WITHIN(0.000001f, FrequencyManager::getOffset(),

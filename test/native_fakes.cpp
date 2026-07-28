@@ -418,6 +418,15 @@ void RecordingPublisher::publishDiscovery() { discoveryPublishes++; }
 
 void resetAllFakes()
 {
+    // A case may leave a non-blocking deep scan part-way through. Step it to
+    // completion while its callbacks are still valid, so neither the scan state
+    // nor a dangling callback leaks into the next test.
+    if (FrequencyManager::isScanInProgress())
+    {
+        FrequencyManager::requestScanCancel();
+        FrequencyManager::loopScan();
+    }
+
     // Start at a plausible uptime rather than zero: several timers in the
     // firmware use "0" as their "never happened" sentinel, so a test running at
     // millis() == 0 would exercise a state the device never boots into.
