@@ -8,8 +8,10 @@ on:
       - include/**
       - platformio.ini
       - test/fixtures/**
+      - test/native_esphome/**
       - test/native_fakes.*
       - test/native_shims/**
+      - test/test_native_esphome_publisher/**
       - test/test_native_meter_fixtures/**
       - test/test_native_meter_reader/**
       - test/test_embedded_unit/**
@@ -21,8 +23,10 @@ on:
       - include/**
       - platformio.ini
       - test/fixtures/**
+      - test/native_esphome/**
       - test/native_fakes.*
       - test/native_shims/**
+      - test/test_native_esphome_publisher/**
       - test/test_native_meter_fixtures/**
       - test/test_native_meter_reader/**
       - test/test_embedded_unit/**
@@ -74,3 +78,7 @@ jobs:
       - name: Run native fixture tests
         run: |
           pio test -e native -v
+
+      - name: Run native ESPHome publisher tests
+        run: |
+          pio test -e native_esphome -v

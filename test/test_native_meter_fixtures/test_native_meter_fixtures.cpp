@@ -1198,6 +1198,18 @@ void test_radian_parse_clock_and_type_are_best_effort(void)
     }
 }
 
+// Transmit-path tests, defined in test_transmit_frame.cpp
+void test_request_frame_round_trips_through_the_receiver(void);
+void test_request_frame_carries_the_meter_identity(void);
+void test_request_frame_crc_is_valid_after_the_round_trip(void);
+void test_request_frame_round_trips_for_boundary_identities(void);
+void test_request_frame_starts_with_the_sync_pattern(void);
+void test_request_frame_length_is_stable(void);
+void test_request_frames_differ_between_meters(void);
+void test_request_frame_is_deterministic(void);
+void test_serial_encoding_round_trips_arbitrary_payloads(void);
+void test_serial_encoding_round_trips_all_byte_values(void);
+
 int main(int argc, char **argv)
 {
     (void)argc;
@@ -1226,5 +1238,17 @@ int main(int argc, char **argv)
     RUN_TEST(test_fixture_frames_reject_every_single_bit_flip);
     RUN_TEST(test_read_failure_messages_are_distinct);
     RUN_TEST(test_tmeter_data_defaults_to_no_failure);
+
+    // Transmit path
+    RUN_TEST(test_request_frame_round_trips_through_the_receiver);
+    RUN_TEST(test_request_frame_carries_the_meter_identity);
+    RUN_TEST(test_request_frame_crc_is_valid_after_the_round_trip);
+    RUN_TEST(test_request_frame_round_trips_for_boundary_identities);
+    RUN_TEST(test_request_frame_starts_with_the_sync_pattern);
+    RUN_TEST(test_request_frame_length_is_stable);
+    RUN_TEST(test_request_frames_differ_between_meters);
+    RUN_TEST(test_request_frame_is_deterministic);
+    RUN_TEST(test_serial_encoding_round_trips_arbitrary_payloads);
+    RUN_TEST(test_serial_encoding_round_trips_all_byte_values);
     return UNITY_END();
 }

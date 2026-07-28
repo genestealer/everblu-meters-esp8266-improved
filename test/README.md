@@ -16,6 +16,9 @@ End-to-end replay of real radio captures.
   are parsed and checked field by field.
 - Also covers CRC validation, framing errors, glitch tolerance, buffer
   truncation, history bounds and read-failure classification.
+- `test_transmit_frame.cpp` covers the other direction: the interrogation frame
+  built by `Make_Radian_Master_req()` is pushed back through the receiver and
+  checked to recover the original payload, identity and CRC.
 
 To add a fixture from a firmware log:
 
@@ -42,6 +45,21 @@ Behaviour of the two stateful services, driven against fake hardware.
   the manual stop path and the automatic scan after a failure streak
 - `test_frequency_manager.cpp` - deep scan lock and abort paths, the calibration
   quality guard, persistence round-trips and adaptive FREQEST tracking
+
+### `test_native_esphome_publisher/`
+
+ESPHomeDataPublisher, built the way the shipped external component builds it.
+
+Runs under `[env:native_esphome]` rather than `[env:native]`, because the whole
+publisher is wrapped in `#ifdef USE_ESPHOME` and the ESPHome build needs a
+flattened include path. The recording sensor stubs live in
+`test/native_esphome/esphome/`, on that environment's include path only, so
+`__has_include("esphome/core/log.h")` stays false for the MQTT-mode suites.
+
+Covers sensor population and formatting, the history payload and its
+"unavailable" fallbacks, null-argument handling, unit conversions, and the
+"first non-null registration wins" rule for the sensors that describe the one
+shared radio.
 
 ## Fakes and the virtual clock
 
@@ -72,8 +90,11 @@ cooldowns are exercised instantly and deterministically. Nothing ever sleeps.
 ## Running
 
 ```bash
-# All host suites
+# All MQTT-mode host suites
 pio test -e native
+
+# The ESPHome-mode suite
+pio test -e native_esphome
 
 # One suite
 pio test -e native -f test_embedded_unit
@@ -105,8 +126,8 @@ rather than trying to emulate the whole Arduino API.
 1. Add the test function to the relevant `test_*.cpp` file, or create a new one
    in the same suite directory.
 2. Declare it and register it with `RUN_TEST(...)` in that suite's runner
-   (`test_runner.cpp` for `test_embedded_unit` and `test_native_meter_reader`,
-   `main()` for `test_native_meter_fixtures`).
+   (`test_runner.cpp` for `test_embedded_unit`, `test_native_meter_reader` and
+   `test_native_esphome_publisher`, `main()` for `test_native_meter_fixtures`).
 3. Do not define `setUp`, `tearDown` or `main` in the individual test files:
    Unity allows only one of each per suite binary.
 4. If the code under test is not already compiled for the host, add its `.cpp`
@@ -134,11 +155,13 @@ CI collects coverage over the host-tested sources with gcovr. Locally:
 
 ```bash
 pio test -e native
-gcovr --root . --object-directory .pio/build/native/ --print-summary \
+pio test -e native_esphome
+gcovr --root . --object-directory .pio/build/ --print-summary \
   --filter src/core/crc_kermit.cpp \
   --filter src/core/radian_parser.cpp \
   --filter src/core/radian_decoder.cpp \
   --filter src/core/utils.cpp \
+  --filter src/adapters/implementations/esphome_data_publisher.cpp \
   --filter src/services/frequency_manager.cpp \
   --filter src/services/meter_history.cpp \
   --filter src/services/meter_reader.cpp \

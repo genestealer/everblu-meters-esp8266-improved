@@ -27,8 +27,10 @@
 #include <string>
 
 // The real Arduino core exposes the C maths library (NAN, isnan, roundf, fabs)
-// in the global namespace, and shared service code relies on that.
+// and the C time functions in the global namespace, and shared service code
+// relies on both.
 #include <math.h>
+#include <time.h>
 
 // ---------------------------------------------------------------------------
 // Timing
