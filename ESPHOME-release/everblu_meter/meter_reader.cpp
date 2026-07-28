@@ -49,7 +49,7 @@ static void logReadableSummary(const tmeter_data &data, const IConfigProvider *c
 }
 
 MeterReader::MeterReader(IConfigProvider *config, ITimeProvider *timeProvider, IDataPublisher *publisher)
-    : m_config(config), m_timeProvider(timeProvider), m_publisher(publisher), m_initialized(false), m_readingInProgress(false), m_isScheduledRead(false), m_haConnected(false), m_radioConnected(false), m_retryCount(0), m_lastFailedAttempt(0), m_nextRetryTime(0), m_autoScanAfterFailureDone(false), m_totalReadAttempts(0), m_successfulReads(0), m_failedReads(0), m_lastErrorMessage("None"), m_lastScheduleCheck(0), m_lastStatsPublish(0), m_readHourLocal(10), m_readMinuteLocal(0), m_lastReadDayMatch(false), m_lastReadTimeMatch(false)
+    : m_config(config), m_timeProvider(timeProvider), m_publisher(publisher), m_initialized(false), m_readingInProgress(false), m_isScheduledRead(false), m_haConnected(false), m_radioConnected(false), m_retryCount(0), m_inCooldown(false), m_lastFailedAttempt(0), m_nextRetryTime(0), m_autoScanAfterFailureDone(false), m_retryFailureReason(ReadFailure::None), m_totalReadAttempts(0), m_successfulReads(0), m_failedReads(0), m_lastErrorMessage("None"), m_lastScheduleCheck(0), m_lastStatsPublish(0), m_readHourLocal(10), m_readMinuteLocal(0), m_lastReadDayMatch(false), m_lastReadTimeMatch(false)
 {
 }
 
@@ -249,8 +249,11 @@ bool MeterReader::shouldPerformScheduledRead()
         return false;
     }
 
-    // Check if in cooldown period after failures
-    if (m_lastFailedAttempt > 0)
+    // Check if in cooldown period after failures.
+    // The flag, rather than a non-zero timestamp, is what marks the cooldown as
+    // running: millis() legitimately returns 0 for the first millisecond after
+    // boot, and a failure landing there must not skip the cooldown entirely.
+    if (m_inCooldown)
     {
         unsigned long cooldown = m_config->getRetryCooldownMs();
         if (millis() - m_lastFailedAttempt < cooldown)
@@ -258,6 +261,7 @@ bool MeterReader::shouldPerformScheduledRead()
             return false;
         }
         // Cooldown expired, reset
+        m_inCooldown = false;
         m_lastFailedAttempt = 0;
     }
 
@@ -332,7 +336,7 @@ void MeterReader::performReading()
     // Validate data
     if (meter_data.reads_counter == 0 || meter_data.volume == 0)
     {
-        handleFailedRead();
+        handleFailedRead(meter_data.failure);
         return;
     }
 
@@ -389,23 +393,37 @@ void MeterReader::handleSuccessfulRead(const tmeter_data &data)
     LOG_I("everblu_meter", "Data published successfully");
 }
 
-void MeterReader::handleFailedRead()
+void MeterReader::handleFailedRead(ReadFailure reason)
 {
-    LOG_W("everblu_meter", "Read failed (attempt %d/%d)",
-          m_retryCount + 1, m_config->getMaxRetries());
+    LOG_W("everblu_meter", "Read failed (attempt %d/%d)%s",
+          m_retryCount + 1, m_config->getMaxRetries(),
+          read_failure_log_suffix(reason));
+
+    // Remember the most informative symptom of the sequence: a run of corrupted
+    // frames ending in one silent timeout is still an RF quality problem, so the
+    // final message should not fall back to "no response".
+    if (reason != ReadFailure::None && reason != ReadFailure::NoReply)
+    {
+        m_retryFailureReason = reason;
+    }
 
     if (m_retryCount < m_config->getMaxRetries() - 1)
     {
         // Schedule retry after delay.
-        // Keep the "Active Reading" sensor true and the radio state as "Reading"
-        // for the whole retry sequence so they don't flicker running/idle between
-        // attempts. They are cleared only on final success or after max retries.
+        // The "Active Reading" sensor and the radio state are re-asserted on
+        // every attempt but never cleared between them, so they don't drop to
+        // idle mid-sequence and make the read look finished. They are cleared
+        // only on final success or after max retries.
         // m_readingInProgress also stays true to keep the sequence atomic (the
         // retry timer in loop() calls performReading() directly, bypassing the
         // m_readingInProgress guard).
         m_retryCount++;
         m_nextRetryTime = millis() + RETRY_DELAY_MS;
-        m_lastErrorMessage = "No meter response (asleep/out of range/wrong Year/Serial) - retrying";
+        // Deliberately the symptom of THIS attempt, not the sticky
+        // m_retryFailureReason: while a sequence is still running the user wants
+        // to see what just happened. Only the final message below prefers the
+        // most informative symptom of the whole sequence.
+        m_lastErrorMessage = read_failure_message(reason, true);
 
         m_publisher->publishStatusMessage("Retry scheduled");
         m_publisher->publishError(m_lastErrorMessage);
@@ -417,8 +435,10 @@ void MeterReader::handleFailedRead()
     {
         // Max retries reached
         m_failedReads++;
+        m_inCooldown = true;
         m_lastFailedAttempt = millis();
-        m_lastErrorMessage = "No meter response after max retries - check distance and meter Year/Serial";
+        m_lastErrorMessage = read_failure_message(
+            m_retryFailureReason != ReadFailure::None ? m_retryFailureReason : reason, false);
 
         m_publisher->publishError(m_lastErrorMessage);
         m_publisher->publishStatusMessage("Failed after max retries");
@@ -456,6 +476,7 @@ void MeterReader::resetRetryState()
 {
     m_retryCount = 0;
     m_nextRetryTime = 0;
+    m_retryFailureReason = ReadFailure::None;
 }
 
 void MeterReader::stopReading()

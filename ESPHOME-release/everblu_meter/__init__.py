@@ -540,7 +540,6 @@ async def to_code(config):
     # Define flags for conditional compilation in ESPHome environment
     # Use build flags instead of defines to ensure propagation to ALL .cpp files
     cg.add_build_flag("-DUSE_ESPHOME")
-    cg.add_build_flag("-DWIFI_SERIAL_NO_REMAP")  # Don't remap Serial in ESPHome builds
     # Note: ESPHome automatically compiles all .cpp files in component directory
     # No need to explicitly list source files - just ensure main.cpp is excluded from release
 

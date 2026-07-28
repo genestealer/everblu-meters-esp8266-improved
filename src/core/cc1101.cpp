@@ -1051,6 +1051,8 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
       echo_debug(1, "[ERROR] Buffer too small for meter data (size=%d, need>=30)\n", size);
     }
     echo_debug(1, "[ERROR] Invalid primary meter fields - discarding frame\n");
+    // The frame itself was intact (CRC passed); only its contents were rejected.
+    data.failure = ReadFailure::ParseRejected;
     return data;
   }
 
@@ -2031,6 +2033,9 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
       {
         echo_debug(1, "[METER] This points to a marginal/noisy RF link (weak signal or a slight frequency offset), not a code fault. Improving antenna placement or running a frequency scan usually fixes it.\n");
       }
+      // Record that a reply frame WAS received but failed CRC (corrupted), so
+      // the caller can report "corrupted frame" rather than "no response".
+      sdata.failure = ReadFailure::CrcFailed;
       meter_data_size = 0;
     }
   }
@@ -2041,6 +2046,7 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
     echo_debug(1, "[METER] If this persists, try improving antenna placement or running a frequency scan to recalibrate the radio.\n");
     echo_debug(1, "[METER] A scan runs automatically after repeated failures unless disabled (AUTO_SCAN_ON_FAILURE_ENABLED / auto_scan_on_failure); for a full re-scan see AUTO_SCAN_ENABLED / CLEAR_EEPROM_ON_BOOT.\n");
     echo_debug(debug_out, "[METER] Meter data frame timeout\n");
+    sdata.failure = ReadFailure::NoReply;
   }
   sdata.rssi = halRfReadReg(RSSI_ADDR);                              // Read RSSI value from CC1101
   sdata.rssi_dbm = cc1100_rssi_convert2dbm(halRfReadReg(RSSI_ADDR)); // Read RSSI value from CC1101 and convert to dBm
@@ -2051,17 +2057,22 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
 
 struct tmeter_data get_meter_data(void)
 {
+  // None of the paths below key the radio, so they report NotAttempted rather
+  // than a radio symptom: telling the user to check distance and antenna
+  // placement when METER_CODE is unusable points at the wrong remedy.
 #if defined(USE_ESPHOME)
   // ESPHome multi-instance flows should use get_meter_data_for_meter().
   // Fail fast to avoid a blocking radio transaction with an invalid identity.
   echo_debug(1, "[METER] get_meter_data() is unsupported in USE_ESPHOME; use get_meter_data_for_meter()\n");
   struct tmeter_data sdata = {};
+  sdata.failure = ReadFailure::NotAttempted;
   return sdata;
 #else
   struct tmeter_data sdata = {};
 
 #if !defined(METER_CODE)
   echo_debug(1, "[METER] METER_CODE is not defined; cannot read meter\n");
+  sdata.failure = ReadFailure::NotAttempted;
   return sdata;
 #else
   const char *meter_code = METER_CODE;
@@ -2070,6 +2081,7 @@ struct tmeter_data get_meter_data(void)
   if (!everblu::core::parseMeterCode(meter_code, &meter_year, &meter_serial))
   {
     echo_debug(1, "[METER] Invalid METER_CODE: expected YY-SSSSSSS or YY-SSSSSSS-NNN\n");
+    sdata.failure = ReadFailure::NotAttempted;
     return sdata;
   }
 

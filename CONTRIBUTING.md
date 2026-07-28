@@ -32,6 +32,18 @@ bash ./ESPHOME/prepare-component-release.sh
 
 ## Pull request expectations
 
+Before opening a PR, run the same checks CI runs:
+
+```powershell
+pip install -r scripts/requirements-dev.txt   # first time only
+./scripts/run-tests.ps1 -Build
+```
+
+That runs the host test suites (`pio test -e native` and `-e native_esphome`), the ESPHome
+config tests, and compiles both firmware targets. None of it needs a board, a radio or a
+meter. Steps whose tooling is missing are reported as skipped rather than failing. See
+[test/README.md](test/README.md) for the individual commands and for how to add a test.
+
 If your PR changes files under `src/` or `ESPHOME/components/everblu_meter/`, you should also run the release preparation script and commit updated files in `ESPHOME-release/`.
 
 A CI workflow validates that `ESPHOME-release/` matches generated output.

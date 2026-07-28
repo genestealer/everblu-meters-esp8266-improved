@@ -33,12 +33,23 @@ jobs:
         environment:
           - name: huzzah
             board: Adafruit HUZZAH ESP8266
+            suffix: ""
+          # private.h defaults WIFI_SERIAL_MONITOR_ENABLED to 0, so without this
+          # variant the mirror, its ring buffer and the `Serial` remap are
+          # #ifdef'd out of every job and never compiled.
+          - name: huzzah
+            board: Adafruit HUZZAH ESP8266 (WiFi serial monitor)
+            suffix: "-wifi-serial"
+            wifi_serial: true
           - name: d1_mini_pro
             board: WeMos D1 Mini Pro
+            suffix: ""
           - name: d1_mini
             board: WeMos D1 Mini
+            suffix: ""
           - name: nodemcuv2
             board: NodeMCU v2
+            suffix: ""
 
     name: Build ${{ matrix.environment.board }}
 
@@ -87,8 +98,17 @@ jobs:
         run: echo "::add-matcher::.github/workflows/matchers/gcc.json"
 
       - name: Build PlatformIO Project (${{ matrix.environment.board }})
+        # The WiFi serial monitor variant is selected with a compiler define rather
+        # than by rewriting private.h. A sed that no longer matches exits 0 having
+        # changed nothing, which would quietly build a duplicate of the default job
+        # and still report success. private.example.h wraps the define in #ifndef
+        # precisely so this override is possible. None of the ESP8266 environments
+        # set build_flags in platformio.ini, so replacing them here loses nothing.
+        env:
+          PLATFORMIO_BUILD_FLAGS: ${{ matrix.environment.wifi_serial && '-DWIFI_SERIAL_MONITOR_ENABLED=1' || '' }}
         run: |
           echo "Building with warning analysis..."
+          echo "Extra build flags: '${PLATFORMIO_BUILD_FLAGS}'"
           pio run -e ${{ matrix.environment.name }} -v 2>&1 | tee build-output.log
 
           # Check build status
@@ -152,7 +172,7 @@ jobs:
       - name: Upload firmware artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: firmware-esp8266-${{ matrix.environment.name }}
+          name: firmware-esp8266-${{ matrix.environment.name }}${{ matrix.environment.suffix }}
           path: .pio/build/${{ matrix.environment.name }}/firmware.*
           retention-days: 30
 
@@ -160,7 +180,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: build-logs-esp8266-${{ matrix.environment.name }}
+          name: build-logs-esp8266-${{ matrix.environment.name }}${{ matrix.environment.suffix }}
           path: |
             build-output.log
             warnings.txt

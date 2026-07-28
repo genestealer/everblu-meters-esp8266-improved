@@ -9,7 +9,12 @@
 target-version = "py311"
 
 # ESPHOME-release/ is generated output (never hand-edited); .pio is a build dir.
-extend-exclude = ["ESPHOME-release", ".pio"]
+#
+# Markdown is excluded because ruff 0.16 started formatting Python code fences inside
+# `.md` files. The docs deliberately contain illustrative, abbreviated and "before"
+# snippets that are not meant to be formatter-clean, so linting them adds noise
+# without improving any shipped code.
+extend-exclude = ["ESPHOME-release", ".pio", "*.md"]
 
 [lint]
 # Rule families selected by ESPHome (numpy-only NPY dropped as irrelevant here).
@@ -60,6 +65,11 @@ ignore = [
 force-sort-within-sections = true
 combine-as-imports = true
 split-on-trailing-comma = false
+# `esphome` is an external dependency, but on case-insensitive filesystems (Windows,
+# macOS) ruff's first-party detection matches the repo's own `ESPHOME/` directory and
+# splits the esphome imports across two sections. Stating the section explicitly keeps
+# local runs and Linux CI in agreement.
+known-third-party = ["esphome"]
 
 [lint.per-file-ignores]
 # PlatformIO advanced-scripting injects the SCons `env` / `Import` globals at runtime,

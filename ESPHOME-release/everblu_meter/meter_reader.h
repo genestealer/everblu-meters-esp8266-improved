@@ -178,8 +178,9 @@ private:
 
     /**
      * @brief Handle failed reading attempt
+     * @param reason Why the attempt produced no usable data
      */
-    void handleFailedRead();
+    void handleFailedRead(ReadFailure reason);
 
     /**
      * @brief Reset retry counter and cooldown
@@ -200,9 +201,11 @@ private:
 
     // Retry management
     int m_retryCount;
+    bool m_inCooldown;                // True while the post-failure cooldown is running
     unsigned long m_lastFailedAttempt;
     unsigned long m_nextRetryTime;
-    bool m_autoScanAfterFailureDone; // Guards the failure-recovery frequency scan to once per failure streak
+    bool m_autoScanAfterFailureDone;  // Guards the failure-recovery frequency scan to once per failure streak
+    ReadFailure m_retryFailureReason; // Most informative failure seen so far in the current retry sequence
 
     // Statistics
     unsigned long m_totalReadAttempts;

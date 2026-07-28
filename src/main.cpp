@@ -275,9 +275,15 @@ const char jsonTemplate[] = "{ "
 int _retry = 0;
 const int max_retries = MAX_RETRIES;          // Maximum number of retry attempts (configurable in private.h)
 unsigned long lastFailedAttempt = 0;          // Timestamp of last failed attempt
+// The flag, rather than a non-zero lastFailedAttempt, is what marks the cooldown
+// as running: millis() legitimately returns 0 for the first millisecond after
+// boot, and a failure landing there must not skip the cooldown entirely. This
+// mirrors MeterReader::m_inCooldown so both deployment paths behave the same.
+bool g_inCooldown = false;
 const unsigned long RETRY_COOLDOWN = 3600000; // 1 hour cooldown in milliseconds
 bool g_autoScanAfterFailureDone = false;      // Guards the failure-recovery frequency scan to once per failure streak
 bool g_postScanReadAttempted = false;         // Guards the single post-scan re-read to once per failure streak
+ReadFailure g_retryFailureReason = ReadFailure::None; // Most informative failure seen so far in the current retry sequence
 
 // Global variable to store the reading schedule (default from private.h)
 const char *readingSchedule = DEFAULT_READING_SCHEDULE;
@@ -509,9 +515,9 @@ static const char *wifiStatusToString(wl_status_t st)
 void onUpdateData()
 {
   Serial.println("");
-  Serial.println("========================================");
-  Serial.printf("        METER READ - START (fw %s)\n", EVERBLU_FW_VERSION);
-  Serial.println("========================================");
+  EVB_PRINTLN("========================================");
+  EVB_PRINTF("        METER READ - START (fw %s)\n", EVERBLU_FW_VERSION);
+  EVB_PRINTLN("========================================");
   TS_PRINTF("[STATUS] Updating data from meter...\n");
   TS_PRINTF("[STATUS] Retry count: %d\n", _retry);
   TS_PRINTF("[STATUS] Reading schedule: %s\n", readingSchedule);
@@ -544,12 +550,25 @@ void onUpdateData()
   {
     TS_PRINTF("[ERROR] Unable to retrieve data from meter (attempt %d/%d)\n", _retry + 1, max_retries);
 
+    // Remember the most informative symptom of the sequence: a run of corrupted
+    // frames ending in one silent timeout is still an RF quality problem, so the
+    // final message should not fall back to "no response".
+    if (meter_data.failure != ReadFailure::None && meter_data.failure != ReadFailure::NoReply)
+    {
+      g_retryFailureReason = meter_data.failure;
+    }
+
     if (_retry < max_retries - 1)
     {
       // Schedule retry using callback instead of recursion to prevent stack overflow
       _retry++;
-      static char errorMsg[64];
-      snprintf(errorMsg, sizeof(errorMsg), "Retry %d/%d - No data received", _retry, max_retries);
+      static char errorMsg[128];
+      // Deliberately the symptom of THIS attempt, not the sticky
+      // g_retryFailureReason: while a sequence is still running the user wants
+      // to see what just happened. Only the final message below prefers the
+      // most informative symptom of the whole sequence.
+      snprintf(errorMsg, sizeof(errorMsg), "Retry %d/%d - %s", _retry, max_retries,
+               read_failure_message(meter_data.failure, true));
       lastErrorMessage = errorMsg;
       TS_PRINTF("[STATUS] Scheduling retry in 5 seconds... (next attempt %d/%d)\n", _retry + 1, max_retries);
       // Keep the "Active Reading" sensor true and the radio state as "Reading"
@@ -564,9 +583,11 @@ void onUpdateData()
     else
     {
       // Max retries reached, enter cooldown period
+      g_inCooldown = true;
       lastFailedAttempt = millis();
       failedReads++;
-      lastErrorMessage = "Max retries reached - cooling down";
+      lastErrorMessage = read_failure_message(
+          g_retryFailureReason != ReadFailure::None ? g_retryFailureReason : meter_data.failure, false);
       TS_PRINTF("[ERROR] Max retries (%d) reached. Entering 1-hour cooldown period.\n", max_retries);
       mqtt.publish(String(mqttBaseTopic) + "/active_reading", "false", true);
       mqtt.publish(String(mqttBaseTopic) + "/cc1101_state", cc1101RadioConnected ? "Idle" : "unavailable", true);
@@ -581,6 +602,7 @@ void onUpdateData()
       mqtt.publish(String(mqttBaseTopic) + "/total_attempts", buffer, true);
       digitalWrite(LED_BUILTIN, HIGH); // Turn off LED
       _retry = 0;                      // Reset retry counter for next scheduled attempt
+      g_retryFailureReason = ReadFailure::None;
 
       // When the meter cannot be reached after all retries, a drifted carrier
       // frequency (crystal offset) is a common cause. Automatically run a
@@ -606,7 +628,8 @@ void onUpdateData()
         if (offsetAfterScan != offsetBeforeScan && !g_postScanReadAttempted)
         {
           g_postScanReadAttempted = true;
-          lastFailedAttempt = 0;    // lift the cooldown for this single retry
+          g_inCooldown = false;     // lift the cooldown for this single retry
+          lastFailedAttempt = 0;
           _retry = max_retries - 1; // enter as the final attempt: one shot only
           TS_PRINTF("[FREQ] New frequency offset found (%.3f -> %.3f kHz) - attempting one more read...\n",
                     offsetBeforeScan * 1000.0, offsetAfterScan * 1000.0);
@@ -614,9 +637,9 @@ void onUpdateData()
         }
       }
     }
-    Serial.println("========================================");
-    Serial.println("        METER READ - FAILED");
-    Serial.println("========================================");
+    EVB_PRINTLN("========================================");
+    EVB_PRINTLN("        METER READ - FAILED");
+    EVB_PRINTLN("========================================");
     Serial.println("");
     return;
   }
@@ -762,7 +785,9 @@ void onUpdateData()
 
   // Reset retry counter and cooldown on successful read
   _retry = 0;
+  g_inCooldown = false;
   lastFailedAttempt = 0;
+  g_retryFailureReason = ReadFailure::None;
   g_autoScanAfterFailureDone = false; // Allow a fresh auto-scan on the next failure streak
   g_postScanReadAttempted = false;    // Allow a fresh post-scan re-read on the next failure streak
   successfulReads++;
@@ -785,9 +810,9 @@ void onUpdateData()
   // Reset scheduled read flag for next invocation
   g_isScheduledRead = false;
 
-  Serial.println("========================================");
-  Serial.println("        METER READ - COMPLETE");
-  Serial.println("========================================");
+  EVB_PRINTLN("========================================");
+  EVB_PRINTLN("        METER READ - COMPLETE");
+  EVB_PRINTLN("========================================");
   Serial.println("");
 }
 
@@ -807,7 +832,7 @@ void onScheduled()
   if (ScheduleManager::isReadingDay(ptm) && timeMatch && ptm->tm_sec == 0)
   {
     // Check if we're still in cooldown period after failed attempts
-    if (lastFailedAttempt > 0 && (millis() - lastFailedAttempt) < RETRY_COOLDOWN)
+    if (g_inCooldown && (millis() - lastFailedAttempt) < RETRY_COOLDOWN)
     {
       unsigned long remainingCooldown = (RETRY_COOLDOWN - (millis() - lastFailedAttempt)) / 1000;
       TS_PRINTF("[WARN] Still in cooldown period. %lu seconds remaining.\n", remainingCooldown);
@@ -822,12 +847,13 @@ void onScheduled()
     }
 
     // Cooldown period is over, reset and proceed
+    g_inCooldown = false;
     lastFailedAttempt = 0;
 
     // Call back in 23 hours
     mqtt.executeDelayed(1000 * 60 * 60 * 23, onScheduled);
 
-    Serial.println("It is time to update data from meter :)");
+    EVB_PRINTLN("It is time to update data from meter :)");
 
     // Update data
     _retry = 0;
@@ -1270,7 +1296,7 @@ void onConnectionEstablished()
     // NOTE: if updating FS this would be the place to unmount FS using FS.end()
     Serial.println("Start updating " + type); });
   ArduinoOTA.onEnd([]()
-                   { Serial.println("\nEnd updating."); });
+                   { EVB_PRINTLN("\nEnd updating."); });
   ArduinoOTA.onProgress([](unsigned int progress, unsigned int total)
                         { TS_PRINTF("[OTA] %u%%\r\n", (progress / (total / 100))); });
   ArduinoOTA.onError([](ota_error_t error)
@@ -1307,7 +1333,7 @@ void onConnectionEstablished()
     }
 
     // Check if we're in cooldown period
-    if (lastFailedAttempt > 0 && (millis() - lastFailedAttempt) < RETRY_COOLDOWN) {
+    if (g_inCooldown && (millis() - lastFailedAttempt) < RETRY_COOLDOWN) {
       unsigned long remainingCooldown = (RETRY_COOLDOWN - (millis() - lastFailedAttempt)) / 1000;
       TS_PRINTF("[WARN] Cannot trigger update: Still in cooldown period. %lu seconds remaining.\n", remainingCooldown);
 
@@ -1359,7 +1385,7 @@ void onConnectionEstablished()
                      return;
                    }
 
-                   Serial.println("Restart command received via MQTT. Restarting in 2 seconds...");
+                   EVB_PRINTLN("Restart command received via MQTT. Restarting in 2 seconds...");
                    char topicBuffer[MQTT_TOPIC_BUFFER_SIZE];
                    snprintf(topicBuffer, sizeof(topicBuffer), "%s/status_message", mqttBaseTopic);
                    mqtt.publish(topicBuffer, "Device restarting...", true);
@@ -1380,7 +1406,7 @@ void onConnectionEstablished()
       return;
     }
 
-    Serial.println("Deep frequency scan command received via MQTT");
+    EVB_PRINTLN("Deep frequency scan command received via MQTT");
     performDeepFrequencyScan(); });
 
   char resetFrequencyTopic[MQTT_TOPIC_BUFFER_SIZE];
@@ -1396,7 +1422,7 @@ void onConnectionEstablished()
       return;
     }
 
-    Serial.println("Reset frequency offset command received via MQTT");
+    EVB_PRINTLN("Reset frequency offset command received via MQTT");
     resetFrequencyOffset(); });
 
   // Publish Home Assistant discovery only when enabled in compile-time config.
@@ -1466,7 +1492,7 @@ void onConnectionEstablished()
   digitalWrite(LED_BUILTIN, HIGH); // turned off
 
   TS_PRINTLN("[STATUS] Setup done");
-  Serial.println("================================\n");
+  EVB_PRINTLN("================================\n");
 
   onScheduled();
 }
@@ -1618,22 +1644,22 @@ bool validateConfiguration()
   uint8_t parsed_year = 0;
   uint32_t parsed_serial = 0;
 
-  Serial.println("\n=== Configuration Validation ===");
+  EVB_PRINTLN("\n=== Configuration Validation ===");
 
   // Validate METER_CODE parse results
   if (!everblu::core::parseMeterCode(METER_CODE, &parsed_year, &parsed_serial))
   {
     TS_PRINTLN("[ERROR] Invalid METER_CODE in private.h");
-    Serial.println("       Expected dashed format: \"YY-SSSSSSS\" or \"YY-SSSSSSS-NNN\"");
-    Serial.println("       Example: label '16-0039185-107' -> '16-0039185-107'");
+    EVB_PRINTLN("       Expected dashed format: \"YY-SSSSSSS\" or \"YY-SSSSSSS-NNN\"");
+    EVB_PRINTLN("       Example: label '16-0039185-107' -> '16-0039185-107'");
     valid = false;
   }
   else
   {
     g_meterYear = parsed_year;
     g_meterSerial = parsed_serial;
-    Serial.printf("✓ METER_CODE: %s (year=%d, serial=%lu)\n",
-                  METER_CODE, g_meterYear, (unsigned long)g_meterSerial);
+    EVB_PRINTF("✓ METER_CODE: %s (year=%d, serial=%lu)\n",
+               METER_CODE, g_meterYear, (unsigned long)g_meterSerial);
   }
 
 // Validate FREQUENCY if defined (should be 300-500 MHz for 433 MHz band)
@@ -1645,10 +1671,10 @@ bool validateConfiguration()
   }
   else
   {
-    Serial.printf("✓ FREQUENCY: %.6f MHz\n", FREQUENCY);
+    EVB_PRINTF("✓ FREQUENCY: %.6f MHz\n", FREQUENCY);
   }
 #else
-  Serial.println("✓ FREQUENCY: Using default 433.82 MHz (RADIAN protocol)");
+  EVB_PRINTLN("✓ FREQUENCY: Using default 433.82 MHz (RADIAN protocol)");
 #endif
 
   // Validate reading time defaults (UTC)
@@ -1664,37 +1690,37 @@ bool validateConfiguration()
   }
   else
   {
-    Serial.printf("✓ Reading Time (UTC): %02d:%02d\n", DEFAULT_READING_HOUR_UTC, DEFAULT_READING_MINUTE_UTC);
+    EVB_PRINTF("✓ Reading Time (UTC): %02d:%02d\n", DEFAULT_READING_HOUR_UTC, DEFAULT_READING_MINUTE_UTC);
   }
 
 // Validate GDO0 pin (basic check - should be defined)
 #ifdef GDO0
-  Serial.printf("✓ GDO0 Pin: GPIO %d\n", GDO0);
+  EVB_PRINTF("✓ GDO0 Pin: GPIO %d\n", GDO0);
 #else
   TS_PRINTLN("[ERROR] GDO0 pin not defined in private.h");
   valid = false;
 #endif
 
 #if defined(GDO2)
-  Serial.printf("✓ GDO2 Pin: GPIO %d (TX/RX FIFO threshold - hardware-assisted underflow prevention)\n", GDO2);
+  EVB_PRINTF("✓ GDO2 Pin: GPIO %d (TX/RX FIFO threshold - hardware-assisted underflow prevention)\n", GDO2);
 #else // DISABLE_GDO2_FIFO_MANAGEMENT
   // src/core/cc1101.cpp emits a compile-time #error when neither GDO2 nor
   // DISABLE_GDO2_FIFO_MANAGEMENT is defined, so reaching here means the opt-out is set.
-  Serial.println("  GDO2 Pin: disabled via DISABLE_GDO2_FIFO_MANAGEMENT (legacy SPI polling fallback)");
+  EVB_PRINTLN("  GDO2 Pin: disabled via DISABLE_GDO2_FIFO_MANAGEMENT (legacy SPI polling fallback)");
 #endif
 
   // Validate reading schedule
   if (!isValidReadingSchedule(readingSchedule))
   {
     TS_PRINTF("[WARNING] Invalid reading schedule '%s'. Will fall back to 'Monday-Friday'.\n", readingSchedule);
-    Serial.println("         Expected: presets ('Monday-Friday', 'Monday-Saturday', 'Monday-Sunday') or a single day ('Monday'..'Sunday')");
+    EVB_PRINTLN("         Expected: presets ('Monday-Friday', 'Monday-Saturday', 'Monday-Sunday') or a single day ('Monday'..'Sunday')");
   }
   else
   {
-    Serial.printf("✓ Reading Schedule: %s\n", readingSchedule);
+    EVB_PRINTF("✓ Reading Schedule: %s\n", readingSchedule);
   }
 
-  Serial.println("================================\n");
+  EVB_PRINTLN("================================\n");
 
   return valid;
 }
@@ -1720,9 +1746,9 @@ void setup()
     delay(10);
   }
 #endif
-  Serial.println("Everblu Meters ESP8266/ESP32 Starting...");
-  Serial.println("Water/Gas usage data for Home Assistant");
-  Serial.println("https://github.com/genestealer/everblu-meters-esp8266-improved");
+  EVB_PRINTLN("Everblu Meters ESP8266/ESP32 Starting...");
+  EVB_PRINTLN("Water/Gas usage data for Home Assistant");
+  EVB_PRINTLN("https://github.com/genestealer/everblu-meters-esp8266-improved");
   TS_PRINTF("[STATUS] Firmware version: %s\n", EVERBLU_FW_VERSION);
   TS_PRINTF("[STATUS] Target meter: 20%02d-%07lu\n\n", g_meterYear, (unsigned long)g_meterSerial);
 
@@ -1732,9 +1758,9 @@ void setup()
   // Validate configuration before proceeding
   if (!validateConfiguration())
   {
-    Serial.println("\n*** FATAL: Configuration validation failed! ***");
-    Serial.println("*** Fix the errors in private.h and reflash ***");
-    Serial.println("*** Device halted - will not continue ***\n");
+    EVB_PRINTLN("\n*** FATAL: Configuration validation failed! ***");
+    EVB_PRINTLN("*** Fix the errors in private.h and reflash ***");
+    EVB_PRINTLN("*** Device halted - will not continue ***\n");
     while (1)
     {
       digitalWrite(LED_BUILTIN, LOW); // Blink LED to indicate error
@@ -1747,7 +1773,7 @@ void setup()
   // Initialize resolved schedule caches using UTC defaults and configured timezone offset
   updateResolvedScheduleFromUtc(DEFAULT_READING_HOUR_UTC, DEFAULT_READING_MINUTE_UTC);
 
-  Serial.println("✓ Configuration valid - proceeding with initialization\n");
+  EVB_PRINTLN("✓ Configuration valid - proceeding with initialization\n");
 
   // Note: mqttBaseTopic and meterSerialStr are initialized at global scope
   // to ensure they're ready when EspMQTTClient constructor runs
@@ -1818,7 +1844,7 @@ void setup()
 #if defined(ESP8266)
 #if ENABLE_WIFI_PHY_MODE_11G
   WiFi.setPhyMode(WIFI_PHY_MODE_11G);
-  Serial.println("Wi-Fi PHY mode set to 11G.");
+  EVB_PRINTLN("Wi-Fi PHY mode set to 11G.");
 #else
   TS_PRINTLN("[WIFI] Wi-Fi PHY mode 11G is disabled.");
 #endif
@@ -1840,7 +1866,7 @@ void setup()
   // Optional functionalities of EspMQTTClient
 #if ENABLE_MQTT_DEBUGGING
   mqtt.enableDebuggingMessages(true); // Enable debugging messages sent to serial output
-  Serial.println(">> MQTT debugging enabled");
+  EVB_PRINTLN(">> MQTT debugging enabled");
 #endif
 
   // Set CC1101 radio frequency with automatic calibration
@@ -1854,9 +1880,9 @@ void setup()
   if (!cc1101_init(effectiveFrequency))
   {
     TS_PRINTLN("[WARNING] CC1101 radio initialization failed!");
-    Serial.println("Please check: 1) Wiring connections 2) 3.3V power supply 3) SPI pins");
-    Serial.println("Continuing with WiFi/MQTT only - radio functionality will not be available");
-    Serial.println("Device will remain accessible via WiFi/MQTT for diagnostics and configuration");
+    EVB_PRINTLN("Please check: 1) Wiring connections 2) 3.3V power supply 3) SPI pins");
+    EVB_PRINTLN("Continuing with WiFi/MQTT only - radio functionality will not be available");
+    EVB_PRINTLN("Device will remain accessible via WiFi/MQTT for diagnostics and configuration");
     cc1101RadioConnected = false;
   }
   else

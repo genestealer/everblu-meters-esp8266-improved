@@ -261,9 +261,14 @@
 // 0 (default): Disabled - improves security and reduces overhead
 // 1:           Enabled - allows remote monitoring via telnet on port 23
 //
+// Wrapped in #ifndef so a build can override it with -DWIFI_SERIAL_MONITOR_ENABLED=1
+// without a macro redefinition. CI uses that to compile the monitor on both paths.
+//
 // To use when enabled:
 //   telnet <device-ip> 23
+#ifndef WIFI_SERIAL_MONITOR_ENABLED
 #define WIFI_SERIAL_MONITOR_ENABLED 0
+#endif
 #if WIFI_SERIAL_MONITOR_ENABLED
 #warning "WiFi serial monitor is ENABLED: meter readings may fail due to timing/compensation limits on the ESP"
 #endif

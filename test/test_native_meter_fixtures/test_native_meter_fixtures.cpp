@@ -13,6 +13,7 @@
 
 #include "core/radian_parser.h"
 #include "core/radian_decoder.h"
+#include "core/cc1101.h" // ReadFailure classification helpers
 
 struct Fixture
 {
@@ -1001,6 +1002,227 @@ void test_radian_reading_within_history_bounds_skips_when_insufficient(void)
     TEST_ASSERT_TRUE(radian_reading_within_history_bounds(11500, history, 3, 100UL));
 }
 
+// ---------------------------------------------------------------------------
+// Read failure classification: a silent meter, a corrupted frame, a frame with
+// invalid fields and a read the radio never attempted must each produce
+// distinct, non-empty guidance so users are not told to "check distance" when
+// the real problem is RF quality or an unusable METER_CODE.
+// ---------------------------------------------------------------------------
+void test_read_failure_messages_are_distinct(void)
+{
+    const ReadFailure reasons[] = {ReadFailure::None, ReadFailure::NotAttempted,
+                                   ReadFailure::NoReply, ReadFailure::CrcFailed,
+                                   ReadFailure::ParseRejected};
+
+    for (ReadFailure reason : reasons)
+    {
+        TEST_ASSERT_NOT_NULL(read_failure_message(reason, true));
+        TEST_ASSERT_NOT_NULL(read_failure_message(reason, false));
+        TEST_ASSERT_TRUE(strlen(read_failure_message(reason, true)) > 0);
+        TEST_ASSERT_TRUE(strlen(read_failure_message(reason, false)) > 0);
+        TEST_ASSERT_NOT_NULL(read_failure_log_suffix(reason));
+    }
+
+    // A corrupted frame must not be reported as "no meter response".
+    TEST_ASSERT_NOT_EQUAL(0, strcmp(read_failure_message(ReadFailure::CrcFailed, true),
+                                    read_failure_message(ReadFailure::NoReply, true)));
+    TEST_ASSERT_NOT_EQUAL(0, strcmp(read_failure_message(ReadFailure::ParseRejected, true),
+                                    read_failure_message(ReadFailure::NoReply, true)));
+    TEST_ASSERT_NOT_EQUAL(0, strcmp(read_failure_message(ReadFailure::CrcFailed, true),
+                                    read_failure_message(ReadFailure::ParseRejected, true)));
+
+    // A read the radio never attempted must not be reported as a radio symptom.
+    TEST_ASSERT_NOT_EQUAL(0, strcmp(read_failure_message(ReadFailure::NotAttempted, true),
+                                    read_failure_message(ReadFailure::NoReply, true)));
+    TEST_ASSERT_NOT_EQUAL(0, strcmp(read_failure_message(ReadFailure::NotAttempted, false),
+                                    read_failure_message(ReadFailure::NoReply, false)));
+    TEST_ASSERT_TRUE(strlen(read_failure_log_suffix(ReadFailure::NotAttempted)) > 0);
+
+    // Retrying cannot fix a configuration error, so both texts read the same.
+    TEST_ASSERT_EQUAL_STRING(read_failure_message(ReadFailure::NotAttempted, true),
+                             read_failure_message(ReadFailure::NotAttempted, false));
+
+    // Retrying and final wording differ, so the log shows the sequence ending.
+    TEST_ASSERT_NOT_EQUAL(0, strcmp(read_failure_message(ReadFailure::CrcFailed, true),
+                                    read_failure_message(ReadFailure::CrcFailed, false)));
+
+    // None falls back to the no-response wording and adds no log suffix.
+    TEST_ASSERT_EQUAL_STRING(read_failure_message(ReadFailure::NoReply, true),
+                             read_failure_message(ReadFailure::None, true));
+    TEST_ASSERT_EQUAL_STRING("", read_failure_log_suffix(ReadFailure::None));
+    TEST_ASSERT_EQUAL_STRING("", read_failure_log_suffix(ReadFailure::NoReply));
+    TEST_ASSERT_TRUE(strlen(read_failure_log_suffix(ReadFailure::CrcFailed)) > 0);
+    TEST_ASSERT_TRUE(strlen(read_failure_log_suffix(ReadFailure::ParseRejected)) > 0);
+}
+
+// A default-constructed tmeter_data (the value returned when no read is
+// attempted) must classify as "no failure recorded", not as a corrupted frame.
+void test_tmeter_data_defaults_to_no_failure(void)
+{
+    tmeter_data data{};
+    TEST_ASSERT_TRUE(ReadFailure::None == data.failure);
+
+    tmeter_data zeroed;
+    memset(&zeroed, 0, sizeof(zeroed));
+    TEST_ASSERT_TRUE(ReadFailure::None == zeroed.failure);
+}
+
+// ---------------------------------------------------------------------------
+// Mutation coverage against the captured frames.
+//
+// The CRC trailer is the only thing standing between a corrupted reception and
+// a bogus reading published to Home Assistant, so verify it exhaustively rather
+// than with a single hand-picked flipped bit: every one-bit corruption of a
+// real, CRC-valid frame must be rejected.
+// ---------------------------------------------------------------------------
+void test_fixture_frames_reject_every_single_bit_flip(void)
+{
+    FixtureLoadResult loaded = load_fixtures();
+    if (!loaded.fixture_file_found)
+    {
+        TEST_IGNORE_MESSAGE("fixtures.lst not found; skipping mutation coverage");
+        return;
+    }
+
+    size_t frames_checked = 0;
+
+    for (const Fixture &fx : loaded.fixtures)
+    {
+        if (!fx.expected_crc_valid || fx.decoded.size() < 4)
+        {
+            continue;
+        }
+
+        const uint8_t length_field = fx.decoded[0];
+        const size_t frame_len = length_field ? (size_t)length_field : fx.decoded.size();
+        if (frame_len > fx.decoded.size())
+        {
+            continue; // advertises more than was captured; CRC check is skipped
+        }
+
+        // Byte 0 is the length field. Corrupting it changes where the CRC is
+        // read from, and a length beyond the buffer is deliberately accepted as
+        // a compatibility shim, so it is excluded here and covered separately
+        // in test_radian_validate_crc.
+        for (size_t byte = 1; byte < frame_len; byte++)
+        {
+            for (int bit = 0; bit < 8; bit++)
+            {
+                std::vector<uint8_t> corrupted = fx.decoded;
+                corrupted[byte] ^= (uint8_t)(1u << bit);
+
+                char msg[128];
+                snprintf(msg, sizeof(msg),
+                         "%s: flipping bit %d of byte %u was not caught by the CRC",
+                         fx.name.c_str(), bit, (unsigned)byte);
+                TEST_ASSERT_FALSE_MESSAGE(
+                    radian_validate_crc(corrupted.data(), corrupted.size()), msg);
+            }
+        }
+
+        frames_checked++;
+    }
+
+    TEST_ASSERT_TRUE_MESSAGE(frames_checked > 0,
+                             "No CRC-valid fixture frames available to mutate");
+}
+
+// The meter clock and identifier are best-effort extras: out-of-range or
+// non-printable bytes must blank those fields without discarding an otherwise
+// valid reading.
+void test_radian_parse_clock_and_type_are_best_effort(void)
+{
+    // Well-formed frame with a valid clock (27/04/2026 09:59:49) and the ASCII
+    // identifier "133290AL02" at bytes [32..41].
+    uint8_t base[120];
+    make_test_buf(base, sizeof(base), 774431UL, 6, 18);
+    base[24] = 27; // day
+    base[25] = 4;  // month
+    base[26] = 26; // year -> 2026
+    base[28] = 9;  // hour
+    base[29] = 59; // minute
+    base[30] = 49; // second
+    memcpy(&base[32], "133290AL02", 10);
+    base[42] = 0x00;
+
+    struct radian_primary_data out;
+    TEST_ASSERT_TRUE(radian_parse_primary_data(base, sizeof(base), &out));
+    TEST_ASSERT_TRUE(out.clock_valid);
+    TEST_ASSERT_EQUAL_STRING("133290AL02", out.meter_type);
+
+    // Each out-of-range clock component must clear clock_valid on its own while
+    // the reading itself is still accepted.
+    struct ClockMutation
+    {
+        size_t offset;
+        uint8_t value;
+        const char *what;
+    };
+    const ClockMutation invalid_clocks[] = {
+        {24, 0, "day 0"},
+        {24, 32, "day 32"},
+        {25, 0, "month 0"},
+        {25, 13, "month 13"},
+        {28, 24, "hour 24"},
+        {29, 60, "minute 60"},
+        {30, 60, "second 60"},
+    };
+
+    for (const ClockMutation &m : invalid_clocks)
+    {
+        uint8_t buf[120];
+        memcpy(buf, base, sizeof(buf));
+        buf[m.offset] = m.value;
+
+        TEST_ASSERT_TRUE_MESSAGE(radian_parse_primary_data(buf, sizeof(buf), &out), m.what);
+        TEST_ASSERT_FALSE_MESSAGE(out.clock_valid, m.what);
+        // The reading itself survives an unset meter clock.
+        TEST_ASSERT_EQUAL_UINT32(774431UL, out.volume);
+    }
+
+    // A non-printable byte inside the identifier discards the whole string
+    // rather than publishing a partial one.
+    {
+        uint8_t buf[120];
+        memcpy(buf, base, sizeof(buf));
+        buf[36] = 0x07;
+        TEST_ASSERT_TRUE(radian_parse_primary_data(buf, sizeof(buf), &out));
+        TEST_ASSERT_EQUAL_STRING("", out.meter_type);
+        TEST_ASSERT_TRUE(out.clock_valid);
+    }
+
+    // A leading NUL means "no identifier".
+    {
+        uint8_t buf[120];
+        memcpy(buf, base, sizeof(buf));
+        buf[32] = 0x00;
+        TEST_ASSERT_TRUE(radian_parse_primary_data(buf, sizeof(buf), &out));
+        TEST_ASSERT_EQUAL_STRING("", out.meter_type);
+    }
+
+    // Bytes [32..42] with no NUL must stay inside meter_type[12].
+    {
+        uint8_t buf[120];
+        memcpy(buf, base, sizeof(buf));
+        memset(&buf[32], 'A', 11);
+        TEST_ASSERT_TRUE(radian_parse_primary_data(buf, sizeof(buf), &out));
+        TEST_ASSERT_EQUAL_STRING("AAAAAAAAAAA", out.meter_type);
+        TEST_ASSERT_EQUAL_size_t(11, strlen(out.meter_type));
+    }
+}
+
+// Transmit-path tests, defined in test_transmit_frame.cpp
+void test_request_frame_round_trips_through_the_receiver(void);
+void test_request_frame_carries_the_meter_identity(void);
+void test_request_frame_crc_is_valid_after_the_round_trip(void);
+void test_request_frame_round_trips_for_boundary_identities(void);
+void test_request_frame_starts_with_the_sync_pattern(void);
+void test_request_frame_length_is_stable(void);
+void test_request_frames_differ_between_meters(void);
+void test_request_frame_is_deterministic(void);
+void test_serial_encoding_round_trips_arbitrary_payloads(void);
+void test_serial_encoding_round_trips_all_byte_values(void);
+
 int main(int argc, char **argv)
 {
     (void)argc;
@@ -1023,7 +1245,23 @@ int main(int argc, char **argv)
     RUN_TEST(test_radian_reading_within_history_bounds_skips_when_insufficient);
     RUN_TEST(test_radian_parse_extended_fields_home001);
     RUN_TEST(test_radian_parse_extended_fields_absent_when_short);
+    RUN_TEST(test_radian_parse_clock_and_type_are_best_effort);
     RUN_TEST(test_replay_meter_fixtures);
     RUN_TEST(test_replay_raw_meter_fixtures);
+    RUN_TEST(test_fixture_frames_reject_every_single_bit_flip);
+    RUN_TEST(test_read_failure_messages_are_distinct);
+    RUN_TEST(test_tmeter_data_defaults_to_no_failure);
+
+    // Transmit path
+    RUN_TEST(test_request_frame_round_trips_through_the_receiver);
+    RUN_TEST(test_request_frame_carries_the_meter_identity);
+    RUN_TEST(test_request_frame_crc_is_valid_after_the_round_trip);
+    RUN_TEST(test_request_frame_round_trips_for_boundary_identities);
+    RUN_TEST(test_request_frame_starts_with_the_sync_pattern);
+    RUN_TEST(test_request_frame_length_is_stable);
+    RUN_TEST(test_request_frames_differ_between_meters);
+    RUN_TEST(test_request_frame_is_deterministic);
+    RUN_TEST(test_serial_encoding_round_trips_arbitrary_payloads);
+    RUN_TEST(test_serial_encoding_round_trips_all_byte_values);
     return UNITY_END();
 }

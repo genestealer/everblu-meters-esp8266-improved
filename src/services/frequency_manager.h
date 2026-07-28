@@ -22,23 +22,16 @@
 #include "storage_abstraction.h"
 #endif
 
-// Meter data structure - define only if not already defined by cc1101.h
-// ESPHome or other projects should define this structure with equivalent fields
-#ifndef __CC1101_H__
-struct tmeter_data
-{
-    int volume;             // Current consumption reading in liters (water) or cubic meters (gas)
-    int reads_counter;      // Number of times meter has been read (0 = no data received)
-    int battery_left;       // Estimated battery life remaining in months
-    int time_start;         // Reading window start time (24-hour format)
-    int time_end;           // Reading window end time (24-hour format)
-    int rssi;               // Radio Signal Strength Indicator (raw value)
-    int rssi_dbm;           // RSSI converted to dBm
-    int lqi;                // Link Quality Indicator (0-127, lower is better)
-    int8_t freqest;         // Frequency offset estimate for adaptive tracking
-    uint32_t history[13];   // Monthly historical readings (13 months)
-    bool history_available; // True if historical data was extracted
-};
+// struct tmeter_data has exactly one definition, in cc1101.h. Never duplicate
+// it here: MeterReadCallback returns a tmeter_data by value across translation
+// units, so a divergent local copy silently undersizes the caller's return slot
+// and corrupts the stack during a scan.
+#if __has_include("../core/cc1101.h")
+#include "../core/cc1101.h"
+#elif __has_include("cc1101.h")
+#include "cc1101.h"
+#else
+#error "Missing cc1101.h (defines struct tmeter_data)"
 #endif
 
 /**

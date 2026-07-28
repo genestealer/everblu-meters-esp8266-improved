@@ -83,6 +83,76 @@ void cc1101_set_rx_attenuation(int db);
 uint32_t cc1101_get_gdo2_timeout_count(void);
 
 /**
+ * @enum ReadFailure
+ * @brief Why a meter read produced no usable data
+ *
+ * Lets the caller tell a silent meter apart from a marginal RF link, so the
+ * status and error messages point at the right remedy.
+ */
+enum class ReadFailure : uint8_t
+{
+  None = 0,      // No failure recorded (read succeeded, or not attempted)
+  NotAttempted,  // Radio never keyed: meter identity missing or unusable
+  NoReply,       // No frame arrived within the timeout window
+  CrcFailed,     // A frame arrived but failed the RADIAN CRC (corrupted)
+  ParseRejected  // Frame passed CRC but the primary meter fields were invalid
+};
+
+/**
+ * @brief Short suffix describing a failure, for appending to a log line
+ * @param reason Failure classification from tmeter_data::failure
+ * @return Suffix beginning with " - ", or "" when there is nothing to add
+ */
+inline const char *read_failure_log_suffix(ReadFailure reason)
+{
+  switch (reason)
+  {
+  case ReadFailure::NotAttempted:
+    return " - meter identity not configured, radio not keyed";
+  case ReadFailure::CrcFailed:
+    return " - corrupted frame (failed CRC)";
+  case ReadFailure::ParseRejected:
+    return " - frame received but meter fields invalid";
+  default:
+    return "";
+  }
+}
+
+/**
+ * @brief User-facing error text for a failed read
+ *
+ * Split by symptom so the suggested remedy matches the actual cause: a silent
+ * meter points at range/identity, whereas a corrupted frame points at RF
+ * quality or carrier drift. NotAttempted is neither, and must not be reported
+ * as a radio symptom: the transceiver was never keyed.
+ *
+ * @param reason Failure classification from tmeter_data::failure
+ * @param retrying true while retries remain, false for the final message
+ * @return Static string, safe to store as a const char *
+ */
+inline const char *read_failure_message(ReadFailure reason, bool retrying)
+{
+  switch (reason)
+  {
+  case ReadFailure::NotAttempted:
+    // Retrying cannot help a configuration error, so both texts say the same thing.
+    return "Meter identity not configured - check METER_CODE (expected YY-SSSSSSS)";
+  case ReadFailure::CrcFailed:
+    return retrying
+               ? "Corrupted frame received - failed CRC (weak signal or frequency offset)"
+               : "Corrupted frames after max retries - improve signal or run a frequency scan";
+  case ReadFailure::ParseRejected:
+    return retrying
+               ? "Frame received but meter fields invalid - check meter Year/Serial"
+               : "Frames received but meter fields invalid after max retries - check meter Year/Serial";
+  default:
+    return retrying
+               ? "No meter response (asleep/out of range/wrong Year/Serial)"
+               : "No meter response after max retries - check distance and meter Year/Serial";
+  }
+}
+
+/**
  * @struct tmeter_data
  * @brief Meter data structure containing current readings and metadata
  *
@@ -105,6 +175,7 @@ struct tmeter_data
   bool history_available; // True if historical data was successfully extracted
   char meter_time[32];    // Meter real-time clock "YYYY-MM-DD HH:MM:SS" (empty if not decoded)
   char meter_type[12];    // Meter type/identifier ASCII string, e.g. "133290AL02" (empty if not decoded)
+  ReadFailure failure;    // Why the read produced no usable data (None on success)
 };
 
 /**

@@ -67,7 +67,9 @@ public:
      * @param currentVolume Current meter reading
      * @param outputBuffer Buffer to write JSON to
      * @param bufferSize Size of output buffer
-     * @return Number of bytes written (including null terminator), or 0 if buffer too small
+     * @return Number of characters written, excluding the null terminator, or 0
+     *         if there is no history or the payload does not fit. A truncated,
+     *         unparseable payload is never returned.
      */
     static int generateHistoryJson(const uint32_t history[13], uint32_t currentVolume,
                                    char *outputBuffer, int bufferSize);

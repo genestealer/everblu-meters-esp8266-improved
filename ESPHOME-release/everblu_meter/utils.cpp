@@ -11,8 +11,10 @@
 #include <Arduino.h>
 #include "crc_kermit.h"
 #include "cc1101.h"		 // For tmeter_data struct
-#include "wifi_serial.h" // Mirror Serial to WiFi
-#include "logging.h"	 // Cross-platform logging
+// private.h is pulled in ahead of wifi_serial.h so WIFI_SERIAL_MONITOR_ENABLED is
+// already known when the mirror decides whether to compile itself in. Not strictly
+// required (wifi_serial.h falls back to including private.h itself), but it keeps
+// the dependency visible at the top of the file.
 #if !defined(USE_ESPHOME)
 #if defined(__has_include)
 #if __has_include("private.h")
@@ -22,67 +24,84 @@
 /* No __has_include support; skip optional private.h */
 #endif
 #endif
+#include "wifi_serial.h" // Mirror Serial to WiFi
+#include "logging.h"	 // Cross-platform logging
 
 #include <string.h>
 
 // When true, echo_debug() output is suppressed (see utils.h).
 bool g_echo_debug_quiet = false;
 
-// Consolidated hex display function with optional formatting
-// mode: 0=16 per line with newlines, 1=array format, 2=single line, 3=single line with 'S' separator
-void show_in_hex_formatted(const uint8_t *buffer, size_t len, int mode)
+// Emit the accumulated line and start a new one.
+static void flush_hex_line(char *line_buf, int &line_pos)
 {
-	size_t i = 0;
-	char line_buf[256];
-	int line_pos = 0;
-
-	for (i = 0; i < len; i++)
-	{
-		if (mode == 0)
-		{
-			// Original show_in_hex: 16 bytes per line
-			if (!(i % 16))
-			{
-				if (line_pos > 0)
-				{
-					line_buf[line_pos] = '\0';
-					LOG_D("everblu_meter", "%s", line_buf);
-					line_pos = 0;
-				}
-			}
-			line_pos += snprintf(line_buf + line_pos, sizeof(line_buf) - line_pos, "%02X ", buffer[i]);
-		}
-		else if (mode == 1)
-		{
-			// Array format with 16 per line
-			if (!(i % 16) && i > 0)
-			{
-				if (line_pos > 0)
-				{
-					line_buf[line_pos] = '\0';
-					LOG_D("everblu_meter", "%s", line_buf);
-					line_pos = 0;
-				}
-			}
-			line_pos += snprintf(line_buf + line_pos, sizeof(line_buf) - line_pos, "0x%02X, ", buffer[i]);
-		}
-		else if (mode == 2)
-		{
-			// Single line format
-			line_pos += snprintf(line_buf + line_pos, sizeof(line_buf) - line_pos, "%02X ", buffer[i]);
-		}
-		else if (mode == 3)
-		{
-			// Single line with 'S' separator (for GET requests)
-			line_pos += snprintf(line_buf + line_pos, sizeof(line_buf) - line_pos, "%02XS", buffer[i]);
-		}
-	}
-
 	if (line_pos > 0)
 	{
 		line_buf[line_pos] = '\0';
 		LOG_D("everblu_meter", "%s", line_buf);
+		line_pos = 0;
 	}
+}
+
+// Consolidated hex display function with optional formatting
+// mode: 0=16 per line with newlines, 1=array format, 2=single line, 3=single line with 'S' separator
+//
+// Modes 2 and 3 describe a single logical line whose length grows with the
+// buffer, so the output is wrapped once it fills line_buf. Without that wrap a
+// buffer longer than about 85 bytes walked off the end of the stack array: a
+// full 124-byte RADIAN frame needs 372 characters. snprintf() returns the
+// length it *would* have written, so line_pos ran past the buffer size and the
+// remaining-space argument, computed as an unsigned difference, underflowed to
+// a huge value instead of clamping.
+void show_in_hex_formatted(const uint8_t *buffer, size_t len, int mode)
+{
+	if (buffer == nullptr)
+	{
+		return;
+	}
+
+	char line_buf[256];
+	int line_pos = 0;
+
+	// Longest chunk any mode appends ("0x%02X, ") plus its terminator.
+	const int MAX_CHUNK = 7;
+
+	for (size_t i = 0; i < len; i++)
+	{
+		if ((mode == 0 || mode == 1) && i > 0 && (i % 16) == 0)
+		{
+			// Fixed 16 bytes per line.
+			flush_hex_line(line_buf, line_pos);
+		}
+		else if (line_pos + MAX_CHUNK > (int)sizeof(line_buf))
+		{
+			// Would not fit: wrap before writing rather than overrun.
+			flush_hex_line(line_buf, line_pos);
+		}
+
+		const int space = (int)sizeof(line_buf) - line_pos;
+		int written = 0;
+
+		if (mode == 0 || mode == 2)
+		{
+			written = snprintf(line_buf + line_pos, (size_t)space, "%02X ", buffer[i]);
+		}
+		else if (mode == 1)
+		{
+			written = snprintf(line_buf + line_pos, (size_t)space, "0x%02X, ", buffer[i]);
+		}
+		else if (mode == 3)
+		{
+			written = snprintf(line_buf + line_pos, (size_t)space, "%02XS", buffer[i]);
+		}
+
+		if (written > 0 && written < space)
+		{
+			line_pos += written;
+		}
+	}
+
+	flush_hex_line(line_buf, line_pos);
 }
 
 // Legacy function wrappers for backwards compatibility
@@ -108,6 +127,11 @@ void show_in_hex_one_line_GET(const uint8_t *buffer, size_t len)
 
 void show_in_bin(const uint8_t *buffer, size_t len)
 {
+	if (buffer == nullptr)
+	{
+		return;
+	}
+
 	const uint8_t *ptr;
 	uint8_t mask;
 	char bin_buf[512];
@@ -135,6 +159,16 @@ void show_in_bin(const uint8_t *buffer, size_t len)
 
 int calculateMeterdBmToPercentage(int rssi_dbm)
 {
+	// NOTE: the -120..-40 dBm scale is an arbitrary display convenience, not a
+	// calibrated measurement. It exists so Home Assistant can show a signal bar;
+	// the percentage has no physical meaning and the endpoints were picked to
+	// span roughly "unusable" to "right next to the meter". Judge link quality
+	// from the dBm and LQI values instead. Any change to these endpoints shifts
+	// every historical value in Home Assistant, so treat it as user-visible.
+	//
+	// This is the single implementation for both builds: the ESPHome publisher
+	// delegates here so its sensor cannot drift away from the device log.
+
 	// Clamp RSSI to a reasonable range (e.g., -120 dBm to -40 dBm)
 	int clamped_rssi = constrain(rssi_dbm, -120, -40);
 
@@ -208,7 +242,8 @@ void echo_debug(bool l_flag, const char *fmt, ...)
 	// Use INFO level so messages are always visible in WiFi logs
 	LOG_I("everblu_meter", "%s", buf);
 #else
-	// MQTT mode: Route through WiFiSerial for USB + WiFi visibility.
+	// MQTT mode: `Serial` is remapped to the WiFi mirror by wifi_serial.h when the
+	// monitor is enabled, and is the plain hardware UART when it is not.
 	// Colourise based on the leading "[TAG]" token (e.g. [METER], [FREQ]) so
 	// the VS Code terminal / PlatformIO monitor is easier to scan. The RESET is
 	// emitted before any trailing newline to avoid colouring blank line breaks.
@@ -220,17 +255,17 @@ void echo_debug(bool l_flag, const char *fmt, ...)
 		bool hasNewline = (len > 0 && buf[len - 1] == '\n');
 		if (hasNewline)
 			buf[len - 1] = '\0';
-		WiFiSerial.print(ts);
-		WiFiSerial.print(col);
-		WiFiSerial.print(buf);
-		WiFiSerial.print(EVB_ANSI_RESET);
+		Serial.print(ts);
+		Serial.print(col);
+		Serial.print(buf);
+		Serial.print(EVB_ANSI_RESET);
 		if (hasNewline)
-			WiFiSerial.print('\n');
+			Serial.print('\n');
 	}
 	else
 	{
-		WiFiSerial.print(ts);
-		WiFiSerial.print(buf);
+		Serial.print(ts);
+		Serial.print(buf);
 	}
 #endif
 
