@@ -583,6 +583,27 @@ void test_a_scan_is_only_stepped_by_the_reader_that_started_it(void)
     drainFrequencyScan(owner);
 }
 
+void test_a_running_scan_blocks_reads_and_further_scan_requests(void)
+{
+    // The scan owns the radio until it finishes. Anything that would retune it
+    // mid-sweep has to be turned away rather than queued.
+    g_config.frequency = 433.82f;
+
+    MeterReader reader = makeReader();
+    reader.performFrequencyScan();
+    TEST_ASSERT_TRUE(reader.isScanInProgress());
+
+    const int before = (int)fakeRadio().calls.size();
+
+    reader.performFrequencyScan(); // Second press of the scan button
+    reader.triggerReading(false);  // Manual read while the sweep is running
+
+    TEST_ASSERT_EQUAL(before, (int)fakeRadio().calls.size());
+    TEST_ASSERT_TRUE(FrequencyManager::isScanInProgress());
+
+    drainFrequencyScan(reader);
+}
+
 void test_reset_frequency_offset_clears_storage_and_retunes(void)
 {
     StorageAbstraction::saveFloat("freq_offset", 0.030f, 0xABCD);

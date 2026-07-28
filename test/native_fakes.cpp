@@ -41,6 +41,7 @@ void FakeRadio::reset()
     initFrequencies.clear();
     initSucceeds = true;
     recModeCalls = 0;
+    onInit = nullptr;
     carrierFrequency = 0.0f;
     carrierWidthMHz = 0.010f;
     cancelScanAfterCalls = 0;
@@ -77,6 +78,10 @@ void setMHZ(float mhz)
 bool cc1101_init(float freq)
 {
     FakeRadio &radio = fakeRadio();
+    if (radio.onInit)
+    {
+        radio.onInit(freq);
+    }
     radio.initFrequencies.push_back(freq);
     return radio.initSucceeds;
 }
