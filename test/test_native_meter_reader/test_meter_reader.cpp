@@ -428,6 +428,62 @@ void test_scheduled_read_is_skipped_on_a_non_reading_day(void)
     TEST_ASSERT_EQUAL(0, (int)fakeRadio().calls.size());
 }
 
+void test_reading_day_gate_covers_every_schedule_string(void)
+{
+    // MeterReader::isReadingDayForConfiguredSchedule() reads m_config live rather
+    // than sharing ScheduleManager's static state (each instance can run its own
+    // schedule, which multi-meter setups rely on), so it is a second, independent
+    // implementation of the day-matching rules and needs its own coverage rather
+    // than relying on ScheduleManager's tests.
+    //
+    // 2025-06-08..14 is Sunday..Saturday, one of each day of the week.
+    struct Case
+    {
+        const char *schedule;
+        int day; // 8 = Sunday .. 14 = Saturday
+        bool expectRead;
+    };
+    const Case cases[] = {
+        {"Monday-Friday", 8, false},   // Sunday
+        {"Monday-Friday", 14, false},  // Saturday
+        {"Monday-Friday", 10, true},   // Tuesday
+        {"Monday-Saturday", 8, false}, // Sunday
+        {"Monday-Saturday", 14, true}, // Saturday
+        {"Monday-Sunday", 8, true},    // Sunday
+        {"Monday-Sunday", 14, true},   // Saturday
+        {"Sunday", 8, true},
+        {"Sunday", 9, false},
+        {"Monday", 9, true},
+        {"Monday", 10, false},
+        {"Tuesday", 10, true},
+        {"Wednesday", 11, true},
+        {"Thursday", 12, true},
+        {"Friday", 13, true},
+        {"Saturday", 14, true},
+        {"Saturday", 8, false},
+        {"Whenever I feel like it", 10, false}, // Unknown schedule: always skipped
+    };
+
+    for (const Case &c : cases)
+    {
+        meterReaderSetUp();
+        g_config.schedule = c.schedule;
+        g_config.readHourUTC = 10;
+        g_config.readMinuteUTC = 0;
+        fakeRadio().responses.push_back(FakeRadio::success());
+
+        MeterReader reader = makeReader();
+        g_time.setUtc(2025, 6, c.day, 10, 0, 0);
+        nativeClockAdvance(1000);
+        reader.loop();
+
+        char message[96];
+        snprintf(message, sizeof(message), "schedule='%s' day=%d expected %s",
+                 c.schedule, c.day, c.expectRead ? "a read" : "no read");
+        TEST_ASSERT_EQUAL_MESSAGE(c.expectRead ? 1 : 0, (int)fakeRadio().calls.size(), message);
+    }
+}
+
 void test_scheduled_read_waits_for_time_sync(void)
 {
     fakeRadio().responses.push_back(FakeRadio::success());

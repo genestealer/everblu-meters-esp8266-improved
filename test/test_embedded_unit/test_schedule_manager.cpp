@@ -334,6 +334,49 @@ void test_reading_time_local_to_utc_roundtrip(void)
 }
 
 /**
+ * Test: converting local back to UTC wraps to the previous day when the offset
+ * pushes the local time past midnight (recalculateUtcFromLocal's negative branch)
+ */
+void test_reading_time_local_to_utc_wraps_to_previous_day(void)
+{
+    ScheduleManager::begin("Monday-Friday", 10, 0, 60); // UTC+1
+    ScheduleManager::setReadingTimeFromLocal(0, 30);
+
+    // 00:30 local - 1h offset wraps back to 23:30 UTC the previous day
+    TEST_ASSERT_EQUAL_INT(23, ScheduleManager::getReadingHourUtc());
+    TEST_ASSERT_EQUAL_INT(30, ScheduleManager::getReadingMinuteUtc());
+}
+
+/**
+ * Test: getSchedule() reports whatever setSchedule()/begin() last accepted
+ */
+void test_get_schedule_reports_the_active_schedule(void)
+{
+    ScheduleManager::begin("Monday-Saturday", 10, 0, 0);
+    TEST_ASSERT_EQUAL_STRING("Monday-Saturday", ScheduleManager::getSchedule());
+
+    ScheduleManager::setSchedule("Friday");
+    TEST_ASSERT_EQUAL_STRING("Friday", ScheduleManager::getSchedule());
+}
+
+/**
+ * Test: setTimezoneOffset() updates both the stored offset and the derived
+ * local reading time, matching what begin() does at startup
+ */
+void test_set_timezone_offset_updates_local_reading_time(void)
+{
+    ScheduleManager::begin("Monday-Friday", 22, 30, 0);
+    TEST_ASSERT_EQUAL_INT(22, ScheduleManager::getReadingHourLocal());
+
+    ScheduleManager::setTimezoneOffset(120); // UTC+2
+
+    TEST_ASSERT_EQUAL_INT(120, ScheduleManager::getTimezoneOffsetMinutes());
+    // 22:30 UTC + 2h wraps past midnight to 00:30 local
+    TEST_ASSERT_EQUAL_INT(0, ScheduleManager::getReadingHourLocal());
+    TEST_ASSERT_EQUAL_INT(30, ScheduleManager::getReadingMinuteLocal());
+}
+
+/**
  * Test: out-of-range reading times are clamped rather than wrapped
  */
 void test_reading_time_is_clamped(void)
