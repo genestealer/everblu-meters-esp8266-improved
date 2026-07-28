@@ -419,6 +419,10 @@ void MeterReader::handleFailedRead(ReadFailure reason)
         // m_readingInProgress guard).
         m_retryCount++;
         m_nextRetryTime = millis() + RETRY_DELAY_MS;
+        // Deliberately the symptom of THIS attempt, not the sticky
+        // m_retryFailureReason: while a sequence is still running the user wants
+        // to see what just happened. Only the final message below prefers the
+        // most informative symptom of the whole sequence.
         m_lastErrorMessage = read_failure_message(reason, true);
 
         m_publisher->publishStatusMessage("Retry scheduled");

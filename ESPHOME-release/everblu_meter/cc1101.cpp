@@ -2057,17 +2057,22 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
 
 struct tmeter_data get_meter_data(void)
 {
+  // None of the paths below key the radio, so they report NotAttempted rather
+  // than a radio symptom: telling the user to check distance and antenna
+  // placement when METER_CODE is unusable points at the wrong remedy.
 #if defined(USE_ESPHOME)
   // ESPHome multi-instance flows should use get_meter_data_for_meter().
   // Fail fast to avoid a blocking radio transaction with an invalid identity.
   echo_debug(1, "[METER] get_meter_data() is unsupported in USE_ESPHOME; use get_meter_data_for_meter()\n");
   struct tmeter_data sdata = {};
+  sdata.failure = ReadFailure::NotAttempted;
   return sdata;
 #else
   struct tmeter_data sdata = {};
 
 #if !defined(METER_CODE)
   echo_debug(1, "[METER] METER_CODE is not defined; cannot read meter\n");
+  sdata.failure = ReadFailure::NotAttempted;
   return sdata;
 #else
   const char *meter_code = METER_CODE;
@@ -2076,6 +2081,7 @@ struct tmeter_data get_meter_data(void)
   if (!everblu::core::parseMeterCode(meter_code, &meter_year, &meter_serial))
   {
     echo_debug(1, "[METER] Invalid METER_CODE: expected YY-SSSSSSS or YY-SSSSSSS-NNN\n");
+    sdata.failure = ReadFailure::NotAttempted;
     return sdata;
   }
 

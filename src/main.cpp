@@ -275,6 +275,11 @@ const char jsonTemplate[] = "{ "
 int _retry = 0;
 const int max_retries = MAX_RETRIES;          // Maximum number of retry attempts (configurable in private.h)
 unsigned long lastFailedAttempt = 0;          // Timestamp of last failed attempt
+// The flag, rather than a non-zero lastFailedAttempt, is what marks the cooldown
+// as running: millis() legitimately returns 0 for the first millisecond after
+// boot, and a failure landing there must not skip the cooldown entirely. This
+// mirrors MeterReader::m_inCooldown so both deployment paths behave the same.
+bool g_inCooldown = false;
 const unsigned long RETRY_COOLDOWN = 3600000; // 1 hour cooldown in milliseconds
 bool g_autoScanAfterFailureDone = false;      // Guards the failure-recovery frequency scan to once per failure streak
 bool g_postScanReadAttempted = false;         // Guards the single post-scan re-read to once per failure streak
@@ -558,6 +563,10 @@ void onUpdateData()
       // Schedule retry using callback instead of recursion to prevent stack overflow
       _retry++;
       static char errorMsg[128];
+      // Deliberately the symptom of THIS attempt, not the sticky
+      // g_retryFailureReason: while a sequence is still running the user wants
+      // to see what just happened. Only the final message below prefers the
+      // most informative symptom of the whole sequence.
       snprintf(errorMsg, sizeof(errorMsg), "Retry %d/%d - %s", _retry, max_retries,
                read_failure_message(meter_data.failure, true));
       lastErrorMessage = errorMsg;
@@ -574,6 +583,7 @@ void onUpdateData()
     else
     {
       // Max retries reached, enter cooldown period
+      g_inCooldown = true;
       lastFailedAttempt = millis();
       failedReads++;
       lastErrorMessage = read_failure_message(
@@ -618,7 +628,8 @@ void onUpdateData()
         if (offsetAfterScan != offsetBeforeScan && !g_postScanReadAttempted)
         {
           g_postScanReadAttempted = true;
-          lastFailedAttempt = 0;    // lift the cooldown for this single retry
+          g_inCooldown = false;     // lift the cooldown for this single retry
+          lastFailedAttempt = 0;
           _retry = max_retries - 1; // enter as the final attempt: one shot only
           TS_PRINTF("[FREQ] New frequency offset found (%.3f -> %.3f kHz) - attempting one more read...\n",
                     offsetBeforeScan * 1000.0, offsetAfterScan * 1000.0);
@@ -774,6 +785,7 @@ void onUpdateData()
 
   // Reset retry counter and cooldown on successful read
   _retry = 0;
+  g_inCooldown = false;
   lastFailedAttempt = 0;
   g_retryFailureReason = ReadFailure::None;
   g_autoScanAfterFailureDone = false; // Allow a fresh auto-scan on the next failure streak
@@ -820,7 +832,7 @@ void onScheduled()
   if (ScheduleManager::isReadingDay(ptm) && timeMatch && ptm->tm_sec == 0)
   {
     // Check if we're still in cooldown period after failed attempts
-    if (lastFailedAttempt > 0 && (millis() - lastFailedAttempt) < RETRY_COOLDOWN)
+    if (g_inCooldown && (millis() - lastFailedAttempt) < RETRY_COOLDOWN)
     {
       unsigned long remainingCooldown = (RETRY_COOLDOWN - (millis() - lastFailedAttempt)) / 1000;
       TS_PRINTF("[WARN] Still in cooldown period. %lu seconds remaining.\n", remainingCooldown);
@@ -835,6 +847,7 @@ void onScheduled()
     }
 
     // Cooldown period is over, reset and proceed
+    g_inCooldown = false;
     lastFailedAttempt = 0;
 
     // Call back in 23 hours
@@ -1320,7 +1333,7 @@ void onConnectionEstablished()
     }
 
     // Check if we're in cooldown period
-    if (lastFailedAttempt > 0 && (millis() - lastFailedAttempt) < RETRY_COOLDOWN) {
+    if (g_inCooldown && (millis() - lastFailedAttempt) < RETRY_COOLDOWN) {
       unsigned long remainingCooldown = (RETRY_COOLDOWN - (millis() - lastFailedAttempt)) / 1000;
       TS_PRINTF("[WARN] Cannot trigger update: Still in cooldown period. %lu seconds remaining.\n", remainingCooldown);
 

@@ -91,10 +91,11 @@ uint32_t cc1101_get_gdo2_timeout_count(void);
  */
 enum class ReadFailure : uint8_t
 {
-  None = 0,     // No failure recorded (read succeeded, or not attempted)
-  NoReply,      // No frame arrived within the timeout window
-  CrcFailed,    // A frame arrived but failed the RADIAN CRC (corrupted)
-  ParseRejected // Frame passed CRC but the primary meter fields were invalid
+  None = 0,      // No failure recorded (read succeeded, or not attempted)
+  NotAttempted,  // Radio never keyed: meter identity missing or unusable
+  NoReply,       // No frame arrived within the timeout window
+  CrcFailed,     // A frame arrived but failed the RADIAN CRC (corrupted)
+  ParseRejected  // Frame passed CRC but the primary meter fields were invalid
 };
 
 /**
@@ -106,6 +107,8 @@ inline const char *read_failure_log_suffix(ReadFailure reason)
 {
   switch (reason)
   {
+  case ReadFailure::NotAttempted:
+    return " - meter identity not configured, radio not keyed";
   case ReadFailure::CrcFailed:
     return " - corrupted frame (failed CRC)";
   case ReadFailure::ParseRejected:
@@ -120,7 +123,8 @@ inline const char *read_failure_log_suffix(ReadFailure reason)
  *
  * Split by symptom so the suggested remedy matches the actual cause: a silent
  * meter points at range/identity, whereas a corrupted frame points at RF
- * quality or carrier drift.
+ * quality or carrier drift. NotAttempted is neither, and must not be reported
+ * as a radio symptom: the transceiver was never keyed.
  *
  * @param reason Failure classification from tmeter_data::failure
  * @param retrying true while retries remain, false for the final message
@@ -130,6 +134,9 @@ inline const char *read_failure_message(ReadFailure reason, bool retrying)
 {
   switch (reason)
   {
+  case ReadFailure::NotAttempted:
+    // Retrying cannot help a configuration error, so both texts say the same thing.
+    return "Meter identity not configured - check METER_CODE (expected YY-SSSSSSS)";
   case ReadFailure::CrcFailed:
     return retrying
                ? "Corrupted frame received - failed CRC (weak signal or frequency offset)"
