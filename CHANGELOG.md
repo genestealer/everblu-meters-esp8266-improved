@@ -18,10 +18,14 @@ Releases are created manually by tagging commits with version tags matching `v*.
 ### Changed
 
 - **Failed reads now report which of three causes applied**, instead of always reporting `"No meter response (asleep/out of range/wrong Year/Serial)"`: no reply at all, a reply that failed CRC (marginal RF link), or a reply that passed CRC but carried invalid meter fields. Status, error and log messages point at the matching remedy. `tmeter_data` gains a `failure` field (`ReadFailure` enum); the classification is sticky across a retry sequence, and both builds report it.
+- **ESPHome RSSI percentage values will change on upgrade.** The ESPHome publisher carried its own copy of the dBm-to-percentage conversion, mapping -120..-50 dBm onto 0-100%, while the shared helper in `utils.cpp` maps -120..-40 dBm. The same reading was therefore logged as one figure and published to Home Assistant as another: -70 dBm appeared as 62% in the device log and 71% in the `rssi_percentage` sensor. Both now use the shared helper, so ESPHome values drop slightly (-70 dBm now reports 62%, -50 dBm now reports 87% instead of 100%). Expect a one-off step down in Home Assistant history, and retune any automation thresholds set against that entity. MQTT values and the LQI percentage are unchanged.
 
 ### Fixed
 
 - **Stack corruption during a frequency scan.** `frequency_manager.h` carried a duplicate `struct tmeter_data` behind an `#ifndef __CC1101_H__` guard that never fired for `frequency_manager.cpp`, so that translation unit used a struct missing `meter_time` and `meter_type` (since v3.2.0). As the meter-read callback returns `tmeter_data` by value, every scan step wrote ~48 bytes past the caller's return slot. The duplicate is removed in favour of including `cc1101.h`.
+- **Crash when publishing a null radio state (ESPHome).** `ESPHomeDataPublisher::publishRadioState()` guarded the null before updating the text sensor, but then dereferenced it in the `strcmp` that derives the CC1101 Connected binary sensor.
+- **Post-failure cooldown was skipped when a read failed at `millis() == 0`.** The cooldown used a non-zero timestamp as its "running" flag, so a failure in the first millisecond after boot left the scheduler free to retry immediately. It is now tracked with an explicit flag.
+- **`MeterHistory::generateHistoryJson()` could return a length greater than the supplied buffer** and emit a truncated, unparseable JSON document that callers would then publish. It now refuses to truncate and returns 0.
 
 ## [v3.2.0] - 2026-07-09
 

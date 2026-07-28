@@ -201,6 +201,7 @@ private:
 
     // Retry management
     int m_retryCount;
+    bool m_inCooldown;                // True while the post-failure cooldown is running
     unsigned long m_lastFailedAttempt;
     unsigned long m_nextRetryTime;
     bool m_autoScanAfterFailureDone;  // Guards the failure-recovery frequency scan to once per failure streak

@@ -5,7 +5,40 @@
 
 #include "meter_history.h"
 #include "logging.h"
+#include <cstdarg>
+#include <cstdio>
 #include <cstring>
+
+namespace
+{
+    /**
+     * @brief Append printf-style text at @p pos, refusing to truncate
+     *
+     * Returns false if the formatted text does not fit in the remaining space,
+     * leaving @p pos unchanged. A half-written JSON document is never useful to
+     * a caller, so truncation is treated as an error rather than best-effort.
+     */
+    bool appendFormatted(char *buffer, int bufferSize, int &pos, const char *fmt, ...)
+    {
+        if (pos < 0 || pos >= bufferSize)
+        {
+            return false;
+        }
+
+        va_list args;
+        va_start(args, fmt);
+        const int written = vsnprintf(buffer + pos, (size_t)(bufferSize - pos), fmt, args);
+        va_end(args);
+
+        if (written < 0 || written >= bufferSize - pos)
+        {
+            return false;
+        }
+
+        pos += written;
+        return true;
+    }
+}
 
 HistoryStats MeterHistory::calculateStats(const uint32_t history[13], uint32_t currentVolume)
 {
@@ -64,81 +97,52 @@ int MeterHistory::generateHistoryJson(const uint32_t history[13], uint32_t curre
         return 0;
     }
 
-    int monthCount = countValidMonths(history);
+    outputBuffer[0] = '\0';
+
+    const int monthCount = countValidMonths(history);
     if (monthCount == 0)
     {
         return 0; // No valid history
     }
 
     int pos = 0;
-    int remaining = bufferSize;
-
-    // Start JSON object
-    pos += snprintf(outputBuffer + pos, remaining, "{\"history\":[");
-    remaining = bufferSize - pos;
-
-    if (remaining <= 1)
-    {
-        return 0;
-    }
+    bool ok = appendFormatted(outputBuffer, bufferSize, pos, "{\"history\":[");
 
     // Add historical volumes
-    for (int i = 0; i < monthCount; i++)
+    for (int i = 0; ok && i < monthCount; i++)
     {
-        remaining = bufferSize - pos;
-        if (remaining <= 1)
-        {
-            break;
-        }
-        pos += snprintf(outputBuffer + pos, remaining, "%s%u",
-                        (i > 0 ? "," : ""), history[i]);
+        ok = appendFormatted(outputBuffer, bufferSize, pos, "%s%u", (i > 0 ? "," : ""), history[i]);
     }
 
-    // Add monthly usage calculations
-    remaining = bufferSize - pos;
-    if (remaining <= 1)
+    if (ok)
     {
-        // Buffer full before monthly_usage - close and return best-effort
-        outputBuffer[bufferSize - 1] = '\0';
-        return pos;
+        ok = appendFormatted(outputBuffer, bufferSize, pos, "],\"monthly_usage\":[");
     }
-
-    pos += snprintf(outputBuffer + pos, remaining, "],\"monthly_usage\":[");
 
     // Start at the second month: the oldest month has no earlier baseline, so we
     // omit it entirely rather than publishing a misleading value. monthly_usage
     // holds (monthCount - 1) real month-over-month deltas, aligned so
     // monthly_usage[k] pairs with history[k+1].
-    for (int i = 1; i < monthCount; i++)
+    for (int i = 1; ok && i < monthCount; i++)
     {
-        uint32_t usage = calculateUsage(history[i], history[i - 1]);
-
-        remaining = bufferSize - pos;
-        if (remaining <= 1)
-        {
-            break;
-        }
-        pos += snprintf(outputBuffer + pos, remaining, "%s%u",
-                        (i > 1 ? "," : ""), usage);
+        const uint32_t usage = calculateUsage(history[i], history[i - 1]);
+        ok = appendFormatted(outputBuffer, bufferSize, pos, "%s%u", (i > 1 ? "," : ""), usage);
     }
 
-    // Calculate current month usage
-    uint32_t currentMonthUsage = calculateUsage(currentVolume, (monthCount > 0) ? history[monthCount - 1] : 0);
-
-    remaining = bufferSize - pos;
-    if (remaining <= 1)
+    if (ok)
     {
-        // Buffer full - close and return best-effort
-        outputBuffer[bufferSize - 1] = '\0';
-        return pos;
+        const uint32_t currentMonthUsage = calculateUsage(currentVolume, history[monthCount - 1]);
+        ok = appendFormatted(outputBuffer, bufferSize, pos,
+                             "],\"current_month_usage\":%u,\"months_available\":%d}",
+                             currentMonthUsage, monthCount);
     }
 
-    pos += snprintf(outputBuffer + pos, remaining,
-                    "],\"current_month_usage\":%u,\"months_available\":%d}",
-                    currentMonthUsage, monthCount);
-
-    // Ensure null termination
-    outputBuffer[bufferSize - 1] = '\0';
+    if (!ok)
+    {
+        // Report failure rather than publishing a truncated, unparseable payload.
+        outputBuffer[0] = '\0';
+        return 0;
+    }
 
     return pos;
 }

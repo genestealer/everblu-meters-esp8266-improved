@@ -552,7 +552,7 @@ EverbluMeterComponent (ESPHome)
 - **volume** - Current meter reading (L or m³)
 - **battery** - Estimated battery life (years)
 - **counter** - Alternative volume counter
-- **rssi** / **rssi_percentage** - Radio signal strength
+- **rssi** / **rssi_percentage** - Radio signal strength. `rssi_percentage` maps -120 to -40 dBm onto 0-100%; the scale is an arbitrary display convenience so Home Assistant can show a signal bar, not a calibrated measurement. Judge link quality from the dBm and LQI values instead.
 - **lqi** / **lqi_percentage** - Link quality indicator (raw `lqi` is 0-127 where *lower is better*; `lqi_percentage` inverts this so higher % = better link)
 - **time_start** / **time_end** - Reading timing
 - **frequency_offset** - Current frequency offset (kHz)

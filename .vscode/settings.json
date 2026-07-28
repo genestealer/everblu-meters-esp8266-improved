@@ -1,4 +1,14 @@
 {
+	// This repository began as a fork but is no longer linked to the original
+	// project on GitHub, and it has its own default branch and release history.
+	// Other remotes may be present for pulling in work from sibling forks, so
+	// pin the GitHub Pull Requests extension to `origin`: otherwise it can treat
+	// one of those as the repository and default new pull requests to the wrong
+	// owner and base branch.
+	"githubPullRequests.remotes": [
+		"origin"
+	],
+
 	// // Keep the release folder out of search/watch
 	// "files.exclude": {
 	// 	"**/ESPHOME-release/**": true

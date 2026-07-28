@@ -7,6 +7,7 @@
 #include "meter_history.h"
 
 #ifdef USE_ESPHOME
+#include "utils.h" // Shared RSSI/LQI percentage conversions
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/binary_sensor/binary_sensor.h"
@@ -220,7 +221,13 @@ void ESPHomeDataPublisher::publishRadioState(const char *state)
 {
 #ifdef USE_ESPHOME
     ESP_LOGD(TAG_PUB, "Radio state: %s", state ? state : "(null)");
-    if (radio_state_sensor_ && state)
+    if (!state)
+    {
+        // Nothing to report, and the connectivity check below would dereference it.
+        return;
+    }
+
+    if (radio_state_sensor_)
     {
         radio_state_sensor_->publish_state(state);
     }
@@ -365,20 +372,28 @@ bool ESPHomeDataPublisher::isReady() const
 }
 
 // Helper methods
+//
+// Both conversions delegate to the shared implementations in utils.cpp so that
+// the ESPHome and MQTT builds report the same percentage for the same reading.
+// They previously carried their own copies, and the RSSI one used a different
+// input range (-120..-50 rather than -120..-40), which made the same signal
+// read several percent higher under ESPHome.
 int ESPHomeDataPublisher::calculateRssiPercentage(int rssi_dbm) const
 {
-    // RSSI to percentage conversion
-    // -50 dBm = 100%, -120 dBm = 0%
-    int clamped = (rssi_dbm < -120) ? -120 : (rssi_dbm > -50 ? -50 : rssi_dbm);
-    return (int)((clamped + 120) * 100.0 / 70.0);
+#ifdef USE_ESPHOME
+    return calculateMeterdBmToPercentage(rssi_dbm);
+#else
+    (void)rssi_dbm;
+    return 0;
+#endif
 }
 
 int ESPHomeDataPublisher::calculateLqiPercentage(int lqi) const
 {
-    // CC1101 LQI is a 7-bit demodulation-error metric (bit 7 = CRC_OK, masked upstream)
-    // where a LOWER value means a better link. Invert so a higher percentage means a
-    // better link. Uses the same integer arithmetic as Arduino map(error, 0, 127, 100, 0)
-    // in calculateLQIToPercentage() so both builds report identical values.
-    int error = lqi & 0x7F;
-    return (error * -100) / 127 + 100;
+#ifdef USE_ESPHOME
+    return calculateLQIToPercentage(lqi);
+#else
+    (void)lqi;
+    return 0;
+#endif
 }

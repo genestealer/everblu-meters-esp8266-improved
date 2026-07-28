@@ -1,21 +1,22 @@
 /**
  * @file test_schedule_manager.cpp
- * @brief Unit tests for ScheduleManager - validates schedule logic for all day combinations
+ * @brief Unit tests for ScheduleManager - schedule logic, timezone conversion, auto-alignment
+ *
+ * Test registration lives in test_runner.cpp.
  */
 
 #include <unity.h>
 #include <ctime>
 #include <cstring>
-#include "src/services/schedule_manager.h"
+#include "services/schedule_manager.h"
 
 // Wrapper to drive ScheduleManager using the legacy isReadingDay signature
-static ScheduleManager g_scheduleManager;
-
-bool isReadingDay(struct tm *ptm, const char *schedule)
+static bool isReadingDay(struct tm *ptm, const char *schedule)
 {
-    g_scheduleManager.setSchedule(schedule);
-    return g_scheduleManager.isReadingDay(ptm);
+    ScheduleManager::setSchedule(schedule);
+    return ScheduleManager::isReadingDay(ptm);
 }
+
 /**
  * Helper to create a tm structure for a specific day of week
  * @param dayOfWeek 0 = Sunday, 1 = Monday, ..., 6 = Saturday
@@ -221,22 +222,36 @@ void test_schedule_invalid(void)
 }
 
 /**
- * Test: Empty schedule string returns false
+ * Test: Empty schedule string falls back to Monday-Friday
  */
 void test_schedule_empty(void)
 {
     struct tm monday = createTmForDay(1);
-    TEST_ASSERT_FALSE(isReadingDay(&monday, ""));
+    struct tm sunday = createTmForDay(0);
+
+    TEST_ASSERT_TRUE(isReadingDay(&monday, ""));
+    TEST_ASSERT_FALSE(isReadingDay(&sunday, ""));
 }
 
 /**
- * Test: Null schedule string handling
+ * Test: Null schedule string must not crash and falls back to Monday-Friday
  */
 void test_schedule_null(void)
 {
     struct tm monday = createTmForDay(1);
-    // Should not crash - returns false for null
-    TEST_ASSERT_FALSE(isReadingDay(&monday, nullptr));
+    struct tm sunday = createTmForDay(0);
+
+    TEST_ASSERT_TRUE(isReadingDay(&monday, nullptr));
+    TEST_ASSERT_FALSE(isReadingDay(&sunday, nullptr));
+}
+
+/**
+ * Test: Null tm pointer must not crash and is never a reading day
+ */
+void test_schedule_null_tm_is_not_a_reading_day(void)
+{
+    ScheduleManager::setSchedule("Monday-Sunday");
+    TEST_ASSERT_FALSE(ScheduleManager::isReadingDay(nullptr));
 }
 
 /**
@@ -277,33 +292,84 @@ void test_all_schedules_all_days(void)
     }
 }
 
-// Optional: Unity test runner setup
-void setUp(void)
+/**
+ * Test: UTC reading time is converted to local using a positive (east) offset
+ */
+void test_reading_time_utc_to_local_positive_offset(void)
 {
-    // No setup needed for this test
-}
+    ScheduleManager::begin("Monday-Friday", 22, 30, 120); // UTC+2
 
-void tearDown(void)
-{
-    // No teardown needed
+    TEST_ASSERT_EQUAL_INT(22, ScheduleManager::getReadingHourUtc());
+    TEST_ASSERT_EQUAL_INT(30, ScheduleManager::getReadingMinuteUtc());
+    // 22:30 UTC + 2h wraps past midnight to 00:30 local
+    TEST_ASSERT_EQUAL_INT(0, ScheduleManager::getReadingHourLocal());
+    TEST_ASSERT_EQUAL_INT(30, ScheduleManager::getReadingMinuteLocal());
+    TEST_ASSERT_EQUAL_INT(120, ScheduleManager::getTimezoneOffsetMinutes());
 }
 
 /**
- * Unity/PlatformIO test runner entry point.
- * Ensures that the tests in this file are actually executed.
+ * Test: UTC reading time is converted to local using a negative (west) offset
  */
-void setup(void)
+void test_reading_time_utc_to_local_negative_offset(void)
 {
-    UNITY_BEGIN();
+    ScheduleManager::begin("Monday-Friday", 1, 15, -330); // UTC-5:30
 
-    // Run schedule manager tests defined in this file
-    RUN_TEST(test_schedule_null);
-    RUN_TEST(test_all_schedules_all_days);
-
-    UNITY_END();
+    // 01:15 UTC - 5:30 wraps back to 19:45 local on the previous day
+    TEST_ASSERT_EQUAL_INT(19, ScheduleManager::getReadingHourLocal());
+    TEST_ASSERT_EQUAL_INT(45, ScheduleManager::getReadingMinuteLocal());
 }
 
-void loop(void)
+/**
+ * Test: setting the local reading time round-trips back through UTC
+ */
+void test_reading_time_local_to_utc_roundtrip(void)
 {
-    // Nothing to do here; tests are run once in setup()
+    ScheduleManager::begin("Monday-Friday", 10, 0, 60); // UTC+1
+    ScheduleManager::setReadingTimeFromLocal(9, 45);
+
+    TEST_ASSERT_EQUAL_INT(9, ScheduleManager::getReadingHourLocal());
+    TEST_ASSERT_EQUAL_INT(45, ScheduleManager::getReadingMinuteLocal());
+    TEST_ASSERT_EQUAL_INT(8, ScheduleManager::getReadingHourUtc());
+    TEST_ASSERT_EQUAL_INT(45, ScheduleManager::getReadingMinuteUtc());
+}
+
+/**
+ * Test: out-of-range reading times are clamped rather than wrapped
+ */
+void test_reading_time_is_clamped(void)
+{
+    ScheduleManager::begin("Monday-Friday", 99, 99, 0);
+    TEST_ASSERT_EQUAL_INT(23, ScheduleManager::getReadingHourUtc());
+    TEST_ASSERT_EQUAL_INT(59, ScheduleManager::getReadingMinuteUtc());
+
+    ScheduleManager::setReadingTimeFromUtc(-5, -5);
+    TEST_ASSERT_EQUAL_INT(0, ScheduleManager::getReadingHourUtc());
+    TEST_ASSERT_EQUAL_INT(0, ScheduleManager::getReadingMinuteUtc());
+}
+
+/**
+ * Test: auto-alignment picks the midpoint of the meter wake window
+ */
+void test_auto_align_uses_window_midpoint(void)
+{
+    ScheduleManager::begin("Monday-Friday", 10, 0, 0);
+
+    // Window 06:00-18:00 local is 12 hours wide, midpoint 12:00
+    TEST_ASSERT_TRUE(ScheduleManager::autoAlignToMeterWindow(6, 18, true));
+    TEST_ASSERT_EQUAL_INT(12, ScheduleManager::getReadingHourLocal());
+
+    // Without midpoint, alignment lands on the start of the window
+    TEST_ASSERT_TRUE(ScheduleManager::autoAlignToMeterWindow(6, 18, false));
+    TEST_ASSERT_EQUAL_INT(6, ScheduleManager::getReadingHourLocal());
+}
+
+/**
+ * Test: a zero-length meter window is rejected and leaves the time unchanged
+ */
+void test_auto_align_rejects_zero_length_window(void)
+{
+    ScheduleManager::begin("Monday-Friday", 10, 0, 0);
+
+    TEST_ASSERT_FALSE(ScheduleManager::autoAlignToMeterWindow(8, 8, true));
+    TEST_ASSERT_EQUAL_INT(10, ScheduleManager::getReadingHourLocal());
 }
