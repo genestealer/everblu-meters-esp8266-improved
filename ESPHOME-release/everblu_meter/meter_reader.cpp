@@ -498,10 +498,18 @@ void MeterReader::handleFailedRead(ReadFailure reason)
         // manual scan still get recalibrated. The guard is reset on the next
         // successful read so we don't burn power scanning on every cooldown
         // when the meter is genuinely unreachable (e.g. dead battery).
+        //
+        // In multi-meter setups this always scans against THIS meter (the one
+        // that just exhausted its retries) - activateCallbackContext() was set
+        // for it at the start of performReading(), so the scan's RF responses
+        // come from the same meter, not whichever meter last pressed a button.
         if (m_config->isAutoScanOnFailureEnabled() && !m_autoScanAfterFailureDone)
         {
             m_autoScanAfterFailureDone = true;
-            LOG_W("everblu_meter", "Running automatic frequency scan to check for meter offset drift... (disable with auto_scan_on_failure / AUTO_SCAN_ON_FAILURE_ENABLED)");
+            LOG_W("everblu_meter",
+                  "Running automatic frequency scan for meter %02u-%06lu after failed reads... "
+                  "(disable with auto_scan_on_failure / AUTO_SCAN_ON_FAILURE_ENABLED)",
+                  m_config->getMeterYear(), (unsigned long) m_config->getMeterSerial());
             m_publisher->publishStatusMessage("Auto frequency scan after failed reads");
             // Narrow ±20 kHz / 1 kHz scan: fast re-tune after drift failure.
             // The full ±150 kHz deep scan is reserved for manual commands and
@@ -558,7 +566,20 @@ void MeterReader::performFrequencyScan()
         return;
     }
 
-    LOG_I("everblu_meter", "Starting frequency scan...");
+    // Two DIFFERENT things are being reported here, and in a multi-meter setup
+    // they can disagree:
+    //   - the meter INTERROGATED is this instance's meter (activateCallbackContext
+    //     above points the shared FrequencyManager callbacks at this reader);
+    //   - the frequency SWEPT is centred on FrequencyManager's single global
+    //     s_baseFrequency, which is whichever meter entry ran begin() LAST.
+    // If the two lines below show a centre that isn't this meter's configured
+    // frequency, the entries disagree on `frequency` and the scan window (and
+    // the narrow auto-scan-on-failure window especially) may be centred wrongly.
+    LOG_I("everblu_meter", "Starting frequency scan using meter %02u-%06lu (%s)...",
+          m_config->getMeterYear(), (unsigned long) m_config->getMeterSerial(),
+          m_config->isMeterGas() ? "gas" : "water");
+    LOG_I("everblu_meter", "Scan centred on %.6f MHz (this meter is configured for %.6f MHz)",
+          FrequencyManager::getBaseFrequency(), m_config->getFrequency());
 
     // Non-blocking: loop() steps the scan and publishes the result when it ends.
     FrequencyManager::beginDeepFrequencyScan();
