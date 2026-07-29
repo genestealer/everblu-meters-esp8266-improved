@@ -663,6 +663,92 @@ void cc1101_configureRF_0(float freq)
   SPIWriteBurstReg(PATABLE_ADDR, PA, 8);
 }
 
+/**
+ * Verify the SPI link to the CC1101 before trusting anything the radio reports.
+ *
+ * The previous check only rejected VERSION 0x00 and 0xFF, which let a broken bus pass
+ * whenever MISO was stuck at any other constant. Every register then read back that same
+ * value, so RSSI/LQI/MARCSTATE and the whole RX FIFO looked like plausible-but-wrong data
+ * and the failure surfaced much later as an unexplained CRC error.
+ *
+ * The decisive test is a write/read-back on a scratch register using two complementary
+ * patterns. A constant MISO cannot follow both, so this catches a stuck line at any value,
+ * a missing device, a wrong MISO pin, a bus multiplexer left in the wrong position, and a
+ * second SPI device holding the line. SYNC1/SYNC0 are used as the scratch pair because
+ * cc1101_configureRF_0() rewrites both immediately afterwards.
+ *
+ * @return true when the radio is present and the bus is trustworthy.
+ */
+static bool cc1101_verify_spi_link(void)
+{
+  // Round 1 then round 2 use complementary patterns, so between them every data bit is
+  // driven both high and low in each direction.
+  static const uint8_t kProbe[2][2] = {{0xAA, 0x55}, {0x55, 0xAA}};
+  bool readback_ok = true;
+  for (uint8_t round = 0; round < 2 && readback_ok; round++)
+  {
+    halRfWriteReg(SYNC1, kProbe[round][0]);
+    halRfWriteReg(SYNC0, kProbe[round][1]);
+    if (halRfReadReg(SYNC1) != kProbe[round][0] || halRfReadReg(SYNC0) != kProbe[round][1])
+    {
+      readback_ok = false;
+    }
+  }
+
+  uint8_t partnum = halRfReadReg(PARTNUM_ADDR);
+  uint8_t version = halRfReadReg(VERSION_ADDR);
+
+  if (!readback_ok)
+  {
+    // Distinguish "every read returns the same byte" (stuck/undriven MISO, or another
+    // device owning the line) from a generally unreliable bus, so the remedy is specific.
+    uint8_t marcstate = halRfReadReg(MARCSTATE_ADDR);
+    bool stuck_at_constant = (partnum == version) && (version == marcstate);
+
+    LOG_E("everblu_meter", "CC1101 SPI self-test FAILED - register write/read-back did not match (PARTNUM: 0x%02X, VERSION: 0x%02X, MARCSTATE: 0x%02X)", partnum, version, marcstate);
+    if (stuck_at_constant)
+    {
+      LOG_E("everblu_meter", "Every register read returned 0x%02X, so MISO is stuck and the radio is not really being read. Check: 1) miso_pin is correct for this board 2) any bus-routing/mux GPIO is set to reach the CC1101 3) other SPI radios (nRF24, SX127x) on this bus are isolated or hold their CS high 4) 3.3V supply and CS/SCK/MOSI wiring.", version);
+    }
+    else
+    {
+      LOG_E("everblu_meter", "Check: 1) CS/SCK/MOSI/MISO wiring and pin assignment 2) 3.3V power supply 3) lower the SPI data_rate 4) other SPI devices sharing this bus.");
+    }
+    return false;
+  }
+
+  // The link works. Re-read VERSION a few times: a device that answers correctly but
+  // inconsistently points at contention from another device or an over-fast/noisy bus.
+  for (uint8_t i = 0; i < 8; i++)
+  {
+    uint8_t repeat = halRfReadReg(VERSION_ADDR);
+    if (repeat != version)
+    {
+      LOG_W("everblu_meter", "CC1101 VERSION register is unstable (0x%02X then 0x%02X) - the SPI bus is unreliable. Suspect another device on this bus driving MISO, an over-fast data_rate, or long/noisy wiring.", version, repeat);
+      break;
+    }
+  }
+
+  // Print the detection banner only once to avoid flooding logs during frequency scans.
+  static bool s_reported_ok = false;
+  if (!s_reported_ok)
+  {
+    s_reported_ok = true;
+    // Silicon revisions seen in the wild; clones may report something else but still work,
+    // so an unknown value is a warning rather than a hard failure now that read-back passed.
+    if (version == 0x04 || version == 0x14)
+    {
+      LOG_I("everblu_meter", "Radio found OK, SPI self-test passed (PARTNUM: 0x%02X, VERSION: 0x%02X)", partnum, version);
+    }
+    else
+    {
+      LOG_W("everblu_meter", "SPI self-test passed but VERSION 0x%02X is not a known CC1101 revision (expected 0x04 or 0x14) - continuing, but confirm this is a genuine CC1101 if reads fail.", version);
+    }
+  }
+
+  return true;
+}
+
 bool cc1101_init(float freq)
 {
 #ifdef USE_ESPHOME
@@ -699,25 +785,9 @@ bool cc1101_init(float freq)
   cc1101_reset();
   delay(1);
 
-  // Verify CC1101 is present by reading version register
-  uint8_t partnum = halRfReadReg(PARTNUM_ADDR);
-  uint8_t version = halRfReadReg(VERSION_ADDR);
-
-  // Check if version register returns a valid value (not 0x00 or 0xFF)
-  // PARTNUM may be 0x00 on some variants, so we rely mainly on VERSION
-  if (version == 0x00 || version == 0xFF)
+  if (!cc1101_verify_spi_link())
   {
-    LOG_E("everblu_meter", "CC1101 radio not responding (PARTNUM: 0x%02X, VERSION: 0x%02X)", partnum, version);
-    LOG_E("everblu_meter", "Check: 1) Wiring connections 2) 3.3V power supply 3) SPI pins");
     return false;
-  }
-
-  // Print the detection banner only once to avoid flooding logs during scans
-  static bool s_reported_ok = false;
-  if (!s_reported_ok)
-  {
-    LOG_I("everblu_meter", "Radio found OK (PARTNUM: 0x%02X, VERSION: 0x%02X)", partnum, version);
-    s_reported_ok = true;
   }
 
   cc1101_configureRF_0(freq);

@@ -46,6 +46,20 @@ Behaviour of the two stateful services, driven against fake hardware.
 - `test_frequency_manager.cpp` - deep scan lock and abort paths, the calibration
   quality guard, persistence round-trips and adaptive FREQEST tracking
 
+### `test_native_cc1101_link/`
+
+The boot-time SPI link self-test in `cc1101_init()`.
+
+This is the only suite that links the real `src/core/cc1101.cpp`. It runs under
+`[env:native_cc1101]`, where `test/native_shims/SPI.h` stands in for the bus and
+`native_cc1101_device.h` stands in for the radio, so the driver's own SPI
+handling is exercised rather than replaced by `FakeRadio`.
+
+Covers the healthy path, a MISO line stuck at any constant (including 0x0F and
+0x14, values the old identity-only check would have accepted), an absent radio,
+an unknown silicon revision, an unstable bus, and re-running the self-test on
+the repeated `cc1101_init()` calls a frequency scan makes.
+
 ### `test_native_esphome_publisher/`
 
 ESPHomeDataPublisher, built the way the shipped external component builds it.
@@ -75,6 +89,13 @@ It replaces three things at link time:
 | CC1101 free functions (`cc1101_init`, `get_meter_data_for_meter`, ...) | No radio on the host |
 | `StorageAbstraction` | No EEPROM or NVS on the host |
 | `WifiSerialStream` / `WiFiSerial` | No network stack; log output goes to stdout. Only compiled when `WIFI_SERIAL_MONITOR_ENABLED` is `1`, which `env:native` sets so the mirror path stays covered on the host |
+
+The CC1101 replacement is skipped when `EVERBLU_NATIVE_REAL_CC1101` is defined,
+which `[env:native_cc1101]` sets so the real driver can be linked instead.
+That environment simulates the layer below the driver rather than the driver
+itself: `test/native_shims/SPI.h` routes every transfer to a handler, and
+`test/test_native_cc1101_link/native_cc1101_device.h` answers as a CC1101 whose
+MISO line can be made to stick, float or misbehave on demand.
 
 The fake radio answers in one of two modes. Scripted mode consumes a queue of
 `tmeter_data` outcomes, repeating the last entry once the script runs out.
@@ -108,6 +129,9 @@ pio test -e native
 
 # The ESPHome-mode suite
 pio test -e native_esphome
+
+# The CC1101 driver suite
+pio test -e native_cc1101
 
 # One suite
 pio test -e native -f test_embedded_unit
