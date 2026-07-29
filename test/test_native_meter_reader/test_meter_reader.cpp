@@ -660,6 +660,27 @@ void test_a_running_scan_blocks_reads_and_further_scan_requests(void)
     drainFrequencyScan(reader);
 }
 
+void test_a_gas_meter_scans_the_same_as_a_water_meter(void)
+{
+    // Meter type only changes how a reading is reported, never how the radio is
+    // calibrated, so a gas-configured reader must drive the sweep identically.
+    // This also covers the gas arm of the scan-start diagnostics, which is the
+    // only place performFrequencyScan() branches on meter type.
+    g_config.meterIsGas = true;
+    g_config.frequency = 433.82f;
+
+    MeterReader reader = makeReader();
+    reader.performFrequencyScan();
+
+    TEST_ASSERT_TRUE(FrequencyManager::isScanInProgress());
+    TEST_ASSERT_EQUAL_STRING("Frequency Scanning", g_publisher.lastRadioState().c_str());
+
+    drainFrequencyScan(reader);
+
+    TEST_ASSERT_FALSE(FrequencyManager::isScanInProgress());
+    TEST_ASSERT_EQUAL_STRING("Idle", g_publisher.lastRadioState().c_str());
+}
+
 void test_reset_frequency_offset_clears_storage_and_retunes(void)
 {
     StorageAbstraction::saveFloat("freq_offset", 0.030f, 0xABCD);
