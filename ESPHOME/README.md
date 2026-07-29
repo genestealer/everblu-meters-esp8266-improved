@@ -9,56 +9,58 @@ Native ESPHome external component for reading EverBlu Cyble Enhanced water and g
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**
 
-- [Documentation](#documentation)
-  - [For End Users](#for-end-users)
-  - [For Developers](#for-developers)
-- [Quick Start](#quick-start)
-- [Breaking Change: SPI Configuration Required](#breaking-change-spi-configuration-required)
-  - [1. Use as External Component](#1-use-as-external-component)
-  - [2. Build and Upload](#2-build-and-upload)
-- [ESPHome Device Builder (Visual Dashboard)](#esphome-device-builder-visual-dashboard)
-- [Board-Specific Configuration](#board-specific-configuration)
-  - [Arduino Nano ESP32 (ESP32S3)](#arduino-nano-esp32-esp32s3)
-  - [Other ESP32 Boards](#other-esp32-boards)
-- [Configuration Reference](#configuration-reference)
-  - [Key Parameters](#key-parameters)
-  - [Schedule Options](#schedule-options)
-  - [Custom Schedule Example](#custom-schedule-example)
-  - [Logging](#logging)
-  - [Timezone Adjustment](#timezone-adjustment)
-- [Features](#features)
-- [Example Configurations](#example-configurations)
-- [Hardware Requirements](#hardware-requirements)
-  - [Wiring (ESP8266 D1 Mini)](#wiring-esp8266-d1-mini)
-  - [Wiring (ESP32)](#wiring-esp32)
-- [Benefits](#benefits)
-  - [vs. Standalone MQTT Mode](#vs-standalone-mqtt-mode)
-  - [ESPHome Mode Advantages](#esphome-mode-advantages)
-- [Home Assistant Best Practice: Utility Meter Helper](#home-assistant-best-practice-utility-meter-helper)
-  - [Migrating Sensor History Between Platforms](#migrating-sensor-history-between-platforms)
-  - [Historical Data from Meter](#historical-data-from-meter)
-- [Architecture](#architecture)
-- [Available Sensors](#available-sensors)
-  - [Numeric Sensors](#numeric-sensors)
-  - [Text Sensors](#text-sensors)
-  - [Binary Sensors](#binary-sensors)
-  - [Control Buttons](#control-buttons)
-- [Common Configuration Patterns](#common-configuration-patterns)
-  - [Water Meter - Basic](#water-meter---basic)
-  - [Gas Meter - Basic](#gas-meter---basic)
-  - [With Full Monitoring](#with-full-monitoring)
-- [Troubleshooting](#troubleshooting)
-  - [Corrupted or Invalid Volume Readings](#corrupted-or-invalid-volume-readings)
-  - [No Meter Response](#no-meter-response)
-  - [Signal Quality Issues](#signal-quality-issues)
-- [Quick Troubleshooting](#quick-troubleshooting)
-  - [Quick Fixes](#quick-fixes)
-- [License](#license)
-- [Credits](#credits)
-- [Links](#links)
-- [Development: Code Style & Formatting](#development-code-style--formatting)
-  - [Running the formatter](#running-the-formatter)
-  - [Linting & pre-commit](#linting--pre-commit)
+- [ESPHome Integration for EverBlu Cyble Enhanced Meters](#esphome-integration-for-everblu-cyble-enhanced-meters)
+  - [Documentation](#documentation)
+    - [For End Users](#for-end-users)
+    - [For Developers](#for-developers)
+  - [Quick Start](#quick-start)
+  - [Breaking Change: SPI Configuration Required](#breaking-change-spi-configuration-required)
+    - [1. Use as External Component](#1-use-as-external-component)
+    - [2. Build and Upload](#2-build-and-upload)
+  - [ESPHome Device Builder (Visual Dashboard)](#esphome-device-builder-visual-dashboard)
+  - [Board-Specific Configuration](#board-specific-configuration)
+    - [Arduino Nano ESP32 (ESP32S3)](#arduino-nano-esp32-esp32s3)
+    - [Other ESP32 Boards](#other-esp32-boards)
+  - [Configuration Reference](#configuration-reference)
+    - [Key Parameters](#key-parameters)
+    - [Schedule Options](#schedule-options)
+    - [Custom Schedule Example](#custom-schedule-example)
+    - [Logging](#logging)
+    - [Timezone Adjustment](#timezone-adjustment)
+  - [Features](#features)
+  - [Example Configurations](#example-configurations)
+  - [Hardware Requirements](#hardware-requirements)
+    - [Wiring (ESP8266 D1 Mini)](#wiring-esp8266-d1-mini)
+    - [Wiring (ESP32)](#wiring-esp32)
+  - [Benefits](#benefits)
+    - [vs. Standalone MQTT Mode](#vs-standalone-mqtt-mode)
+    - [ESPHome Mode Advantages](#esphome-mode-advantages)
+  - [Home Assistant Best Practice: Utility Meter Helper](#home-assistant-best-practice-utility-meter-helper)
+    - [Migrating Sensor History Between Platforms](#migrating-sensor-history-between-platforms)
+    - [Historical Data from Meter](#historical-data-from-meter)
+  - [Architecture](#architecture)
+  - [Available Sensors](#available-sensors)
+    - [Numeric Sensors](#numeric-sensors)
+    - [Text Sensors](#text-sensors)
+    - [Binary Sensors](#binary-sensors)
+    - [Control Buttons](#control-buttons)
+    - [Frequency scans in multi-meter setups](#frequency-scans-in-multi-meter-setups)
+  - [Common Configuration Patterns](#common-configuration-patterns)
+    - [Water Meter - Basic](#water-meter---basic)
+    - [Gas Meter - Basic](#gas-meter---basic)
+    - [With Full Monitoring](#with-full-monitoring)
+  - [Troubleshooting](#troubleshooting)
+    - [Corrupted or Invalid Volume Readings](#corrupted-or-invalid-volume-readings)
+    - [No Meter Response](#no-meter-response)
+    - [Signal Quality Issues](#signal-quality-issues)
+  - [Quick Troubleshooting](#quick-troubleshooting)
+    - [Quick Fixes](#quick-fixes)
+  - [License](#license)
+  - [Credits](#credits)
+  - [Links](#links)
+  - [Development: Code Style \& Formatting](#development-code-style--formatting)
+    - [Running the formatter](#running-the-formatter)
+    - [Linting \& pre-commit](#linting--pre-commit)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -586,6 +588,50 @@ EverbluMeterComponent (ESPHome)
 - **stop_reading_button** - Cancel the current read/retry sequence. Also requests best-effort cancellation of an in-progress deep frequency scan (it bails at the next step; see [#133](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/133))
 - **deep_scan_button** - Trigger a Deep frequency scan (±150 kHz, fine 2.5 kHz steps, maps the response window then zooms to the carrier centre)
 - **reset_frequency_button** - Reset the frequency offset
+
+### Frequency scans in multi-meter setups
+
+Frequency calibration is **radio-global, not per-meter**. There is one base
+frequency, one stored offset and one tuned frequency for the whole device, no
+matter how many `everblu_meter:` entries you declare. A scan therefore has two
+separate properties that can disagree:
+
+| Property | Scope |
+| --- | --- |
+| Which meter answers the scan | Per-entry: the meter on the `everblu_meter:` entry that triggered it |
+| Which frequency range is swept | Global: centred on the single base frequency |
+| Where the resulting offset is stored | Global: one value, applied to every meter |
+
+The meter that answers is whichever entry triggered the scan. For a manual
+`deep_scan_button` press that is the entry declaring the button. For the
+automatic scan run by `auto_scan_on_failure` (enabled by default) it is the
+meter that just exhausted its own `max_retries`, which need not be the entry
+the button was declared on. Both cases are named in the log:
+
+```text
+Starting frequency scan using meter 20-0257750 (water)...
+Scan centred on 433.820007 MHz (this meter is configured for 433.782712 MHz)
+Running automatic frequency scan for meter 20-0259301 after failed reads...
+```
+
+The swept range, however, is **not** per-meter. It is centred on the base
+frequency held in the shared `FrequencyManager`, which is set by whichever
+entry initialised **last** during boot. Because of this:
+
+> [!IMPORTANT]
+> Every `everblu_meter:` entry sharing one CC1101 must be given the **same**
+> `frequency:` value. If they differ, only the last entry's value takes effect
+> and the others are silently ignored, so scans (and normal reads) run at a
+> frequency that no longer matches those meters' configuration. The wide
+> ±150 kHz manual deep scan will usually still find the carrier, but the narrow
+> ±20 kHz `auto_scan_on_failure` window can end up centred well away from it.
+
+If you need genuinely independent calibration per meter, use one CC1101 (and
+one ESP) per meter. Declare `deep_scan_button`, `reset_frequency_button` and
+the offset/tuned-frequency sensors on the **first** meter entry only, as in
+[example-multi-meter.yaml](example-multi-meter.yaml); adding extra scan buttons
+on other entries only changes which meter answers, not the swept range or the
+shared offset.
 
 ## Common Configuration Patterns
 

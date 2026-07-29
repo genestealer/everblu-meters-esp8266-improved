@@ -102,9 +102,26 @@ everblu_meter:
     request_reading_button:
       name: "${meter_1_prefix} Read Meter Now"
       device_id: water_meter_device_1
-    # Frequency calibration is a property of the shared CC1101 radio, not the meter.
-    # Declare these buttons/sensors on ONE meter only (here, the first). They are
-    # global: any meter's reads/scans update this single set of entities.
+    # Frequency calibration is a property of the shared CC1101 radio, not the
+    # meter. Declare these buttons/sensors on METER 1 ONLY - there is one base
+    # frequency, one offset and one tuned frequency for the whole device.
+    #
+    # Every entry must use the SAME `frequency:` value (all entries here use the
+    # default). FrequencyManager::begin() is called per entry and overwrites a
+    # single global, so only the LAST entry's value takes effect and any others
+    # are silently ignored.
+    #
+    # A scan has two properties that can disagree:
+    #   - which METER answers: the entry that triggered the scan. For this button
+    #     that is meter 1; for the automatic auto_scan_on_failure scan it is
+    #     whichever meter just exhausted its own retries.
+    #   - which FREQUENCIES are swept: always centred on the single global base
+    #     frequency, never on the triggering entry's `frequency:`.
+    # Both are logged at scan start, e.g.
+    #   Starting frequency scan using meter 20-0257750 (water)...
+    #   Scan centred on 433.820007 MHz (this meter is configured for 433.820007 MHz)
+    #
+    # For genuinely independent calibration, use one CC1101 (and one ESP) per meter.
     deep_scan_button:
       name: "Radio Deep Frequency Scan"
     reset_frequency_button:
@@ -227,8 +244,13 @@ everblu_meter:
     stop_reading_button:
       name: "${meter_2_prefix} Stop Reading"
       device_id: water_meter_device_2
-    # Frequency calibration buttons/sensors are radio-global and declared on the
-    # first meter only (see water_meter_1 above); they act on the shared CC1101.
+    # No frequency calibration entities here. deep_scan_button,
+    # reset_frequency_button and the offset/tuned-frequency sensors are
+    # radio-global and are declared on meter 1 only (see water_meter_1 above).
+    #
+    # Do NOT set `frequency:` here to a different value from water_meter_1 -
+    # there is a single global base frequency and the last entry to initialise
+    # silently wins.
 
     volume:
       name: "${meter_2_prefix} Water Volume"
