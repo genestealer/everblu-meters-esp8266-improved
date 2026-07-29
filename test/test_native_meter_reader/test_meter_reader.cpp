@@ -428,6 +428,62 @@ void test_scheduled_read_is_skipped_on_a_non_reading_day(void)
     TEST_ASSERT_EQUAL(0, (int)fakeRadio().calls.size());
 }
 
+void test_reading_day_gate_covers_every_schedule_string(void)
+{
+    // MeterReader::isReadingDayForConfiguredSchedule() reads m_config live rather
+    // than sharing ScheduleManager's static state (each instance can run its own
+    // schedule, which multi-meter setups rely on), so it is a second, independent
+    // implementation of the day-matching rules and needs its own coverage rather
+    // than relying on ScheduleManager's tests.
+    //
+    // 2025-06-08..14 is Sunday..Saturday, one of each day of the week.
+    struct Case
+    {
+        const char *schedule;
+        int day; // 8 = Sunday .. 14 = Saturday
+        bool expectRead;
+    };
+    const Case cases[] = {
+        {"Monday-Friday", 8, false},   // Sunday
+        {"Monday-Friday", 14, false},  // Saturday
+        {"Monday-Friday", 10, true},   // Tuesday
+        {"Monday-Saturday", 8, false}, // Sunday
+        {"Monday-Saturday", 14, true}, // Saturday
+        {"Monday-Sunday", 8, true},    // Sunday
+        {"Monday-Sunday", 14, true},   // Saturday
+        {"Sunday", 8, true},
+        {"Sunday", 9, false},
+        {"Monday", 9, true},
+        {"Monday", 10, false},
+        {"Tuesday", 10, true},
+        {"Wednesday", 11, true},
+        {"Thursday", 12, true},
+        {"Friday", 13, true},
+        {"Saturday", 14, true},
+        {"Saturday", 8, false},
+        {"Whenever I feel like it", 10, false}, // Unknown schedule: always skipped
+    };
+
+    for (const Case &c : cases)
+    {
+        meterReaderSetUp();
+        g_config.schedule = c.schedule;
+        g_config.readHourUTC = 10;
+        g_config.readMinuteUTC = 0;
+        fakeRadio().responses.push_back(FakeRadio::success());
+
+        MeterReader reader = makeReader();
+        g_time.setUtc(2025, 6, c.day, 10, 0, 0);
+        nativeClockAdvance(1000);
+        reader.loop();
+
+        char message[96];
+        snprintf(message, sizeof(message), "schedule='%s' day=%d expected %s",
+                 c.schedule, c.day, c.expectRead ? "a read" : "no read");
+        TEST_ASSERT_EQUAL_MESSAGE(c.expectRead ? 1 : 0, (int)fakeRadio().calls.size(), message);
+    }
+}
+
 void test_scheduled_read_waits_for_time_sync(void)
 {
     fakeRadio().responses.push_back(FakeRadio::success());
@@ -651,4 +707,101 @@ void test_small_frequency_errors_do_not_move_the_offset(void)
     }
 
     TEST_ASSERT_FLOAT_WITHIN(0.000001f, 0.0f, FrequencyManager::getOffset());
+}
+
+void test_reset_frequency_offset_reports_radio_failure(void)
+{
+    // resetFrequencyOffset() re-initialises the radio at the base frequency;
+    // if that init fails, isRadioConnected() must reflect it rather than stay
+    // stuck on whatever the last successful state was.
+    g_config.frequency = 433.82f;
+
+    MeterReader reader = makeReader();
+    TEST_ASSERT_TRUE(reader.isRadioConnected());
+
+    fakeRadio().initSucceeds = false;
+    reader.resetFrequencyOffset();
+
+    TEST_ASSERT_FALSE(reader.isRadioConnected());
+}
+
+void test_history_available_but_all_zero_is_not_treated_as_valid(void)
+{
+    // history_available can be true while every slot is still zero (meter never
+    // reported history); the readable-summary log path must not treat that as
+    // real history (it only affects logging, not what gets published).
+    tmeter_data zeroHistory = FakeRadio::success();
+    zeroHistory.history_available = true;
+    for (int i = 0; i < 13; i++)
+    {
+        zeroHistory.history[i] = 0;
+    }
+    fakeRadio().responses.push_back(zeroHistory);
+
+    MeterReader reader = makeReader();
+    reader.triggerReading(false);
+
+    // Still published as a normal reading; publishHistory() is driven purely by
+    // history_available, independent of MeterHistory::isHistoryValid().
+    TEST_ASSERT_EQUAL(1, (int)g_publisher.readings.size());
+    TEST_ASSERT_EQUAL(1, g_publisher.historyPublishes);
+}
+
+void test_misconfigured_gas_volume_divisor_falls_back_without_failing_the_read(void)
+{
+    // getGasVolumeDivisor() <= 0 is only used to pick a fallback divisor for the
+    // human-readable log line; the read itself must still succeed and publish.
+    g_config.meterIsGas = true;
+    g_config.gasVolumeDivisor = 0;
+    fakeRadio().responses.push_back(FakeRadio::success(500));
+
+    MeterReader reader = makeReader();
+    reader.triggerReading(false);
+
+    TEST_ASSERT_EQUAL(1, (int)g_publisher.readings.size());
+    TEST_ASSERT_EQUAL(500, g_publisher.readings[0].data.volume);
+}
+
+void test_negative_timezone_offset_wraps_reading_time_to_previous_day(void)
+{
+    // UTC 00:30 with a UTC-1 offset wraps to 23:30 local on the PREVIOUS day.
+    // begin() must apply the same wraparound to m_readHourLocal/m_readMinuteLocal
+    // that ScheduleManager's recalculateLocalFromUtc() applies, or the two would
+    // disagree about when "local" reading time actually is.
+    g_config.schedule = "Monday-Friday";
+    g_config.readHourUTC = 0;
+    g_config.readMinuteUTC = 30;
+    g_config.timezoneOffsetMinutes = -60;
+    fakeRadio().responses.push_back(FakeRadio::success());
+
+    MeterReader reader = makeReader();
+
+    // 2025-06-10 00:30 UTC (Tuesday) is 2025-06-09 23:30 local (Monday).
+    g_time.setUtc(2025, 6, 10, 0, 30, 0);
+    nativeClockAdvance(1000);
+    reader.loop();
+
+    TEST_ASSERT_EQUAL(1, (int)fakeRadio().calls.size());
+}
+
+void test_stop_reading_cancels_a_scan_with_no_read_in_progress(void)
+{
+    // stopReading()'s "was anything active" check must also catch a running
+    // frequency scan on its own, without a read ever having started.
+    g_config.frequency = 433.82f;
+
+    MeterReader reader = makeReader();
+    reader.performFrequencyScan();
+    TEST_ASSERT_TRUE(FrequencyManager::isScanInProgress());
+    TEST_ASSERT_FALSE(reader.isReadingInProgress());
+
+    reader.stopReading();
+
+    // The scan itself can only bail at its next step boundary; stopReading()
+    // requests that cancellation but the "was anything active" report and the
+    // published state must reflect it immediately.
+    TEST_ASSERT_EQUAL_STRING("Reading stopped", g_publisher.lastStatus().c_str());
+
+    drainFrequencyScan(reader);
+    TEST_ASSERT_FALSE(FrequencyManager::isScanInProgress());
 }

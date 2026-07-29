@@ -34,6 +34,7 @@ void test_stop_cancels_a_pending_retry(void);
 void test_stop_when_idle_does_not_publish_state(void);
 void test_scheduled_read_triggers_once_at_the_configured_time(void);
 void test_scheduled_read_is_skipped_on_a_non_reading_day(void);
+void test_reading_day_gate_covers_every_schedule_string(void);
 void test_scheduled_read_waits_for_time_sync(void);
 void test_cooldown_blocks_scheduled_reads_until_it_expires(void);
 void test_cooldown_applies_to_a_failure_at_time_zero(void);
@@ -46,6 +47,11 @@ void test_a_running_scan_blocks_reads_and_further_scan_requests(void);
 void test_reset_frequency_offset_clears_storage_and_retunes(void);
 void test_successful_reads_feed_adaptive_frequency_tracking(void);
 void test_small_frequency_errors_do_not_move_the_offset(void);
+void test_reset_frequency_offset_reports_radio_failure(void);
+void test_history_available_but_all_zero_is_not_treated_as_valid(void);
+void test_misconfigured_gas_volume_divisor_falls_back_without_failing_the_read(void);
+void test_negative_timezone_offset_wraps_reading_time_to_previous_day(void);
+void test_stop_reading_cancels_a_scan_with_no_read_in_progress(void);
 
 // test_frequency_manager.cpp
 void test_freq_begin_without_callbacks_is_refused(void);
@@ -115,6 +121,7 @@ int main(int, char **)
     RUN_TEST(test_stop_when_idle_does_not_publish_state);
     RUN_TEST(test_scheduled_read_triggers_once_at_the_configured_time);
     RUN_TEST(test_scheduled_read_is_skipped_on_a_non_reading_day);
+    RUN_TEST(test_reading_day_gate_covers_every_schedule_string);
     RUN_TEST(test_scheduled_read_waits_for_time_sync);
     RUN_TEST(test_cooldown_blocks_scheduled_reads_until_it_expires);
     RUN_TEST(test_cooldown_applies_to_a_failure_at_time_zero);
@@ -127,6 +134,11 @@ int main(int, char **)
     RUN_TEST(test_reset_frequency_offset_clears_storage_and_retunes);
     RUN_TEST(test_successful_reads_feed_adaptive_frequency_tracking);
     RUN_TEST(test_small_frequency_errors_do_not_move_the_offset);
+    RUN_TEST(test_reset_frequency_offset_reports_radio_failure);
+    RUN_TEST(test_history_available_but_all_zero_is_not_treated_as_valid);
+    RUN_TEST(test_misconfigured_gas_volume_divisor_falls_back_without_failing_the_read);
+    RUN_TEST(test_negative_timezone_offset_wraps_reading_time_to_previous_day);
+    RUN_TEST(test_stop_reading_cancels_a_scan_with_no_read_in_progress);
 
     // FrequencyManager
     RUN_TEST(test_freq_begin_without_callbacks_is_refused);
