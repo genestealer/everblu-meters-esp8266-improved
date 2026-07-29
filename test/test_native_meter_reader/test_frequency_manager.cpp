@@ -12,6 +12,8 @@
 #include <unity.h>
 
 #include <cmath>
+#include <string>
+#include <vector>
 
 #include <Arduino.h>
 
@@ -25,6 +27,56 @@ namespace
 
     bool radioInit(float freq) { return cc1101_init(freq); }
     tmeter_data readMeter() { return get_meter_data_for_meter(21, 123456); }
+
+    /// Every (state, message) pair the scan reported, in order.
+    std::vector<std::string> g_scanStates;
+    std::vector<std::string> g_scanMessages;
+
+    void recordScanStatus(const char *state, const char *message)
+    {
+        g_scanStates.push_back(state != nullptr ? state : "");
+        g_scanMessages.push_back(message != nullptr ? message : "");
+    }
+
+    /**
+     * @brief Detect the moment the zoom pass begins.
+     *
+     * The zoom starts one step below the window the coarse sweep just mapped,
+     * so the first downward retune of a scan marks the phase change. That is
+     * the only point a test can hook without reaching into the scan's private
+     * state.
+     */
+    bool isFirstZoomRetune(float freq)
+    {
+        const FakeRadio &radio = fakeRadio();
+        return !radio.initFrequencies.empty() && freq < radio.lastInitFrequency();
+    }
+
+    /// Model the meter dropping out (falling asleep) as the zoom pass starts.
+    void silenceMeterWhenZoomStarts()
+    {
+        fakeRadio().onInit = [](float freq)
+        {
+            if (isFirstZoomRetune(freq))
+            {
+                fakeRadio().carrierFrequency = 0.0f;
+                fakeRadio().onInit = nullptr;
+            }
+        };
+    }
+
+    /// Model the radio failing to retune from the zoom pass onwards.
+    void failRadioInitWhenZoomStarts()
+    {
+        fakeRadio().onInit = [](float freq)
+        {
+            if (isFirstZoomRetune(freq))
+            {
+                fakeRadio().initSucceeds = false;
+                fakeRadio().onInit = nullptr;
+            }
+        };
+    }
 
     /// Register the fake radio with FrequencyManager and initialise it.
     void beginManager()
@@ -60,6 +112,8 @@ namespace
 void frequencyManagerSetUp()
 {
     resetAllFakes();
+    g_scanStates.clear();
+    g_scanMessages.clear();
 }
 
 // ---------------------------------------------------------------------------
@@ -260,6 +314,125 @@ void test_freq_scan_narrow_range_visits_fewer_steps_than_a_deep_sweep(void)
     const int deepSteps = (int)fakeRadio().calls.size();
 
     TEST_ASSERT_GREATER_THAN(narrowSteps, deepSteps);
+}
+
+void test_freq_scan_advances_one_step_per_loop_and_stops_between_steps(void)
+{
+    // Issue #133: the scan is stepped from the host loop, so a stop request
+    // raised between steps (as the Stop button does) is honoured immediately.
+    beginManager();
+    FrequencyManager::saveFrequencyOffset(0.012f);
+    placeCarrier(30.0f, 6.0f);
+
+    FrequencyManager::beginDeepFrequencyScan(0.050f, 0.0025f);
+    TEST_ASSERT_TRUE(FrequencyManager::isScanInProgress());
+    TEST_ASSERT_EQUAL(0, (int)fakeRadio().calls.size()); // Nothing swept yet
+
+    FrequencyManager::loopScan();
+    FrequencyManager::loopScan();
+    TEST_ASSERT_EQUAL(2, (int)fakeRadio().calls.size()); // Exactly one read per step
+    TEST_ASSERT_TRUE(FrequencyManager::isScanInProgress());
+
+    FrequencyManager::requestScanCancel();
+    FrequencyManager::loopScan();
+
+    TEST_ASSERT_FALSE(FrequencyManager::isScanInProgress());
+    TEST_ASSERT_EQUAL(2, (int)fakeRadio().calls.size()); // Aborted before the next read
+    TEST_ASSERT_FLOAT_WITHIN(0.000001f, 0.012f, FrequencyManager::getOffset());
+    TEST_ASSERT_FLOAT_WITHIN(0.000001f, BASE_FREQ + 0.012f, fakeRadio().lastInitFrequency());
+}
+
+void test_freq_scan_ignores_a_second_start_while_one_is_running(void)
+{
+    beginManager();
+    placeCarrier(30.0f, 6.0f);
+
+    FrequencyManager::beginDeepFrequencyScan(0.050f, 0.0025f);
+    FrequencyManager::loopScan();
+    const int stepsSoFar = (int)fakeRadio().calls.size();
+
+    // A second button press must not restart the sweep from the beginning.
+    FrequencyManager::beginDeepFrequencyScan(0.050f, 0.0025f);
+    FrequencyManager::loopScan();
+
+    TEST_ASSERT_EQUAL(stepsSoFar + 1, (int)fakeRadio().calls.size());
+}
+
+void test_freq_scan_refuses_to_start_without_callbacks(void)
+{
+    // Without a radio to drive, the scan must not arm its state machine: a
+    // half-started scan would block every later read from the host loop.
+    FrequencyManager::beginDeepFrequencyScan(0.020f, 0.0025f);
+
+    TEST_ASSERT_FALSE(FrequencyManager::isScanInProgress());
+    TEST_ASSERT_EQUAL(0, (int)fakeRadio().calls.size());
+}
+
+void test_freq_loop_scan_does_nothing_when_no_scan_is_running(void)
+{
+    // The host pumps loopScan() unconditionally, so an idle call has to be free.
+    beginManager();
+    placeCarrier(30.0f, 6.0f);
+
+    FrequencyManager::loopScan();
+
+    TEST_ASSERT_FALSE(FrequencyManager::isScanInProgress());
+    TEST_ASSERT_EQUAL(0, (int)fakeRadio().calls.size());
+}
+
+void test_freq_scan_reports_its_result_through_the_status_callback(void)
+{
+    beginManager();
+    placeCarrier(20.0f, 6.0f);
+
+    FrequencyManager::performDeepFrequencyScan(0.050f, 0.0025f, recordScanStatus);
+
+    TEST_ASSERT_EQUAL(2, (int)g_scanStates.size());
+    TEST_ASSERT_EQUAL_STRING("Frequency Scanning", g_scanStates.front().c_str());
+    TEST_ASSERT_EQUAL_STRING("Idle", g_scanStates.back().c_str());
+    TEST_ASSERT_EQUAL(0, (int)g_scanMessages.back().rfind("Deep scan complete: offset"));
+}
+
+void test_freq_scan_reports_a_failed_sweep_through_the_status_callback(void)
+{
+    beginManager();
+    fakeRadio().carrierFrequency = 0.0f; // Meter never answers
+
+    FrequencyManager::performDeepFrequencyScan(0.020f, 0.0025f, recordScanStatus);
+
+    TEST_ASSERT_EQUAL(2, (int)g_scanStates.size());
+    TEST_ASSERT_EQUAL_STRING("Idle", g_scanStates.back().c_str());
+    TEST_ASSERT_EQUAL_STRING("Deep scan failed - check setup", g_scanMessages.back().c_str());
+}
+
+void test_freq_scan_keeps_the_stored_offset_when_the_candidate_stops_answering(void)
+{
+    // The meter drops out between the coarse sweep and the zoom, so neither the
+    // zoom nor the post-lock verification decodes anything. A calibration that
+    // is already known good must survive that (issue #104).
+    beginManager();
+    FrequencyManager::saveFrequencyOffset(0.012f);
+    placeCarrier(20.0f, 6.0f);
+    silenceMeterWhenZoomStarts();
+
+    FrequencyManager::performDeepFrequencyScan(0.050f, 0.0025f);
+
+    TEST_ASSERT_FLOAT_WITHIN(0.000001f, 0.012f, FrequencyManager::getOffset());
+    TEST_ASSERT_FLOAT_WITHIN(0.000001f, BASE_FREQ + 0.012f, fakeRadio().lastInitFrequency());
+}
+
+void test_freq_scan_falls_back_to_the_window_midpoint_when_the_zoom_cannot_retune(void)
+{
+    // The radio stops accepting new frequencies once the zoom starts. Rather
+    // than lose the sweep, the scan keeps the midpoint of the window it mapped.
+    beginManager();
+    placeCarrier(20.0f, 6.0f);
+    failRadioInitWhenZoomStarts();
+
+    FrequencyManager::performDeepFrequencyScan(0.050f, 0.0025f);
+
+    TEST_ASSERT_TRUE(FrequencyManager::getOffset() > 0.0f);
+    assertLockedInsideWindow(20.0f, 6.0f, 2.5f);
 }
 
 // ---------------------------------------------------------------------------

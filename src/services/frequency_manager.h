@@ -153,11 +153,16 @@ public:
     static float loadFrequencyOffset();
 
     /**
-     * @brief Perform a Deep frequency scan
+     * @brief Perform a Deep frequency scan (blocking)
      *
      * Scans +-150 kHz (default) around the base frequency in fine 2.5 kHz steps for a
      * thorough sweep. Maps the response window then zooms to the exact carrier centre.
      * Also used on first boot when no offset is saved.
+     *
+     * Convenience wrapper around beginDeepFrequencyScan() + loopScan(); it does not
+     * return until the scan finishes, so the caller's loop is stalled for the whole
+     * sweep. Hosts with a cooperative main loop (ESPHome) should drive the scan with
+     * beginDeepFrequencyScan()/loopScan() instead so the Stop button stays responsive.
      *
      * @param scanRangeMHz Half-width of scan in MHz. Default 0.150 (±150 kHz full sweep).
      *                    Pass 0.020 for a narrow ±20 kHz re-tune after a drift failure.
@@ -169,6 +174,35 @@ public:
         float scanRangeMHz = 0.150f,
         float scanStepMHz = 0.0025f,
         void (*statusCallback)(const char *state, const char *message) = nullptr);
+
+    /**
+     * @brief Start a Deep frequency scan and return immediately
+     *
+     * The scan then advances by one frequency step per loopScan() call, which keeps
+     * the host loop responsive so an incoming Stop command can still be delivered and
+     * requestScanCancel() observed mid-scan.
+     *
+     * @param scanRangeMHz Half-width of scan in MHz (see performDeepFrequencyScan)
+     * @param scanStepMHz Step size in MHz (see performDeepFrequencyScan)
+     * @param statusCallback Optional callback for status updates (can be nullptr)
+     */
+    static void beginDeepFrequencyScan(
+        float scanRangeMHz = 0.150f,
+        float scanStepMHz = 0.0025f,
+        void (*statusCallback)(const char *state, const char *message) = nullptr);
+
+    /**
+     * @brief Check whether a scan started by beginDeepFrequencyScan() is still running
+     * @return true while the scan state machine has work left to do
+     */
+    static bool isScanInProgress();
+
+    /**
+     * @brief Advance the scan by one step
+     *
+     * Performs at most one radio transaction per call. No-op when no scan is running.
+     */
+    static void loopScan();
 
     /**
      * @brief Adaptive frequency tracking using FREQEST
@@ -194,8 +228,8 @@ public:
     /**
      * @brief Request cancellation of an in-progress deep frequency scan.
      *
-     * The scan loop checks this between frequency steps and bails out at the
-     * next step boundary (it cannot interrupt the blocking read within a single
+     * The scan checks this between frequency steps and bails out at the next
+     * step boundary (it cannot interrupt the blocking read within a single
      * step). Has no effect once the scan has already finished.
      */
     static void requestScanCancel();
@@ -236,6 +270,43 @@ public:
     static void setAdaptiveThreshold(int threshold);
 
 private:
+    /**
+     * @brief Phases of the non-blocking deep scan state machine
+     */
+    enum class ScanPhase : uint8_t
+    {
+        Idle,            // No scan running
+        WindowMap,       // Coarse sweep mapping the response window
+        Zoom,            // Fine sweep across the discovered window
+        VerifyCandidate, // Post-lock verification of the scan candidate
+        VerifyStored     // Verification of the previously stored offset
+    };
+
+    /**
+     * @brief Persisted state of the non-blocking deep scan
+     *
+     * Holds everything the old blocking loop kept in locals, so a scan can be
+     * suspended between frequency steps and resumed from the host loop.
+     */
+    struct ScanState
+    {
+        ScanPhase phase;               // Current phase (Idle when no scan is running)
+        StatusCallback statusCallback; // Optional status reporting hook
+        float freq;                    // Next frequency to test
+        float scanEnd;                 // Last frequency of the window-map sweep
+        float step;                    // Window-map step size in MHz
+        float firstHitFreq;            // Start of the discovered response window (-1 = none yet)
+        float lastHitFreq;             // End of the discovered response window
+        int bestRSSI;                  // Best RSSI seen so far
+        int consecutiveMisses;         // Misses since the last hit (window-end detection)
+        float previousOffset;          // Known-good offset snapshot (quality guard, issue #104)
+        float zoomEnd;                 // Last frequency of the zoom sweep
+        float zoomStep;                // Zoom step size in MHz
+        float bestFreq;                // Best candidate frequency found
+        int candQuality;               // |FREQEST| of the candidate (smaller = better centred)
+        bool quietPrevious;            // Saved g_echo_debug_quiet (RAII guard cannot span loops)
+    };
+
     // Configuration
     static float s_baseFrequency;   // Base meter frequency (e.g., 433.82 MHz)
     static float s_storedOffset;    // Current frequency offset in MHz
@@ -248,6 +319,9 @@ private:
     static int s_successfulReadsCount;  // Counter for adaptive tracking
     static float s_cumulativeFreqError; // Accumulated frequency error in MHz
 
+    // Non-blocking deep scan state
+    static ScanState s_scan;
+
     // Injected callbacks (dependency injection for reusability)
     static RadioInitCallback s_radioInitCallback; // Radio initialization function
     static MeterReadCallback s_meterReadCallback; // Meter reading function
@@ -258,6 +332,11 @@ private:
     static constexpr float MAX_OFFSET = 0.1;              // Max offset: +100 kHz
     static constexpr float ADAPT_MIN_ERROR_KHZ = 2.0;     // Min error to trigger adaptation (kHz)
     static constexpr float ADAPT_CORRECTION_FACTOR = 0.5; // Apply 50% correction to avoid oscillation
+    static constexpr int MISS_TOLERANCE = 5;              // Consecutive misses that close the response window
+    // CC1101 minimum frequency step = Fxosc / 2^16 = 26 MHz / 65536 ~ 397 Hz.
+    // Steps finer than this round to the same register value, silently retesting
+    // the same physical frequency. Zoom steps are clamped to at least 1 register step.
+    static constexpr float CC1101_MIN_STEP_MHZ = 26.0f / 65536.0f / 1000.0f;
 
     // Storage key for frequency offset
     static constexpr const char *STORAGE_KEY = "freq_offset";
@@ -266,6 +345,15 @@ private:
     // Helper functions
     static void feedWatchdog();
     static bool validateCallbacks(); // Validate that required callbacks are set
+
+    // Deep scan state machine helpers
+    static void finishScan(const char *state, const char *message);
+    static void beginZoomOrFail();
+    static void stepWindowMap();
+    static void stepZoom();
+    static void stepVerifyCandidate();
+    static void stepVerifyStored();
+    static void stepFinalise(bool acceptCandidate);
 
     // Private constructor - static-only class
     FrequencyManager() = delete;

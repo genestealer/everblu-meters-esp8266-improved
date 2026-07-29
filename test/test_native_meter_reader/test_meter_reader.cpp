@@ -39,6 +39,17 @@ namespace
         nativeClockAdvance(ms);
         reader.loop();
     }
+
+    /// Step the auto-started frequency scan to completion, as the host loop does.
+    void drainFrequencyScan(MeterReader &reader)
+    {
+        int guard = 0;
+        while (FrequencyManager::isScanInProgress() && guard++ < 5000)
+        {
+            reader.loop();
+        }
+        reader.loop(); // One more pass so the reader publishes the resulting tuning
+    }
 }
 
 void meterReaderSetUp()
@@ -505,6 +516,9 @@ void test_auto_scan_on_failure_runs_once_per_failure_streak(void)
     reader.triggerReading(false);
     TEST_ASSERT_TRUE(g_publisher.sawStatus("Auto frequency scan after failed reads"));
 
+    // The scan is stepped from loop(), so it has to finish before the next read.
+    drainFrequencyScan(reader);
+
     g_publisher.reset();
     reader.triggerReading(false);
     TEST_ASSERT_FALSE(g_publisher.sawStatus("Auto frequency scan after failed reads"));
@@ -519,6 +533,7 @@ void test_auto_scan_on_failure_is_rearmed_by_a_success(void)
 
     MeterReader reader = makeReader();
     reader.triggerReading(false);
+    drainFrequencyScan(reader);
 
     fakeRadio().responses.clear();
     fakeRadio().responses.push_back(FakeRadio::success());
@@ -530,6 +545,7 @@ void test_auto_scan_on_failure_is_rearmed_by_a_success(void)
     reader.triggerReading(false);
 
     TEST_ASSERT_TRUE(g_publisher.sawStatus("Auto frequency scan after failed reads"));
+    drainFrequencyScan(reader);
 }
 
 void test_auto_scan_on_failure_stays_off_when_disabled(void)
@@ -542,6 +558,50 @@ void test_auto_scan_on_failure_stays_off_when_disabled(void)
     reader.triggerReading(false);
 
     TEST_ASSERT_FALSE(g_publisher.sawStatus("Auto frequency scan after failed reads"));
+}
+
+void test_a_scan_is_only_stepped_by_the_reader_that_started_it(void)
+{
+    // FrequencyManager holds the calibration in static state shared by every
+    // reader on the radio. A second reader must stand down rather than step
+    // someone else's scan with its own radio context and meter identity.
+    g_config.frequency = 433.82f;
+
+    MeterReader owner = makeReader();
+    MeterReader other = makeReader();
+
+    owner.performFrequencyScan();
+    TEST_ASSERT_TRUE(FrequencyManager::isScanInProgress());
+
+    const int before = (int)fakeRadio().calls.size();
+    other.loop();
+    TEST_ASSERT_EQUAL(before, (int)fakeRadio().calls.size());
+
+    owner.loop();
+    TEST_ASSERT_EQUAL(before + 1, (int)fakeRadio().calls.size());
+
+    drainFrequencyScan(owner);
+}
+
+void test_a_running_scan_blocks_reads_and_further_scan_requests(void)
+{
+    // The scan owns the radio until it finishes. Anything that would retune it
+    // mid-sweep has to be turned away rather than queued.
+    g_config.frequency = 433.82f;
+
+    MeterReader reader = makeReader();
+    reader.performFrequencyScan();
+    TEST_ASSERT_TRUE(reader.isScanInProgress());
+
+    const int before = (int)fakeRadio().calls.size();
+
+    reader.performFrequencyScan(); // Second press of the scan button
+    reader.triggerReading(false);  // Manual read while the sweep is running
+
+    TEST_ASSERT_EQUAL(before, (int)fakeRadio().calls.size());
+    TEST_ASSERT_TRUE(FrequencyManager::isScanInProgress());
+
+    drainFrequencyScan(reader);
 }
 
 void test_reset_frequency_offset_clears_storage_and_retunes(void)

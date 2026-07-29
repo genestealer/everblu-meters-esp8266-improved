@@ -13,6 +13,13 @@ Releases are created manually by tagging commits with version tags matching `v*.
 - Keep PR coverage explicit per release so branch-only work is auditable against merge history.
 - Add new versions below, not above this section.
 
+## [Unreleased]
+
+### Changed
+
+- **The deep frequency scan is now stepped from the main loop instead of blocking it** ([#133](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/133)). `FrequencyManager` gained `beginDeepFrequencyScan()`, `isScanInProgress()` and `loopScan()`, which advance the sweep one frequency at a time and keep all of the previous window-map, zoom, post-lock verification and quality-guard behaviour. `MeterReader::loop()` drives the scan, so the ESPHome API keeps being serviced and the Stop Reading button now aborts a manual scan at the next step boundary rather than being buffered until the whole scan finishes. The auto-scan after a failure streak is started the same way. `performDeepFrequencyScan()` is kept as a blocking wrapper for the standalone MQTT build, so its behaviour is unchanged.
+- The radio state reports `Frequency Scanning` while a manual deep scan runs, and returns to `Idle` when it ends.
+
 ## [v3.3.0] - 2026-07-28
 
 ### AI Metadata

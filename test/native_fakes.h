@@ -69,6 +69,11 @@ struct FakeRadio
     std::vector<float> initFrequencies;
     int recModeCalls = 0;
 
+    // Optional hook fired at the start of every cc1101_init(), before the call
+    // is recorded, so a test can change the fake's behaviour from inside a scan
+    // (for example silencing the meter the moment the zoom pass begins).
+    void (*onInit)(float freq) = nullptr;
+
     void reset();
 
     /// Build a successful reading (non-zero volume and reads_counter).

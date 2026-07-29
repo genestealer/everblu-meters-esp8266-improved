@@ -49,7 +49,7 @@ static void logReadableSummary(const tmeter_data &data, const IConfigProvider *c
 }
 
 MeterReader::MeterReader(IConfigProvider *config, ITimeProvider *timeProvider, IDataPublisher *publisher)
-    : m_config(config), m_timeProvider(timeProvider), m_publisher(publisher), m_initialized(false), m_readingInProgress(false), m_isScheduledRead(false), m_haConnected(false), m_radioConnected(false), m_retryCount(0), m_inCooldown(false), m_lastFailedAttempt(0), m_nextRetryTime(0), m_autoScanAfterFailureDone(false), m_retryFailureReason(ReadFailure::None), m_totalReadAttempts(0), m_successfulReads(0), m_failedReads(0), m_lastErrorMessage("None"), m_lastScheduleCheck(0), m_lastStatsPublish(0), m_readHourLocal(10), m_readMinuteLocal(0), m_lastReadDayMatch(false), m_lastReadTimeMatch(false)
+    : m_config(config), m_timeProvider(timeProvider), m_publisher(publisher), m_initialized(false), m_readingInProgress(false), m_isScheduledRead(false), m_haConnected(false), m_radioConnected(false), m_scanInProgress(false), m_retryCount(0), m_inCooldown(false), m_lastFailedAttempt(0), m_nextRetryTime(0), m_autoScanAfterFailureDone(false), m_retryFailureReason(ReadFailure::None), m_totalReadAttempts(0), m_successfulReads(0), m_failedReads(0), m_lastErrorMessage("None"), m_lastScheduleCheck(0), m_lastStatsPublish(0), m_readHourLocal(10), m_readMinuteLocal(0), m_lastReadDayMatch(false), m_lastReadTimeMatch(false)
 {
 }
 
@@ -195,6 +195,37 @@ void MeterReader::loop()
 
     unsigned long now = millis();
 
+    // Drive the deep frequency scan one step per loop() so the host stays
+    // responsive and a Stop request can still be delivered mid-scan (issue #133).
+    // FrequencyManager state is shared by every reader on the radio, so only the
+    // reader that started the scan steps it (stepping it from another instance
+    // would apply the wrong radio and meter identity); the rest stand down until
+    // it finishes rather than retuning the radio mid-sweep.
+    if (FrequencyManager::isScanInProgress())
+    {
+        if (m_scanInProgress)
+        {
+            activateCallbackContext();
+            FrequencyManager::loopScan();
+        }
+        return;
+    }
+
+    if (m_scanInProgress)
+    {
+        // The scan finished or was cancelled on the previous iteration: report the
+        // resulting tuning once, rather than polling it every loop.
+        m_scanInProgress = false;
+        LOG_I("everblu_meter", "Frequency scan complete");
+
+        if (m_publisher)
+        {
+            m_publisher->publishFrequencyOffset(FrequencyManager::getOffset());
+            m_publisher->publishTunedFrequency(FrequencyManager::getTunedFrequency());
+            m_publisher->publishRadioState("Idle");
+        }
+    }
+
     // Check for pending retry
     if (m_retryCount > 0 && m_nextRetryTime > 0 && now >= m_nextRetryTime)
     {
@@ -293,6 +324,14 @@ void MeterReader::triggerReading(bool isScheduled)
     if (m_readingInProgress)
     {
         LOG_W("everblu_meter", "Reading already in progress, skipping trigger");
+        return;
+    }
+
+    // A running scan owns the radio and is stepped from loop(); starting a read
+    // now would retune it mid-sweep.
+    if (FrequencyManager::isScanInProgress())
+    {
+        LOG_W("everblu_meter", "Frequency scan in progress, skipping trigger");
         return;
     }
 
@@ -467,7 +506,9 @@ void MeterReader::handleFailedRead(ReadFailure reason)
             // Narrow ±20 kHz / 1 kHz scan: fast re-tune after drift failure.
             // The full ±150 kHz deep scan is reserved for manual commands and
             // first-boot with no stored offset (both called via performFrequencyScan).
-            FrequencyManager::performDeepFrequencyScan(0.020f, 0.001f);
+            // Started rather than run inline so loop() keeps stepping it (issue #133).
+            FrequencyManager::beginDeepFrequencyScan(0.020f, 0.001f);
+            m_scanInProgress = true;
         }
     }
 }
@@ -484,7 +525,8 @@ void MeterReader::stopReading()
     // A blocking RF transfer already in flight cannot be aborted mid-transaction;
     // this cancels any pending retry sequence and returns the reader to idle so
     // it stops retrying and won't start the next queued read.
-    const bool wasActive = m_readingInProgress || m_retryCount > 0 || m_nextRetryTime > 0;
+    const bool wasActive = m_readingInProgress || m_retryCount > 0 || m_nextRetryTime > 0 ||
+                           FrequencyManager::isScanInProgress();
 
     resetRetryState();
     m_readingInProgress = false;
@@ -510,18 +552,22 @@ void MeterReader::performFrequencyScan()
 {
     activateCallbackContext();
 
+    if (FrequencyManager::isScanInProgress())
+    {
+        LOG_W("everblu_meter", "Frequency scan already running - ignoring request");
+        return;
+    }
+
     LOG_I("everblu_meter", "Starting frequency scan...");
 
-    FrequencyManager::performDeepFrequencyScan();
+    // Non-blocking: loop() steps the scan and publishes the result when it ends.
+    FrequencyManager::beginDeepFrequencyScan();
+    m_scanInProgress = true;
 
-    LOG_I("everblu_meter", "Frequency scan complete");
-
-    // Publish the updated frequency offset immediately after scan completes
     if (m_publisher)
     {
-        float offsetMHz = FrequencyManager::getOffset();
-        m_publisher->publishFrequencyOffset(offsetMHz);
-        m_publisher->publishTunedFrequency(FrequencyManager::getTunedFrequency());
+        m_publisher->publishRadioState("Frequency Scanning");
+        m_publisher->publishStatusMessage("Deep frequency scan running");
     }
 }
 

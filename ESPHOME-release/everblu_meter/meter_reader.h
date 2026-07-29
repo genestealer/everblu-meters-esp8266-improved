@@ -93,9 +93,18 @@ public:
     void triggerReading(bool isScheduled);
 
     /**
-     * @brief Perform a Deep frequency scan (window-map + zoom) to recalibrate the carrier offset
+     * @brief Start a Deep frequency scan (window-map + zoom) to recalibrate the carrier offset
+     *
+     * Returns immediately: the scan is then stepped from loop(), so the host stays
+     * responsive and stopReading() can abort it mid-scan.
      */
     void performFrequencyScan();
+
+    /**
+     * @brief Check whether a deep frequency scan is currently running
+     * @return true while the scan state machine is being stepped
+     */
+    bool isScanInProgress() const { return m_scanInProgress; }
 
     /**
      * @brief Reset frequency offset to 0
@@ -106,8 +115,9 @@ public:
      * @brief Stop the current reading sequence
      *
      * Cancels any pending retry and returns the reader to idle so it stops
-     * retrying and does not start the next queued read. A blocking RF transfer
-     * that is already in flight cannot be interrupted mid-transaction.
+     * retrying and does not start the next queued read. Also aborts an in-progress
+     * deep frequency scan at its next step boundary. A blocking RF transfer that is
+     * already in flight cannot be interrupted mid-transaction.
      */
     void stopReading();
 
@@ -197,7 +207,8 @@ private:
     bool m_readingInProgress;
     bool m_isScheduledRead;
     bool m_haConnected;
-    bool m_radioConnected; // Tracks CC1101 radio initialization success
+    bool m_radioConnected;  // Tracks CC1101 radio initialization success
+    bool m_scanInProgress;  // True while a non-blocking deep frequency scan is being stepped from loop()
 
     // Retry management
     int m_retryCount;

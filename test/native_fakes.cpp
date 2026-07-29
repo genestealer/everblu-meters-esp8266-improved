@@ -41,6 +41,7 @@ void FakeRadio::reset()
     initFrequencies.clear();
     initSucceeds = true;
     recModeCalls = 0;
+    onInit = nullptr;
     carrierFrequency = 0.0f;
     carrierWidthMHz = 0.010f;
     cancelScanAfterCalls = 0;
@@ -77,6 +78,10 @@ void setMHZ(float mhz)
 bool cc1101_init(float freq)
 {
     FakeRadio &radio = fakeRadio();
+    if (radio.onInit)
+    {
+        radio.onInit(freq);
+    }
     radio.initFrequencies.push_back(freq);
     return radio.initSucceeds;
 }
@@ -418,6 +423,15 @@ void RecordingPublisher::publishDiscovery() { discoveryPublishes++; }
 
 void resetAllFakes()
 {
+    // A case may leave a non-blocking deep scan part-way through. Step it to
+    // completion while its callbacks are still valid, so neither the scan state
+    // nor a dangling callback leaks into the next test.
+    if (FrequencyManager::isScanInProgress())
+    {
+        FrequencyManager::requestScanCancel();
+        FrequencyManager::loopScan();
+    }
+
     // Start at a plausible uptime rather than zero: several timers in the
     // firmware use "0" as their "never happened" sentinel, so a test running at
     // millis() == 0 would exercise a state the device never boots into.
