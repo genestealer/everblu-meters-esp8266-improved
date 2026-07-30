@@ -183,4 +183,72 @@ using String = std::string;
 #define LOW 0
 #endif
 
+using byte = uint8_t;
+
+// ---------------------------------------------------------------------------
+// GPIO
+// ---------------------------------------------------------------------------
+//
+// Pin levels are a plain host-side array. That lets a test read back what the
+// firmware drove, and drive what the firmware is about to read, which is what
+// makes the CC1101 GDO pins observable without hardware.
+
+#ifndef INPUT
+#define INPUT 0
+#endif
+#ifndef OUTPUT
+#define OUTPUT 1
+#endif
+#ifndef INPUT_PULLUP
+#define INPUT_PULLUP 2
+#endif
+
+inline constexpr int kNativePinCount = 64;
+
+inline uint8_t *nativePinLevels()
+{
+    static uint8_t levels[kNativePinCount] = {0};
+    return levels;
+}
+
+inline uint8_t *nativePinModes()
+{
+    static uint8_t modes[kNativePinCount] = {0};
+    return modes;
+}
+
+inline void nativePinReset()
+{
+    memset(nativePinLevels(), 0, kNativePinCount);
+    memset(nativePinModes(), 0, kNativePinCount);
+}
+
+inline void pinMode(uint8_t pin, uint8_t mode)
+{
+    if (pin >= kNativePinCount)
+    {
+        return;
+    }
+    nativePinModes()[pin] = mode;
+    // A pull-up leaves the line high until something drives it, which is what
+    // the firmware relies on to detect a disconnected GDO2.
+    if (mode == INPUT_PULLUP)
+    {
+        nativePinLevels()[pin] = HIGH;
+    }
+}
+
+inline void digitalWrite(uint8_t pin, uint8_t level)
+{
+    if (pin < kNativePinCount)
+    {
+        nativePinLevels()[pin] = level ? HIGH : LOW;
+    }
+}
+
+inline int digitalRead(uint8_t pin)
+{
+    return (pin < kNativePinCount) ? nativePinLevels()[pin] : LOW;
+}
+
 #endif // EVERBLU_NATIVE_ARDUINO_SHIM_H

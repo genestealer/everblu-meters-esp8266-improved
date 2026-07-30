@@ -132,9 +132,12 @@ try {
 
     # Host test suites. -e native covers the MQTT-mode code; -e native_esphome
     # rebuilds the shared sources with USE_ESPHOME so the ESPHome publisher,
-    # which is otherwise compiled out entirely, is exercised too.
+    # which is otherwise compiled out entirely, is exercised too; -e native_cc1101
+    # links the real CC1101 driver against a simulated SPI bus, which the other
+    # two replace with FakeRadio.
     Invoke-Step "Host tests (native)" { pio test -e native }
     Invoke-Step "Host tests (native_esphome)" { pio test -e native_esphome }
+    Invoke-Step "Host tests (native_cc1101)" { pio test -e native_cc1101 }
 
     # ESPHome YAML schema validation. These import the real ESPHome validators,
     # so they need both esphome and pytest.

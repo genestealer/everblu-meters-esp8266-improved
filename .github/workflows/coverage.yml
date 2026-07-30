@@ -11,6 +11,7 @@ on:
       - test/native_esphome/**
       - test/native_fakes.*
       - test/native_shims/**
+      - test/test_native_cc1101_link/**
       - test/test_native_esphome_publisher/**
       - test/test_native_meter_fixtures/**
       - test/test_native_meter_reader/**
@@ -26,6 +27,7 @@ on:
       - test/native_esphome/**
       - test/native_fakes.*
       - test/native_shims/**
+      - test/test_native_cc1101_link/**
       - test/test_native_esphome_publisher/**
       - test/test_native_meter_fixtures/**
       - test/test_native_meter_reader/**
@@ -79,6 +81,7 @@ jobs:
         run: |
           pio test -e native -v
           pio test -e native_esphome -v
+          pio test -e native_cc1101 -v
 
       - name: Collect coverage
         # --object-directory spans both native environments, which compile several
@@ -89,6 +92,7 @@ jobs:
         run: |
           gcovr \
             --root . \
+            --filter src/core/cc1101.cpp \
             --filter src/core/crc_kermit.cpp \
             --filter src/core/radian_parser.cpp \
             --filter src/core/radian_decoder.cpp \

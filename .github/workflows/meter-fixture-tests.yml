@@ -11,6 +11,7 @@ on:
       - test/native_esphome/**
       - test/native_fakes.*
       - test/native_shims/**
+      - test/test_native_cc1101_link/**
       - test/test_native_esphome_publisher/**
       - test/test_native_meter_fixtures/**
       - test/test_native_meter_reader/**
@@ -26,6 +27,7 @@ on:
       - test/native_esphome/**
       - test/native_fakes.*
       - test/native_shims/**
+      - test/test_native_cc1101_link/**
       - test/test_native_esphome_publisher/**
       - test/test_native_meter_fixtures/**
       - test/test_native_meter_reader/**
@@ -82,3 +84,7 @@ jobs:
       - name: Run native ESPHome publisher tests
         run: |
           pio test -e native_esphome -v
+
+      - name: Run native CC1101 driver tests
+        run: |
+          pio test -e native_cc1101 -v

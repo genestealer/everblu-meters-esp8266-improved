@@ -70,6 +70,11 @@ tmeter_data FakeRadio::failure(ReadFailure reason)
     return data;
 }
 
+// The CC1101 link seam is skipped by [env:native_cc1101], which compiles the real
+// src/core/cc1101.cpp against a simulated SPI bus instead. Everything else in
+// this file (FakeRadio itself, storage, WiFi serial) is still needed there.
+#ifndef EVERBLU_NATIVE_REAL_CC1101
+
 void setMHZ(float mhz)
 {
     fakeRadio().initFrequencies.push_back(mhz);
@@ -145,6 +150,8 @@ struct tmeter_data get_meter_data(void)
 {
     return get_meter_data_for_meter(0, 0);
 }
+
+#endif // EVERBLU_NATIVE_REAL_CC1101
 
 // ---------------------------------------------------------------------------
 // FakeStorage and the StorageAbstraction link seam
