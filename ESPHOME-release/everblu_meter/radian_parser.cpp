@@ -33,8 +33,12 @@ bool radian_validate_crc(const uint8_t *decoded_buffer, size_t size)
 
     if (expected_len > size)
     {
-        // Keep compatibility with frames that advertise a longer length than payload.
-        return true;
+        // The length byte claims more bytes than were decoded, so the CRC
+        // trailer is not in the buffer and the frame cannot be verified at all.
+        // In practice this means a truncated or misaligned capture. Reject it:
+        // accepting it unchecked let corrupt frames through the one integrity
+        // gate the radio path has.
+        return false;
     }
 
     if (expected_len < 4)
