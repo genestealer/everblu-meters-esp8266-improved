@@ -677,9 +677,11 @@ void cc1101_configureRF_0(float freq)
  * second SPI device holding the line. SYNC1/SYNC0 are used as the scratch pair because
  * cc1101_configureRF_0() rewrites both immediately afterwards.
  *
+ * @param partnum_out Optional; receives the PARTNUM register value.
+ * @param version_out Optional; receives the VERSION register value.
  * @return true when the radio is present and the bus is trustworthy.
  */
-static bool cc1101_verify_spi_link(void)
+static bool cc1101_verify_spi_link(uint8_t *partnum_out, uint8_t *version_out)
 {
   // Round 1 then round 2 use complementary patterns, so between them every data bit is
   // driven both high and low in each direction.
@@ -697,6 +699,11 @@ static bool cc1101_verify_spi_link(void)
 
   uint8_t partnum = halRfReadReg(PARTNUM_ADDR);
   uint8_t version = halRfReadReg(VERSION_ADDR);
+
+  if (partnum_out != NULL)
+    *partnum_out = partnum;
+  if (version_out != NULL)
+    *version_out = version;
 
   if (!readback_ok)
   {
@@ -749,6 +756,58 @@ static bool cc1101_verify_spi_link(void)
   return true;
 }
 
+bool cc1101_probe_spi_link(uint8_t *partnum_out, uint8_t *version_out)
+{
+  if (partnum_out != NULL)
+    *partnum_out = 0;
+  if (version_out != NULL)
+    *version_out = 0;
+
+  if ((wiringPiSPISetup(0, 500000)) < 0)
+  {
+    LOG_E("everblu_meter", "Failed to initialize SPI bus - check CC1101 wiring and connections");
+    return false;
+  }
+
+  cc1101_reset();
+  delay(1);
+
+  return cc1101_verify_spi_link(partnum_out, version_out);
+}
+
+void cc1101_collect_diagnostics(cc1101_diagnostics_t *out)
+{
+  int8_t cc1100_rssi_convert2dbm(uint8_t Rssi_dec); // defined below
+
+  if (out == NULL)
+    return;
+
+  memset(out, 0, sizeof(*out));
+  out->gdo0_level = -1;
+  out->gdo2_level = -1;
+
+  // Read-back check first: when the bus is untrustworthy every register below returns the
+  // same meaningless byte, and reporting those values as if they were real is what made
+  // this class of fault so hard to spot in the first place.
+  out->link_ok = cc1101_verify_spi_link(&out->partnum, &out->version);
+
+  out->marcstate = halRfReadReg(MARCSTATE_ADDR);
+  out->freq2 = halRfReadReg(FREQ2);
+  out->freq1 = halRfReadReg(FREQ1);
+  out->freq0 = halRfReadReg(FREQ0);
+  out->mdmcfg4 = halRfReadReg(MDMCFG4);
+  out->mdmcfg3 = halRfReadReg(MDMCFG3);
+  out->mdmcfg2 = halRfReadReg(MDMCFG2);
+  out->pktctrl0 = halRfReadReg(PKTCTRL0);
+  out->rssi_dbm = cc1100_rssi_convert2dbm(halRfReadReg(RSSI_ADDR));
+  out->lqi = halRfReadReg(LQI_ADDR) & 0x7F;
+
+  if (GET_GDO0_PIN() >= 0)
+    out->gdo0_level = (digitalRead(GET_GDO0_PIN()) == LOW) ? 0 : 1;
+  if (GET_GDO2_PIN() >= 0)
+    out->gdo2_level = (digitalRead(GET_GDO2_PIN()) == LOW) ? 0 : 1;
+}
+
 bool cc1101_init(float freq)
 {
 #ifdef USE_ESPHOME
@@ -785,7 +844,7 @@ bool cc1101_init(float freq)
   cc1101_reset();
   delay(1);
 
-  if (!cc1101_verify_spi_link())
+  if (!cc1101_verify_spi_link(NULL, NULL))
   {
     return false;
   }
@@ -799,6 +858,42 @@ bool cc1101_init(float freq)
   delay(5);          // Wait for calibration to complete (typically <1ms, but we add margin)
 
   echo_debug(debug_out, "[CC1101] Frequency synthesizer calibrated for %.6f MHz\n", freq);
+
+  // One-time GDO0 wiring self-test. IOCFG0 is sync-word-detect (set by
+  // cc1101_configureRF_0) and the radio is IDLE here, so a correctly wired GDO0 must read
+  // LOW. The pin is configured INPUT_PULLUP, so an unconnected or wrong GPIO reads HIGH.
+  // Without this check a wrong gdo0_pin fails silently in a way that looks like success:
+  // every "wait for GDO0" loop returns immediately, so the logs show "GDO0 triggered at
+  // 0ms" and a frame is "received" that is really just noise (issue seen on boards where
+  // GDO0 was pointed at an unrelated peripheral pin).
+  {
+    static bool s_gdo0_selftest_done = false;
+    if (!s_gdo0_selftest_done)
+    {
+      s_gdo0_selftest_done = true;
+      CC1101_CMD(SIDLE);
+      delayMicroseconds(100);
+      // Sample a few times: a genuinely idle GDO0 is steady, so a single reading is enough
+      // in principle, but repeating costs nothing and avoids reacting to a transient.
+      bool stuck_high = true;
+      for (uint8_t i = 0; i < 4 && stuck_high; i++)
+      {
+        if (digitalRead(GET_GDO0_PIN()) == LOW)
+          stuck_high = false;
+        delayMicroseconds(100);
+      }
+      if (stuck_high)
+      {
+        LOG_W("everblu_meter",
+              "GDO0 self-test FAILED: pin %d reads HIGH while the radio is IDLE (expected LOW). GDO0 is probably on the wrong GPIO or not connected - the pin has a pull-up, so an unwired pin reads HIGH. Every sync-word wait will then return instantly and 'received' frames will be noise. Check gdo0_pin against your board's CC1101 GDO0 pin.",
+              GET_GDO0_PIN());
+      }
+      else
+      {
+        echo_debug(debug_out, "[CC1101] GDO0 self-test passed (LOW while idle)\n");
+      }
+    }
+  }
 
   // One-time GDO2 wiring self-test. With IOCFG2 in TX-FIFO-threshold mode (0x02, set by
   // cc1101_configureRF_0) GDO2 must read LOW with an empty TX FIFO and HIGH once the FIFO

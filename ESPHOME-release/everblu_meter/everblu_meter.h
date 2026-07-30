@@ -48,6 +48,7 @@ class EverbluMeterTriggerButton final : public button::Button {
   void set_deep_scan(bool is_deep_scan) { this->is_deep_scan_ = is_deep_scan; }
   void set_reset_frequency(bool is_reset) { this->is_reset_frequency_ = is_reset; }
   void set_stop(bool is_stop) { this->is_stop_ = is_stop; }
+  void set_diagnostic(bool is_diagnostic) { this->is_diagnostic_ = is_diagnostic; }
 
  protected:
   void press_action() override;
@@ -57,6 +58,7 @@ class EverbluMeterTriggerButton final : public button::Button {
   bool is_deep_scan_{false};
   bool is_reset_frequency_{false};
   bool is_stop_{false};
+  bool is_diagnostic_{false};
 };
 
 class EverbluMeterComponent final : public PollingComponent,
@@ -143,6 +145,7 @@ class EverbluMeterComponent final : public PollingComponent,
   void request_deep_scan();
   void request_reset_frequency();
   void request_stop_reading();
+  void request_diagnostic_report();
 
  protected:
   // Configuration
@@ -170,6 +173,14 @@ class EverbluMeterComponent final : public PollingComponent,
   void republish_initial_states();
   void apply_radio_context();
   bool gdo0_error_logged_{false};  // One-shot flag to prevent log flooding
+
+  // Boot-time SPI link probe result, captured in setup() and reported by dump_config()
+  // so a dead or mis-wired bus is visible in the config block every user copies, without
+  // waiting for a Home Assistant connection or a button press.
+  bool spi_probe_ran_{false};
+  bool spi_link_ok_{false};
+  uint8_t spi_partnum_{0};
+  uint8_t spi_version_{0};
 
   // GDO0 pin (required) and GDO2 pin (optional TX FIFO threshold)
   InternalGPIOPin *gdo0_pin_{nullptr};

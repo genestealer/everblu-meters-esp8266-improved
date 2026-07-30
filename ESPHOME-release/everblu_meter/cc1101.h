@@ -83,6 +83,55 @@ void cc1101_set_rx_attenuation(int db);
 uint32_t cc1101_get_gdo2_timeout_count(void);
 
 /**
+ * @brief Probe the SPI link to the CC1101 without configuring the radio.
+ *
+ * Performs the same reset + write/read-back self-test as cc1101_init(), but stops there.
+ * Intended to be called early (for example from an ESPHome setup()) so a dead or
+ * mis-wired SPI link is reported in the boot log, rather than only surfacing later when
+ * the first read is attempted. Failures are logged with the same remediation guidance.
+ *
+ * @param partnum_out Optional; receives the PARTNUM register value.
+ * @param version_out Optional; receives the VERSION register value.
+ * @return true when the radio answered and the bus is trustworthy.
+ */
+bool cc1101_probe_spi_link(uint8_t *partnum_out, uint8_t *version_out);
+
+/**
+ * @brief Snapshot of radio identity, key registers and GDO line levels.
+ *
+ * Everything a support request needs in order to tell a wiring fault from an RF problem,
+ * captured in one pass so it can be logged as a single copy-pasteable block.
+ */
+typedef struct
+{
+  bool link_ok;      /**< SPI write/read-back self-test passed */
+  uint8_t partnum;   /**< PARTNUM: 0x00 on a genuine CC1101 */
+  uint8_t version;   /**< VERSION: 0x04 or 0x14 on known revisions */
+  uint8_t marcstate; /**< Main radio control state machine state */
+  uint8_t freq2;     /**< Carrier frequency, MSB */
+  uint8_t freq1;
+  uint8_t freq0;
+  uint8_t mdmcfg4; /**< RX filter bandwidth + data rate exponent */
+  uint8_t mdmcfg3;
+  uint8_t mdmcfg2;
+  uint8_t pktctrl0;
+  int8_t rssi_dbm; /**< Current RSSI, converted to dBm */
+  uint8_t lqi;
+  int gdo0_level; /**< 0 = LOW, 1 = HIGH, -1 = pin not configured */
+  int gdo2_level; /**< 0 = LOW, 1 = HIGH, -1 = pin not configured */
+} cc1101_diagnostics_t;
+
+/**
+ * @brief Fill @p out with a one-shot diagnostic snapshot of the radio.
+ *
+ * Safe to call at any time; does not reset or reconfigure the radio. When the SPI link
+ * is untrustworthy, link_ok is false and the register values are meaningless.
+ *
+ * @param out Destination struct; ignored when NULL.
+ */
+void cc1101_collect_diagnostics(cc1101_diagnostics_t *out);
+
+/**
  * @enum ReadFailure
  * @brief Why a meter read produced no usable data
  *
