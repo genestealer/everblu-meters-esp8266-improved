@@ -6,5 +6,5 @@
  */
 
 #ifndef EVERBLU_FW_VERSION
-#define EVERBLU_FW_VERSION "3.3.0"
+#define EVERBLU_FW_VERSION "3.4.0"
 #endif

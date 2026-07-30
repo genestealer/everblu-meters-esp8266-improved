@@ -13,11 +13,33 @@ Releases are created manually by tagging commits with version tags matching `v*.
 - Keep PR coverage explicit per release so branch-only work is auditable against merge history.
 - Add new versions below, not above this section.
 
-## [Unreleased]
+## [v3.4.0] - 2026-07-30
+
+### AI Metadata
+
+```yaml
+release_type: minor
+base_branch: main
+release_branch: main
+includes_prs: [144, 146, 147, 150]
+notable_superseded_work:
+  - "the non-blocking deep scan fix (issue 133) was merged separately into develop as #145 and into main as #144 plus #146; this release ships the main-side history, and develop is fast-forwarded to match afterwards"
+scope_summary:
+  - "The deep frequency scan is stepped from the main loop instead of blocking it, so the Stop Reading button can abort a manual scan"
+  - "cc1101_init() now runs a write/read-back self-test over SYNC1/SYNC0 before trusting the radio, catching a stuck or undriven SPI bus that previously looked like a healthy connection"
+  - "Frequency scan log lines name the meter being interrogated and the configured frequency, so a multi-meter setup with mismatched frequency: values is visible in the log"
+  - "New env:native_cc1101 host test environment links the real CC1101 driver against a simulated register file with injectable SPI bus faults"
+```
+
+### Added
+
+- **Frequency scan logging now names the meter being interrogated and reports the scan centre alongside that meter's configured frequency.** In a multi-meter setup (several `everblu_meter:` entries sharing one CC1101), *which meter answers* a scan is per-entry, but *which frequency range is swept* is a single value shared by every entry, set by whichever entry's `setup()` ran last. `performFrequencyScan()` and the auto-scan-on-failure warning now log the meter code and gas/water type, so a mismatch between the swept centre and an entry's configured `frequency:` is visible in the log instead of silently narrowing the scan window away from the carrier. `ESPHOME/README.md` gains a "Frequency scans in multi-meter setups" section documenting the per-meter/global split and warning that every entry sharing a radio must use the same `frequency:` ([#147](https://github.com/genestealer/everblu-meters-esp8266-improved/pull/147)).
+- **`cc1101_init()` verifies the SPI link before trusting anything the radio reports.** The previous check only rejected a `VERSION` register read of `0x00` or `0xFF`, so a MISO line stuck at any other constant, floating, or held by another device on a shared bus passed, and every later read of `RSSI`, `LQI`, `MARCSTATE` and the RX FIFO returned that same byte, looking like a plausible but wrong reading. A write/read-back self-test over `SYNC1`/`SYNC0` with two complementary bit patterns runs first: a constant or undriven MISO cannot follow both, which also catches a missing device, a wrong `miso_pin`, a board bus-routing multiplexer left in the wrong position, and a second SPI device holding the line. Failure is fatal (`radio_connected` stays `false`) with a log message naming the likely cause. A device that answers correctly but inconsistently across repeated reads gets a warning instead of a hard failure, and an unrecognised-but-stable silicon revision (not `0x04` or `0x14`) is now accepted with a warning rather than rejected outright ([#150](https://github.com/genestealer/everblu-meters-esp8266-improved/pull/150), fixes [#148](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/148)).
+- **`env:native_cc1101`**, a new PlatformIO host test environment that links the real `src/core/cc1101.cpp` against a simulated CC1101 register file instead of the usual `FakeRadio` seam, with fault injection over MISO (stuck-at-any-constant, absent device, unstable bus). `test/native_shims/SPI.h` routes `SPI.transfer()` to a pluggable handler so the self-test above is exercised against the faults it exists to catch.
 
 ### Changed
 
-- **The deep frequency scan is now stepped from the main loop instead of blocking it** ([#133](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/133)). `FrequencyManager` gained `beginDeepFrequencyScan()`, `isScanInProgress()` and `loopScan()`, which advance the sweep one frequency at a time and keep all of the previous window-map, zoom, post-lock verification and quality-guard behaviour. `MeterReader::loop()` drives the scan, so the ESPHome API keeps being serviced and the Stop Reading button now aborts a manual scan at the next step boundary rather than being buffered until the whole scan finishes. The auto-scan after a failure streak is started the same way. `performDeepFrequencyScan()` is kept as a blocking wrapper for the standalone MQTT build, so its behaviour is unchanged.
+- **The deep frequency scan is now stepped from the main loop instead of blocking it** ([#133](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/133)). `FrequencyManager` gained `beginDeepFrequencyScan()`, `isScanInProgress()` and `loopScan()`, which advance the sweep one frequency at a time and keep all of the previous window-map, zoom, post-lock verification and quality-guard behaviour. `MeterReader::loop()` drives the scan, so the ESPHome API keeps being serviced and the Stop Reading button now aborts a manual scan at the next step boundary rather than being buffered until the whole scan finishes. The auto-scan after a failure streak is started the same way. `performDeepFrequencyScan()` is kept as a blocking wrapper for the standalone MQTT build, so its behaviour is unchanged ([#144](https://github.com/genestealer/everblu-meters-esp8266-improved/pull/144), [#146](https://github.com/genestealer/everblu-meters-esp8266-improved/pull/146)).
 - The radio state reports `Frequency Scanning` while a manual deep scan runs, and returns to `Idle` when it ends.
 
 ## [v3.3.0] - 2026-07-28
