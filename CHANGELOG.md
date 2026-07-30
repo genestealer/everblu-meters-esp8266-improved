@@ -18,7 +18,7 @@ Releases are created manually by tagging commits with version tags matching `v*.
 ### Added
 
 - **`diagnostic_report_button`**: a new optional button that logs a single copy-pasteable block containing the configured CS/GDO0/GDO2 pins, a live SPI link self-test, the key CC1101 registers (PARTNUM, VERSION, MARCSTATE, FREQ2/1/0, MDMCFG4/3/2, PKTCTRL0), RSSI/LQI and the current GDO0/GDO2 line levels. It deliberately does not require the meter reader to be initialised, because the most common reason to press it is that the radio never came up.
-- **GDO0 wiring self-test**: `cc1101_init()` now checks that GDO0 reads LOW while the radio is IDLE, mirroring the existing GDO2 self-test. The pin is configured with a pull-up, so a wrong or unconnected GPIO reads HIGH. Previously a mis-assigned `gdo0_pin` failed silently in a way that resembled success: every sync-word wait returned immediately, producing `GDO0 triggered at 0ms` and "received" frames that were only noise.
+- **GDO0 wiring self-test**: `cc1101_init()` now checks that GDO0 reads LOW while the radio is IDLE, mirroring the existing GDO2 self-test. The pin is configured with a pull-up, so a wrong or unconnected GPIO reads HIGH. Previously a mis-assigned `gdo0_pin` failed silently in a way that resembled success: every sync-word wait returned immediately, producing `GDO0 triggered at 0ms` and "received" frames that were only noise. The verdict is exposed through `cc1101_collect_diagnostics()` and shown in the diagnostic report, so a fault that appears mid-life is visible rather than only at the first boot after a miswire.
 
 ### Changed
 

@@ -315,6 +315,10 @@ void cc1101_set_rx_attenuation(int db)
 // Monotonic (lifetime) counter; surfaced via cc1101_get_gdo2_timeout_count() for telemetry.
 static uint32_t _gdo2_stuck_timeouts = 0;
 
+// Latest verdict of the GDO0 idle-level self-test (see cc1101_init). Kept as state rather
+// than a log line only, so the fault is visible in the diagnostic report at any time.
+static bool _gdo0_disconnected = false;
+
 uint32_t cc1101_get_gdo2_timeout_count(void)
 {
   return _gdo2_stuck_timeouts;
@@ -801,6 +805,7 @@ void cc1101_collect_diagnostics(cc1101_diagnostics_t *out)
   out->pktctrl0 = halRfReadReg(PKTCTRL0);
   out->rssi_dbm = cc1100_rssi_convert2dbm(halRfReadReg(RSSI_ADDR));
   out->lqi = halRfReadReg(LQI_ADDR) & 0x7F;
+  out->gdo0_disconnected = _gdo0_disconnected;
 
   if (GET_GDO0_PIN() >= 0)
     out->gdo0_level = (digitalRead(GET_GDO0_PIN()) == LOW) ? 0 : 1;
@@ -859,39 +864,43 @@ bool cc1101_init(float freq)
 
   echo_debug(debug_out, "[CC1101] Frequency synthesizer calibrated for %.6f MHz\n", freq);
 
-  // One-time GDO0 wiring self-test. IOCFG0 is sync-word-detect (set by
-  // cc1101_configureRF_0) and the radio is IDLE here, so a correctly wired GDO0 must read
-  // LOW. The pin is configured INPUT_PULLUP, so an unconnected or wrong GPIO reads HIGH.
-  // Without this check a wrong gdo0_pin fails silently in a way that looks like success:
-  // every "wait for GDO0" loop returns immediately, so the logs show "GDO0 triggered at
-  // 0ms" and a frame is "received" that is really just noise (issue seen on boards where
-  // GDO0 was pointed at an unrelated peripheral pin).
+  // GDO0 wiring self-test. IOCFG0 is sync-word-detect (set by cc1101_configureRF_0) and
+  // the radio is IDLE here, so a correctly wired GDO0 must read LOW. The pin is configured
+  // INPUT_PULLUP, so an unconnected or wrong GPIO reads HIGH. Without this check a wrong
+  // gdo0_pin fails silently in a way that looks like success: every "wait for GDO0" loop
+  // returns immediately, so the logs show "GDO0 triggered at 0ms" and a frame is
+  // "received" that is really just noise (issue seen on boards where GDO0 was pointed at
+  // an unrelated peripheral pin).
+  //
+  // The check runs on every init - it costs one strobe and a few reads - but the warning
+  // is emitted once, because a frequency scan calls cc1101_init() per step and would
+  // otherwise repeat it dozens of times. The verdict is kept in _gdo0_disconnected so it
+  // stays visible through cc1101_collect_diagnostics().
   {
-    static bool s_gdo0_selftest_done = false;
-    if (!s_gdo0_selftest_done)
+    CC1101_CMD(SIDLE);
+    delayMicroseconds(100);
+    // Sample a few times: a genuinely idle GDO0 is steady, so a single reading is enough
+    // in principle, but repeating costs nothing and avoids reacting to a transient.
+    bool stuck_high = true;
+    for (uint8_t i = 0; i < 4 && stuck_high; i++)
     {
-      s_gdo0_selftest_done = true;
-      CC1101_CMD(SIDLE);
+      if (digitalRead(GET_GDO0_PIN()) == LOW)
+        stuck_high = false;
       delayMicroseconds(100);
-      // Sample a few times: a genuinely idle GDO0 is steady, so a single reading is enough
-      // in principle, but repeating costs nothing and avoids reacting to a transient.
-      bool stuck_high = true;
-      for (uint8_t i = 0; i < 4 && stuck_high; i++)
-      {
-        if (digitalRead(GET_GDO0_PIN()) == LOW)
-          stuck_high = false;
-        delayMicroseconds(100);
-      }
-      if (stuck_high)
-      {
-        LOG_W("everblu_meter",
-              "GDO0 self-test FAILED: pin %d reads HIGH while the radio is IDLE (expected LOW). GDO0 is probably on the wrong GPIO or not connected - the pin has a pull-up, so an unwired pin reads HIGH. Every sync-word wait will then return instantly and 'received' frames will be noise. Check gdo0_pin against your board's CC1101 GDO0 pin.",
-              GET_GDO0_PIN());
-      }
-      else
-      {
-        echo_debug(debug_out, "[CC1101] GDO0 self-test passed (LOW while idle)\n");
-      }
+    }
+    _gdo0_disconnected = stuck_high;
+
+    static bool s_gdo0_warning_logged = false;
+    if (stuck_high && !s_gdo0_warning_logged)
+    {
+      s_gdo0_warning_logged = true;
+      LOG_W("everblu_meter",
+            "GDO0 self-test FAILED: pin %d reads HIGH while the radio is IDLE (expected LOW). GDO0 is probably on the wrong GPIO or not connected - the pin has a pull-up, so an unwired pin reads HIGH. Every sync-word wait will then return instantly and 'received' frames will be noise. Check gdo0_pin against your board's CC1101 GDO0 pin.",
+            GET_GDO0_PIN());
+    }
+    else if (!stuck_high)
+    {
+      echo_debug(debug_out, "[CC1101] GDO0 self-test passed (LOW while idle)\n");
     }
   }
 

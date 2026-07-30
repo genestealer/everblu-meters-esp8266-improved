@@ -119,6 +119,12 @@ typedef struct
   uint8_t lqi;
   int gdo0_level; /**< 0 = LOW, 1 = HIGH, -1 = pin not configured */
   int gdo2_level; /**< 0 = LOW, 1 = HIGH, -1 = pin not configured */
+  /**
+   * True when the last cc1101_init() found GDO0 HIGH while the radio was IDLE, which means
+   * the pin is almost certainly on the wrong GPIO or not connected. Sync-word waits then
+   * return instantly and "received" frames are noise.
+   */
+  bool gdo0_disconnected;
 } cc1101_diagnostics_t;
 
 /**

@@ -38,6 +38,14 @@ struct NativeCC1101
     // ---- Fault injection -------------------------------------------------
     NativeSpiFault fault = NativeSpiFault::None;
     uint8_t stuckValue = 0xFF;
+    /**
+     * Whether GDO0 is actually wired to the pin the driver is watching.
+     *
+     * A connected GDO0 is driven LOW by the radio while it is IDLE. When false the fake
+     * leaves the pin alone, so the host pull-up keeps it HIGH - exactly what the firmware
+     * sees when gdo0_pin points at the wrong GPIO or at nothing at all.
+     */
+    bool gdo0Connected = true;
 
     // ---- Observability ---------------------------------------------------
     uint32_t transfers = 0;
@@ -128,6 +136,14 @@ inline void nativeCC1101Transfer(uint8_t *buffer, size_t length)
 {
     NativeCC1101 &device = nativeCC1101();
     device.transfers++;
+
+    // A wired GDO0 is held LOW by the radio outside a packet. The driver sets the pin to
+    // INPUT_PULLUP on every init, which leaves it HIGH, so the fake has to re-assert the
+    // line the same way real silicon would once it is talking on the bus.
+    if (device.gdo0Connected)
+    {
+        digitalWrite(GDO0, LOW);
+    }
 
     if (length == 0)
     {

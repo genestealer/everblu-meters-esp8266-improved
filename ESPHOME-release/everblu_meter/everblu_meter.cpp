@@ -418,6 +418,7 @@ void EverbluMeterComponent::request_diagnostic_report() {
            "  MDMCFG4/3/2: 0x%02X 0x%02X 0x%02X\n"
            "  RSSI: %d dBm, LQI: %u\n"
            "  GDO0 level: %s (expect LOW while idle), GDO2 level: %s\n"
+           "  GDO0 wiring self-test: %s\n"
            "  GDO2 fault count: %lu\n"
            "  Meter reader initialised: %s\n"
            "===== end of report =====",
@@ -429,6 +430,7 @@ void EverbluMeterComponent::request_diagnostic_report() {
            diag.link_ok ? "PASSED" : "FAILED - register values below are meaningless", diag.partnum, diag.version,
            diag.marcstate, diag.pktctrl0, diag.freq2, diag.freq1, diag.freq0, diag.mdmcfg4, diag.mdmcfg3, diag.mdmcfg2,
            diag.rssi_dbm, diag.lqi, level_text(diag.gdo0_level), level_text(diag.gdo2_level),
+           diag.gdo0_disconnected ? "FAILED - GDO0 looks unconnected or on the wrong GPIO" : "passed",
            (unsigned long) cc1101_get_gdo2_timeout_count(), this->meter_initialized_ ? "yes" : "no");
 }
 

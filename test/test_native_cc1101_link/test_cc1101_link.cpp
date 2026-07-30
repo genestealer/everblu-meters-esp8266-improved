@@ -139,3 +139,144 @@ void test_cc1101_init_re_runs_the_self_test_on_every_call(void)
     nativeCC1101().fault = NativeSpiFault::None;
     TEST_ASSERT_TRUE(cc1101_init(kTestFrequency));
 }
+
+// ---------------------------------------------------------------------------
+// cc1101_probe_spi_link: the same check, callable before the radio is configured
+// ---------------------------------------------------------------------------
+
+void test_probe_reports_the_radio_identity_on_a_healthy_bus(void)
+{
+    // ESPHome calls this during setup() so a wiring fault lands in the boot log
+    // that users actually capture, instead of waiting for the first read.
+    nativeCC1101Install();
+
+    uint8_t partnum = 0xEE;
+    uint8_t version = 0xEE;
+    TEST_ASSERT_TRUE(cc1101_probe_spi_link(&partnum, &version));
+    TEST_ASSERT_EQUAL_HEX8(kCc1101PartNum, partnum);
+    TEST_ASSERT_EQUAL_HEX8(kCc1101Version, version);
+}
+
+void test_probe_rejects_a_stuck_bus_and_reports_what_it_saw(void)
+{
+    // The caller shows these values to the user, so they must be the bytes that
+    // were actually read - seeing PARTNUM and VERSION both equal to the stuck
+    // value is what makes the fault recognisable.
+    nativeCC1101Install();
+    nativeCC1101().fault = NativeSpiFault::StuckConstant;
+    nativeCC1101().stuckValue = 0x0F;
+
+    uint8_t partnum = 0;
+    uint8_t version = 0;
+    TEST_ASSERT_FALSE(cc1101_probe_spi_link(&partnum, &version));
+    TEST_ASSERT_EQUAL_HEX8(0x0F, partnum);
+    TEST_ASSERT_EQUAL_HEX8(0x0F, version);
+}
+
+void test_probe_accepts_null_outputs(void)
+{
+    // The identity is optional: a caller that only wants the verdict should not
+    // have to supply somewhere to put it.
+    nativeCC1101Install();
+
+    TEST_ASSERT_TRUE(cc1101_probe_spi_link(nullptr, nullptr));
+}
+
+// ---------------------------------------------------------------------------
+// cc1101_collect_diagnostics: the one-shot snapshot behind the report button
+// ---------------------------------------------------------------------------
+
+void test_diagnostics_capture_the_configured_radio_state(void)
+{
+    nativeCC1101Install();
+    TEST_ASSERT_TRUE(cc1101_init(kTestFrequency));
+
+    cc1101_diagnostics_t diag;
+    cc1101_collect_diagnostics(&diag);
+
+    TEST_ASSERT_TRUE(diag.link_ok);
+    TEST_ASSERT_EQUAL_HEX8(kCc1101PartNum, diag.partnum);
+    TEST_ASSERT_EQUAL_HEX8(kCc1101Version, diag.version);
+    // 433.82 MHz lands in the 0x10 page of the frequency word; the exact value
+    // is asserted elsewhere, here it only has to be something the radio was
+    // actually programmed with rather than a default or a stuck byte.
+    TEST_ASSERT_EQUAL_HEX8(0x10, diag.freq2);
+    TEST_ASSERT_EQUAL_HEX8(nativeCC1101().config[0x10], diag.mdmcfg4);
+    TEST_ASSERT_EQUAL_HEX8(nativeCC1101().config[0x08], diag.pktctrl0);
+}
+
+void test_diagnostics_flag_an_untrustworthy_bus(void)
+{
+    // Every register reads back as the stuck value, so the report has to say the
+    // numbers below it are meaningless rather than presenting them as readings.
+    nativeCC1101Install();
+    nativeCC1101().fault = NativeSpiFault::StuckConstant;
+    nativeCC1101().stuckValue = 0x0F;
+
+    cc1101_diagnostics_t diag;
+    cc1101_collect_diagnostics(&diag);
+
+    TEST_ASSERT_FALSE(diag.link_ok);
+    TEST_ASSERT_EQUAL_HEX8(0x0F, diag.partnum);
+    TEST_ASSERT_EQUAL_HEX8(0x0F, diag.version);
+    TEST_ASSERT_EQUAL_HEX8(0x0F, diag.marcstate);
+}
+
+void test_diagnostics_tolerate_a_null_destination(void)
+{
+    cc1101_collect_diagnostics(nullptr); // must not crash
+}
+
+// ---------------------------------------------------------------------------
+// GDO0 wiring self-test
+// ---------------------------------------------------------------------------
+
+void test_gdo0_self_test_passes_when_the_line_is_wired(void)
+{
+    // A wired GDO0 is held LOW by the radio while it is IDLE.
+    nativeCC1101Install();
+    nativeCC1101().gdo0Connected = true;
+
+    TEST_ASSERT_TRUE(cc1101_init(kTestFrequency));
+
+    cc1101_diagnostics_t diag;
+    cc1101_collect_diagnostics(&diag);
+    TEST_ASSERT_FALSE(diag.gdo0_disconnected);
+    TEST_ASSERT_EQUAL_INT(0, diag.gdo0_level);
+}
+
+void test_gdo0_self_test_detects_a_pin_pointed_at_nothing(void)
+{
+    // The reported failure mode: gdo0_pin set to a GPIO the CC1101 is not on.
+    // The pull-up holds it HIGH, so every sync-word wait returns instantly and
+    // the "frames" that follow are noise. Nothing else in the driver notices.
+    nativeCC1101Install();
+    nativeCC1101().gdo0Connected = false;
+
+    TEST_ASSERT_TRUE(cc1101_init(kTestFrequency)); // SPI is fine; only GDO0 is wrong
+
+    cc1101_diagnostics_t diag;
+    cc1101_collect_diagnostics(&diag);
+    TEST_ASSERT_TRUE(diag.gdo0_disconnected);
+    TEST_ASSERT_EQUAL_INT(1, diag.gdo0_level);
+}
+
+void test_gdo0_verdict_clears_once_the_line_is_fixed(void)
+{
+    // The verdict is state, not a latch: re-running init on a corrected board
+    // must clear it, otherwise the diagnostic report would keep accusing a
+    // wiring fault that no longer exists.
+    nativeCC1101Install();
+    nativeCC1101().gdo0Connected = false;
+    TEST_ASSERT_TRUE(cc1101_init(kTestFrequency));
+
+    cc1101_diagnostics_t diag;
+    cc1101_collect_diagnostics(&diag);
+    TEST_ASSERT_TRUE(diag.gdo0_disconnected);
+
+    nativeCC1101().gdo0Connected = true;
+    TEST_ASSERT_TRUE(cc1101_init(kTestFrequency));
+
+    cc1101_collect_diagnostics(&diag);
+    TEST_ASSERT_FALSE(diag.gdo0_disconnected);
+}
