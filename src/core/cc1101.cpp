@@ -7,6 +7,7 @@
 #include "radian_parser.h"
 #include "radian_decoder.h" // Shared platform-neutral 4-bit-per-bit decoder
 #include "logging.h" // Cross-platform logging
+#include "version.h" // EVERBLU_FW_VERSION, reported by the diagnostic report
 #include <Arduino.h> // Arduino core
 #if !defined(USE_ESPHOME)
 #if defined(__has_include)
@@ -848,6 +849,120 @@ void cc1101_collect_diagnostics(cc1101_diagnostics_t *out)
   {
     CC1101_CMD(SRX);
   }
+}
+
+void cc1101_print_diagnostic_report(const cc1101_report_context_t *ctx)
+{
+  cc1101_diagnostics_t diag;
+  cc1101_collect_diagnostics(&diag);
+
+  static const char *const kGdoLevel[3] = {"LOW", "HIGH", "unknown (pin not configured yet)"};
+  const char *gdo0_level = kGdoLevel[(diag.gdo0_level < 0 || diag.gdo0_level > 1) ? 2 : diag.gdo0_level];
+  const char *gdo2_level = kGdoLevel[(diag.gdo2_level < 0 || diag.gdo2_level > 1) ? 2 : diag.gdo2_level];
+
+  const char *gdo0_verdict;
+  switch (diag.gdo0_selftest)
+  {
+  case CC1101_SELFTEST_PASSED:
+    gdo0_verdict = "passed";
+    break;
+  case CC1101_SELFTEST_FAILED:
+    gdo0_verdict = "FAILED - GDO0 looks unconnected or on the wrong GPIO";
+    break;
+  default:
+    // Do not print "passed" here. The radio has not been initialised, so the test has not
+    // run - and a report taken before the first read is exactly the case where a false
+    // "passed" would send someone looking in the wrong place.
+    gdo0_verdict = "NOT RUN - the radio has not been initialised yet";
+    break;
+  }
+
+  // Fall back to a placeholder context so every field below has something to print. A
+  // report is most often requested when setup failed part-way, so it must not depend on
+  // the caller having valid configuration to hand.
+  cc1101_report_context_t empty;
+  memset(&empty, 0, sizeof(empty));
+  if (ctx == NULL)
+    ctx = &empty;
+
+  const char *meter_code = (ctx->meter_code != NULL) ? ctx->meter_code : "unknown";
+
+  // Pin descriptions are optional: ESPHome can say more about a pin than a GPIO number
+  // (inverted, pull-up, expander) and passes its own text, while the standalone build has
+  // nothing to add, so fall back to the numbers the driver is actually using.
+  char cs_default[40];
+  char gdo0_default[24];
+  char gdo2_default[48];
+  const char *cs_text = ctx->cs_pin_text;
+  const char *gdo0_text = ctx->gdo0_pin_text;
+  const char *gdo2_text = ctx->gdo2_pin_text;
+
+  if (cs_text == NULL)
+  {
+#if defined(USE_ESPHOME)
+    cs_text = "managed by the ESPHome SPI bus";
+#else
+    snprintf(cs_default, sizeof(cs_default), "GPIO%d (hardware SPI SS)", (int) SPI_SS);
+    cs_text = cs_default;
+#endif
+  }
+  if (gdo0_text == NULL)
+  {
+    if (GET_GDO0_PIN() >= 0)
+    {
+      snprintf(gdo0_default, sizeof(gdo0_default), "GPIO%d", GET_GDO0_PIN());
+      gdo0_text = gdo0_default;
+    }
+    else
+    {
+      gdo0_text = "NOT configured";
+    }
+  }
+  if (gdo2_text == NULL)
+  {
+    if (GET_GDO2_PIN() >= 0)
+    {
+      snprintf(gdo2_default, sizeof(gdo2_default), "GPIO%d", GET_GDO2_PIN());
+      gdo2_text = gdo2_default;
+    }
+    else
+    {
+      gdo2_text = "disabled (legacy SPI polling fallback)";
+    }
+  }
+
+  // Emitted as several calls rather than one block: the ESPHome logger truncates a single
+  // message at its transmit buffer (512 bytes by default), which cut the report off
+  // part-way through the GDO0 line and lost the wiring verdicts that matter most.
+  LOG_I("everblu_meter", "===== EverBlu diagnostic report =====");
+  LOG_I("everblu_meter",
+        "  Firmware Version: %s\n"
+        "  Meter Code: %s (year=%u, serial=%lu, %s)\n"
+        "  Configured Frequency: %.6f MHz\n"
+        "  RX Attenuation: %d dB",
+        EVERBLU_FW_VERSION, meter_code, (unsigned) ctx->meter_year, (unsigned long) ctx->meter_serial,
+        ctx->is_gas ? "Gas" : "Water", ctx->configured_frequency_mhz, ctx->rx_attenuation_db);
+  LOG_I("everblu_meter", "  CS Pin: %s, GDO0 Pin: %s, GDO2 Pin: %s", cs_text, gdo0_text, gdo2_text);
+  LOG_I("everblu_meter",
+        "  SPI Link Self-Test: %s\n"
+        "  PARTNUM: 0x%02X (expect 0x00), VERSION: 0x%02X (expect 0x04 or 0x14)",
+        diag.link_ok ? "PASSED" : "FAILED - the register values below are meaningless", diag.partnum, diag.version);
+  LOG_I("everblu_meter",
+        "  MARCSTATE: 0x%02X (%s), PKTCTRL0: 0x%02X\n"
+        "  FREQ2/1/0: 0x%02X 0x%02X 0x%02X -> carrier %.6f MHz (configured base %.6f MHz)\n"
+        "  MDMCFG4/3/2: 0x%02X 0x%02X 0x%02X\n"
+        "  RSSI: %d dBm, LQI: %u (last measurement; only meaningful after a frame arrives)",
+        diag.marcstate, cc1101_marcstate_name(diag.marcstate), diag.pktctrl0, diag.freq2, diag.freq1, diag.freq0,
+        diag.carrier_mhz, ctx->configured_frequency_mhz, diag.mdmcfg4, diag.mdmcfg3, diag.mdmcfg2, diag.rssi_dbm,
+        diag.lqi);
+  LOG_I("everblu_meter",
+        "  GDO0 level: %s (expect LOW while idle), GDO2 level: %s\n"
+        "  GDO0 wiring self-test: %s\n"
+        "  GDO2 fault count: %lu\n"
+        "  Meter reader initialised: %s",
+        gdo0_level, gdo2_level, gdo0_verdict, (unsigned long) cc1101_get_gdo2_timeout_count(),
+        ctx->meter_initialised ? "yes" : "no");
+  LOG_I("everblu_meter", "===== end of report =====");
 }
 
 float cc1101_freq_registers_to_mhz(uint8_t freq2, uint8_t freq1, uint8_t freq0)

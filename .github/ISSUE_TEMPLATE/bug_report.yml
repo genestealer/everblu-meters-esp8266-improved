@@ -10,6 +10,9 @@ body:
 
         • Tell us whether you use the ESPHome integration or the MQTT integration.
         • Attach DEBUG-level logs. See docs/LOGGING_SYSTEM.md for guidance.
+        • Attach the diagnostic / self-test output. This is the single most useful thing you can
+          include: it tells a wiring fault apart from an RF problem in one step. See the
+          "Diagnostic report" field below for how to generate it.
 
   - type: dropdown
     id: integration
@@ -143,6 +146,32 @@ body:
       placeholder: Clear and concise description of the issue.
     validations:
       required: true
+
+  - type: textarea
+    id: diagnostic_report
+    attributes:
+      label: Diagnostic report / self-test output (REQUIRED)
+      description: |
+        **ESPHome users:** add `diagnostic_report_button:` to your `everblu_meter:` block (see
+        `ESPHOME/example-water-meter.yaml`), reflash, then press the **Diagnostic Report** button in
+        Home Assistant while the ESPHome log stream is open.
+
+        **MQTT users:** press the **Diagnostic Report** button on the device in Home Assistant, or
+        publish `report` to `everblu/cyble/<meter-serial>/diagnostic_report`. The report is written to
+        the log, so have the serial monitor open at 115200 baud (`pio device monitor`) or the WiFi
+        serial monitor connected (`telnet <device-ip> 23`, see docs/WIFI_SERIAL_MONITOR.md).
+
+        Either way, copy the whole `===== EverBlu diagnostic report =====` block. Both builds produce
+        the same format, and it works even when the radio never came up.
+
+        Redact your meter serial and any credentials if you would rather not share them.
+      placeholder: |
+        ```
+        <paste the diagnostic report or boot self-test output here>
+        ```
+      render: shell
+    validations:
+      required: false
 
   - type: textarea
     id: logs

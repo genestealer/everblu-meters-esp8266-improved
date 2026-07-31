@@ -167,6 +167,44 @@ typedef struct
 void cc1101_collect_diagnostics(cc1101_diagnostics_t *out);
 
 /**
+ * @brief Caller-supplied context for cc1101_print_diagnostic_report().
+ *
+ * The driver knows the radio but not how the surrounding firmware was configured, so the
+ * caller passes in the parts of the report it owns. Pin descriptions are strings rather
+ * than numbers because ESPHome describes a pin as more than a GPIO number (inverted,
+ * pull-up, expander), and the MQTT build has no pin object at all.
+ *
+ * String members may be NULL; they are printed as "unknown" rather than crashing.
+ * A NULL pin description falls back to the GPIO numbers the driver is actually using.
+ */
+typedef struct
+{
+  const char *meter_code;         /**< Meter code as configured, e.g. "21-0123456". */
+  uint16_t meter_year;            /**< Two-digit production year parsed from the meter code. */
+  uint32_t meter_serial;          /**< Serial number parsed from the meter code. */
+  bool is_gas;                    /**< true for a gas meter, false for water. */
+  float configured_frequency_mhz; /**< Base frequency before any calibration offset. */
+  int rx_attenuation_db;          /**< Configured front-end RX attenuation. */
+  const char *cs_pin_text;        /**< Chip-select pin description; NULL to derive one. */
+  const char *gdo0_pin_text;      /**< GDO0 pin description; NULL to derive one. */
+  const char *gdo2_pin_text;      /**< GDO2 pin description; NULL to derive one. */
+  bool meter_initialised;         /**< Whether the meter reader finished setting up. */
+} cc1101_report_context_t;
+
+/**
+ * @brief Log a copy-pasteable diagnostic report covering wiring, link and radio state.
+ *
+ * Calls cc1101_collect_diagnostics() itself, then prints the snapshot alongside the
+ * caller-supplied configuration in @p ctx. Shared by the ESPHome component and the
+ * standalone MQTT firmware so both produce byte-for-byte comparable reports in a bug
+ * report. Safe to call before the radio has been initialised: the SPI and GDO0 verdicts
+ * then report "FAILED"/"NOT RUN" rather than a misleading pass.
+ *
+ * @param ctx Configuration context; a NULL pointer prints the radio half only.
+ */
+void cc1101_print_diagnostic_report(const cc1101_report_context_t *ctx);
+
+/**
  * @brief Human-readable name for a MARCSTATE value (datasheet Table 25).
  *
  * Reported as a bare number, a state such as 0x11 reads as a fault when it is usually

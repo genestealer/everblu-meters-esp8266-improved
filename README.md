@@ -527,6 +527,25 @@ The following MQTT topics are used to integrate the device with Home Assistant v
 
 </details>
 
+<details>
+<summary>MQTT command topics (Home Assistant buttons)</summary>
+
+Each of these appears in Home Assistant as a button on the device. `<serial>` is the meter serial number parsed from `METER_CODE`.
+
+| **Button**               | **MQTT Topic**                                | **Payload** | **Description**                                                          |
+| ------------------------ | --------------------------------------------- | ----------- | ------------------------------------------------------------------------ |
+| `Request Reading Now`    | `everblu/cyble/<serial>/trigger_force`         | `update`    | Read the meter immediately, bypassing the cooldown.                      |
+| `Deep Frequency Scan`    | `everblu/cyble/<serial>/deep_scan`             | `scan`      | Sweep ±150 kHz in 2.5 kHz steps and store the best offset.               |
+| `Reset Frequency Offset` | `everblu/cyble/<serial>/reset_frequency`       | `reset`     | Clear the stored calibration and re-tune from the base frequency.        |
+| `Diagnostic Report`      | `everblu/cyble/<serial>/diagnostic_report`     | `report`    | Log the wiring / SPI link / radio report. See below.                     |
+| `Restart Device`         | `everblu/cyble/<serial>/restart`               | `restart`   | Reboot the ESP.                                                          |
+
+**Diagnostic Report** prints one copy-pasteable block covering the configured CS/GDO0/GDO2 pins, a live SPI link self-test, the key CC1101 registers (PARTNUM, VERSION, MARCSTATE, FREQ2/1/0, MDMCFG4/3/2, PKTCTRL0), RSSI/LQI, the GDO0 wiring self-test verdict and the current GDO0/GDO2 line levels. Press it first when raising an issue: it tells a wiring fault apart from an RF problem in one step, and it works even when the radio never came up.
+
+The report goes to the log rather than to MQTT, so watch the serial monitor at 115200 baud (`pio device monitor`) or the [WiFi serial monitor](docs/WIFI_SERIAL_MONITOR.md) while you press it. The ESPHome component has the same button and prints the same format.
+
+</details>
+
 ---
 
 ## Multiple Devices

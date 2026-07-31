@@ -17,9 +17,37 @@
 
 | Topic | Payload | Description |
 |-------|---------|-------------|
-| `everblu/cyble/frequency_scan` | `scan` | Trigger automatic frequency scan |
+| `everblu/cyble/deep_scan` | `scan` | Trigger a deep frequency scan |
+| `everblu/cyble/reset_frequency` | `reset` | Clear the stored frequency offset and re-tune |
+| `everblu/cyble/diagnostic_report` | `report` | Log the wiring / SPI link / radio diagnostic report |
 | `everblu/cyble/trigger` | `update` | Manual meter read (existing) |
 | `everblu/cyble/restart` | `restart` | Restart the device (existing) |
+
+---
+
+## Diagnostic Report
+
+The first thing to capture when something is not working. One copy-pasteable block covering the
+configured CS/GDO0/GDO2 pins, a live SPI link self-test, the key CC1101 registers, RSSI/LQI, the GDO0
+wiring self-test verdict and the current GDO0/GDO2 line levels. It works even when the radio never
+came up, which is when it is most useful.
+
+**MQTT build**
+
+Press the **Diagnostic Report** button on the device in Home Assistant, or publish the command
+directly:
+
+```bash
+mosquitto_pub -h <mqtt_broker> -t "everblu/cyble/<serial>/diagnostic_report" -m "report"
+```
+
+The report is written to the log, not to MQTT, so watch the serial monitor at 115200 baud
+(`pio device monitor`) or the [WiFi serial monitor](WIFI_SERIAL_MONITOR.md) while you press it.
+
+**ESPHome build**
+
+Add `diagnostic_report_button:` to your `everblu_meter:` block, then press **Diagnostic Report** with
+the ESPHome log stream open. Same format as the MQTT build.
 
 ---
 

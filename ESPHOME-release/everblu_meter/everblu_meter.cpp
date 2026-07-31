@@ -394,66 +394,26 @@ void EverbluMeterComponent::request_diagnostic_report() {
   // that the radio never came up, and a report is most useful precisely then.
   this->apply_radio_context();
 
-  cc1101_diagnostics_t diag;
-  cc1101_collect_diagnostics(&diag);
-
-  const char *const gdo_level[3] = {"LOW", "HIGH", "unknown (pin not configured yet)"};
-  auto level_text = [&](int level) { return gdo_level[(level < 0 || level > 1) ? 2 : level]; };
-
-  const char *gdo0_verdict;
-  switch (diag.gdo0_selftest) {
-    case CC1101_SELFTEST_PASSED:
-      gdo0_verdict = "passed";
-      break;
-    case CC1101_SELFTEST_FAILED:
-      gdo0_verdict = "FAILED - GDO0 looks unconnected or on the wrong GPIO";
-      break;
-    default:
-      // Do not print "passed" here. The radio has not been initialised, so the test has
-      // not run - and a report taken before the first read is exactly the case where a
-      // false "passed" would send someone looking in the wrong place.
-      gdo0_verdict = "NOT RUN - the radio has not been initialised yet";
-      break;
-  }
-
   char cs_text[GPIO_SUMMARY_MAX_LEN];
   char gdo0_text[GPIO_SUMMARY_MAX_LEN];
   char gdo2_text[GPIO_SUMMARY_MAX_LEN];
 
-  // Emitted as several calls rather than one block: the logger truncates a single message
-  // at its transmit buffer (512 bytes by default), which cut the report off part-way
-  // through the GDO0 line and lost the wiring verdicts that matter most.
-  ESP_LOGI(TAG, "===== EverBlu diagnostic report =====");
-  ESP_LOGI(TAG,
-           "  Component Version: %s\n"
-           "  Meter Code: %s (year=%u, serial=%lu, %s)\n"
-           "  Configured Frequency: %.6f MHz\n"
-           "  RX Attenuation: %d dB",
-           EVERBLU_FW_VERSION, this->meter_code_.c_str(), this->meter_year_, (unsigned long) this->meter_serial_,
-           this->is_gas_ ? "Gas" : "Water", this->frequency_, this->rx_attenuation_db_);
-  ESP_LOGI(TAG, "  CS Pin: %s, GDO0 Pin: %s, GDO2 Pin: %s",
-           pin_summary(this->cs_, cs_text, sizeof(cs_text), "NOT configured"),
-           pin_summary(this->gdo0_pin_, gdo0_text, sizeof(gdo0_text), "NOT configured"),
-           pin_summary(this->gdo2_pin_, gdo2_text, sizeof(gdo2_text), "disabled"));
-  ESP_LOGI(TAG,
-           "  SPI Link Self-Test: %s\n"
-           "  PARTNUM: 0x%02X (expect 0x00), VERSION: 0x%02X (expect 0x04 or 0x14)",
-           diag.link_ok ? "PASSED" : "FAILED - the register values below are meaningless", diag.partnum, diag.version);
-  ESP_LOGI(TAG,
-           "  MARCSTATE: 0x%02X (%s), PKTCTRL0: 0x%02X\n"
-           "  FREQ2/1/0: 0x%02X 0x%02X 0x%02X -> carrier %.6f MHz (configured base %.6f MHz)\n"
-           "  MDMCFG4/3/2: 0x%02X 0x%02X 0x%02X\n"
-           "  RSSI: %d dBm, LQI: %u (last measurement; only meaningful after a frame arrives)",
-           diag.marcstate, cc1101_marcstate_name(diag.marcstate), diag.pktctrl0, diag.freq2, diag.freq1, diag.freq0,
-           diag.carrier_mhz, this->frequency_, diag.mdmcfg4, diag.mdmcfg3, diag.mdmcfg2, diag.rssi_dbm, diag.lqi);
-  ESP_LOGI(TAG,
-           "  GDO0 level: %s (expect LOW while idle), GDO2 level: %s\n"
-           "  GDO0 wiring self-test: %s\n"
-           "  GDO2 fault count: %lu\n"
-           "  Meter reader initialised: %s",
-           level_text(diag.gdo0_level), level_text(diag.gdo2_level), gdo0_verdict,
-           (unsigned long) cc1101_get_gdo2_timeout_count(), this->meter_initialized_ ? "yes" : "no");
-  ESP_LOGI(TAG, "===== end of report =====");
+  // The report body itself lives in the core driver so the ESPHome and MQTT builds emit
+  // identical blocks; only the pin descriptions differ, and ESPHome can say more about a
+  // pin than a bare GPIO number.
+  cc1101_report_context_t ctx;
+  ctx.meter_code = this->meter_code_.c_str();
+  ctx.meter_year = this->meter_year_;
+  ctx.meter_serial = this->meter_serial_;
+  ctx.is_gas = this->is_gas_;
+  ctx.configured_frequency_mhz = this->frequency_;
+  ctx.rx_attenuation_db = this->rx_attenuation_db_;
+  ctx.cs_pin_text = pin_summary(this->cs_, cs_text, sizeof(cs_text), "NOT configured");
+  ctx.gdo0_pin_text = pin_summary(this->gdo0_pin_, gdo0_text, sizeof(gdo0_text), "NOT configured");
+  ctx.gdo2_pin_text = pin_summary(this->gdo2_pin_, gdo2_text, sizeof(gdo2_text), "disabled");
+  ctx.meter_initialised = this->meter_initialized_;
+
+  cc1101_print_diagnostic_report(&ctx);
 }
 
 void EverbluMeterComponent::apply_radio_context() {

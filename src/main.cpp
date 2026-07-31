@@ -178,6 +178,12 @@ bool autoScanOnFailureEnabled = (AUTO_SCAN_ON_FAILURE_ENABLED != 0); // Enable a
 #endif
 const int ADAPT_THRESHOLD = ADAPTIVE_THRESHOLD;
 
+// Front-end RX attenuation, reported by the diagnostic report. The driver applies its own
+// default when this is absent from private.h; mirror it so the report agrees with the radio.
+#ifndef RX_ATTENUATION_DB
+#define RX_ATTENUATION_DB 0
+#endif
+
 // ============================================================================
 // Frequency Management API (thin MQTT wrappers over the shared FrequencyManager)
 // ============================================================================
@@ -197,6 +203,15 @@ void performDeepFrequencyScan(float scanRangeMHz = 0.150f, float scanStepMHz = 0
  * @brief Reset the persisted frequency offset to zero and re-tune the radio.
  */
 void resetFrequencyOffset();
+
+/**
+ * @brief Log the wiring / SPI link / radio diagnostic report to the serial monitor.
+ *
+ * Same block as the ESPHome "Diagnostic Report" button, so one format covers both
+ * integrations. Safe to call when the radio never came up, which is when it is most
+ * useful.
+ */
+void printDiagnosticReport();
 
 // ============================================================================
 // Frequency Management Implementation
@@ -1227,6 +1242,20 @@ void publishHADiscovery()
   json += "}";
   publishDiscoveryMessage("button", "everblu_meter_reset_frequency", json);
 
+  json = "{\n";
+  json += "  \"name\": \"Diagnostic Report\",\n";
+  json += "  \"uniq_id\": \"" + getMeterPrefix() + "everblu_meter_diagnostic_report\",\n";
+  json += "  \"obj_id\": \"" + getMeterPrefix() + "everblu_meter_diagnostic_report\",\n";
+  json += "  \"ic\": \"mdi:clipboard-text-search-outline\",\n";
+  json += "  \"qos\": 0,\n";
+  json += "  \"avty_t\": \"" + String(mqttBaseTopic) + "/status\",\n";
+  json += "  \"cmd_t\": \"" + String(mqttBaseTopic) + "/diagnostic_report\",\n";
+  json += "  \"pl_prs\": \"report\",\n";
+  json += "  \"ent_cat\": \"diagnostic\",\n";
+  json += "  \"dev\": {\n    " + buildDeviceJson() + "\n  }\n";
+  json += "}";
+  publishDiscoveryMessage("button", "everblu_meter_diagnostic_report", json);
+
   // Binary sensor for active reading
   json = "{\n";
   json += "  \"name\": \"Active Reading\",\n";
@@ -1438,6 +1467,19 @@ void onConnectionEstablished()
     EVB_PRINTLN("Reset frequency offset command received via MQTT");
     resetFrequencyOffset(); });
 
+  char diagnosticReportTopic[MQTT_TOPIC_BUFFER_SIZE];
+  snprintf(diagnosticReportTopic, sizeof(diagnosticReportTopic), "%s/diagnostic_report", mqttBaseTopic);
+  mqtt.subscribe(diagnosticReportTopic, [](const String &message)
+                 {
+    // Input validation: only accept "report" command
+    if (message != "report") {
+      TS_PRINTF("[WARN] Invalid diagnostic report command '%s' (expected 'report')\n", message.c_str());
+      return;
+    }
+
+    EVB_PRINTLN("Diagnostic report command received via MQTT");
+    printDiagnosticReport(); });
+
   // Publish Home Assistant discovery only when enabled in compile-time config.
 #if ENABLE_HA_DISCOVERY
   TS_PRINTLN("[MQTT] Send Home Assistant discovery config.");
@@ -1603,6 +1645,31 @@ void resetFrequencyOffset()
   snprintf(freqBuffer, sizeof(freqBuffer), "%.6f", FrequencyManager::getTunedFrequency());
   snprintf(topicBuffer, sizeof(topicBuffer), "%s/tuned_frequency", mqttBaseTopic);
   mqtt.publish(topicBuffer, freqBuffer, false);
+}
+
+// Function: printDiagnosticReport
+// Description: Log the shared wiring/link/radio diagnostic block to the serial (and
+//              WiFi serial) monitor. The report body lives in the core driver, so this
+//              only supplies the configuration the driver cannot know about. Matches the
+//              output of the ESPHome "Diagnostic Report" button so a single format covers
+//              both integrations in a bug report.
+void printDiagnosticReport()
+{
+  cc1101_report_context_t ctx;
+  ctx.meter_code = METER_CODE;
+  ctx.meter_year = g_meterYear;
+  ctx.meter_serial = g_meterSerial;
+  ctx.is_gas = meterIsGas;
+  ctx.configured_frequency_mhz = FrequencyManager::getBaseFrequency();
+  ctx.rx_attenuation_db = RX_ATTENUATION_DB;
+  // Pins are compile-time defines shared with the driver in this build, so let the driver
+  // describe them rather than restating the same #ifdefs here.
+  ctx.cs_pin_text = nullptr;
+  ctx.gdo0_pin_text = nullptr;
+  ctx.gdo2_pin_text = nullptr;
+  ctx.meter_initialised = cc1101RadioConnected;
+
+  cc1101_print_diagnostic_report(&ctx);
 }
 
 // Function: adaptiveFrequencyTracking
