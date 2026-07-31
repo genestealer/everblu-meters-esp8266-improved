@@ -40,6 +40,7 @@ Releases are created manually by tagging commits with version tags matching `v*.
 
 ### Fixed
 
+- **`dump_config()` was truncated mid-line on real hardware.** It emitted the whole block as a single `ESP_LOGCONFIG` call, which ran to roughly 480 characters once the RX attenuation, CS pin and SPI self-test lines were added. The logger truncates a message at its transmit buffer (512 bytes including the line header), so the block stopped at `SPI Link Self-Test: PASSED (P` and lost the PARTNUM/VERSION values, i.e. exactly the field that was added so support requests would carry it. It is now split across several calls, the same way the diagnostic report already was.
 - **The unbounded `sprintf()` building the standalone `/json` payload** is now `snprintf()`, matching the rest of `src/main.cpp`.
 
 ### Removed
