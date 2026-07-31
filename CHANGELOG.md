@@ -13,6 +13,21 @@ Releases are created manually by tagging commits with version tags matching `v*.
 - Keep PR coverage explicit per release so branch-only work is auditable against merge history.
 - Add new versions below, not above this section.
 
+## [Unreleased]
+
+### Added
+
+- **`diagnostic_report_button`**: a new optional button that logs a single copy-pasteable block containing the configured CS/GDO0/GDO2 pins, a live SPI link self-test, the key CC1101 registers (PARTNUM, VERSION, MARCSTATE, FREQ2/1/0, MDMCFG4/3/2, PKTCTRL0), RSSI/LQI and the current GDO0/GDO2 line levels. It deliberately does not require the meter reader to be initialised, because the most common reason to press it is that the radio never came up.
+- **GDO0 wiring self-test**: `cc1101_init()` now checks that GDO0 reads LOW while the radio is IDLE, mirroring the existing GDO2 self-test. The pin is configured with a pull-up, so a wrong or unconnected GPIO reads HIGH. Previously a mis-assigned `gdo0_pin` failed silently in a way that resembled success: every sync-word wait returned immediately, producing `GDO0 triggered at 0ms` and "received" frames that were only noise. The verdict is exposed through `cc1101_collect_diagnostics()` and shown in the diagnostic report, so a fault that appears mid-life is visible rather than only at the first boot after a miswire.
+
+### Changed
+
+- **The SPI link self-test now runs during `setup()`**, not on the first Home Assistant connection. A stuck MISO or a wrong `cs_pin`/`miso_pin` is a hard wiring fault, and users typically capture only the boot log, which previously contained no evidence of it.
+- **`dump_config()` reports the actual GPIO numbers** for the CS, GDO0 and GDO2 pins instead of just `configured`, and adds the RX attenuation setting and the SPI link self-test result. Support requests usually consist of this block alone, which could not be checked against a board pinout without the numbers.
+- **The SPI write/read-back probe restores the sync word it borrowed.** `SYNC1`/`SYNC0` are the scratch pair, and the last pattern written is `0x55`/`0xAA`. `cc1101_init()` rewrites them immediately afterwards, but `cc1101_collect_diagnostics()` runs against a configured, listening radio, so without the restore the operational sync word silently became `0x55AA`.
+- **`MARCSTATE` is reported by name** in the diagnostic report. As a bare number a state such as `0x11` reads as a fault, when it is usually just a receiver parked with nothing draining the FIFO (`RXFIFO_OVERFLOW`).
+- **The diagnostic report decodes `FREQ2/1/0` into the actual carrier frequency** and prints it alongside the configured base. The two differ by whatever calibration offset is in effect, so reporting only the configured value hid a ~31 kHz discrepancy that could otherwise be spotted only by doing the register arithmetic by hand.
+
 ## [v3.4.0] - 2026-07-30
 
 ### AI Metadata

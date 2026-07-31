@@ -122,3 +122,7 @@ everblu_meter:
     name: "CI Deep Scan"
   reset_frequency_button:
     name: "CI Reset Freq"
+  stop_reading_button:
+    name: "CI Stop Reading"
+  diagnostic_report_button:
+    name: "CI Diagnostic Report"
