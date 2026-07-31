@@ -40,6 +40,8 @@ Added `FEED_WDT()` calls in all critical loops to prevent watchdog resets.
 - **Line 948:** Simplified watchdog feeding in WUP transmission loop (consolidated 3 calls to 1)
 - **Line 974:** Added in `receive_radian_frame()` during frame reception
 - Existing watchdog calls maintained in `cc1101_wait_for_packet()` and `get_meter_data()`
+  (`cc1101_wait_for_packet()` was a diagnostic helper that never sat on the live read path
+  and has since been deleted; the live path is `receive_radian_frame()`)
 
 ### Testing Recommendations
 

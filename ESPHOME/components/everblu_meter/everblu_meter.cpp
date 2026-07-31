@@ -397,8 +397,24 @@ void EverbluMeterComponent::request_diagnostic_report() {
   cc1101_diagnostics_t diag;
   cc1101_collect_diagnostics(&diag);
 
-  const char *gdo_level[3] = {"LOW", "HIGH", "not configured"};
-  auto level_text = [&](int level) { return gdo_level[level < 0 ? 2 : level]; };
+  const char *const gdo_level[3] = {"LOW", "HIGH", "unknown (pin not configured yet)"};
+  auto level_text = [&](int level) { return gdo_level[(level < 0 || level > 1) ? 2 : level]; };
+
+  const char *gdo0_verdict;
+  switch (diag.gdo0_selftest) {
+    case CC1101_SELFTEST_PASSED:
+      gdo0_verdict = "passed";
+      break;
+    case CC1101_SELFTEST_FAILED:
+      gdo0_verdict = "FAILED - GDO0 looks unconnected or on the wrong GPIO";
+      break;
+    default:
+      // Do not print "passed" here. The radio has not been initialised, so the test has
+      // not run - and a report taken before the first read is exactly the case where a
+      // false "passed" would send someone looking in the wrong place.
+      gdo0_verdict = "NOT RUN - the radio has not been initialised yet";
+      break;
+  }
 
   char cs_text[GPIO_SUMMARY_MAX_LEN];
   char gdo0_text[GPIO_SUMMARY_MAX_LEN];
@@ -435,8 +451,7 @@ void EverbluMeterComponent::request_diagnostic_report() {
            "  GDO0 wiring self-test: %s\n"
            "  GDO2 fault count: %lu\n"
            "  Meter reader initialised: %s",
-           level_text(diag.gdo0_level), level_text(diag.gdo2_level),
-           diag.gdo0_disconnected ? "FAILED - GDO0 looks unconnected or on the wrong GPIO" : "passed",
+           level_text(diag.gdo0_level), level_text(diag.gdo2_level), gdo0_verdict,
            (unsigned long) cc1101_get_gdo2_timeout_count(), this->meter_initialized_ ? "yes" : "no");
   ESP_LOGI(TAG, "===== end of report =====");
 }

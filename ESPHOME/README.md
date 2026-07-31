@@ -376,6 +376,13 @@ Five complete example configurations are provided:
 - **CC1101** RF transceiver module (868/915 MHz version)
 - **EverBlu Cyble Enhanced** meter with RF module installed
 
+### Software Requirements
+
+- **ESPHome 2026.1.0 or later.** The component reports its pin assignments through
+  `GPIOPin::dump_summary(char *, size_t)`, which first shipped in that release. The
+  component's config validation enforces this, so an older install fails during
+  validation with a clear message rather than part-way through the C++ compile.
+
 ### Wiring (ESP8266 D1 Mini)
 
 | CC1101 Pin | D1 Mini | GPIO         |

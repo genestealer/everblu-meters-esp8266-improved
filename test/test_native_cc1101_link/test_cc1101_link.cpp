@@ -316,6 +316,27 @@ void test_diagnostics_report_where_the_radio_is_actually_tuned(void)
 // GDO0 wiring self-test
 // ---------------------------------------------------------------------------
 
+void test_gdo0_self_test_is_reported_as_not_run_before_the_first_init(void)
+{
+    // MUST RUN FIRST (see test_runner.cpp): the verdict is process-wide state, and this
+    // is the only point at which no init has happened yet.
+    //
+    // The report button deliberately works without the meter reader, so it is usually
+    // pressed precisely when the radio never came up - i.e. when cc1101_init() has not
+    // run. Defaulting the verdict to "passed" there would clear GDO0 of a fault that was
+    // never actually checked, which is worse than saying nothing.
+    nativeCC1101Install();
+
+    cc1101_diagnostics_t diag;
+    cc1101_collect_diagnostics(&diag);
+
+    TEST_ASSERT_EQUAL_INT(CC1101_SELFTEST_NOT_RUN, diag.gdo0_selftest);
+    // The pins have not been given a mode either, so their levels are unknown rather than
+    // whatever a floating input happened to settle at.
+    TEST_ASSERT_EQUAL_INT(-1, diag.gdo0_level);
+    TEST_ASSERT_EQUAL_INT(-1, diag.gdo2_level);
+}
+
 void test_gdo0_self_test_passes_when_the_line_is_wired(void)
 {
     // A wired GDO0 is held LOW by the radio while it is IDLE.
@@ -326,7 +347,7 @@ void test_gdo0_self_test_passes_when_the_line_is_wired(void)
 
     cc1101_diagnostics_t diag;
     cc1101_collect_diagnostics(&diag);
-    TEST_ASSERT_FALSE(diag.gdo0_disconnected);
+    TEST_ASSERT_EQUAL_INT(CC1101_SELFTEST_PASSED, diag.gdo0_selftest);
     TEST_ASSERT_EQUAL_INT(0, diag.gdo0_level);
 }
 
@@ -342,7 +363,7 @@ void test_gdo0_self_test_detects_a_pin_pointed_at_nothing(void)
 
     cc1101_diagnostics_t diag;
     cc1101_collect_diagnostics(&diag);
-    TEST_ASSERT_TRUE(diag.gdo0_disconnected);
+    TEST_ASSERT_EQUAL_INT(CC1101_SELFTEST_FAILED, diag.gdo0_selftest);
     TEST_ASSERT_EQUAL_INT(1, diag.gdo0_level);
 }
 
@@ -357,11 +378,45 @@ void test_gdo0_verdict_clears_once_the_line_is_fixed(void)
 
     cc1101_diagnostics_t diag;
     cc1101_collect_diagnostics(&diag);
-    TEST_ASSERT_TRUE(diag.gdo0_disconnected);
+    TEST_ASSERT_EQUAL_INT(CC1101_SELFTEST_FAILED, diag.gdo0_selftest);
 
     nativeCC1101().gdo0Connected = true;
     TEST_ASSERT_TRUE(cc1101_init(kTestFrequency));
 
     cc1101_collect_diagnostics(&diag);
-    TEST_ASSERT_FALSE(diag.gdo0_disconnected);
+    TEST_ASSERT_EQUAL_INT(CC1101_SELFTEST_PASSED, diag.gdo0_selftest);
+}
+
+void test_diagnostics_park_the_radio_and_put_it_back_in_rx(void)
+{
+    // cc1101_init() ends in cc1101_rec_mode(), so the radio is normally sitting in RX when
+    // the report button is pressed. The link probe has to write SYNC1/SYNC0, which the
+    // datasheet only allows from IDLE, so the radio is parked for the probe - but leaving
+    // it in IDLE would silently deafen the parked receiver, which is the opposite of what
+    // a diagnostic should do.
+    nativeCC1101Install();
+    TEST_ASSERT_TRUE(cc1101_init(kTestFrequency));
+    TEST_ASSERT_EQUAL_HEX8(0x0D, nativeCC1101().marcstate); // RX: where init leaves it
+
+    cc1101_diagnostics_t diag;
+    cc1101_collect_diagnostics(&diag);
+
+    // The snapshot reports where the radio was, not where the probe had to move it.
+    TEST_ASSERT_EQUAL_HEX8(0x0D, diag.marcstate);
+    TEST_ASSERT_EQUAL_HEX8(0x0D, nativeCC1101().marcstate);
+}
+
+void test_diagnostics_leave_an_idle_radio_idle(void)
+{
+    // The converse of the above: a radio that was not receiving must not be strobed into
+    // RX as a side effect of asking it for a report.
+    nativeCC1101Install();
+    TEST_ASSERT_TRUE(cc1101_init(kTestFrequency));
+    nativeCC1101().marcstate = 0x01; // IDLE, as if a read had just finished
+
+    cc1101_diagnostics_t diag;
+    cc1101_collect_diagnostics(&diag);
+
+    TEST_ASSERT_EQUAL_HEX8(0x01, diag.marcstate);
+    TEST_ASSERT_EQUAL_HEX8(0x01, nativeCC1101().marcstate);
 }

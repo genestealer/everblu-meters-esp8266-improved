@@ -315,9 +315,16 @@ void cc1101_set_rx_attenuation(int db)
 // Monotonic (lifetime) counter; surfaced via cc1101_get_gdo2_timeout_count() for telemetry.
 static uint32_t _gdo2_stuck_timeouts = 0;
 
-// Latest verdict of the GDO0 idle-level self-test (see cc1101_init). Kept as state rather
-// than a log line only, so the fault is visible in the diagnostic report at any time.
-static bool _gdo0_disconnected = false;
+// Latest verdict of the GDO0 idle-level self-test (see cc1101_init), as one of
+// CC1101_SELFTEST_NOT_RUN / _PASSED / _FAILED. Kept as state rather than a log line only,
+// so the fault is visible in the diagnostic report at any time. It starts as NOT_RUN so a
+// report taken before the radio was ever initialised cannot claim the test passed - that
+// is precisely when a report is most likely to be taken.
+static int8_t _gdo0_selftest = CC1101_SELFTEST_NOT_RUN;
+
+// Whether cc1101_init() has applied pinMode() to the GDO lines. Before that they are
+// floating inputs, so sampling them would report noise dressed up as a signal.
+static bool _gdo_pins_configured = false;
 
 uint32_t cc1101_get_gdo2_timeout_count(void)
 {
@@ -548,6 +555,7 @@ void CC1101_CMD(uint8_t spi_instr)
 
 void echo_cc1101_version(void);
 void show_cc1101_registers_settings(void);
+int8_t cc1100_rssi_convert2dbm(uint8_t Rssi_dec);
 
 //---------------[CC1100 reset function]-----------------------
 // Reset CC1101 via software reset strobe command (per datasheet §19.1)
@@ -788,20 +796,32 @@ bool cc1101_probe_spi_link(uint8_t *partnum_out, uint8_t *version_out)
 
 void cc1101_collect_diagnostics(cc1101_diagnostics_t *out)
 {
-  int8_t cc1100_rssi_convert2dbm(uint8_t Rssi_dec); // defined below
   if (out == NULL)
     return;
 
   memset(out, 0, sizeof(*out));
   out->gdo0_level = -1;
   out->gdo2_level = -1;
+  out->gdo0_selftest = _gdo0_selftest;
+
+  // Capture MARCSTATE before anything below can disturb it. The link probe has to park the
+  // radio, so reading it afterwards would only ever report IDLE and the report would never
+  // show where the radio actually was.
+  out->marcstate = halRfReadReg(MARCSTATE_ADDR);
+
+  // The probe borrows SYNC1/SYNC0 as scratch registers, and the datasheet requires the
+  // radio to be in IDLE when those are programmed. The report button can be pressed while
+  // a receiver is parked in RX, so park it, probe, then put it back where it was.
+  const uint8_t marc = (uint8_t) (out->marcstate & 0x1F);
+  const bool was_receiving = (marc == 0x0D) || (marc == 0x0E) || (marc == 0x0F); // RX, RX_END, RX_RST
+  CC1101_CMD(SIDLE);
+  delayMicroseconds(100);
 
   // Read-back check first: when the bus is untrustworthy every register below returns the
   // same meaningless byte, and reporting those values as if they were real is what made
   // this class of fault so hard to spot in the first place.
   out->link_ok = cc1101_verify_spi_link(&out->partnum, &out->version);
 
-  out->marcstate = halRfReadReg(MARCSTATE_ADDR);
   out->freq2 = halRfReadReg(FREQ2);
   out->freq1 = halRfReadReg(FREQ1);
   out->freq0 = halRfReadReg(FREQ0);
@@ -812,12 +832,22 @@ void cc1101_collect_diagnostics(cc1101_diagnostics_t *out)
   out->carrier_mhz = cc1101_freq_registers_to_mhz(out->freq2, out->freq1, out->freq0);
   out->rssi_dbm = cc1100_rssi_convert2dbm(halRfReadReg(RSSI_ADDR));
   out->lqi = halRfReadReg(LQI_ADDR) & 0x7F;
-  out->gdo0_disconnected = _gdo0_disconnected;
 
-  if (GET_GDO0_PIN() >= 0)
-    out->gdo0_level = (digitalRead(GET_GDO0_PIN()) == LOW) ? 0 : 1;
-  if (GET_GDO2_PIN() >= 0)
-    out->gdo2_level = (digitalRead(GET_GDO2_PIN()) == LOW) ? 0 : 1;
+  // Only sample the GDO lines once they have been set up as inputs. Reading an
+  // unconfigured pin returns whatever the floating input happens to settle at, which in a
+  // diagnostic report is worse than admitting the value is unknown.
+  if (_gdo_pins_configured)
+  {
+    if (GET_GDO0_PIN() >= 0)
+      out->gdo0_level = (digitalRead(GET_GDO0_PIN()) == LOW) ? 0 : 1;
+    if (GET_GDO2_PIN() >= 0)
+      out->gdo2_level = (digitalRead(GET_GDO2_PIN()) == LOW) ? 0 : 1;
+  }
+
+  if (was_receiving)
+  {
+    CC1101_CMD(SRX);
+  }
 }
 
 float cc1101_freq_registers_to_mhz(uint8_t freq2, uint8_t freq1, uint8_t freq0)
@@ -883,6 +913,10 @@ bool cc1101_init(float freq)
     echo_debug(debug_out, "[CC1101] GDO2 pin %d configured as FIFO threshold input (pull-up)\n", GET_GDO2_PIN());
   }
 
+  // From here on the GDO lines carry a real signal rather than a floating level, so
+  // cc1101_collect_diagnostics() may report them.
+  _gdo_pins_configured = true;
+
   // Initialize SPI transport for CC1101 communication.
   // Standalone builds configure Arduino SPI here at 500 kHz.
   // ESPHome builds ignore the requested speed and use the SPIDevice rate.
@@ -919,9 +953,11 @@ bool cc1101_init(float freq)
   // an unrelated peripheral pin).
   //
   // The check runs on every init - it costs one strobe and a few reads - but the warning
-  // is emitted once, because a frequency scan calls cc1101_init() per step and would
-  // otherwise repeat it dozens of times. The verdict is kept in _gdo0_disconnected so it
-  // stays visible through cc1101_collect_diagnostics().
+  // is rate-limited, because a frequency scan calls cc1101_init() per step and would
+  // otherwise repeat it dozens of times. It is re-armed whenever the test passes, so a
+  // connection that starts failing hours into a run is reported rather than swallowed by
+  // a boot-time one-shot. The verdict is kept in _gdo0_selftest so it stays visible
+  // through cc1101_collect_diagnostics().
   {
     CC1101_CMD(SIDLE);
     delayMicroseconds(100);
@@ -934,19 +970,21 @@ bool cc1101_init(float freq)
         stuck_high = false;
       delayMicroseconds(100);
     }
-    _gdo0_disconnected = stuck_high;
+    _gdo0_selftest = stuck_high ? CC1101_SELFTEST_FAILED : CC1101_SELFTEST_PASSED;
 
     static bool s_gdo0_warning_logged = false;
-    if (stuck_high && !s_gdo0_warning_logged)
+    if (!stuck_high)
+    {
+      // Re-arm so an intermittent fault is logged again the next time it appears.
+      s_gdo0_warning_logged = false;
+      echo_debug(debug_out, "[CC1101] GDO0 self-test passed (LOW while idle)\n");
+    }
+    else if (!s_gdo0_warning_logged)
     {
       s_gdo0_warning_logged = true;
       LOG_W("everblu_meter",
             "GDO0 self-test FAILED: pin %d reads HIGH while the radio is IDLE (expected LOW). GDO0 is probably on the wrong GPIO or not connected - the pin has a pull-up, so an unwired pin reads HIGH. Every sync-word wait will then return instantly and 'received' frames will be noise. Check gdo0_pin against your board's CC1101 GDO0 pin.",
             GET_GDO0_PIN());
-    }
-    else if (!stuck_high)
-    {
-      echo_debug(debug_out, "[CC1101] GDO0 self-test passed (LOW while idle)\n");
     }
   }
 
@@ -1134,6 +1172,18 @@ static bool validate_radian_crc(const uint8_t *decoded_buffer, size_t size)
   if (size < 4)
   {
     echo_debug(1, "[ERROR] Decoded frame too small for CRC validation (size=%u)\n", size);
+    return false;
+  }
+
+  // Call out truncation separately. radian_validate_crc() rejects these too, but the
+  // generic "CRC failed" message sends people looking at the frequency or the aerial when
+  // the real symptom is that the capture stopped before the CRC trailer arrived.
+  const uint8_t length_field = decoded_buffer[0];
+  if (length_field != 0 && (size_t) length_field > size)
+  {
+    echo_debug(1,
+               "[ERROR] Frame truncated: length byte claims %u bytes, only %u decoded - the CRC trailer was never received, discarding\n",
+               (unsigned)length_field, (unsigned)size);
     return false;
   }
 

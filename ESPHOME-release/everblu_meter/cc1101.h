@@ -96,6 +96,13 @@ uint32_t cc1101_get_gdo2_timeout_count(void);
  */
 bool cc1101_probe_spi_link(uint8_t *partnum_out, uint8_t *version_out);
 
+/** Self-test verdict: the test has not run, so nothing is known either way. */
+#define CC1101_SELFTEST_NOT_RUN (-1)
+/** Self-test verdict: the test ran and passed. */
+#define CC1101_SELFTEST_PASSED (0)
+/** Self-test verdict: the test ran and failed. */
+#define CC1101_SELFTEST_FAILED (1)
+
 /**
  * @brief Snapshot of radio identity, key registers and GDO line levels.
  *
@@ -126,21 +133,34 @@ typedef struct
   uint8_t pktctrl0;
   int8_t rssi_dbm; /**< Current RSSI, converted to dBm */
   uint8_t lqi;
-  int gdo0_level; /**< 0 = LOW, 1 = HIGH, -1 = pin not configured */
-  int gdo2_level; /**< 0 = LOW, 1 = HIGH, -1 = pin not configured */
   /**
-   * True when the last cc1101_init() found GDO0 HIGH while the radio was IDLE, which means
-   * the pin is almost certainly on the wrong GPIO or not connected. Sync-word waits then
-   * return instantly and "received" frames are noise.
+   * GDO0 line level: 0 = LOW, 1 = HIGH, -1 = unknown.
+   *
+   * Unknown means the pin has not been configured as an input yet (cc1101_init() has not
+   * run), so sampling it would report a floating pin rather than a signal.
    */
-  bool gdo0_disconnected;
+  int gdo0_level;
+  int gdo2_level; /**< GDO2 line level; same encoding as gdo0_level. */
+  /**
+   * Verdict of the GDO0 idle-level self-test run by cc1101_init(), as one of
+   * CC1101_SELFTEST_NOT_RUN / _PASSED / _FAILED.
+   *
+   * FAILED means GDO0 read HIGH while the radio was IDLE, so the pin is almost certainly
+   * on the wrong GPIO or not connected; sync-word waits then return instantly and
+   * "received" frames are noise. NOT_RUN is reported separately from PASSED because a
+   * diagnostic snapshot is most often taken when the radio never came up, which is
+   * exactly when the self-test has not had a chance to run.
+   */
+  int8_t gdo0_selftest;
 } cc1101_diagnostics_t;
 
 /**
  * @brief Fill @p out with a one-shot diagnostic snapshot of the radio.
  *
- * Safe to call at any time; does not reset or reconfigure the radio. When the SPI link
- * is untrustworthy, link_ok is false and the register values are meaningless.
+ * Does not reset or reconfigure the radio, but it is not purely passive: the SPI
+ * read-back check borrows SYNC1/SYNC0 as scratch registers, so the radio is parked in
+ * IDLE for the duration and returned to RX afterwards if that is where it was. When the
+ * SPI link is untrustworthy, link_ok is false and the register values are meaningless.
  *
  * @param out Destination struct; ignored when NULL.
  */

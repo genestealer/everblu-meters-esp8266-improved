@@ -519,6 +519,11 @@ def validate_pins(config):
 
 CONFIG_SCHEMA = cv.All(
     CONFIG_SCHEMA,
+    # dump_config() and the diagnostic report render pin summaries with the buffer-based
+    # GPIOPin::dump_summary() and GPIO_SUMMARY_MAX_LEN, both of which first shipped in
+    # ESPHome 2026.1.0. Without this guard an older install passes validation and then
+    # fails deep inside the C++ compile with no indication of the real cause.
+    cv.require_esphome_version(2026, 1, 0),
     validate_gdo2_required,
     validate_esp32_framework,
     validate_pins,

@@ -28,9 +28,12 @@ void test_marcstate_names_cover_every_datasheet_state(void);
 void test_marcstate_name_masks_off_the_unused_upper_bits(void);
 void test_freq_registers_decode_to_the_tuned_carrier(void);
 void test_diagnostics_report_where_the_radio_is_actually_tuned(void);
+void test_gdo0_self_test_is_reported_as_not_run_before_the_first_init(void);
 void test_gdo0_self_test_passes_when_the_line_is_wired(void);
 void test_gdo0_self_test_detects_a_pin_pointed_at_nothing(void);
 void test_gdo0_verdict_clears_once_the_line_is_fixed(void);
+void test_diagnostics_park_the_radio_and_put_it_back_in_rx(void);
+void test_diagnostics_leave_an_idle_radio_idle(void);
 
 void setUp(void)
 {
@@ -44,6 +47,9 @@ int main(int, char **)
 {
     UNITY_BEGIN();
 
+    // MUST STAY FIRST: the GDO0 self-test verdict is process-wide state, so this is the
+    // only point at which "no init has run yet" can still be observed.
+    RUN_TEST(test_gdo0_self_test_is_reported_as_not_run_before_the_first_init);
     RUN_TEST(test_cc1101_init_succeeds_on_a_healthy_bus);
     RUN_TEST(test_cc1101_init_rejects_miso_stuck_at_0x0f);
     RUN_TEST(test_cc1101_init_rejects_miso_stuck_at_any_constant);
@@ -68,6 +74,8 @@ int main(int, char **)
     RUN_TEST(test_gdo0_self_test_passes_when_the_line_is_wired);
     RUN_TEST(test_gdo0_self_test_detects_a_pin_pointed_at_nothing);
     RUN_TEST(test_gdo0_verdict_clears_once_the_line_is_fixed);
+    RUN_TEST(test_diagnostics_park_the_radio_and_put_it_back_in_rx);
+    RUN_TEST(test_diagnostics_leave_an_idle_radio_idle);
 
     return UNITY_END();
 }
