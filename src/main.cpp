@@ -345,6 +345,19 @@ static void parseMeterCode()
 // Buffer size: 128 bytes provides 1.45x safety margin for topic construction
 #define MQTT_TOPIC_BUFFER_SIZE 128
 
+// Publish to "<mqttBaseTopic>/<suffix>" without building the topic as an
+// Arduino String. A single read publishes around 20 topics, and every
+// String(mqttBaseTopic) + "/suffix" allocated and freed two heap blocks, which
+// fragments the ~40 KB ESP8266 heap over the life of the device. The rest of
+// the file already builds topics into a stack buffer; this keeps the hot path
+// consistent with that.
+static bool publishSub(const char *suffix, const char *payload, bool retain = false)
+{
+  char topicBuffer[MQTT_TOPIC_BUFFER_SIZE];
+  snprintf(topicBuffer, sizeof(topicBuffer), "%s/%s", mqttBaseTopic, suffix);
+  return mqtt.publish(topicBuffer, payload, retain);
+}
+
 // ============================================================================
 // Meter Type Configuration
 // ============================================================================
@@ -530,8 +543,8 @@ void onUpdateData()
   digitalWrite(LED_BUILTIN, LOW); // Turn on LED to indicate activity
 
   // Notify MQTT that active reading has started
-  mqtt.publish(String(mqttBaseTopic) + "/active_reading", "true", true);
-  mqtt.publish(String(mqttBaseTopic) + "/cc1101_state", "Reading", true);
+  publishSub("active_reading", "true", true);
+  publishSub("cc1101_state", "Reading", true);
 
   struct tmeter_data meter_data = get_meter_data(); // Fetch meter data
 
@@ -575,7 +588,7 @@ void onUpdateData()
       // for the whole retry sequence so they don't flip to "Not running"/Idle
       // between attempts. They are cleared only on final success or after max
       // retries (see the else branch below).
-      mqtt.publish(String(mqttBaseTopic) + "/last_error", lastErrorMessage, true);
+      publishSub("last_error", lastErrorMessage, true);
       digitalWrite(LED_BUILTIN, HIGH); // Turn off LED
       // Use non-blocking callback instead of recursive call
       mqtt.executeDelayed(5000, onUpdateData);
@@ -589,17 +602,17 @@ void onUpdateData()
       lastErrorMessage = read_failure_message(
           g_retryFailureReason != ReadFailure::None ? g_retryFailureReason : meter_data.failure, false);
       TS_PRINTF("[ERROR] Max retries (%d) reached. Entering 1-hour cooldown period.\n", max_retries);
-      mqtt.publish(String(mqttBaseTopic) + "/active_reading", "false", true);
-      mqtt.publish(String(mqttBaseTopic) + "/cc1101_state", cc1101RadioConnected ? "Idle" : "unavailable", true);
-      mqtt.publish(String(mqttBaseTopic) + "/status_message", "Failed after max retries, cooling down for 1 hour", true);
-      mqtt.publish(String(mqttBaseTopic) + "/last_error", lastErrorMessage, true);
+      publishSub("active_reading", "false", true);
+      publishSub("cc1101_state", cc1101RadioConnected ? "Idle" : "unavailable", true);
+      publishSub("status_message", "Failed after max retries, cooling down for 1 hour", true);
+      publishSub("last_error", lastErrorMessage, true);
 
       char buffer[16];
       snprintf(buffer, sizeof(buffer), "%lu", failedReads);
-      mqtt.publish(String(mqttBaseTopic) + "/failed_reads", buffer, true);
+      publishSub("failed_reads", buffer, true);
 
       snprintf(buffer, sizeof(buffer), "%lu", totalReadAttempts);
-      mqtt.publish(String(mqttBaseTopic) + "/total_attempts", buffer, true);
+      publishSub("total_attempts", buffer, true);
       digitalWrite(LED_BUILTIN, HIGH); // Turn off LED
       _retry = 0;                      // Reset retry counter for next scheduled attempt
       g_retryFailureReason = ReadFailure::None;
@@ -672,7 +685,7 @@ void onUpdateData()
     // Water meters: publish value in liters
     snprintf(valueBuffer, sizeof(valueBuffer), "%d", meter_data.volume);
   }
-  mqtt.publish(String(mqttBaseTopic) + "/liters", valueBuffer, true);
+  publishSub("liters", valueBuffer, true);
   delay(5);
 
   // Publish historical data as JSON attributes for Home Assistant.
@@ -694,7 +707,7 @@ void onUpdateData()
     if (written > 0)
     {
       TS_PRINTF("[MQTT] Publishing JSON attributes (%d bytes): %s\n\n", written, historyJson);
-      mqtt.publish(String(mqttBaseTopic) + "/liters_attributes", historyJson, true);
+      publishSub("liters_attributes", historyJson, true);
       delay(5);
 
       HistoryStats stats = MeterHistory::calculateStats(meter_data.history, currentVolume);
@@ -708,43 +721,43 @@ void onUpdateData()
   }
 
   snprintf(valueBuffer, sizeof(valueBuffer), "%d", meter_data.reads_counter);
-  mqtt.publish(String(mqttBaseTopic) + "/counter", valueBuffer, true);
+  publishSub("counter", valueBuffer, true);
   delay(5);
 
   snprintf(valueBuffer, sizeof(valueBuffer), "%d", meter_data.battery_left);
-  mqtt.publish(String(mqttBaseTopic) + "/battery", valueBuffer, true);
+  publishSub("battery", valueBuffer, true);
   delay(5);
 
   snprintf(valueBuffer, sizeof(valueBuffer), "%d", meter_data.rssi_dbm);
-  mqtt.publish(String(mqttBaseTopic) + "/rssi_dbm", valueBuffer, true);
+  publishSub("rssi_dbm", valueBuffer, true);
   delay(5);
 
   snprintf(valueBuffer, sizeof(valueBuffer), "%d", calculateMeterdBmToPercentage(meter_data.rssi_dbm));
-  mqtt.publish(String(mqttBaseTopic) + "/rssi_percentage", valueBuffer, true);
+  publishSub("rssi_percentage", valueBuffer, true);
   delay(5);
 
   snprintf(valueBuffer, sizeof(valueBuffer), "%d", meter_data.lqi);
-  mqtt.publish(String(mqttBaseTopic) + "/lqi", valueBuffer, true);
+  publishSub("lqi", valueBuffer, true);
   delay(5);
-  mqtt.publish(String(mqttBaseTopic) + "/time_start", timeStartFormatted, true);
+  publishSub("time_start", timeStartFormatted, true);
   delay(5);
-  mqtt.publish(String(mqttBaseTopic) + "/time_end", timeEndFormatted, true);
+  publishSub("time_end", timeEndFormatted, true);
   delay(5);
-  mqtt.publish(String(mqttBaseTopic) + "/timestamp", iso8601, true); // timestamp since epoch in UTC
+  publishSub("timestamp", iso8601, true); // ISO-8601 timestamp in UTC
   delay(5);
-  mqtt.publish(String(mqttBaseTopic) + "/meter_time", meter_data.meter_time, true); // meter's own real-time clock
+  publishSub("meter_time", meter_data.meter_time, true); // meter's own real-time clock
   delay(5);
-  mqtt.publish(String(mqttBaseTopic) + "/meter_type", meter_data.meter_type, true); // meter type/identifier string
+  publishSub("meter_type", meter_data.meter_type, true); // meter type/identifier string
   delay(5);
 
   snprintf(valueBuffer, sizeof(valueBuffer), "%d", calculateLQIToPercentage(meter_data.lqi));
-  mqtt.publish(String(mqttBaseTopic) + "/lqi_percentage", valueBuffer, true);
+  publishSub("lqi_percentage", valueBuffer, true);
   delay(5);
 
   // Publish all data as a JSON message as well this is redundant but may be useful for some
   char json[512];
-  sprintf(json, jsonTemplate, meter_data.volume, meter_data.reads_counter, meter_data.battery_left, meter_data.rssi, iso8601);
-  mqtt.publish(String(mqttBaseTopic) + "/json", json, true);
+  snprintf(json, sizeof(json), jsonTemplate, meter_data.volume, meter_data.reads_counter, meter_data.battery_left, meter_data.rssi, iso8601);
+  publishSub("json", json, true);
   delay(5);
 
 #if AUTO_ALIGN_READING_TIME
@@ -769,7 +782,7 @@ void onUpdateData()
       // Publish updated reading_time HH:MM
       char readingTimeFormatted2[6];
       snprintf(readingTimeFormatted2, sizeof(readingTimeFormatted2), "%02d:%02d", g_readHourUtc, g_readMinuteUtc);
-      mqtt.publish(String(mqttBaseTopic) + "/reading_time", readingTimeFormatted2, true);
+      publishSub("reading_time", readingTimeFormatted2, true);
       delay(5);
 
       TS_PRINTF("[SCHEDULE] Auto-aligned reading time to %02d:%02d local-offset (%02d:%02d UTC) (window %02d-%02d local)\n",
@@ -779,8 +792,8 @@ void onUpdateData()
 #endif
 
   // Notify MQTT that active reading has ended
-  mqtt.publish(String(mqttBaseTopic) + "/active_reading", "false", true);
-  mqtt.publish(String(mqttBaseTopic) + "/cc1101_state", cc1101RadioConnected ? "Idle" : "unavailable", true);
+  publishSub("active_reading", "false", true);
+  publishSub("cc1101_state", cc1101RadioConnected ? "Idle" : "unavailable", true);
   digitalWrite(LED_BUILTIN, HIGH); // Turn off LED to indicate completion
 
   // Reset retry counter and cooldown on successful read
@@ -797,12 +810,12 @@ void onUpdateData()
   char metricBuffer[16];
 
   snprintf(metricBuffer, sizeof(metricBuffer), "%lu", successfulReads);
-  mqtt.publish(String(mqttBaseTopic) + "/successful_reads", metricBuffer, true);
+  publishSub("successful_reads", metricBuffer, true);
 
   snprintf(metricBuffer, sizeof(metricBuffer), "%lu", totalReadAttempts);
-  mqtt.publish(String(mqttBaseTopic) + "/total_attempts", metricBuffer, true);
+  publishSub("total_attempts", metricBuffer, true);
 
-  mqtt.publish(String(mqttBaseTopic) + "/last_error", "None", true);
+  publishSub("last_error", "None", true);
 
   // Perform adaptive frequency tracking based on FREQEST register
   adaptiveFrequencyTracking(meter_data.freqest);

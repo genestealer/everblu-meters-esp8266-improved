@@ -441,9 +441,10 @@ void test_radian_validate_crc(void)
     uint8_t short_len[8] = {3, 0, 0, 0, 0, 0, 0, 0};
     TEST_ASSERT_FALSE(radian_validate_crc(short_len, sizeof(short_len)));
 
-    // length_field larger than the buffer is accepted (compat shim).
+    // length_field larger than the buffer means the CRC trailer was never
+    // decoded, so the frame is unverifiable and must be rejected.
     uint8_t long_len[8] = {200, 0, 0, 0, 0, 0, 0, 0};
-    TEST_ASSERT_TRUE(radian_validate_crc(long_len, sizeof(long_len)));
+    TEST_ASSERT_FALSE(radian_validate_crc(long_len, sizeof(long_len)));
 
     // length_field == 0 falls back to the actual buffer size.
     uint8_t implicit[8] = {0, 0xDE, 0xAD, 0xBE, 0xEF, 0x01, 0, 0};
@@ -1101,9 +1102,8 @@ void test_fixture_frames_reject_every_single_bit_flip(void)
         }
 
         // Byte 0 is the length field. Corrupting it changes where the CRC is
-        // read from, and a length beyond the buffer is deliberately accepted as
-        // a compatibility shim, so it is excluded here and covered separately
-        // in test_radian_validate_crc.
+        // read from rather than corrupting the payload, so it is excluded here
+        // and covered separately in test_radian_validate_crc.
         for (size_t byte = 1; byte < frame_len; byte++)
         {
             for (int bit = 0; bit < 8; bit++)

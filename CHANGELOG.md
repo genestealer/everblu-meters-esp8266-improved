@@ -4,7 +4,6 @@ All notable changes to this project will be documented in this file.
 
 Releases are created manually by tagging commits with version tags matching `v*.*.*` (e.g., `v2.1.0`). Users should build from source and configure `private.h` with their own meter settings.
 
-
 ## AI Notes For Maintainers And Tools
 
 - Treat release sections as the source of truth for shipped behavior.
@@ -27,6 +26,18 @@ Releases are created manually by tagging commits with version tags matching `v*.
 - **The SPI write/read-back probe restores the sync word it borrowed.** `SYNC1`/`SYNC0` are the scratch pair, and the last pattern written is `0x55`/`0xAA`. `cc1101_init()` rewrites them immediately afterwards, but `cc1101_collect_diagnostics()` runs against a configured, listening radio, so without the restore the operational sync word silently became `0x55AA`.
 - **`MARCSTATE` is reported by name** in the diagnostic report. As a bare number a state such as `0x11` reads as a fault, when it is usually just a receiver parked with nothing draining the FIFO (`RXFIFO_OVERFLOW`).
 - **The diagnostic report decodes `FREQ2/1/0` into the actual carrier frequency** and prints it alongside the configured base. The two differ by whatever calibration offset is in effect, so reporting only the configured value hid a ~31 kHz discrepancy that could otherwise be spotted only by doing the register arithmetic by hand.
+- **Standalone MQTT publishes no longer build their topics as Arduino `String`s.** A single read published around 20 topics as `String(mqttBaseTopic) + "/suffix"`, allocating and freeing two heap blocks each time and fragmenting the ~40 KB ESP8266 heap over the life of the device. A `publishSub()` helper formats the topic into a stack buffer instead, consistent with how the rest of the file already builds topics.
+- **`StorageAbstraction::clearAll()` logs a warning on ESPHome** instead of silently returning `false`, so a factory-reset caller can tell the difference between a failure and a no-op. ESPHome's preference API has no bulk-erase primitive; individual keys must be cleared with `clearKey()`.
+
+### Fixed
+
+- **A frame whose length byte claims more bytes than were decoded is now rejected instead of being accepted unchecked.** `radian_validate_crc()` returned "valid" without verifying anything when the declared length exceeded the decoded payload, which in practice means a truncated or misaligned capture. That bypassed the only integrity gate on the radio path and left the downstream parser sanity checks to catch the damage. Such frames now fail CRC validation and are discarded. The captured `home_001` test fixture is one of these truncated frames and is now marked `crc_valid=0`; parse coverage for the same meter comes from the complete `home_002` frame.
+- **The unbounded `sprintf()` building the standalone `/json` payload** is now `snprintf()`, matching the rest of `src/main.cpp`.
+
+### Removed
+
+- **Dead diagnostic code in the CC1101 driver:** `cc1101_wait_for_packet()`, `cc1101_check_packet_received()` and `is_look_like_radian_frame()` had no callers and were not part of the `cc1101.h` public API. They also held the only unbounded call into the hex-dump helper. The live receive path is `receive_radian_frame()` and is unchanged.
+- **The unreachable carry branch in `setMHZ()`.** `freq0` is a `byte`, so `if (freq0 > 255)` could never be true; the loop above it already subtracts a whole FREQ1 step before `freq0` can reach 256.
 
 ## [v3.4.0] - 2026-07-30
 
@@ -135,7 +146,6 @@ scope_summary:
 - **RADIAN CRC now validates end-to-end on live frames for the first time.** Two stacked defects meant the CRC was never actually checked: the raw capture truncated the frame so the CRC trailer was never received, and `radian_validate_crc()` computed the checksum over the wrong range (it skipped the length byte). The frame is 124 bytes; the CRC-16/KERMIT is computed over bytes [0..121] (including the length byte) with the trailer at [122-123]. Verified against multiple live captures.
 - **`extract-meter-fixture.py` CRC check used the wrong convention**: it computed the CRC over bytes [1..], skipping the length byte, so captured fixtures were marked `crc_valid=0`. It now matches the firmware and covers bytes [0..].
 
-
 ## [v3.1.1] - 2026-07-08
 
 ### AI Metadata
@@ -153,8 +163,6 @@ scope_summary:
 ### Fixed
 
 - **Wake-up burst truncated to ~60ms on the second and later reads** ([#127](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/127)): `receive_radian_frame()` switches `MDMCFG4` to the 4x-oversampled 9.6 kbps RX rate, but `get_meter_data_for_meter()` never restored the 2.4 kbps TX rate before transmitting. Only the first read after boot worked (fresh from `cc1101_init()`); every later read clocked the wake-up burst out 4x too fast, draining the TX FIFO and hitting `TXFIFO_UNDERFLOW` (MARCSTATE 0x16) after ~60ms instead of the full ~2s burst. The TX phase now rewrites `MDMCFG4`/`MDMCFG3` to 2.4 kbps on every read.
-
-
 
 ## [v3.1.0] - 2026-07-07
 
