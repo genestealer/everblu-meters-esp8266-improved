@@ -12,6 +12,7 @@
 | `everblu/cyble/failed_reads` | Number | Number of failed reads |
 | `everblu/cyble/last_error` | Text | Description of last error (or "None") |
 | `everblu/cyble/frequency_offset` | Number | Current frequency offset in MHz |
+| `everblu/cyble/diagnostic_report_state` | JSON | Last diagnostic report: `taken` timestamp plus the full `report` text (retained) |
 
 ### Commands
 
@@ -41,8 +42,14 @@ directly:
 mosquitto_pub -h <mqtt_broker> -t "everblu/cyble/<serial>/diagnostic_report" -m "report"
 ```
 
-The report is written to the log, not to MQTT, so watch the serial monitor at 115200 baud
-(`pio device monitor`) or the [WiFi serial monitor](WIFI_SERIAL_MONITOR.md) while you press it.
+The report goes to the log (serial monitor at 115200 baud, or the
+[WiFi serial monitor](WIFI_SERIAL_MONITOR.md)) and is also published retained to
+`everblu/cyble/<serial>/diagnostic_report_state`.
+
+To read it from Home Assistant instead: a state is capped at 255 characters, so the
+`Diagnostic Report` sensor shows when the report was taken and holds the text in its `report`
+attribute. Open **Developer tools -> States**, select the entity and copy the attribute. Because the
+topic is retained, the report is still there after a Home Assistant restart.
 
 **ESPHome build**
 

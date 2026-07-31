@@ -568,6 +568,7 @@ EverbluMeterComponent (ESPHome)
 - **tuned_frequency** - Actual tuned frequency (MHz)
 - **frequency_estimate** - CC1101 frequency estimate from last reading (kHz) - helps monitor frequency drift
 - **total_attempts** / **successful_reads** / **failed_reads** - Statistics
+- **gdo2_timeouts** - GDO2 wiring faults since boot (failed boot self-test plus runtime FIFO-threshold timeouts). A non-zero, growing value points at a miswired or wrong-GPIO GDO2 rather than an RF problem
 
 ### Text Sensors
 

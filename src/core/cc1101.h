@@ -12,6 +12,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 #ifdef USE_ESPHOME
 /**
  * @brief Configure CC1101 to use ESPHome SPI device
@@ -192,6 +193,16 @@ typedef struct
 } cc1101_report_context_t;
 
 /**
+ * @brief Buffer size that always holds a complete diagnostic report, including the
+ *        terminating NUL.
+ *
+ * A worst-case report (every self-test failed, so every verdict is its long explanatory
+ * form) runs to a little under 1 kB. The report is truncated rather than overflowing if it
+ * ever outgrows this.
+ */
+#define CC1101_REPORT_BUFFER_SIZE 1280
+
+/**
  * @brief Log a copy-pasteable diagnostic report covering wiring, link and radio state.
  *
  * Calls cc1101_collect_diagnostics() itself, then prints the snapshot alongside the
@@ -201,8 +212,11 @@ typedef struct
  * then report "FAILED"/"NOT RUN" rather than a misleading pass.
  *
  * @param ctx Configuration context; a NULL pointer prints the radio half only.
+ * @return The same text that was logged, NUL-terminated, in a static buffer that stays
+ *         valid until the next call. Lets a caller publish the report as well as log it
+ *         without probing the radio a second time. Never NULL.
  */
-void cc1101_print_diagnostic_report(const cc1101_report_context_t *ctx);
+const char *cc1101_print_diagnostic_report(const cc1101_report_context_t *ctx);
 
 /**
  * @brief Human-readable name for a MARCSTATE value (datasheet Table 25).

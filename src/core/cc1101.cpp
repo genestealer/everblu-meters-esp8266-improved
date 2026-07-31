@@ -851,7 +851,7 @@ void cc1101_collect_diagnostics(cc1101_diagnostics_t *out)
   }
 }
 
-void cc1101_print_diagnostic_report(const cc1101_report_context_t *ctx)
+const char *cc1101_print_diagnostic_report(const cc1101_report_context_t *ctx)
 {
   cc1101_diagnostics_t diag;
   cc1101_collect_diagnostics(&diag);
@@ -931,38 +931,74 @@ void cc1101_print_diagnostic_report(const cc1101_report_context_t *ctx)
     }
   }
 
-  // Emitted as several calls rather than one block: the ESPHome logger truncates a single
-  // message at its transmit buffer (512 bytes by default), which cut the report off
-  // part-way through the GDO0 line and lost the wiring verdicts that matter most.
-  LOG_I("everblu_meter", "===== EverBlu diagnostic report =====");
-  LOG_I("everblu_meter",
-        "  Firmware Version: %s\n"
-        "  Meter Code: %s (year=%u, serial=%lu, %s)\n"
-        "  Configured Frequency: %.6f MHz\n"
-        "  RX Attenuation: %d dB",
-        EVERBLU_FW_VERSION, meter_code, (unsigned) ctx->meter_year, (unsigned long) ctx->meter_serial,
-        ctx->is_gas ? "Gas" : "Water", ctx->configured_frequency_mhz, ctx->rx_attenuation_db);
-  LOG_I("everblu_meter", "  CS Pin: %s, GDO0 Pin: %s, GDO2 Pin: %s", cs_text, gdo0_text, gdo2_text);
-  LOG_I("everblu_meter",
-        "  SPI Link Self-Test: %s\n"
-        "  PARTNUM: 0x%02X (expect 0x00), VERSION: 0x%02X (expect 0x04 or 0x14)",
-        diag.link_ok ? "PASSED" : "FAILED - the register values below are meaningless", diag.partnum, diag.version);
-  LOG_I("everblu_meter",
-        "  MARCSTATE: 0x%02X (%s), PKTCTRL0: 0x%02X\n"
-        "  FREQ2/1/0: 0x%02X 0x%02X 0x%02X -> carrier %.6f MHz (configured base %.6f MHz)\n"
-        "  MDMCFG4/3/2: 0x%02X 0x%02X 0x%02X\n"
-        "  RSSI: %d dBm, LQI: %u (last measurement; only meaningful after a frame arrives)",
-        diag.marcstate, cc1101_marcstate_name(diag.marcstate), diag.pktctrl0, diag.freq2, diag.freq1, diag.freq0,
-        diag.carrier_mhz, ctx->configured_frequency_mhz, diag.mdmcfg4, diag.mdmcfg3, diag.mdmcfg2, diag.rssi_dbm,
-        diag.lqi);
-  LOG_I("everblu_meter",
-        "  GDO0 level: %s (expect LOW while idle), GDO2 level: %s\n"
-        "  GDO0 wiring self-test: %s\n"
-        "  GDO2 fault count: %lu\n"
-        "  Meter reader initialised: %s",
-        gdo0_level, gdo2_level, gdo0_verdict, (unsigned long) cc1101_get_gdo2_timeout_count(),
-        ctx->meter_initialised ? "yes" : "no");
-  LOG_I("everblu_meter", "===== end of report =====");
+  // Build the whole report in one buffer first. It is then logged in chunks and handed
+  // back to the caller, so the log and the copy a user pastes into an issue cannot drift
+  // apart, and publishing it costs no second probe of the radio.
+  //
+  // Static rather than automatic: the ESP8266 task stack is only a few kilobytes, and this
+  // is a one-shot, non-reentrant operation triggered by a button press.
+  static char report[CC1101_REPORT_BUFFER_SIZE];
+  size_t used = 0;
+  report[0] = '\0';
+
+// snprintf returns what it *would* have written, so clamp before advancing or a long meter
+// code would push the offset past the end of the buffer.
+#define REPORT_APPEND(...)                                                    \
+  do                                                                          \
+  {                                                                           \
+    if (used < sizeof(report) - 1)                                            \
+    {                                                                         \
+      int written_ = snprintf(report + used, sizeof(report) - used, __VA_ARGS__); \
+      if (written_ > 0)                                                       \
+      {                                                                       \
+        used += (size_t) written_;                                            \
+        if (used >= sizeof(report))                                           \
+          used = sizeof(report) - 1;                                          \
+      }                                                                       \
+    }                                                                         \
+  } while (0)
+
+  REPORT_APPEND("===== EverBlu diagnostic report =====\n");
+  REPORT_APPEND("  Firmware Version: %s\n", EVERBLU_FW_VERSION);
+  REPORT_APPEND("  Meter Code: %s (year=%u, serial=%lu, %s)\n", meter_code, (unsigned) ctx->meter_year,
+                (unsigned long) ctx->meter_serial, ctx->is_gas ? "Gas" : "Water");
+  REPORT_APPEND("  Configured Frequency: %.6f MHz\n", ctx->configured_frequency_mhz);
+  REPORT_APPEND("  RX Attenuation: %d dB\n", ctx->rx_attenuation_db);
+  REPORT_APPEND("  CS Pin: %s, GDO0 Pin: %s, GDO2 Pin: %s\n", cs_text, gdo0_text, gdo2_text);
+  REPORT_APPEND("  SPI Link Self-Test: %s\n",
+                diag.link_ok ? "PASSED" : "FAILED - the register values below are meaningless");
+  REPORT_APPEND("  PARTNUM: 0x%02X (expect 0x00), VERSION: 0x%02X (expect 0x04 or 0x14)\n", diag.partnum,
+                diag.version);
+  REPORT_APPEND("  MARCSTATE: 0x%02X (%s), PKTCTRL0: 0x%02X\n", diag.marcstate,
+                cc1101_marcstate_name(diag.marcstate), diag.pktctrl0);
+  REPORT_APPEND("  FREQ2/1/0: 0x%02X 0x%02X 0x%02X -> carrier %.6f MHz (configured base %.6f MHz)\n", diag.freq2,
+                diag.freq1, diag.freq0, diag.carrier_mhz, ctx->configured_frequency_mhz);
+  REPORT_APPEND("  MDMCFG4/3/2: 0x%02X 0x%02X 0x%02X\n", diag.mdmcfg4, diag.mdmcfg3, diag.mdmcfg2);
+  REPORT_APPEND("  RSSI: %d dBm, LQI: %u (last measurement; only meaningful after a frame arrives)\n",
+                diag.rssi_dbm, diag.lqi);
+  REPORT_APPEND("  GDO0 level: %s (expect LOW while idle), GDO2 level: %s\n", gdo0_level, gdo2_level);
+  REPORT_APPEND("  GDO0 wiring self-test: %s\n", gdo0_verdict);
+  REPORT_APPEND("  GDO2 fault count: %lu\n", (unsigned long) cc1101_get_gdo2_timeout_count());
+  REPORT_APPEND("  Meter reader initialised: %s\n", ctx->meter_initialised ? "yes" : "no");
+  REPORT_APPEND("===== end of report =====");
+
+#undef REPORT_APPEND
+
+  // Logged a line at a time rather than as one message: the ESPHome logger truncates at its
+  // transmit buffer (512 bytes by default), which cut the report off part-way through the
+  // GDO0 line and lost the wiring verdicts that matter most.
+  const char *line = report;
+  while (*line != '\0')
+  {
+    const char *end = strchr(line, '\n');
+    const int len = (end != NULL) ? (int) (end - line) : (int) strlen(line);
+    LOG_I("everblu_meter", "%.*s", len, line);
+    if (end == NULL)
+      break;
+    line = end + 1;
+  }
+
+  return report;
 }
 
 float cc1101_freq_registers_to_mhz(uint8_t freq2, uint8_t freq1, uint8_t freq0)

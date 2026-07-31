@@ -157,9 +157,11 @@ body:
         Home Assistant while the ESPHome log stream is open.
 
         **MQTT users:** press the **Diagnostic Report** button on the device in Home Assistant, or
-        publish `report` to `everblu/cyble/<meter-serial>/diagnostic_report`. The report is written to
-        the log, so have the serial monitor open at 115200 baud (`pio device monitor`) or the WiFi
-        serial monitor connected (`telnet <device-ip> 23`, see docs/WIFI_SERIAL_MONITOR.md).
+        publish `report` to `everblu/cyble/<meter-serial>/diagnostic_report`. Then read it back from
+        the `Diagnostic Report` sensor: open Developer tools -> States, select the entity and copy its
+        `report` attribute. It is also written to the log if you have the serial monitor open at
+        115200 baud (`pio device monitor`) or the WiFi serial monitor connected
+        (`telnet <device-ip> 23`, see docs/WIFI_SERIAL_MONITOR.md).
 
         Either way, copy the whole `===== EverBlu diagnostic report =====` block. Both builds produce
         the same format, and it works even when the radio never came up.

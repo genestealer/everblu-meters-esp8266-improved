@@ -92,11 +92,12 @@ The ESPHome integration is stable and is the recommended way to get started. It 
 Start here:
 
 - **[ESPHOME/README.md](ESPHOME/README.md)** - ESPHome setup, wiring and configuration reference
-- **[ESPHOME/ESPHOME_INTEGRATION_GUIDE.md](ESPHOME/ESPHOME_INTEGRATION_GUIDE.md)** - complete step-by-step installation guide
-- Ready-made configs: [water](ESPHOME/example-water-meter.yaml) · [gas](ESPHOME/example-gas-meter-minimal.yaml) · [advanced](ESPHOME/example-advanced.yaml) · [multi-meter](ESPHOME/example-multi-meter.yaml)
+- **[ESPHOME/docs/ESPHOME_INTEGRATION_GUIDE.md](ESPHOME/docs/ESPHOME_INTEGRATION_GUIDE.md)** - complete step-by-step installation guide
+- Ready-made configs: [water](ESPHOME/example-water-meter.yaml) · [gas](ESPHOME/example-gas-meter-minimal.yaml) · [advanced](ESPHOME/example-advanced.yaml) · [multi-meter](ESPHOME/example-multi-meter.yaml) · [Nano ESP32](ESPHOME/example-nano-esp32.yaml)
 
 A couple of things to know before you flash:
 
+- Requires **ESPHome 2026.1.0 or later**. Config validation enforces this, so an older install fails during validation with a clear message.
 - Build with the Arduino framework (set `esp32.framework.type: arduino`); ESP-IDF is not supported for this component.
 - Migrating from the MQTT firmware? Keep the same meter serial values so your topics and entities stay aligned.
 
@@ -195,8 +196,10 @@ Examples: use the ready-made ESPHome configs:
 - [ESPHOME/example-water-meter.yaml](ESPHOME/example-water-meter.yaml)
 - [ESPHOME/example-gas-meter-minimal.yaml](ESPHOME/example-gas-meter-minimal.yaml)
 - [ESPHOME/example-advanced.yaml](ESPHOME/example-advanced.yaml)
+- [ESPHOME/example-multi-meter.yaml](ESPHOME/example-multi-meter.yaml)
+- [ESPHOME/example-nano-esp32.yaml](ESPHOME/example-nano-esp32.yaml)
 
-**Full documentation**: [ESPHOME/ESPHOME_INTEGRATION_GUIDE.md](ESPHOME/ESPHOME_INTEGRATION_GUIDE.md)
+**Full documentation**: [ESPHOME/docs/ESPHOME_INTEGRATION_GUIDE.md](ESPHOME/docs/ESPHOME_INTEGRATION_GUIDE.md)
 
 ### Option 2: Standalone with MQTT
 
@@ -372,16 +375,16 @@ The project talks to the CC1101 over the ESP8266/ESP32 **hardware SPI pins**. Th
 Pin wiring for the [Wemos D1 Mini](https://www.wemos.cc/en/latest/d1/index.html), [Adafruit Feather HUZZAH ESP8266](https://learn.adafruit.com/adafruit-feather-huzzah-esp8266/pinouts), and ESP32 DevKit:
 
 <!-- markdownlint-disable MD060 -->
-| **CC1101 Pin** | **Function** | **ESP8266 GPIO** | **Wemos D1 Mini** | **HUZZAH ESP8266** | **ESP32 GPIO** | **ESP32 DevKit** | **Notes**                                           |
-| -------------- | ------------ | ---------------- | ----------------- | ------------------ | -------------- | ---------------- | --------------------------------------------------- |
-| **VCC**        | Power        | 3.3V             | 3V3               | 3V                 | 3.3V           | 3V3              | **Important:** Use 3.3V only!                       |
-| **GND**        | Ground       | GND              | G                 | GND                | GND            | GND              | Common ground                                       |
-| **SCK**        | SPI Clock    | GPIO 14          | D5                | #14                | GPIO 18        | SCK              | Hardware SPI clock                                  |
-| **MISO**       | SPI Data In  | GPIO 12          | D6                | #12                | GPIO 19        | MISO             | Also labelled as GDO1 on some CC1101 modules        |
-| **MOSI**       | SPI Data Out | GPIO 13          | D7                | #13                | GPIO 23        | MOSI             | Hardware SPI MOSI                                   |
-| **CSN/CS**     | Chip Select  | GPIO 15          | D8                | #15                | GPIO 25        | GPIO 25          | SPI chip select (ESP32: GPIO 25 avoids the GPIO 5 strapping pin) |
-| **GDO0**       | Data Ready   | GPIO 5           | D1                | #5                 | GPIO 4         | GPIO 4           | Digital interrupt pin (configurable in `private.h`) |
-| **GDO2**       | FIFO Threshold (required) | GPIO 4 | D2 | #4 | GPIO 27 | GPIO 27 | Required by default (v3.0.0+). Hardware FIFO threshold signal. Set via `private.h` (`#define GDO2`) / `gdo2_pin` in ESPHome, or opt out with `DISABLE_GDO2_FIFO_MANAGEMENT` / `disable_gdo2_fifo_management: true` |
+| **CC1101 Pin** | **Function**              | **ESP8266 GPIO** | **Wemos D1 Mini** | **HUZZAH ESP8266** | **ESP32 GPIO** | **ESP32 DevKit** | **Notes**                                                                                                                                                                                                          |
+| -------------- | ------------------------- | ---------------- | ----------------- | ------------------ | -------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **VCC**        | Power                     | 3.3V             | 3V3               | 3V                 | 3.3V           | 3V3              | **Important:** Use 3.3V only!                                                                                                                                                                                      |
+| **GND**        | Ground                    | GND              | G                 | GND                | GND            | GND              | Common ground                                                                                                                                                                                                      |
+| **SCK**        | SPI Clock                 | GPIO 14          | D5                | #14                | GPIO 18        | SCK              | Hardware SPI clock                                                                                                                                                                                                 |
+| **MISO**       | SPI Data In               | GPIO 12          | D6                | #12                | GPIO 19        | MISO             | Also labelled as GDO1 on some CC1101 modules                                                                                                                                                                       |
+| **MOSI**       | SPI Data Out              | GPIO 13          | D7                | #13                | GPIO 23        | MOSI             | Hardware SPI MOSI                                                                                                                                                                                                  |
+| **CSN/CS**     | Chip Select               | GPIO 15          | D8                | #15                | GPIO 25        | GPIO 25          | SPI chip select (ESP32: GPIO 25 avoids the GPIO 5 strapping pin)                                                                                                                                                   |
+| **GDO0**       | Data Ready                | GPIO 5           | D1                | #5                 | GPIO 4         | GPIO 4           | Digital interrupt pin (configurable in `private.h`)                                                                                                                                                                |
+| **GDO2**       | FIFO Threshold (required) | GPIO 4           | D2                | #4                 | GPIO 27        | GPIO 27          | Required by default (v3.0.0+). Hardware FIFO threshold signal. Set via `private.h` (`#define GDO2`) / `gdo2_pin` in ESPHome, or opt out with `DISABLE_GDO2_FIFO_MANAGEMENT` / `disable_gdo2_fifo_management: true` |
 <!-- markdownlint-enable MD060 -->
 
 <details>
@@ -502,26 +505,60 @@ In standalone mode, the firmware integrates with Home Assistant through MQTT Aut
 <details>
 <summary>MQTT topics</summary>
 
-The following MQTT topics are used to integrate the device with Home Assistant via AutoDiscovery:
+The following MQTT topics are used to integrate the device with Home Assistant via AutoDiscovery. Every topic sits under `everblu/cyble/<serial>/`, where `<serial>` is the serial number parsed from `METER_CODE`, so several devices can share one broker.
 
-| **Sensor**         | **MQTT Topic**                         | **Description**                                               |
-| ------------------ | -------------------------------------- | ------------------------------------------------------------- |
-| `Liters`           | `everblu/cyble/liters`                 | Total water usage in litres.                                  |
-| `Battery`          | `everblu/cyble/battery`                | Remaining battery life in months.                             |
-| `Counter`          | `everblu/cyble/counter`                | Number of times the meter has been read (wraps around 255→1). |
-| `RSSI`             | `everblu/cyble/rssi`                   | Raw RSSI value of the meter's signal.                         |
-| `RSSI (dBm)`       | `everblu/cyble/rssi_dbm`               | RSSI value converted to dBm.                                  |
-| `RSSI (%)`         | `everblu/cyble/rssi_percentage`        | RSSI value converted to a percentage. See the note below.     |
-| `Time Start`       | `everblu/cyble/time_start`             | Time when the meter wakes up, formatted as `HH:MM`.           |
-| `Time End`         | `everblu/cyble/time_end`               | Time when the meter goes to sleep, formatted as `HH:MM`.      |
-| `Timestamp`        | `everblu/cyble/timestamp`              | ISO 8601 timestamp of the last reading.                       |
-| `Wi-Fi IP`         | `everblu/cyble/wifi_ip`                | IP address of the device.                                     |
-| `Wi-Fi RSSI`       | `everblu/cyble/wifi_rssi`              | Wi-Fi signal strength in dBm.                                 |
-| `Wi-Fi Signal (%)` | `everblu/cyble/wifi_signal_percentage` | Wi-Fi signal strength as a percentage.                        |
-| `MAC Address`      | `everblu/cyble/mac_address`            | MAC address of the device.                                    |
-| `SSID`             | `everblu/cyble/ssid`                   | Wi-Fi SSID the device is connected to.                        |
-| `BSSID`            | `everblu/cyble/bssid`                  | Wi-Fi BSSID the device is connected to.                       |
-| `Uptime`           | `everblu/cyble/uptime`                 | Device uptime in ISO 8601 format.                             |
+**Meter readings**
+
+| **Sensor**   | **Topic suffix**  | **Description**                                             |
+| ------------ | ----------------- | ----------------------------------------------------------- |
+| `Liters`     | `liters`          | Total usage in litres, or m³ for a gas meter.               |
+| `Battery`    | `battery`         | Remaining battery life in months.                           |
+| `Counter`    | `counter`         | Times the meter has been read (wraps around 255→1).         |
+| `RSSI (dBm)` | `rssi_dbm`        | Signal strength of the meter's reply, in dBm.               |
+| `RSSI (%)`   | `rssi_percentage` | The same value as a percentage. See the note below.         |
+| `LQI`        | `lqi`             | Raw link quality indicator (0-127, lower is better).        |
+| `LQI (%)`    | `lqi_percentage`  | Link quality inverted so that higher is better.             |
+| `Time Start` | `time_start`      | Time when the meter wakes up, formatted as `HH:MM`.         |
+| `Time End`   | `time_end`        | Time when the meter goes to sleep, formatted as `HH:MM`.    |
+| `Timestamp`  | `timestamp`       | ISO 8601 timestamp of the last reading.                     |
+| `Meter Time` | `meter_time`      | The meter's own real-time clock, decoded from the frame.    |
+| `Meter Type` | `meter_type`      | The meter's type/identifier string, decoded from the frame. |
+
+Two further topics carry no entity of their own: `liters_attributes` holds the past-months history that Home Assistant attaches to `Liters`, and `json` carries the whole reading as one document for templating.
+
+**Device and radio diagnostics**
+
+| **Sensor**           | **Topic suffix**          | **Description**                                             |
+| -------------------- | ------------------------- | ----------------------------------------------------------- |
+| `Radio State`        | `cc1101_state`            | `Idle`, `Reading`, `Frequency Scanning` or `unavailable`.   |
+| `Active Reading`     | `active_reading`          | `true` while a read is in progress.                         |
+| `Status`             | `status_message`          | Human-readable description of what the device is doing.     |
+| `Last Error`         | `last_error`              | Why the last read failed, or `None`.                        |
+| `Total Attempts`     | `total_attempts`          | Read attempts since boot.                                   |
+| `Successful Reads`   | `successful_reads`        | Successful reads since boot.                                |
+| `Failed Reads`       | `failed_reads`            | Reads that exhausted every retry.                           |
+| `Frequency Offset`   | `frequency_offset`        | Stored calibration offset, in kHz.                          |
+| `Tuned Frequency`    | `tuned_frequency`         | Frequency the radio is actually tuned to, in MHz.           |
+| `Frequency Estimate` | `frequency_estimate`      | CC1101 FREQEST reading from the last frame, in kHz.         |
+| `Diagnostic Report`  | `diagnostic_report_state` | Last diagnostic report. See the command topics below.       |
+| `Meter Year`         | `everblu_meter_year`      | Production year parsed from `METER_CODE`.                   |
+| `Meter Serial`       | `everblu_meter_serial`    | Serial number parsed from `METER_CODE`.                     |
+| `Reading Schedule`   | `reading_schedule`        | Configured schedule, for example `Monday-Friday`.           |
+| `Reading Time (UTC)` | `reading_time`            | Resolved daily read time in UTC, which may be auto-aligned. |
+
+The device also publishes `status` (the availability / last-will topic, `online` or `offline`) and `cc1101_availability`, which is what enables or disables the buttons when the radio does not come up.
+
+**Device and network**
+
+| **Sensor**         | **Topic suffix**         | **Description**                         |
+| ------------------ | ------------------------ | --------------------------------------- |
+| `Wi-Fi IP`         | `wifi_ip`                | IP address of the device.               |
+| `Wi-Fi RSSI`       | `wifi_rssi`              | Wi-Fi signal strength in dBm.           |
+| `Wi-Fi Signal (%)` | `wifi_signal_percentage` | Wi-Fi signal strength as a percentage.  |
+| `MAC Address`      | `mac_address`            | MAC address of the device.              |
+| `SSID`             | `wifi_ssid`              | Wi-Fi SSID the device is connected to.  |
+| `BSSID`            | `wifi_bssid`             | Wi-Fi BSSID the device is connected to. |
+| `Uptime`           | `uptime`                 | Device uptime in ISO 8601 format.       |
 
 > **Note on `RSSI (%)`.** The percentage is a display convenience, not a calibrated measurement. It maps the -120 to -40 dBm range onto 0-100% so Home Assistant can show a signal bar; the endpoints were chosen to span roughly "unusable" to "right next to the meter" and have no physical meaning. Judge link quality from the dBm and LQI values instead. The same scale is used by the ESPHome `rssi_percentage` sensor and by the device log.
 
@@ -532,17 +569,21 @@ The following MQTT topics are used to integrate the device with Home Assistant v
 
 Each of these appears in Home Assistant as a button on the device. `<serial>` is the meter serial number parsed from `METER_CODE`.
 
-| **Button**               | **MQTT Topic**                                | **Payload** | **Description**                                                          |
-| ------------------------ | --------------------------------------------- | ----------- | ------------------------------------------------------------------------ |
-| `Request Reading Now`    | `everblu/cyble/<serial>/trigger_force`         | `update`    | Read the meter immediately, bypassing the cooldown.                      |
-| `Deep Frequency Scan`    | `everblu/cyble/<serial>/deep_scan`             | `scan`      | Sweep ±150 kHz in 2.5 kHz steps and store the best offset.               |
-| `Reset Frequency Offset` | `everblu/cyble/<serial>/reset_frequency`       | `reset`     | Clear the stored calibration and re-tune from the base frequency.        |
-| `Diagnostic Report`      | `everblu/cyble/<serial>/diagnostic_report`     | `report`    | Log the wiring / SPI link / radio report. See below.                     |
-| `Restart Device`         | `everblu/cyble/<serial>/restart`               | `restart`   | Reboot the ESP.                                                          |
+| **Button**               | **MQTT Topic**                             | **Payload** | **Description**                                                   |
+| ------------------------ | ------------------------------------------ | ----------- | ----------------------------------------------------------------- |
+| `Request Reading Now`    | `everblu/cyble/<serial>/trigger_force`     | `update`    | Read the meter immediately, bypassing the cooldown.               |
+| `Deep Frequency Scan`    | `everblu/cyble/<serial>/deep_scan`         | `scan`      | Sweep ±150 kHz in 2.5 kHz steps and store the best offset.        |
+| `Reset Frequency Offset` | `everblu/cyble/<serial>/reset_frequency`   | `reset`     | Clear the stored calibration and re-tune from the base frequency. |
+| `Diagnostic Report`      | `everblu/cyble/<serial>/diagnostic_report` | `report`    | Log and publish the wiring / SPI link / radio report. See below.  |
+| `Restart Device`         | `everblu/cyble/<serial>/restart`           | `restart`   | Reboot the ESP.                                                   |
+
+There is also a `everblu/cyble/<serial>/trigger` topic, which is the same as `trigger_force` except that it respects the retry cooldown.
 
 **Diagnostic Report** prints one copy-pasteable block covering the configured CS/GDO0/GDO2 pins, a live SPI link self-test, the key CC1101 registers (PARTNUM, VERSION, MARCSTATE, FREQ2/1/0, MDMCFG4/3/2, PKTCTRL0), RSSI/LQI, the GDO0 wiring self-test verdict and the current GDO0/GDO2 line levels. Press it first when raising an issue: it tells a wiring fault apart from an RF problem in one step, and it works even when the radio never came up.
 
-The report goes to the log rather than to MQTT, so watch the serial monitor at 115200 baud (`pio device monitor`) or the [WiFi serial monitor](docs/WIFI_SERIAL_MONITOR.md) while you press it. The ESPHome component has the same button and prints the same format.
+The report goes to the log (serial monitor at 115200 baud, or the [WiFi serial monitor](docs/WIFI_SERIAL_MONITOR.md)) and is also published retained to `everblu/cyble/<serial>/diagnostic_report_state`, so you can read it from Home Assistant without a serial cable. A Home Assistant state is capped at 255 characters, so the `Diagnostic Report` sensor shows when the report was taken and the text is held in its `report` attribute: open **Developer tools -> States**, select the entity, and copy the attribute. Because the topic is retained, the report is still there after a Home Assistant restart.
+
+The ESPHome component has the same button and prints the same format, to the ESPHome log.
 
 </details>
 

@@ -184,6 +184,11 @@ const int ADAPT_THRESHOLD = ADAPTIVE_THRESHOLD;
 #define RX_ATTENUATION_DB 0
 #endif
 
+// Size of the retained JSON payload carrying the diagnostic report. The report itself is
+// capped at CC1101_REPORT_BUFFER_SIZE; the headroom covers the JSON wrapper and the escaped
+// newline after each of its ~17 lines. Must stay within the MQTT max packet size set below.
+#define DIAGNOSTIC_REPORT_PAYLOAD_SIZE (CC1101_REPORT_BUFFER_SIZE + 256)
+
 // ============================================================================
 // Frequency Management API (thin MQTT wrappers over the shared FrequencyManager)
 // ============================================================================
@@ -1256,6 +1261,24 @@ void publishHADiscovery()
   json += "}";
   publishDiscoveryMessage("button", "everblu_meter_diagnostic_report", json);
 
+  // The report text is far longer than the 255-character limit on a Home Assistant state,
+  // so the state is the time it was taken and the text is exposed as a JSON attribute.
+  json = "{\n";
+  json += "  \"name\": \"Diagnostic Report\",\n";
+  json += "  \"uniq_id\": \"" + getMeterPrefix() + "everblu_meter_diagnostic_report_state\",\n";
+  json += "  \"obj_id\": \"" + getMeterPrefix() + "everblu_meter_diagnostic_report_state\",\n";
+  json += "  \"ic\": \"mdi:clipboard-text-search-outline\",\n";
+  json += "  \"dev_cla\": \"timestamp\",\n";
+  json += "  \"qos\": 0,\n";
+  json += "  \"avty_t\": \"" + String(mqttBaseTopic) + "/status\",\n";
+  json += "  \"stat_t\": \"" + String(mqttBaseTopic) + "/diagnostic_report_state\",\n";
+  json += "  \"val_tpl\": \"{{ value_json.taken }}\",\n";
+  json += "  \"json_attr_t\": \"" + String(mqttBaseTopic) + "/diagnostic_report_state\",\n";
+  json += "  \"ent_cat\": \"diagnostic\",\n";
+  json += "  \"dev\": {\n    " + buildDeviceJson() + "\n  }\n";
+  json += "}";
+  publishDiscoveryMessage("sensor", "everblu_meter_diagnostic_report_state", json);
+
   // Binary sensor for active reading
   json = "{\n";
   json += "  \"name\": \"Active Reading\",\n";
@@ -1649,10 +1672,10 @@ void resetFrequencyOffset()
 
 // Function: printDiagnosticReport
 // Description: Log the shared wiring/link/radio diagnostic block to the serial (and
-//              WiFi serial) monitor. The report body lives in the core driver, so this
-//              only supplies the configuration the driver cannot know about. Matches the
-//              output of the ESPHome "Diagnostic Report" button so a single format covers
-//              both integrations in a bug report.
+//              WiFi serial) monitor, and mirror it to a retained MQTT topic so it can be
+//              read from Home Assistant without a serial cable. The report body lives in
+//              the core driver, so this only supplies the configuration the driver cannot
+//              know about, and the output matches the ESPHome "Diagnostic Report" button.
 void printDiagnosticReport()
 {
   cc1101_report_context_t ctx;
@@ -1669,7 +1692,61 @@ void printDiagnosticReport()
   ctx.gdo2_pin_text = nullptr;
   ctx.meter_initialised = cc1101RadioConnected;
 
-  cc1101_print_diagnostic_report(&ctx);
+  const char *report = cc1101_print_diagnostic_report(&ctx);
+
+  // A Home Assistant state string is capped at 255 characters, which the report comfortably
+  // exceeds, so the state carries only when it was taken and the text rides along as a JSON
+  // attribute. Retained, so the entity survives a Home Assistant restart and the report is
+  // still there when someone comes to read it.
+  //
+  // Allocated for the duration of the call rather than kept as a static buffer: it is
+  // needed once per button press, and 1.6 KB is a meaningful share of the ESP8266's RAM to
+  // hold permanently. It is also too large to put on the task stack.
+  char *payload = (char *)malloc(DIAGNOSTIC_REPORT_PAYLOAD_SIZE);
+  if (payload == nullptr)
+  {
+    TS_PRINTLN("[WARN] Not enough memory to publish the diagnostic report; see the log above");
+    return;
+  }
+
+  const time_t now = time(nullptr);
+  char takenIso[32];
+  strftime(takenIso, sizeof(takenIso), "%FT%TZ", gmtime(&now));
+
+  size_t used = (size_t)snprintf(payload, DIAGNOSTIC_REPORT_PAYLOAD_SIZE, "{\"taken\":\"%s\",\"report\":\"", takenIso);
+  for (const char *c = report; *c != '\0' && used + 8 < DIAGNOSTIC_REPORT_PAYLOAD_SIZE; c++)
+  {
+    switch (*c)
+    {
+    case '"':
+      used += (size_t)snprintf(payload + used, DIAGNOSTIC_REPORT_PAYLOAD_SIZE - used, "\\\"");
+      break;
+    case '\\':
+      used += (size_t)snprintf(payload + used, DIAGNOSTIC_REPORT_PAYLOAD_SIZE - used, "\\\\");
+      break;
+    case '\n':
+      used += (size_t)snprintf(payload + used, DIAGNOSTIC_REPORT_PAYLOAD_SIZE - used, "\\n");
+      break;
+    default:
+      // Anything else below 0x20 would be an invalid raw JSON string character. The report
+      // contains none today, but a meter code comes from user configuration.
+      if ((unsigned char)*c < 0x20)
+      {
+        used += (size_t)snprintf(payload + used, DIAGNOSTIC_REPORT_PAYLOAD_SIZE - used, "\\u%04X",
+                                 (unsigned)(unsigned char)*c);
+      }
+      else
+      {
+        payload[used++] = *c;
+        payload[used] = '\0';
+      }
+      break;
+    }
+  }
+  snprintf(payload + used, DIAGNOSTIC_REPORT_PAYLOAD_SIZE - used, "\"}");
+
+  publishSub("diagnostic_report_state", payload, true);
+  free(payload);
 }
 
 // Function: adaptiveFrequencyTracking
