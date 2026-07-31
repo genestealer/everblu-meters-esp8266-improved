@@ -14,15 +14,25 @@ Releases are created manually by tagging commits with version tags matching `v*.
 
 ## [Unreleased]
 
+### Added
+
+- **`diagnostic_report_button`**: a new optional button that logs a single copy-pasteable block containing the configured CS/GDO0/GDO2 pins, a live SPI link self-test, the key CC1101 registers (PARTNUM, VERSION, MARCSTATE, FREQ2/1/0, MDMCFG4/3/2, PKTCTRL0), RSSI/LQI and the current GDO0/GDO2 line levels. It deliberately does not require the meter reader to be initialised, because the most common reason to press it is that the radio never came up.
+- **GDO0 wiring self-test**: `cc1101_init()` now checks that GDO0 reads LOW while the radio is IDLE, mirroring the existing GDO2 self-test. The pin is configured with a pull-up, so a wrong or unconnected GPIO reads HIGH. Previously a mis-assigned `gdo0_pin` failed silently in a way that resembled success: every sync-word wait returned immediately, producing `GDO0 triggered at 0ms` and "received" frames that were only noise. The verdict is exposed through `cc1101_collect_diagnostics()` and shown in the diagnostic report, so a fault that appears mid-life is visible rather than only at the first boot after a miswire.
+
+### Changed
+
+- **The SPI link self-test now runs during `setup()`**, not on the first Home Assistant connection. A stuck MISO or a wrong `cs_pin`/`miso_pin` is a hard wiring fault, and users typically capture only the boot log, which previously contained no evidence of it.
+- **`dump_config()` reports the actual GPIO numbers** for the CS, GDO0 and GDO2 pins instead of just `configured`, and adds the RX attenuation setting and the SPI link self-test result. Support requests usually consist of this block alone, which could not be checked against a board pinout without the numbers.
+- **The SPI write/read-back probe restores the sync word it borrowed.** `SYNC1`/`SYNC0` are the scratch pair, and the last pattern written is `0x55`/`0xAA`. `cc1101_init()` rewrites them immediately afterwards, but `cc1101_collect_diagnostics()` runs against a configured, listening radio, so without the restore the operational sync word silently became `0x55AA`.
+- **`MARCSTATE` is reported by name** in the diagnostic report. As a bare number a state such as `0x11` reads as a fault, when it is usually just a receiver parked with nothing draining the FIFO (`RXFIFO_OVERFLOW`).
+- **The diagnostic report decodes `FREQ2/1/0` into the actual carrier frequency** and prints it alongside the configured base. The two differ by whatever calibration offset is in effect, so reporting only the configured value hid a ~31 kHz discrepancy that could otherwise be spotted only by doing the register arithmetic by hand.
+- **Standalone MQTT publishes no longer build their topics as Arduino `String`s.** A single read published around 20 topics as `String(mqttBaseTopic) + "/suffix"`, allocating and freeing two heap blocks each time and fragmenting the ~40 KB ESP8266 heap over the life of the device. A `publishSub()` helper formats the topic into a stack buffer instead, consistent with how the rest of the file already builds topics.
+- **`StorageAbstraction::clearAll()` logs a warning on ESPHome** instead of silently returning `false`, so a factory-reset caller can tell the difference between a failure and a no-op. ESPHome's preference API has no bulk-erase primitive; individual keys must be cleared with `clearKey()`.
+
 ### Fixed
 
 - **A frame whose length byte claims more bytes than were decoded is now rejected instead of being accepted unchecked.** `radian_validate_crc()` returned "valid" without verifying anything when the declared length exceeded the decoded payload, which in practice means a truncated or misaligned capture. That bypassed the only integrity gate on the radio path and left the downstream parser sanity checks to catch the damage. Such frames now fail CRC validation and are discarded. The captured `home_001` test fixture is one of these truncated frames and is now marked `crc_valid=0`; parse coverage for the same meter comes from the complete `home_002` frame.
 - **The unbounded `sprintf()` building the standalone `/json` payload** is now `snprintf()`, matching the rest of `src/main.cpp`.
-
-### Changed
-
-- **Standalone MQTT publishes no longer build their topics as Arduino `String`s.** A single read published around 20 topics as `String(mqttBaseTopic) + "/suffix"`, allocating and freeing two heap blocks each time and fragmenting the ~40 KB ESP8266 heap over the life of the device. A `publishSub()` helper formats the topic into a stack buffer instead, consistent with how the rest of the file already builds topics.
-- **`StorageAbstraction::clearAll()` logs a warning on ESPHome** instead of silently returning `false`, so a factory-reset caller can tell the difference between a failure and a no-op. ESPHome's preference API has no bulk-erase primitive; individual keys must be cleared with `clearKey()`.
 
 ### Removed
 

@@ -115,6 +115,8 @@ everblu_meter:
     name: "Reset Frequency Offset"
   stop_reading_button:
     name: "Stop Reading"
+  diagnostic_report_button:
+    name: "Diagnostic Report"
 
   # Volume sensors
   volume:

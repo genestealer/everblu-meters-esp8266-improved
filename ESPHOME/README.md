@@ -587,6 +587,7 @@ EverbluMeterComponent (ESPHome)
 - **stop_reading_button** - Cancel the current read/retry sequence. Also requests best-effort cancellation of an in-progress deep frequency scan (it bails at the next step; see [#133](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/133))
 - **deep_scan_button** - Trigger a Deep frequency scan (±150 kHz, fine 2.5 kHz steps, maps the response window then zooms to the carrier centre)
 - **reset_frequency_button** - Reset the frequency offset
+- **diagnostic_report_button** - Print a single copy-pasteable block covering the configured pins, the live SPI link self-test, the key CC1101 registers and the current GDO0/GDO2 levels. Press this first when raising an issue; it captures in one place everything needed to tell a wiring fault from an RF problem, and it works even when the radio never came up
 
 ### Frequency scans in multi-meter setups
 
