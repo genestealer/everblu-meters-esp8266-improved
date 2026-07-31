@@ -16,6 +16,8 @@
 
 #include <unity.h>
 
+#include <cstring>
+
 #include "native_cc1101_device.h"
 #include "core/cc1101.h"
 
@@ -24,6 +26,29 @@ static constexpr float kTestFrequency = 433.82f;
 /** SYNC1/SYNC0, the scratch pair the probe writes through. */
 static constexpr uint8_t kSync1Register = 0x04;
 static constexpr uint8_t kSync0Register = 0x05;
+
+/** Assert that the diagnostic report contains @p needle, quoting it on failure. */
+static void assertReportContains(const char *report, const char *needle)
+{
+    char message[192];
+    snprintf(message, sizeof(message), "report does not contain: %s", needle);
+    TEST_ASSERT_NOT_NULL_MESSAGE(strstr(report, needle), message);
+}
+
+/** A fully populated context, as the MQTT build passes it. */
+static cc1101_report_context_t makeReportContext()
+{
+    cc1101_report_context_t ctx;
+    memset(&ctx, 0, sizeof(ctx));
+    ctx.meter_code = "21-0123456";
+    ctx.meter_year = 21;
+    ctx.meter_serial = 123456;
+    ctx.is_gas = false;
+    ctx.configured_frequency_mhz = kTestFrequency;
+    ctx.rx_attenuation_db = 6;
+    ctx.meter_initialised = true;
+    return ctx;
+}
 
 void test_cc1101_init_succeeds_on_a_healthy_bus(void)
 {
@@ -335,6 +360,12 @@ void test_gdo0_self_test_is_reported_as_not_run_before_the_first_init(void)
     // whatever a floating input happened to settle at.
     TEST_ASSERT_EQUAL_INT(-1, diag.gdo0_level);
     TEST_ASSERT_EQUAL_INT(-1, diag.gdo2_level);
+
+    // Same reasoning for the printed report: it must say the check has not run, and it
+    // must not present an unconfigured pin's level as a reading.
+    const char *report = cc1101_print_diagnostic_report(nullptr);
+    assertReportContains(report, "GDO0 wiring self-test: NOT RUN");
+    assertReportContains(report, "unknown (pin not configured yet)");
 }
 
 void test_gdo0_self_test_passes_when_the_line_is_wired(void)
@@ -419,4 +450,138 @@ void test_diagnostics_leave_an_idle_radio_idle(void)
 
     TEST_ASSERT_EQUAL_HEX8(0x01, diag.marcstate);
     TEST_ASSERT_EQUAL_HEX8(0x01, nativeCC1101().marcstate);
+}
+
+// ---------------------------------------------------------------------------
+// cc1101_print_diagnostic_report: the text a user pastes into a bug report
+// ---------------------------------------------------------------------------
+
+void test_report_states_the_configuration_it_was_given(void)
+{
+    // The report is the whole point of the diagnostics: whatever the caller knows about
+    // the configuration has to reach the text, or a bug report arrives half-empty.
+    nativeCC1101Install();
+    nativeCC1101().gdo0Connected = true;
+    TEST_ASSERT_TRUE(cc1101_init(kTestFrequency));
+
+    cc1101_report_context_t ctx = makeReportContext();
+    ctx.cs_pin_text = "managed by the ESPHome SPI bus";
+    ctx.gdo0_pin_text = "GPIO27 (inverted)";
+    ctx.gdo2_pin_text = "GPIO26";
+
+    const char *report = cc1101_print_diagnostic_report(&ctx);
+    TEST_ASSERT_NOT_NULL(report);
+
+    assertReportContains(report, "===== EverBlu diagnostic report =====");
+    assertReportContains(report, "Meter Code: 21-0123456 (year=21, serial=123456, Water)");
+    assertReportContains(report, "Configured Frequency: 433.82");
+    assertReportContains(report, "RX Attenuation: 6 dB");
+    // Caller-supplied pin text wins over the driver's own numbers: ESPHome knows about
+    // inversion and expanders, the driver only ever sees a GPIO number.
+    assertReportContains(report, "CS Pin: managed by the ESPHome SPI bus, GDO0 Pin: GPIO27 (inverted), GDO2 Pin: GPIO26");
+    assertReportContains(report, "SPI Link Self-Test: PASSED");
+    assertReportContains(report, "PARTNUM: 0x00 (expect 0x00), VERSION: 0x14 (expect 0x04 or 0x14)");
+    assertReportContains(report, "MARCSTATE: 0x0D (RX)");
+    assertReportContains(report, "GDO0 wiring self-test: passed");
+    assertReportContains(report, "Meter reader initialised: yes");
+    assertReportContains(report, "===== end of report =====");
+}
+
+void test_report_distinguishes_a_gas_meter_and_an_uninitialised_reader(void)
+{
+    // Both flags read as their opposite when left at the struct's zero value, so a
+    // report that only ever showed "Water"/"yes" would look correct while being wrong.
+    nativeCC1101Install();
+    TEST_ASSERT_TRUE(cc1101_init(kTestFrequency));
+
+    cc1101_report_context_t ctx = makeReportContext();
+    ctx.is_gas = true;
+    ctx.meter_initialised = false;
+
+    const char *report = cc1101_print_diagnostic_report(&ctx);
+    assertReportContains(report, "serial=123456, Gas)");
+    assertReportContains(report, "Meter reader initialised: no");
+}
+
+void test_report_falls_back_to_the_pins_the_driver_is_using(void)
+{
+    // The standalone build has no pin objects to describe, so it passes nothing and the
+    // driver has to name the pins it is actually driving - a report that said nothing
+    // about the pins would be useless for the wiring faults it exists to diagnose.
+    nativeCC1101Install();
+    TEST_ASSERT_TRUE(cc1101_init(kTestFrequency));
+
+    cc1101_report_context_t ctx = makeReportContext();
+    ctx.meter_code = nullptr;
+
+    const char *report = cc1101_print_diagnostic_report(&ctx);
+    assertReportContains(report, "Meter Code: unknown ");
+    assertReportContains(report, "CS Pin: GPIO15 (hardware SPI SS), GDO0 Pin: GPIO5, GDO2 Pin: GPIO4");
+}
+
+void test_report_works_without_any_context(void)
+{
+    // The button deliberately works when setup never finished, which is exactly when
+    // there is no configuration to hand. A missing context must not cost the radio half
+    // of the report, and must certainly not crash.
+    nativeCC1101Install();
+    TEST_ASSERT_TRUE(cc1101_init(kTestFrequency));
+
+    const char *report = cc1101_print_diagnostic_report(nullptr);
+    TEST_ASSERT_NOT_NULL(report);
+    assertReportContains(report, "Meter Code: unknown (year=0, serial=0, Water)");
+    assertReportContains(report, "SPI Link Self-Test: PASSED");
+    assertReportContains(report, "===== end of report =====");
+}
+
+void test_report_says_the_register_values_are_meaningless_on_a_stuck_bus(void)
+{
+    // The fault this whole suite exists for: every register reads back the same byte. The
+    // report must lead with that, or the values below it send people chasing a radio
+    // problem that is really a wiring problem.
+    nativeCC1101Install();
+    nativeCC1101().fault = NativeSpiFault::StuckConstant;
+    nativeCC1101().stuckValue = 0x0F;
+
+    cc1101_report_context_t ctx = makeReportContext();
+    const char *report = cc1101_print_diagnostic_report(&ctx);
+
+    assertReportContains(report, "SPI Link Self-Test: FAILED - the register values below are meaningless");
+    assertReportContains(report, "PARTNUM: 0x0F (expect 0x00), VERSION: 0x0F (expect 0x04 or 0x14)");
+}
+
+void test_report_calls_out_a_gdo0_line_that_is_not_wired(void)
+{
+    // A failed GDO0 self-test is the single most useful line in the report, because
+    // nothing else in the firmware notices the fault.
+    nativeCC1101Install();
+    nativeCC1101().gdo0Connected = false;
+    TEST_ASSERT_TRUE(cc1101_init(kTestFrequency));
+
+    cc1101_report_context_t ctx = makeReportContext();
+    const char *report = cc1101_print_diagnostic_report(&ctx);
+
+    assertReportContains(report, "GDO0 wiring self-test: FAILED - GDO0 looks unconnected or on the wrong GPIO");
+    assertReportContains(report, "GDO0 level: HIGH (expect LOW while idle)");
+}
+
+void test_report_is_truncated_rather_than_overrunning_its_buffer(void)
+{
+    // The meter code is caller-supplied text of unbounded length. snprintf reports what it
+    // would have written, so an unclamped offset would walk past the end of the buffer and
+    // corrupt whatever follows it.
+    nativeCC1101Install();
+    TEST_ASSERT_TRUE(cc1101_init(kTestFrequency));
+
+    char long_code[CC1101_REPORT_BUFFER_SIZE * 2];
+    memset(long_code, 'A', sizeof(long_code) - 1);
+    long_code[sizeof(long_code) - 1] = '\0';
+
+    cc1101_report_context_t ctx = makeReportContext();
+    ctx.meter_code = long_code;
+
+    const char *report = cc1101_print_diagnostic_report(&ctx);
+    TEST_ASSERT_NOT_NULL(report);
+    TEST_ASSERT_LESS_THAN_UINT(CC1101_REPORT_BUFFER_SIZE, (unsigned) strlen(report));
+    assertReportContains(report, "===== EverBlu diagnostic report =====");
 }

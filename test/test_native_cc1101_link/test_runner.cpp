@@ -34,6 +34,13 @@ void test_gdo0_self_test_detects_a_pin_pointed_at_nothing(void);
 void test_gdo0_verdict_clears_once_the_line_is_fixed(void);
 void test_diagnostics_park_the_radio_and_put_it_back_in_rx(void);
 void test_diagnostics_leave_an_idle_radio_idle(void);
+void test_report_states_the_configuration_it_was_given(void);
+void test_report_distinguishes_a_gas_meter_and_an_uninitialised_reader(void);
+void test_report_falls_back_to_the_pins_the_driver_is_using(void);
+void test_report_works_without_any_context(void);
+void test_report_says_the_register_values_are_meaningless_on_a_stuck_bus(void);
+void test_report_calls_out_a_gdo0_line_that_is_not_wired(void);
+void test_report_is_truncated_rather_than_overrunning_its_buffer(void);
 
 void setUp(void)
 {
@@ -76,6 +83,13 @@ int main(int, char **)
     RUN_TEST(test_gdo0_verdict_clears_once_the_line_is_fixed);
     RUN_TEST(test_diagnostics_park_the_radio_and_put_it_back_in_rx);
     RUN_TEST(test_diagnostics_leave_an_idle_radio_idle);
+    RUN_TEST(test_report_states_the_configuration_it_was_given);
+    RUN_TEST(test_report_distinguishes_a_gas_meter_and_an_uninitialised_reader);
+    RUN_TEST(test_report_falls_back_to_the_pins_the_driver_is_using);
+    RUN_TEST(test_report_works_without_any_context);
+    RUN_TEST(test_report_says_the_register_values_are_meaningless_on_a_stuck_bus);
+    RUN_TEST(test_report_calls_out_a_gdo0_line_that_is_not_wired);
+    RUN_TEST(test_report_is_truncated_rather_than_overrunning_its_buffer);
 
     return UNITY_END();
 }
