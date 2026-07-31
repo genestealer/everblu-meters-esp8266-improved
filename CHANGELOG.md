@@ -12,9 +12,29 @@ Releases are created manually by tagging commits with version tags matching `v*.
 - Keep PR coverage explicit per release so branch-only work is auditable against merge history.
 - Add new versions below, not above this section.
 
-## [Unreleased]
+## [v3.5.0] - 2026-07-31
 
-### Breaking
+### AI Metadata
+
+```yaml
+release_type: minor
+base_branch: main
+release_branch: develop
+includes_prs: [151, 152, 153, 154]
+notable_superseded_work:
+  - "the diagnostic report body was first written inline in the ESPHome component, then moved into the shared CC1101 driver so the MQTT build could emit a byte-for-byte comparable block"
+  - "the GDO0 self-test verdict was first a boolean defaulting to 'passed'; it became tri-state before release so a report taken before cc1101_init() cannot vouch for a check that never ran"
+  - "dump_config() was expanded into a single oversized ESP_LOGCONFIG call in #151, which truncated on real hardware; it was split across several calls before release"
+scope_summary:
+  - "New Diagnostic Report button on both the ESPHome and MQTT builds, printing one copy-pasteable block of pin config, live SPI self-test, key CC1101 registers and GDO line levels"
+  - "New GDO0 wiring self-test in cc1101_init(), catching a gdo0_pin pointed at the wrong GPIO that previously failed silently as noise 'reads'"
+  - "The SPI link self-test moved into setup() and its result added to dump_config(), which now also reports actual GPIO numbers"
+  - "Frames whose length byte exceeds the decoded payload are rejected instead of accepted unchecked, with a distinct truncation message"
+  - "The ESPHome component now requires ESPHome 2026.1.0 or later, enforced during config validation"
+  - "GitHub releases no longer carry prebuilt firmware binaries; users build from source with their own private.h"
+```
+
+### Breaking Changes
 
 - **The ESPHome component now requires ESPHome 2026.1.0 or later.** `dump_config()` and the new diagnostic report print their pin assignments through `GPIOPin::dump_summary(char *, size_t)` and `GPIO_SUMMARY_MAX_LEN`, which first shipped in that release. Config validation enforces the floor with `cv.require_esphome_version()`, so an older install now fails during validation with a clear message instead of part-way through the C++ compile. The standalone PlatformIO build is unaffected.
 - **A frame whose length byte claims more bytes than were decoded is now discarded.** Previously `radian_validate_crc()` returned "valid" without verifying anything in this case, so a truncated or misaligned capture bypassed the only integrity gate on the radio path and left the downstream parser sanity checks to catch the damage. If a meter's frames are consistently truncated, this turns intermittently-corrupt readings into no readings, so the failure is now logged distinctly: `Frame truncated: length byte claims N bytes, only M decoded - the CRC trailer was never received` rather than the generic CRC message, which sent people looking at the aerial and the frequency. The captured `home_001` test fixture is one of these frames and is now marked `crc_valid=0`; parse coverage for the same meter comes from the complete `home_002` frame.
@@ -37,6 +57,7 @@ Releases are created manually by tagging commits with version tags matching `v*.
 - **The diagnostic report decodes `FREQ2/1/0` into the actual carrier frequency** and prints it alongside the configured base. The two differ by whatever calibration offset is in effect, so reporting only the configured value hid a ~31 kHz discrepancy that could otherwise be spotted only by doing the register arithmetic by hand.
 - **Standalone MQTT publishes no longer build their topics as Arduino `String`s.** A single read published around 20 topics as `String(mqttBaseTopic) + "/suffix"`, allocating and freeing two heap blocks each time and fragmenting the ~40 KB ESP8266 heap over the life of the device. A `publishSub()` helper formats the topic into a stack buffer instead, consistent with how the rest of the file already builds topics.
 - **`StorageAbstraction::clearAll()` logs a warning on ESPHome** instead of silently returning `false`, so a factory-reset caller can tell the difference between a failure and a no-op. ESPHome's preference API has no bulk-erase primitive; individual keys must be cleared with `clearKey()`.
+- **GitHub releases no longer build or attach prebuilt firmware binaries.** The release workflow previously built five board variants and attached the `.bin` files. Those builds used a placeholder `private.h`, so the binaries could never contain a working meter serial, Wi-Fi credentials or MQTT settings, and flashing one produced a device that could not read anything. Users build from source with their own `private.h`, which is what the README has always instructed. This removes the build matrix from `.github/workflows/release.yml` and shortens the release run considerably.
 
 ### Fixed
 
