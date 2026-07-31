@@ -29,6 +29,7 @@ Native ESPHome external component for reading EverBlu Cyble Enhanced water and g
 - [Features](#features)
 - [Example Configurations](#example-configurations)
 - [Hardware Requirements](#hardware-requirements)
+  - [Software Requirements](#software-requirements)
   - [Wiring (ESP8266 D1 Mini)](#wiring-esp8266-d1-mini)
   - [Wiring (ESP32)](#wiring-esp32)
 - [Benefits](#benefits)
