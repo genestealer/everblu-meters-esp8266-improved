@@ -29,6 +29,7 @@ Native ESPHome external component for reading EverBlu Cyble Enhanced water and g
 - [Features](#features)
 - [Example Configurations](#example-configurations)
 - [Hardware Requirements](#hardware-requirements)
+  - [Software Requirements](#software-requirements)
   - [Wiring (ESP8266 D1 Mini)](#wiring-esp8266-d1-mini)
   - [Wiring (ESP32)](#wiring-esp32)
 - [Benefits](#benefits)
@@ -376,6 +377,13 @@ Five complete example configurations are provided:
 - **CC1101** RF transceiver module (868/915 MHz version)
 - **EverBlu Cyble Enhanced** meter with RF module installed
 
+### Software Requirements
+
+- **ESPHome 2026.1.0 or later.** The component reports its pin assignments through
+  `GPIOPin::dump_summary(char *, size_t)`, which first shipped in that release. The
+  component's config validation enforces this, so an older install fails during
+  validation with a clear message rather than part-way through the C++ compile.
+
 ### Wiring (ESP8266 D1 Mini)
 
 | CC1101 Pin | D1 Mini | GPIO         |
@@ -560,6 +568,7 @@ EverbluMeterComponent (ESPHome)
 - **tuned_frequency** - Actual tuned frequency (MHz)
 - **frequency_estimate** - CC1101 frequency estimate from last reading (kHz) - helps monitor frequency drift
 - **total_attempts** / **successful_reads** / **failed_reads** - Statistics
+- **gdo2_timeouts** - GDO2 wiring faults since boot (failed boot self-test plus runtime FIFO-threshold timeouts). A non-zero, growing value points at a miswired or wrong-GPIO GDO2 rather than an RF problem
 
 ### Text Sensors
 
@@ -587,6 +596,7 @@ EverbluMeterComponent (ESPHome)
 - **stop_reading_button** - Cancel the current read/retry sequence. Also requests best-effort cancellation of an in-progress deep frequency scan (it bails at the next step; see [#133](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/133))
 - **deep_scan_button** - Trigger a Deep frequency scan (±150 kHz, fine 2.5 kHz steps, maps the response window then zooms to the carrier centre)
 - **reset_frequency_button** - Reset the frequency offset
+- **diagnostic_report_button** - Print a single copy-pasteable block covering the configured pins, the live SPI link self-test, the key CC1101 registers and the current GDO0/GDO2 levels. Press this first when raising an issue; it captures in one place everything needed to tell a wiring fault from an RF problem, and it works even when the radio never came up. The standalone MQTT build prints the same block from its own **Diagnostic Report** button
 
 ### Frequency scans in multi-meter setups
 

@@ -17,6 +17,18 @@ namespace everblu_meter {
 
 static const char *const TAG = "everblu_meter";
 
+namespace {
+// Render a pin as e.g. "GPIO3" into caller-supplied storage, or return the fallback text
+// when the pin is unset. Uses the buffer-based dump_summary(); the std::string overload is
+// deprecated and is removed in ESPHome 2026.7.0.
+const char *pin_summary(GPIOPin *pin, char *buffer, size_t len, const char *fallback) {
+  if (pin == nullptr)
+    return fallback;
+  pin->dump_summary(buffer, len);
+  return buffer;
+}
+}  // namespace
+
 // ESPHome's documented guidance is that a component's loop() should block for at
 // most ~30 ms (https://developers.esphome.io/architecture/components/); the
 // runtime "took a long time" warning in recent releases fires at ~2550 ms.
@@ -49,6 +61,8 @@ void EverbluMeterTriggerButton::press_action() {
     this->parent_->request_deep_scan();
   } else if (this->is_reset_frequency_) {
     this->parent_->request_reset_frequency();
+  } else if (this->is_diagnostic_) {
+    this->parent_->request_diagnostic_report();
   } else {
     this->parent_->request_manual_read();
   }
@@ -158,6 +172,14 @@ void EverbluMeterComponent::setup() {
 
   // Initialize CC1101 context before creating meter reader
   this->apply_radio_context();
+
+  // Probe the SPI link now rather than waiting for the meter reader to be initialised on
+  // the first Home Assistant connection. A stuck MISO or a wrong cs_pin/miso_pin is a hard
+  // wiring fault, and users routinely capture only the boot log; deferring the check meant
+  // those reports contained no evidence of it at all. The result is reported by
+  // dump_config() and the failure guidance is logged by the driver.
+  this->spi_probe_ran_ = true;
+  this->spi_link_ok_ = cc1101_probe_spi_link(&this->spi_partnum_, &this->spi_version_);
 
   // Create meter reader with all adapters (but don't initialize yet)
   this->meter_reader_ = new MeterReader(this->config_provider_, this->time_provider_, this->data_publisher_);
@@ -367,6 +389,33 @@ void EverbluMeterComponent::request_stop_reading() {
   this->meter_reader_->stopReading();
 }
 
+void EverbluMeterComponent::request_diagnostic_report() {
+  // Deliberately does not require meter_reader_: the most common reason to press this is
+  // that the radio never came up, and a report is most useful precisely then.
+  this->apply_radio_context();
+
+  char cs_text[GPIO_SUMMARY_MAX_LEN];
+  char gdo0_text[GPIO_SUMMARY_MAX_LEN];
+  char gdo2_text[GPIO_SUMMARY_MAX_LEN];
+
+  // The report body itself lives in the core driver so the ESPHome and MQTT builds emit
+  // identical blocks; only the pin descriptions differ, and ESPHome can say more about a
+  // pin than a bare GPIO number.
+  cc1101_report_context_t ctx;
+  ctx.meter_code = this->meter_code_.c_str();
+  ctx.meter_year = this->meter_year_;
+  ctx.meter_serial = this->meter_serial_;
+  ctx.is_gas = this->is_gas_;
+  ctx.configured_frequency_mhz = this->frequency_;
+  ctx.rx_attenuation_db = this->rx_attenuation_db_;
+  ctx.cs_pin_text = pin_summary(this->cs_, cs_text, sizeof(cs_text), "NOT configured");
+  ctx.gdo0_pin_text = pin_summary(this->gdo0_pin_, gdo0_text, sizeof(gdo0_text), "NOT configured");
+  ctx.gdo2_pin_text = pin_summary(this->gdo2_pin_, gdo2_text, sizeof(gdo2_text), "disabled");
+  ctx.meter_initialised = this->meter_initialized_;
+
+  cc1101_print_diagnostic_report(&ctx);
+}
+
 void EverbluMeterComponent::apply_radio_context() {
   auto *spi_device = static_cast<spi::SPIDevice<spi::BIT_ORDER_MSB_FIRST, spi::CLOCK_POLARITY_LOW,
                                                 spi::CLOCK_PHASE_LEADING, spi::DATA_RATE_1MHZ> *>(this);
@@ -401,6 +450,26 @@ void EverbluMeterComponent::update() {
 }
 
 void EverbluMeterComponent::dump_config() {
+  // Report the actual GPIO numbers rather than just "configured". A wrong gdo0_pin or
+  // cs_pin is one of the most common setup faults, and support requests almost always
+  // consist of this block alone - without the numbers it cannot be checked against the
+  // board's pinout.
+  char spi_selftest[128];
+  if (!this->spi_probe_ran_) {
+    snprintf(spi_selftest, sizeof(spi_selftest), "not run");
+  } else if (this->spi_link_ok_) {
+    snprintf(spi_selftest, sizeof(spi_selftest), "PASSED (PARTNUM: 0x%02X, VERSION: 0x%02X)", this->spi_partnum_,
+             this->spi_version_);
+  } else {
+    snprintf(spi_selftest, sizeof(spi_selftest),
+             "FAILED (PARTNUM: 0x%02X, VERSION: 0x%02X) - the radio is not being read; see the errors above",
+             this->spi_partnum_, this->spi_version_);
+  }
+
+  char cs_text[GPIO_SUMMARY_MAX_LEN];
+  char gdo0_text[GPIO_SUMMARY_MAX_LEN];
+  char gdo2_text[GPIO_SUMMARY_MAX_LEN];
+
   ESP_LOGCONFIG(TAG,
                 "EverBlu Meter:\n"
                 "  Meter Code: %s (year=%u, serial=%lu)\n"
@@ -416,17 +485,23 @@ void EverbluMeterComponent::dump_config() {
                 "  Max Retries: %d\n"
                 "  Retry Cooldown: %lu ms\n"
                 "  Initial Read On Boot: %s\n"
+                "  RX Attenuation: %d dB\n"
+                "  CS Pin: %s\n"
                 "  GDO0 Pin: %s\n"
-                "  GDO2 Pin: %s",
+                "  GDO2 Pin: %s\n"
+                "  SPI Link Self-Test: %s",
                 this->meter_code_.c_str(), this->meter_year_, (unsigned long) this->meter_serial_,
                 this->is_gas_ ? "Gas" : "Water", EVERBLU_FW_VERSION, this->frequency_,
                 this->auto_scan_ ? "Enabled" : "Disabled", this->reading_schedule_.c_str(), this->read_hour_,
                 this->read_minute_, this->timezone_offset_, this->auto_align_time_ ? "Enabled" : "Disabled",
                 this->auto_align_midpoint_ ? "Enabled" : "Disabled", this->max_retries_, this->retry_cooldown_ms_,
-                this->initial_read_on_boot_ ? "Enabled" : "Disabled",
-                this->gdo0_pin_ != nullptr ? "configured" : "NOT configured (error)",
-                this->gdo2_pin_ != nullptr ? "configured (HW FIFO threshold, TX+RX dynamic)"
-                                           : "disabled (legacy SPI polling fallback)");
+                this->initial_read_on_boot_ ? "Enabled" : "Disabled", this->rx_attenuation_db_,
+                pin_summary(this->cs_, cs_text, sizeof(cs_text), "NOT configured (error)"),
+                pin_summary(this->gdo0_pin_, gdo0_text, sizeof(gdo0_text), "NOT configured (error)"),
+                pin_summary(this->gdo2_pin_, gdo2_text, sizeof(gdo2_text), "disabled (legacy SPI polling fallback)"),
+                spi_selftest);
+  if (this->gdo2_pin_ != nullptr)
+    ESP_LOGCONFIG(TAG, "    GDO2 mode: HW FIFO threshold, TX+RX dynamic");
   if (this->is_gas_)
     ESP_LOGCONFIG(TAG, "  Gas Volume Divisor: %d", this->gas_volume_divisor_);
 

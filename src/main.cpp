@@ -178,6 +178,17 @@ bool autoScanOnFailureEnabled = (AUTO_SCAN_ON_FAILURE_ENABLED != 0); // Enable a
 #endif
 const int ADAPT_THRESHOLD = ADAPTIVE_THRESHOLD;
 
+// Front-end RX attenuation, reported by the diagnostic report. The driver applies its own
+// default when this is absent from private.h; mirror it so the report agrees with the radio.
+#ifndef RX_ATTENUATION_DB
+#define RX_ATTENUATION_DB 0
+#endif
+
+// Size of the retained JSON payload carrying the diagnostic report. The report itself is
+// capped at CC1101_REPORT_BUFFER_SIZE; the headroom covers the JSON wrapper and the escaped
+// newline after each of its ~17 lines. Must stay within the MQTT max packet size set below.
+#define DIAGNOSTIC_REPORT_PAYLOAD_SIZE (CC1101_REPORT_BUFFER_SIZE + 256)
+
 // ============================================================================
 // Frequency Management API (thin MQTT wrappers over the shared FrequencyManager)
 // ============================================================================
@@ -197,6 +208,15 @@ void performDeepFrequencyScan(float scanRangeMHz = 0.150f, float scanStepMHz = 0
  * @brief Reset the persisted frequency offset to zero and re-tune the radio.
  */
 void resetFrequencyOffset();
+
+/**
+ * @brief Log the wiring / SPI link / radio diagnostic report to the serial monitor.
+ *
+ * Same block as the ESPHome "Diagnostic Report" button, so one format covers both
+ * integrations. Safe to call when the radio never came up, which is when it is most
+ * useful.
+ */
+void printDiagnosticReport();
 
 // ============================================================================
 // Frequency Management Implementation
@@ -344,6 +364,19 @@ static void parseMeterCode()
 // Calculation: mqttBaseTopic (max 63) + longest suffix "/wifi_signal_percentage" (24) + null (1) = 88 bytes
 // Buffer size: 128 bytes provides 1.45x safety margin for topic construction
 #define MQTT_TOPIC_BUFFER_SIZE 128
+
+// Publish to "<mqttBaseTopic>/<suffix>" without building the topic as an
+// Arduino String. A single read publishes around 20 topics, and every
+// String(mqttBaseTopic) + "/suffix" allocated and freed two heap blocks, which
+// fragments the ~40 KB ESP8266 heap over the life of the device. The rest of
+// the file already builds topics into a stack buffer; this keeps the hot path
+// consistent with that.
+static bool publishSub(const char *suffix, const char *payload, bool retain = false)
+{
+  char topicBuffer[MQTT_TOPIC_BUFFER_SIZE];
+  snprintf(topicBuffer, sizeof(topicBuffer), "%s/%s", mqttBaseTopic, suffix);
+  return mqtt.publish(topicBuffer, payload, retain);
+}
 
 // ============================================================================
 // Meter Type Configuration
@@ -530,8 +563,8 @@ void onUpdateData()
   digitalWrite(LED_BUILTIN, LOW); // Turn on LED to indicate activity
 
   // Notify MQTT that active reading has started
-  mqtt.publish(String(mqttBaseTopic) + "/active_reading", "true", true);
-  mqtt.publish(String(mqttBaseTopic) + "/cc1101_state", "Reading", true);
+  publishSub("active_reading", "true", true);
+  publishSub("cc1101_state", "Reading", true);
 
   struct tmeter_data meter_data = get_meter_data(); // Fetch meter data
 
@@ -575,7 +608,7 @@ void onUpdateData()
       // for the whole retry sequence so they don't flip to "Not running"/Idle
       // between attempts. They are cleared only on final success or after max
       // retries (see the else branch below).
-      mqtt.publish(String(mqttBaseTopic) + "/last_error", lastErrorMessage, true);
+      publishSub("last_error", lastErrorMessage, true);
       digitalWrite(LED_BUILTIN, HIGH); // Turn off LED
       // Use non-blocking callback instead of recursive call
       mqtt.executeDelayed(5000, onUpdateData);
@@ -589,17 +622,17 @@ void onUpdateData()
       lastErrorMessage = read_failure_message(
           g_retryFailureReason != ReadFailure::None ? g_retryFailureReason : meter_data.failure, false);
       TS_PRINTF("[ERROR] Max retries (%d) reached. Entering 1-hour cooldown period.\n", max_retries);
-      mqtt.publish(String(mqttBaseTopic) + "/active_reading", "false", true);
-      mqtt.publish(String(mqttBaseTopic) + "/cc1101_state", cc1101RadioConnected ? "Idle" : "unavailable", true);
-      mqtt.publish(String(mqttBaseTopic) + "/status_message", "Failed after max retries, cooling down for 1 hour", true);
-      mqtt.publish(String(mqttBaseTopic) + "/last_error", lastErrorMessage, true);
+      publishSub("active_reading", "false", true);
+      publishSub("cc1101_state", cc1101RadioConnected ? "Idle" : "unavailable", true);
+      publishSub("status_message", "Failed after max retries, cooling down for 1 hour", true);
+      publishSub("last_error", lastErrorMessage, true);
 
       char buffer[16];
       snprintf(buffer, sizeof(buffer), "%lu", failedReads);
-      mqtt.publish(String(mqttBaseTopic) + "/failed_reads", buffer, true);
+      publishSub("failed_reads", buffer, true);
 
       snprintf(buffer, sizeof(buffer), "%lu", totalReadAttempts);
-      mqtt.publish(String(mqttBaseTopic) + "/total_attempts", buffer, true);
+      publishSub("total_attempts", buffer, true);
       digitalWrite(LED_BUILTIN, HIGH); // Turn off LED
       _retry = 0;                      // Reset retry counter for next scheduled attempt
       g_retryFailureReason = ReadFailure::None;
@@ -672,7 +705,7 @@ void onUpdateData()
     // Water meters: publish value in liters
     snprintf(valueBuffer, sizeof(valueBuffer), "%d", meter_data.volume);
   }
-  mqtt.publish(String(mqttBaseTopic) + "/liters", valueBuffer, true);
+  publishSub("liters", valueBuffer, true);
   delay(5);
 
   // Publish historical data as JSON attributes for Home Assistant.
@@ -694,7 +727,7 @@ void onUpdateData()
     if (written > 0)
     {
       TS_PRINTF("[MQTT] Publishing JSON attributes (%d bytes): %s\n\n", written, historyJson);
-      mqtt.publish(String(mqttBaseTopic) + "/liters_attributes", historyJson, true);
+      publishSub("liters_attributes", historyJson, true);
       delay(5);
 
       HistoryStats stats = MeterHistory::calculateStats(meter_data.history, currentVolume);
@@ -708,43 +741,43 @@ void onUpdateData()
   }
 
   snprintf(valueBuffer, sizeof(valueBuffer), "%d", meter_data.reads_counter);
-  mqtt.publish(String(mqttBaseTopic) + "/counter", valueBuffer, true);
+  publishSub("counter", valueBuffer, true);
   delay(5);
 
   snprintf(valueBuffer, sizeof(valueBuffer), "%d", meter_data.battery_left);
-  mqtt.publish(String(mqttBaseTopic) + "/battery", valueBuffer, true);
+  publishSub("battery", valueBuffer, true);
   delay(5);
 
   snprintf(valueBuffer, sizeof(valueBuffer), "%d", meter_data.rssi_dbm);
-  mqtt.publish(String(mqttBaseTopic) + "/rssi_dbm", valueBuffer, true);
+  publishSub("rssi_dbm", valueBuffer, true);
   delay(5);
 
   snprintf(valueBuffer, sizeof(valueBuffer), "%d", calculateMeterdBmToPercentage(meter_data.rssi_dbm));
-  mqtt.publish(String(mqttBaseTopic) + "/rssi_percentage", valueBuffer, true);
+  publishSub("rssi_percentage", valueBuffer, true);
   delay(5);
 
   snprintf(valueBuffer, sizeof(valueBuffer), "%d", meter_data.lqi);
-  mqtt.publish(String(mqttBaseTopic) + "/lqi", valueBuffer, true);
+  publishSub("lqi", valueBuffer, true);
   delay(5);
-  mqtt.publish(String(mqttBaseTopic) + "/time_start", timeStartFormatted, true);
+  publishSub("time_start", timeStartFormatted, true);
   delay(5);
-  mqtt.publish(String(mqttBaseTopic) + "/time_end", timeEndFormatted, true);
+  publishSub("time_end", timeEndFormatted, true);
   delay(5);
-  mqtt.publish(String(mqttBaseTopic) + "/timestamp", iso8601, true); // timestamp since epoch in UTC
+  publishSub("timestamp", iso8601, true); // ISO-8601 timestamp in UTC
   delay(5);
-  mqtt.publish(String(mqttBaseTopic) + "/meter_time", meter_data.meter_time, true); // meter's own real-time clock
+  publishSub("meter_time", meter_data.meter_time, true); // meter's own real-time clock
   delay(5);
-  mqtt.publish(String(mqttBaseTopic) + "/meter_type", meter_data.meter_type, true); // meter type/identifier string
+  publishSub("meter_type", meter_data.meter_type, true); // meter type/identifier string
   delay(5);
 
   snprintf(valueBuffer, sizeof(valueBuffer), "%d", calculateLQIToPercentage(meter_data.lqi));
-  mqtt.publish(String(mqttBaseTopic) + "/lqi_percentage", valueBuffer, true);
+  publishSub("lqi_percentage", valueBuffer, true);
   delay(5);
 
   // Publish all data as a JSON message as well this is redundant but may be useful for some
   char json[512];
-  sprintf(json, jsonTemplate, meter_data.volume, meter_data.reads_counter, meter_data.battery_left, meter_data.rssi, iso8601);
-  mqtt.publish(String(mqttBaseTopic) + "/json", json, true);
+  snprintf(json, sizeof(json), jsonTemplate, meter_data.volume, meter_data.reads_counter, meter_data.battery_left, meter_data.rssi, iso8601);
+  publishSub("json", json, true);
   delay(5);
 
 #if AUTO_ALIGN_READING_TIME
@@ -769,7 +802,7 @@ void onUpdateData()
       // Publish updated reading_time HH:MM
       char readingTimeFormatted2[6];
       snprintf(readingTimeFormatted2, sizeof(readingTimeFormatted2), "%02d:%02d", g_readHourUtc, g_readMinuteUtc);
-      mqtt.publish(String(mqttBaseTopic) + "/reading_time", readingTimeFormatted2, true);
+      publishSub("reading_time", readingTimeFormatted2, true);
       delay(5);
 
       TS_PRINTF("[SCHEDULE] Auto-aligned reading time to %02d:%02d local-offset (%02d:%02d UTC) (window %02d-%02d local)\n",
@@ -779,8 +812,8 @@ void onUpdateData()
 #endif
 
   // Notify MQTT that active reading has ended
-  mqtt.publish(String(mqttBaseTopic) + "/active_reading", "false", true);
-  mqtt.publish(String(mqttBaseTopic) + "/cc1101_state", cc1101RadioConnected ? "Idle" : "unavailable", true);
+  publishSub("active_reading", "false", true);
+  publishSub("cc1101_state", cc1101RadioConnected ? "Idle" : "unavailable", true);
   digitalWrite(LED_BUILTIN, HIGH); // Turn off LED to indicate completion
 
   // Reset retry counter and cooldown on successful read
@@ -797,12 +830,12 @@ void onUpdateData()
   char metricBuffer[16];
 
   snprintf(metricBuffer, sizeof(metricBuffer), "%lu", successfulReads);
-  mqtt.publish(String(mqttBaseTopic) + "/successful_reads", metricBuffer, true);
+  publishSub("successful_reads", metricBuffer, true);
 
   snprintf(metricBuffer, sizeof(metricBuffer), "%lu", totalReadAttempts);
-  mqtt.publish(String(mqttBaseTopic) + "/total_attempts", metricBuffer, true);
+  publishSub("total_attempts", metricBuffer, true);
 
-  mqtt.publish(String(mqttBaseTopic) + "/last_error", "None", true);
+  publishSub("last_error", "None", true);
 
   // Perform adaptive frequency tracking based on FREQEST register
   adaptiveFrequencyTracking(meter_data.freqest);
@@ -1214,6 +1247,38 @@ void publishHADiscovery()
   json += "}";
   publishDiscoveryMessage("button", "everblu_meter_reset_frequency", json);
 
+  json = "{\n";
+  json += "  \"name\": \"Diagnostic Report\",\n";
+  json += "  \"uniq_id\": \"" + getMeterPrefix() + "everblu_meter_diagnostic_report\",\n";
+  json += "  \"obj_id\": \"" + getMeterPrefix() + "everblu_meter_diagnostic_report\",\n";
+  json += "  \"ic\": \"mdi:clipboard-text-search-outline\",\n";
+  json += "  \"qos\": 0,\n";
+  json += "  \"avty_t\": \"" + String(mqttBaseTopic) + "/status\",\n";
+  json += "  \"cmd_t\": \"" + String(mqttBaseTopic) + "/diagnostic_report\",\n";
+  json += "  \"pl_prs\": \"report\",\n";
+  json += "  \"ent_cat\": \"diagnostic\",\n";
+  json += "  \"dev\": {\n    " + buildDeviceJson() + "\n  }\n";
+  json += "}";
+  publishDiscoveryMessage("button", "everblu_meter_diagnostic_report", json);
+
+  // The report text is far longer than the 255-character limit on a Home Assistant state,
+  // so the state is the time it was taken and the text is exposed as a JSON attribute.
+  json = "{\n";
+  json += "  \"name\": \"Diagnostic Report\",\n";
+  json += "  \"uniq_id\": \"" + getMeterPrefix() + "everblu_meter_diagnostic_report_state\",\n";
+  json += "  \"obj_id\": \"" + getMeterPrefix() + "everblu_meter_diagnostic_report_state\",\n";
+  json += "  \"ic\": \"mdi:clipboard-text-search-outline\",\n";
+  json += "  \"dev_cla\": \"timestamp\",\n";
+  json += "  \"qos\": 0,\n";
+  json += "  \"avty_t\": \"" + String(mqttBaseTopic) + "/status\",\n";
+  json += "  \"stat_t\": \"" + String(mqttBaseTopic) + "/diagnostic_report_state\",\n";
+  json += "  \"val_tpl\": \"{{ value_json.taken }}\",\n";
+  json += "  \"json_attr_t\": \"" + String(mqttBaseTopic) + "/diagnostic_report_state\",\n";
+  json += "  \"ent_cat\": \"diagnostic\",\n";
+  json += "  \"dev\": {\n    " + buildDeviceJson() + "\n  }\n";
+  json += "}";
+  publishDiscoveryMessage("sensor", "everblu_meter_diagnostic_report_state", json);
+
   // Binary sensor for active reading
   json = "{\n";
   json += "  \"name\": \"Active Reading\",\n";
@@ -1425,6 +1490,19 @@ void onConnectionEstablished()
     EVB_PRINTLN("Reset frequency offset command received via MQTT");
     resetFrequencyOffset(); });
 
+  char diagnosticReportTopic[MQTT_TOPIC_BUFFER_SIZE];
+  snprintf(diagnosticReportTopic, sizeof(diagnosticReportTopic), "%s/diagnostic_report", mqttBaseTopic);
+  mqtt.subscribe(diagnosticReportTopic, [](const String &message)
+                 {
+    // Input validation: only accept "report" command
+    if (message != "report") {
+      TS_PRINTF("[WARN] Invalid diagnostic report command '%s' (expected 'report')\n", message.c_str());
+      return;
+    }
+
+    EVB_PRINTLN("Diagnostic report command received via MQTT");
+    printDiagnosticReport(); });
+
   // Publish Home Assistant discovery only when enabled in compile-time config.
 #if ENABLE_HA_DISCOVERY
   TS_PRINTLN("[MQTT] Send Home Assistant discovery config.");
@@ -1590,6 +1668,85 @@ void resetFrequencyOffset()
   snprintf(freqBuffer, sizeof(freqBuffer), "%.6f", FrequencyManager::getTunedFrequency());
   snprintf(topicBuffer, sizeof(topicBuffer), "%s/tuned_frequency", mqttBaseTopic);
   mqtt.publish(topicBuffer, freqBuffer, false);
+}
+
+// Function: printDiagnosticReport
+// Description: Log the shared wiring/link/radio diagnostic block to the serial (and
+//              WiFi serial) monitor, and mirror it to a retained MQTT topic so it can be
+//              read from Home Assistant without a serial cable. The report body lives in
+//              the core driver, so this only supplies the configuration the driver cannot
+//              know about, and the output matches the ESPHome "Diagnostic Report" button.
+void printDiagnosticReport()
+{
+  cc1101_report_context_t ctx;
+  ctx.meter_code = METER_CODE;
+  ctx.meter_year = g_meterYear;
+  ctx.meter_serial = g_meterSerial;
+  ctx.is_gas = meterIsGas;
+  ctx.configured_frequency_mhz = FrequencyManager::getBaseFrequency();
+  ctx.rx_attenuation_db = RX_ATTENUATION_DB;
+  // Pins are compile-time defines shared with the driver in this build, so let the driver
+  // describe them rather than restating the same #ifdefs here.
+  ctx.cs_pin_text = nullptr;
+  ctx.gdo0_pin_text = nullptr;
+  ctx.gdo2_pin_text = nullptr;
+  ctx.meter_initialised = cc1101RadioConnected;
+
+  const char *report = cc1101_print_diagnostic_report(&ctx);
+
+  // A Home Assistant state string is capped at 255 characters, which the report comfortably
+  // exceeds, so the state carries only when it was taken and the text rides along as a JSON
+  // attribute. Retained, so the entity survives a Home Assistant restart and the report is
+  // still there when someone comes to read it.
+  //
+  // Allocated for the duration of the call rather than kept as a static buffer: it is
+  // needed once per button press, and 1.6 KB is a meaningful share of the ESP8266's RAM to
+  // hold permanently. It is also too large to put on the task stack.
+  char *payload = (char *)malloc(DIAGNOSTIC_REPORT_PAYLOAD_SIZE);
+  if (payload == nullptr)
+  {
+    TS_PRINTLN("[WARN] Not enough memory to publish the diagnostic report; see the log above");
+    return;
+  }
+
+  const time_t now = time(nullptr);
+  char takenIso[32];
+  strftime(takenIso, sizeof(takenIso), "%FT%TZ", gmtime(&now));
+
+  size_t used = (size_t)snprintf(payload, DIAGNOSTIC_REPORT_PAYLOAD_SIZE, "{\"taken\":\"%s\",\"report\":\"", takenIso);
+  for (const char *c = report; *c != '\0' && used + 8 < DIAGNOSTIC_REPORT_PAYLOAD_SIZE; c++)
+  {
+    switch (*c)
+    {
+    case '"':
+      used += (size_t)snprintf(payload + used, DIAGNOSTIC_REPORT_PAYLOAD_SIZE - used, "\\\"");
+      break;
+    case '\\':
+      used += (size_t)snprintf(payload + used, DIAGNOSTIC_REPORT_PAYLOAD_SIZE - used, "\\\\");
+      break;
+    case '\n':
+      used += (size_t)snprintf(payload + used, DIAGNOSTIC_REPORT_PAYLOAD_SIZE - used, "\\n");
+      break;
+    default:
+      // Anything else below 0x20 would be an invalid raw JSON string character. The report
+      // contains none today, but a meter code comes from user configuration.
+      if ((unsigned char)*c < 0x20)
+      {
+        used += (size_t)snprintf(payload + used, DIAGNOSTIC_REPORT_PAYLOAD_SIZE - used, "\\u%04X",
+                                 (unsigned)(unsigned char)*c);
+      }
+      else
+      {
+        payload[used++] = *c;
+        payload[used] = '\0';
+      }
+      break;
+    }
+  }
+  snprintf(payload + used, DIAGNOSTIC_REPORT_PAYLOAD_SIZE - used, "\"}");
+
+  publishSub("diagnostic_report_state", payload, true);
+  free(payload);
 }
 
 // Function: adaptiveFrequencyTracking

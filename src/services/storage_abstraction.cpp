@@ -391,7 +391,11 @@ bool StorageAbstraction::clearKey(const char *key)
 bool StorageAbstraction::clearAll()
 {
 #ifdef EVERBLU_USE_ESPHOME_PREFS
-    // Not supported via ESPHome API in bulk; caller can clear individual keys
+    // ESPHome's preference API has no bulk-erase primitive. Say so, otherwise a
+    // caller such as a factory-reset path cannot tell the difference between a
+    // failure and a silent no-op. Individual keys can still be cleared with
+    // clearKey().
+    LOG_W("everblu_meter", "clearAll() is not supported on ESPHome - clear individual keys with clearKey()");
     return false;
 
 #elif defined(ESP8266)

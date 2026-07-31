@@ -67,3 +67,7 @@ scripts/dev_notes.txt
 /test/rommess
 issue-58-reply.md
 /temp
+
+# ESPHome build output from scripts/test_build_components
+.esphome/
+.ci/esphome/*/.gitignore

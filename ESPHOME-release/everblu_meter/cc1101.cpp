@@ -7,6 +7,7 @@
 #include "radian_parser.h"
 #include "radian_decoder.h" // Shared platform-neutral 4-bit-per-bit decoder
 #include "logging.h" // Cross-platform logging
+#include "version.h" // EVERBLU_FW_VERSION, reported by the diagnostic report
 #include <Arduino.h> // Arduino core
 #if !defined(USE_ESPHOME)
 #if defined(__has_include)
@@ -315,6 +316,17 @@ void cc1101_set_rx_attenuation(int db)
 // Monotonic (lifetime) counter; surfaced via cc1101_get_gdo2_timeout_count() for telemetry.
 static uint32_t _gdo2_stuck_timeouts = 0;
 
+// Latest verdict of the GDO0 idle-level self-test (see cc1101_init), as one of
+// CC1101_SELFTEST_NOT_RUN / _PASSED / _FAILED. Kept as state rather than a log line only,
+// so the fault is visible in the diagnostic report at any time. It starts as NOT_RUN so a
+// report taken before the radio was ever initialised cannot claim the test passed - that
+// is precisely when a report is most likely to be taken.
+static int8_t _gdo0_selftest = CC1101_SELFTEST_NOT_RUN;
+
+// Whether cc1101_init() has applied pinMode() to the GDO lines. Before that they are
+// floating inputs, so sampling them would report noise dressed up as a signal.
+static bool _gdo_pins_configured = false;
+
 uint32_t cc1101_get_gdo2_timeout_count(void)
 {
   return _gdo2_stuck_timeouts;
@@ -544,6 +556,7 @@ void CC1101_CMD(uint8_t spi_instr)
 
 void echo_cc1101_version(void);
 void show_cc1101_registers_settings(void);
+int8_t cc1100_rssi_convert2dbm(uint8_t Rssi_dec);
 
 //---------------[CC1100 reset function]-----------------------
 // Reset CC1101 via software reset strobe command (per datasheet §19.1)
@@ -585,11 +598,10 @@ void setMHZ(float mhz)
       i = 1;
     }
   }
-  if (freq0 > 255)
-  {
-    freq1 += 1;
-    freq0 -= 256;
-  }
+  // No carry handling is needed here. The loop subtracts a whole FREQ1 step
+  // (0.1015625 MHz == 256 FREQ0 LSBs) before freq0 can reach 256, so freq0
+  // always fits in one byte. The former `if (freq0 > 255)` check was dead: freq0
+  // is a byte and can never exceed 255.
 
   /*
   Serial.printf("FREQ2=0x%02X ", freq2);
@@ -677,13 +689,21 @@ void cc1101_configureRF_0(float freq)
  * second SPI device holding the line. SYNC1/SYNC0 are used as the scratch pair because
  * cc1101_configureRF_0() rewrites both immediately afterwards.
  *
+ * @param partnum_out Optional; receives the PARTNUM register value.
+ * @param version_out Optional; receives the VERSION register value.
  * @return true when the radio is present and the bus is trustworthy.
  */
-static bool cc1101_verify_spi_link(void)
+static bool cc1101_verify_spi_link(uint8_t *partnum_out, uint8_t *version_out)
 {
   // Round 1 then round 2 use complementary patterns, so between them every data bit is
   // driven both high and low in each direction.
   static const uint8_t kProbe[2][2] = {{0xAA, 0x55}, {0x55, 0xAA}};
+  // cc1101_init() rewrites the sync word straight afterwards, but
+  // cc1101_collect_diagnostics() runs against a configured, listening radio and must not
+  // leave the scratch pattern behind: SYNC0 would stay at 0xAA instead of the operational
+  // 0x00, so a parked receiver would be matching on the wrong sync word.
+  const uint8_t saved_sync1 = halRfReadReg(SYNC1);
+  const uint8_t saved_sync0 = halRfReadReg(SYNC0);
   bool readback_ok = true;
   for (uint8_t round = 0; round < 2 && readback_ok; round++)
   {
@@ -694,9 +714,16 @@ static bool cc1101_verify_spi_link(void)
       readback_ok = false;
     }
   }
+  halRfWriteReg(SYNC1, saved_sync1);
+  halRfWriteReg(SYNC0, saved_sync0);
 
   uint8_t partnum = halRfReadReg(PARTNUM_ADDR);
   uint8_t version = halRfReadReg(VERSION_ADDR);
+
+  if (partnum_out != NULL)
+    *partnum_out = partnum;
+  if (version_out != NULL)
+    *version_out = version;
 
   if (!readback_ok)
   {
@@ -749,6 +776,270 @@ static bool cc1101_verify_spi_link(void)
   return true;
 }
 
+bool cc1101_probe_spi_link(uint8_t *partnum_out, uint8_t *version_out)
+{
+  if (partnum_out != NULL)
+    *partnum_out = 0;
+  if (version_out != NULL)
+    *version_out = 0;
+
+  if ((wiringPiSPISetup(0, 500000)) < 0)
+  {
+    LOG_E("everblu_meter", "Failed to initialize SPI bus - check CC1101 wiring and connections");
+    return false;
+  }
+
+  cc1101_reset();
+  delay(1);
+
+  return cc1101_verify_spi_link(partnum_out, version_out);
+}
+
+void cc1101_collect_diagnostics(cc1101_diagnostics_t *out)
+{
+  if (out == NULL)
+    return;
+
+  memset(out, 0, sizeof(*out));
+  out->gdo0_level = -1;
+  out->gdo2_level = -1;
+  out->gdo0_selftest = _gdo0_selftest;
+
+  // Capture MARCSTATE before anything below can disturb it. The link probe has to park the
+  // radio, so reading it afterwards would only ever report IDLE and the report would never
+  // show where the radio actually was.
+  out->marcstate = halRfReadReg(MARCSTATE_ADDR);
+
+  // The probe borrows SYNC1/SYNC0 as scratch registers, and the datasheet requires the
+  // radio to be in IDLE when those are programmed. The report button can be pressed while
+  // a receiver is parked in RX, so park it, probe, then put it back where it was.
+  const uint8_t marc = (uint8_t) (out->marcstate & 0x1F);
+  const bool was_receiving = (marc == 0x0D) || (marc == 0x0E) || (marc == 0x0F); // RX, RX_END, RX_RST
+  CC1101_CMD(SIDLE);
+  delayMicroseconds(100);
+
+  // Read-back check first: when the bus is untrustworthy every register below returns the
+  // same meaningless byte, and reporting those values as if they were real is what made
+  // this class of fault so hard to spot in the first place.
+  out->link_ok = cc1101_verify_spi_link(&out->partnum, &out->version);
+
+  out->freq2 = halRfReadReg(FREQ2);
+  out->freq1 = halRfReadReg(FREQ1);
+  out->freq0 = halRfReadReg(FREQ0);
+  out->mdmcfg4 = halRfReadReg(MDMCFG4);
+  out->mdmcfg3 = halRfReadReg(MDMCFG3);
+  out->mdmcfg2 = halRfReadReg(MDMCFG2);
+  out->pktctrl0 = halRfReadReg(PKTCTRL0);
+  out->carrier_mhz = cc1101_freq_registers_to_mhz(out->freq2, out->freq1, out->freq0);
+  out->rssi_dbm = cc1100_rssi_convert2dbm(halRfReadReg(RSSI_ADDR));
+  out->lqi = halRfReadReg(LQI_ADDR) & 0x7F;
+
+  // Only sample the GDO lines once they have been set up as inputs. Reading an
+  // unconfigured pin returns whatever the floating input happens to settle at, which in a
+  // diagnostic report is worse than admitting the value is unknown.
+  if (_gdo_pins_configured)
+  {
+    if (GET_GDO0_PIN() >= 0)
+      out->gdo0_level = (digitalRead(GET_GDO0_PIN()) == LOW) ? 0 : 1;
+    if (GET_GDO2_PIN() >= 0)
+      out->gdo2_level = (digitalRead(GET_GDO2_PIN()) == LOW) ? 0 : 1;
+  }
+
+  if (was_receiving)
+  {
+    CC1101_CMD(SRX);
+  }
+}
+
+const char *cc1101_print_diagnostic_report(const cc1101_report_context_t *ctx)
+{
+  cc1101_diagnostics_t diag;
+  cc1101_collect_diagnostics(&diag);
+
+  static const char *const kGdoLevel[3] = {"LOW", "HIGH", "unknown (pin not configured yet)"};
+  const char *gdo0_level = kGdoLevel[(diag.gdo0_level < 0 || diag.gdo0_level > 1) ? 2 : diag.gdo0_level];
+  const char *gdo2_level = kGdoLevel[(diag.gdo2_level < 0 || diag.gdo2_level > 1) ? 2 : diag.gdo2_level];
+
+  const char *gdo0_verdict;
+  switch (diag.gdo0_selftest)
+  {
+  case CC1101_SELFTEST_PASSED:
+    gdo0_verdict = "passed";
+    break;
+  case CC1101_SELFTEST_FAILED:
+    gdo0_verdict = "FAILED - GDO0 looks unconnected or on the wrong GPIO";
+    break;
+  default:
+    // Do not print "passed" here. The radio has not been initialised, so the test has not
+    // run - and a report taken before the first read is exactly the case where a false
+    // "passed" would send someone looking in the wrong place.
+    gdo0_verdict = "NOT RUN - the radio has not been initialised yet";
+    break;
+  }
+
+  // Fall back to a placeholder context so every field below has something to print. A
+  // report is most often requested when setup failed part-way, so it must not depend on
+  // the caller having valid configuration to hand.
+  cc1101_report_context_t empty;
+  memset(&empty, 0, sizeof(empty));
+  if (ctx == NULL)
+    ctx = &empty;
+
+  const char *meter_code = (ctx->meter_code != NULL) ? ctx->meter_code : "unknown";
+
+  // Pin descriptions are optional: ESPHome can say more about a pin than a GPIO number
+  // (inverted, pull-up, expander) and passes its own text, while the standalone build has
+  // nothing to add, so fall back to the numbers the driver is actually using.
+  char cs_default[40];
+  char gdo0_default[24];
+  char gdo2_default[48];
+  const char *cs_text = ctx->cs_pin_text;
+  const char *gdo0_text = ctx->gdo0_pin_text;
+  const char *gdo2_text = ctx->gdo2_pin_text;
+
+  if (cs_text == NULL)
+  {
+#if defined(USE_ESPHOME)
+    cs_text = "managed by the ESPHome SPI bus";
+#else
+    snprintf(cs_default, sizeof(cs_default), "GPIO%d (hardware SPI SS)", (int) SPI_SS);
+    cs_text = cs_default;
+#endif
+  }
+  if (gdo0_text == NULL)
+  {
+    if (GET_GDO0_PIN() >= 0)
+    {
+      snprintf(gdo0_default, sizeof(gdo0_default), "GPIO%d", GET_GDO0_PIN());
+      gdo0_text = gdo0_default;
+    }
+    else
+    {
+      gdo0_text = "NOT configured";
+    }
+  }
+  if (gdo2_text == NULL)
+  {
+    if (GET_GDO2_PIN() >= 0)
+    {
+      snprintf(gdo2_default, sizeof(gdo2_default), "GPIO%d", GET_GDO2_PIN());
+      gdo2_text = gdo2_default;
+    }
+    else
+    {
+      gdo2_text = "disabled (legacy SPI polling fallback)";
+    }
+  }
+
+  // Build the whole report in one buffer first. It is then logged in chunks and handed
+  // back to the caller, so the log and the copy a user pastes into an issue cannot drift
+  // apart, and publishing it costs no second probe of the radio.
+  //
+  // Static rather than automatic: the ESP8266 task stack is only a few kilobytes, and this
+  // is a one-shot, non-reentrant operation triggered by a button press.
+  static char report[CC1101_REPORT_BUFFER_SIZE];
+  size_t used = 0;
+  report[0] = '\0';
+
+// snprintf returns what it *would* have written, so clamp before advancing or a long meter
+// code would push the offset past the end of the buffer.
+#define REPORT_APPEND(...)                                                    \
+  do                                                                          \
+  {                                                                           \
+    if (used < sizeof(report) - 1)                                            \
+    {                                                                         \
+      int written_ = snprintf(report + used, sizeof(report) - used, __VA_ARGS__); \
+      if (written_ > 0)                                                       \
+      {                                                                       \
+        used += (size_t) written_;                                            \
+        if (used >= sizeof(report))                                           \
+          used = sizeof(report) - 1;                                          \
+      }                                                                       \
+    }                                                                         \
+  } while (0)
+
+  REPORT_APPEND("===== EverBlu diagnostic report =====\n");
+  REPORT_APPEND("  Firmware Version: %s\n", EVERBLU_FW_VERSION);
+  REPORT_APPEND("  Meter Code: %s (year=%u, serial=%lu, %s)\n", meter_code, (unsigned) ctx->meter_year,
+                (unsigned long) ctx->meter_serial, ctx->is_gas ? "Gas" : "Water");
+  REPORT_APPEND("  Configured Frequency: %.6f MHz\n", ctx->configured_frequency_mhz);
+  REPORT_APPEND("  RX Attenuation: %d dB\n", ctx->rx_attenuation_db);
+  REPORT_APPEND("  CS Pin: %s, GDO0 Pin: %s, GDO2 Pin: %s\n", cs_text, gdo0_text, gdo2_text);
+  REPORT_APPEND("  SPI Link Self-Test: %s\n",
+                diag.link_ok ? "PASSED" : "FAILED - the register values below are meaningless");
+  REPORT_APPEND("  PARTNUM: 0x%02X (expect 0x00), VERSION: 0x%02X (expect 0x04 or 0x14)\n", diag.partnum,
+                diag.version);
+  REPORT_APPEND("  MARCSTATE: 0x%02X (%s), PKTCTRL0: 0x%02X\n", diag.marcstate,
+                cc1101_marcstate_name(diag.marcstate), diag.pktctrl0);
+  REPORT_APPEND("  FREQ2/1/0: 0x%02X 0x%02X 0x%02X -> carrier %.6f MHz (configured base %.6f MHz)\n", diag.freq2,
+                diag.freq1, diag.freq0, diag.carrier_mhz, ctx->configured_frequency_mhz);
+  REPORT_APPEND("  MDMCFG4/3/2: 0x%02X 0x%02X 0x%02X\n", diag.mdmcfg4, diag.mdmcfg3, diag.mdmcfg2);
+  REPORT_APPEND("  RSSI: %d dBm, LQI: %u (last measurement; only meaningful after a frame arrives)\n",
+                diag.rssi_dbm, diag.lqi);
+  REPORT_APPEND("  GDO0 level: %s (expect LOW while idle), GDO2 level: %s\n", gdo0_level, gdo2_level);
+  REPORT_APPEND("  GDO0 wiring self-test: %s\n", gdo0_verdict);
+  REPORT_APPEND("  GDO2 fault count: %lu\n", (unsigned long) cc1101_get_gdo2_timeout_count());
+  REPORT_APPEND("  Meter reader initialised: %s\n", ctx->meter_initialised ? "yes" : "no");
+  REPORT_APPEND("===== end of report =====");
+
+#undef REPORT_APPEND
+
+  // Logged a line at a time rather than as one message: the ESPHome logger truncates at its
+  // transmit buffer (512 bytes by default), which cut the report off part-way through the
+  // GDO0 line and lost the wiring verdicts that matter most.
+  const char *line = report;
+  while (*line != '\0')
+  {
+    const char *end = strchr(line, '\n');
+    const int len = (end != NULL) ? (int) (end - line) : (int) strlen(line);
+    LOG_I("everblu_meter", "%.*s", len, line);
+    if (end == NULL)
+      break;
+    line = end + 1;
+  }
+
+  return report;
+}
+
+float cc1101_freq_registers_to_mhz(uint8_t freq2, uint8_t freq1, uint8_t freq0)
+{
+  const uint32_t freq = ((uint32_t) freq2 << 16) | ((uint32_t) freq1 << 8) | (uint32_t) freq0;
+  return (float) freq * 26.0f / 65536.0f;
+}
+
+const char *cc1101_marcstate_name(uint8_t marcstate)
+{
+  // Datasheet Table 25. Reported raw, a value such as 0x11 reads as a fault when it is
+  // usually just a receiver that has been parked with nothing draining the FIFO.
+  switch (marcstate & 0x1F)
+  {
+  case 0x00: return "SLEEP";
+  case 0x01: return "IDLE";
+  case 0x02: return "XOFF";
+  case 0x03: return "VCOON_MC";
+  case 0x04: return "REGON_MC";
+  case 0x05: return "MANCAL";
+  case 0x06: return "VCOON";
+  case 0x07: return "REGON";
+  case 0x08: return "STARTCAL";
+  case 0x09: return "BWBOOST";
+  case 0x0A: return "FS_LOCK";
+  case 0x0B: return "IFADCON";
+  case 0x0C: return "ENDCAL";
+  case 0x0D: return "RX";
+  case 0x0E: return "RX_END";
+  case 0x0F: return "RX_RST";
+  case 0x10: return "TXRX_SWITCH";
+  case 0x11: return "RXFIFO_OVERFLOW";
+  case 0x12: return "FSTXON";
+  case 0x13: return "TX";
+  case 0x14: return "TX_END";
+  case 0x15: return "RXTX_SWITCH";
+  case 0x16: return "TXFIFO_UNDERFLOW";
+  default: return "unknown";
+  }
+}
+
 bool cc1101_init(float freq)
 {
 #ifdef USE_ESPHOME
@@ -773,6 +1064,10 @@ bool cc1101_init(float freq)
     echo_debug(debug_out, "[CC1101] GDO2 pin %d configured as FIFO threshold input (pull-up)\n", GET_GDO2_PIN());
   }
 
+  // From here on the GDO lines carry a real signal rather than a floating level, so
+  // cc1101_collect_diagnostics() may report them.
+  _gdo_pins_configured = true;
+
   // Initialize SPI transport for CC1101 communication.
   // Standalone builds configure Arduino SPI here at 500 kHz.
   // ESPHome builds ignore the requested speed and use the SPIDevice rate.
@@ -785,7 +1080,7 @@ bool cc1101_init(float freq)
   cc1101_reset();
   delay(1);
 
-  if (!cc1101_verify_spi_link())
+  if (!cc1101_verify_spi_link(NULL, NULL))
   {
     return false;
   }
@@ -799,6 +1094,50 @@ bool cc1101_init(float freq)
   delay(5);          // Wait for calibration to complete (typically <1ms, but we add margin)
 
   echo_debug(debug_out, "[CC1101] Frequency synthesizer calibrated for %.6f MHz\n", freq);
+
+  // GDO0 wiring self-test. IOCFG0 is sync-word-detect (set by cc1101_configureRF_0) and
+  // the radio is IDLE here, so a correctly wired GDO0 must read LOW. The pin is configured
+  // INPUT_PULLUP, so an unconnected or wrong GPIO reads HIGH. Without this check a wrong
+  // gdo0_pin fails silently in a way that looks like success: every "wait for GDO0" loop
+  // returns immediately, so the logs show "GDO0 triggered at 0ms" and a frame is
+  // "received" that is really just noise (issue seen on boards where GDO0 was pointed at
+  // an unrelated peripheral pin).
+  //
+  // The check runs on every init - it costs one strobe and a few reads - but the warning
+  // is rate-limited, because a frequency scan calls cc1101_init() per step and would
+  // otherwise repeat it dozens of times. It is re-armed whenever the test passes, so a
+  // connection that starts failing hours into a run is reported rather than swallowed by
+  // a boot-time one-shot. The verdict is kept in _gdo0_selftest so it stays visible
+  // through cc1101_collect_diagnostics().
+  {
+    CC1101_CMD(SIDLE);
+    delayMicroseconds(100);
+    // Sample a few times: a genuinely idle GDO0 is steady, so a single reading is enough
+    // in principle, but repeating costs nothing and avoids reacting to a transient.
+    bool stuck_high = true;
+    for (uint8_t i = 0; i < 4 && stuck_high; i++)
+    {
+      if (digitalRead(GET_GDO0_PIN()) == LOW)
+        stuck_high = false;
+      delayMicroseconds(100);
+    }
+    _gdo0_selftest = stuck_high ? CC1101_SELFTEST_FAILED : CC1101_SELFTEST_PASSED;
+
+    static bool s_gdo0_warning_logged = false;
+    if (!stuck_high)
+    {
+      // Re-arm so an intermittent fault is logged again the next time it appears.
+      s_gdo0_warning_logged = false;
+      echo_debug(debug_out, "[CC1101] GDO0 self-test passed (LOW while idle)\n");
+    }
+    else if (!s_gdo0_warning_logged)
+    {
+      s_gdo0_warning_logged = true;
+      LOG_W("everblu_meter",
+            "GDO0 self-test FAILED: pin %d reads HIGH while the radio is IDLE (expected LOW). GDO0 is probably on the wrong GPIO or not connected - the pin has a pull-up, so an unwired pin reads HIGH. Every sync-word wait will then return instantly and 'received' frames will be noise. Check gdo0_pin against your board's CC1101 GDO0 pin.",
+            GET_GDO0_PIN());
+    }
+  }
 
   // One-time GDO2 wiring self-test. With IOCFG2 in TX-FIFO-threshold mode (0x02, set by
   // cc1101_configureRF_0) GDO2 must read LOW with an empty TX FIFO and HIGH once the FIFO
@@ -936,115 +1275,6 @@ void show_cc1101_registers_settings(void)
   echo_debug(debug_out, "\n");
 }
 
-uint8_t is_look_like_radian_frame(uint8_t *buffer, size_t len)
-{
-  int ret;
-  ret = FALSE;
-  for (size_t i = 0; i < len; i++)
-  {
-    if (buffer[i] == 0xFF)
-      ret = TRUE;
-  }
-
-  return ret;
-}
-
-//-----------------[check if Packet is received]-------------------------
-uint8_t cc1101_check_packet_received(void)
-{
-  uint8_t rxBuffer[100];
-  uint8_t l_nb_byte;
-  int8_t l_Rssi_dbm;
-  uint8_t l_lqi, l_freq_est, pktLen;
-  pktLen = 0;
-  if (digitalRead(GET_GDO0_PIN()) == TRUE)
-  {
-    // Read RSSI immediately while signal is present (carrier active)
-    // RSSI register needs to be sampled during packet reception for accuracy
-    l_Rssi_dbm = cc1100_rssi_convert2dbm(halRfReadReg(RSSI_ADDR));
-
-    bool buffer_overflow = false;
-    while (digitalRead(GET_GDO0_PIN()) == TRUE)
-    {
-      delay(2); // Reduced from 5ms to 2ms for faster FIFO reading (prevents overflow)
-
-      // Check for FIFO overflow (bit 7 of RXBYTES register)
-      uint8_t rxbytes_reg = halRfReadReg(RXBYTES_ADDR);
-      if (rxbytes_reg & 0x80)
-      {
-        echo_debug(1, "[ERROR] RX FIFO overflow detected - data corrupted\n");
-        CC1101_CMD(SFRX); // Flush RX FIFO to recover
-        return FALSE;
-      }
-
-      l_nb_byte = rxbytes_reg & RXBYTES_MASK;
-
-      // Bounds check before reading to prevent buffer overflow
-      if ((l_nb_byte) && ((pktLen + l_nb_byte) <= 100))
-      {
-        SPIReadBurstReg(RX_FIFO_ADDR, &rxBuffer[pktLen], l_nb_byte); // Pull data
-        pktLen += l_nb_byte;
-      }
-      else if (l_nb_byte && ((pktLen + l_nb_byte) > 100))
-      {
-        echo_debug(1, "[ERROR] Would overflow rxBuffer (pktLen=%u + l_nb_byte=%u > 100)\n", pktLen, l_nb_byte);
-        buffer_overflow = true;
-        break;
-      }
-    }
-
-    // Read LQI and FREQEST only if packet completed normally (GDO0 went low)
-    // If we exited via buffer overflow, GDO0 may still be high and these registers
-    // are not yet latched, so reading them would give incorrect values.
-    if (buffer_overflow)
-    {
-      echo_debug(1, "[ERROR] Buffer overflow - discarding incomplete packet\n");
-      CC1101_CMD(SFRX); // Flush RX FIFO to recover
-      return FALSE;
-    }
-    // These registers are latched at end-of-packet and contain final quality metrics
-    l_lqi = halRfReadReg(LQI_ADDR);
-    l_freq_est = halRfReadReg(FREQEST_ADDR);
-
-    if (is_look_like_radian_frame(rxBuffer, pktLen))
-    {
-      echo_debug(debug_out, "[CC1101] Packet looks like RADIAN frame");
-      echo_debug(debug_out, "[CC1101] bytes=%u rssi=%d lqi=%u F_est=%d\n", pktLen, l_Rssi_dbm, l_lqi & 0x7F, (int8_t)l_freq_est);
-      show_in_hex_one_line(rxBuffer, pktLen);
-      // show_in_bin(rxBuffer,l_nb_byte);
-    }
-    else
-    {
-      echo_debug(debug_out, ".");
-    }
-    fflush(stdout);
-    return TRUE;
-  }
-  return FALSE;
-}
-
-uint8_t cc1101_wait_for_packet(int milliseconds)
-{
-  int i;
-  for (i = 0; i < milliseconds; i++)
-  {
-    delay(1); // in ms
-    if (i % 100 == 0)
-      FEED_WDT(); // Feed watchdog every 100ms
-    // echo_cc1101_MARCSTATE();
-    if (cc1101_check_packet_received()) // delay till system has data available
-    {
-      return TRUE;
-    }
-    else if (i == milliseconds - 1)
-    {
-      // echo_debug(debug_out,"no packet received!\n");
-      return FALSE;
-    }
-  }
-  return TRUE;
-}
-
 // Diagnostic: the RADIAN frame length is not assumed. Scan every candidate
 // total length L and report where a CRC-16/KERMIT trailer actually closes.
 // The authoritative convention (proven against the reference Make_Radian_Master_req
@@ -1093,6 +1323,18 @@ static bool validate_radian_crc(const uint8_t *decoded_buffer, size_t size)
   if (size < 4)
   {
     echo_debug(1, "[ERROR] Decoded frame too small for CRC validation (size=%u)\n", size);
+    return false;
+  }
+
+  // Call out truncation separately. radian_validate_crc() rejects these too, but the
+  // generic "CRC failed" message sends people looking at the frequency or the aerial when
+  // the real symptom is that the capture stopped before the CRC trailer arrived.
+  const uint8_t length_field = decoded_buffer[0];
+  if (length_field != 0 && (size_t) length_field > size)
+  {
+    echo_debug(1,
+               "[ERROR] Frame truncated: length byte claims %u bytes, only %u decoded - the CRC trailer was never received, discarding\n",
+               (unsigned)length_field, (unsigned)size);
     return false;
   }
 

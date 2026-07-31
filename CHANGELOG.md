@@ -4,7 +4,6 @@ All notable changes to this project will be documented in this file.
 
 Releases are created manually by tagging commits with version tags matching `v*.*.*` (e.g., `v2.1.0`). Users should build from source and configure `private.h` with their own meter settings.
 
-
 ## AI Notes For Maintainers And Tools
 
 - Treat release sections as the source of truth for shipped behavior.
@@ -12,6 +11,41 @@ Releases are created manually by tagging commits with version tags matching `v*.
 - If an item was introduced and later superseded in the same release branch, keep only the final behavior in Added/Changed/Fixed/Removed and record superseded work in the AI metadata block.
 - Keep PR coverage explicit per release so branch-only work is auditable against merge history.
 - Add new versions below, not above this section.
+
+## [Unreleased]
+
+### Breaking
+
+- **The ESPHome component now requires ESPHome 2026.1.0 or later.** `dump_config()` and the new diagnostic report print their pin assignments through `GPIOPin::dump_summary(char *, size_t)` and `GPIO_SUMMARY_MAX_LEN`, which first shipped in that release. Config validation enforces the floor with `cv.require_esphome_version()`, so an older install now fails during validation with a clear message instead of part-way through the C++ compile. The standalone PlatformIO build is unaffected.
+- **A frame whose length byte claims more bytes than were decoded is now discarded.** Previously `radian_validate_crc()` returned "valid" without verifying anything in this case, so a truncated or misaligned capture bypassed the only integrity gate on the radio path and left the downstream parser sanity checks to catch the damage. If a meter's frames are consistently truncated, this turns intermittently-corrupt readings into no readings, so the failure is now logged distinctly: `Frame truncated: length byte claims N bytes, only M decoded - the CRC trailer was never received` rather than the generic CRC message, which sent people looking at the aerial and the frequency. The captured `home_001` test fixture is one of these frames and is now marked `crc_valid=0`; parse coverage for the same meter comes from the complete `home_002` frame.
+
+### Added
+
+- **`diagnostic_report_button`**: a new optional button that logs a single copy-pasteable block containing the configured CS/GDO0/GDO2 pins, a live SPI link self-test, the key CC1101 registers (PARTNUM, VERSION, MARCSTATE, FREQ2/1/0, MDMCFG4/3/2, PKTCTRL0), RSSI/LQI and the current GDO0/GDO2 line levels. It deliberately does not require the meter reader to be initialised, because the most common reason to press it is that the radio never came up.
+- **`Diagnostic Report` MQTT button**: the standalone MQTT build exposes the same report as a Home Assistant button and on the `<base>/diagnostic_report` topic (payload `report`). The report body was moved into the shared CC1101 driver, so both integrations print byte-for-byte comparable blocks and a bug report needs only one set of instructions. As well as going to the serial / WiFi serial log, the report is published retained to `<base>/diagnostic_report_state` and surfaced as a `Diagnostic Report` sensor whose state is the time it was taken and whose `report` attribute holds the text, so it can be read from Home Assistant without a serial cable. A Home Assistant state is capped at 255 characters, hence the attribute.
+- **GDO0 wiring self-test**: `cc1101_init()` now checks that GDO0 reads LOW while the radio is IDLE, mirroring the existing GDO2 self-test. The pin is configured with a pull-up, so a wrong or unconnected GPIO reads HIGH. Previously a mis-assigned `gdo0_pin` failed silently in a way that resembled success: every sync-word wait returned immediately, producing `GDO0 triggered at 0ms` and "received" frames that were only noise. The verdict is exposed through `cc1101_collect_diagnostics()` and shown in the diagnostic report, so a fault that appears mid-life is visible rather than only at the first boot after a miswire.
+
+### Changed
+
+- **The SPI link self-test now runs during `setup()`**, not on the first Home Assistant connection. A stuck MISO or a wrong `cs_pin`/`miso_pin` is a hard wiring fault, and users typically capture only the boot log, which previously contained no evidence of it.
+- **`dump_config()` reports the actual GPIO numbers** for the CS, GDO0 and GDO2 pins instead of just `configured`, and adds the RX attenuation setting and the SPI link self-test result. Support requests usually consist of this block alone, which could not be checked against a board pinout without the numbers.
+- **The SPI write/read-back probe restores the sync word it borrowed.** `SYNC1`/`SYNC0` are the scratch pair, and the last pattern written is `0x55`/`0xAA`. `cc1101_init()` rewrites them immediately afterwards, but `cc1101_collect_diagnostics()` runs against a configured, listening radio, so without the restore the operational sync word silently became `0x55AA`.
+- **The diagnostic snapshot parks the radio for the probe and puts it back.** The datasheet requires IDLE when programming `SYNC1`/`SYNC0`, and `cc1101_init()` ends in `cc1101_rec_mode()`, so the button is normally pressed on a radio sitting in RX. `cc1101_collect_diagnostics()` now captures `MARCSTATE` first, strobes `SIDLE` for the probe and re-enters RX afterwards if that is where the radio was; without it, asking for a report would have left a listening receiver deaf.
+- **The GDO0 self-test verdict distinguishes "not run" from "passed".** The report works without the meter reader, so it is usually taken when the radio never came up, which is exactly when `cc1101_init()` and therefore the self-test have not run. Reporting `passed` there cleared GDO0 of a fault that was never checked. The same applies to the GDO0/GDO2 line levels, which are now reported as unknown until the pins have been given a mode rather than sampling a floating input.
+- **The GDO0 warning is re-armed when the test passes.** It is still rate-limited so a frequency scan (which calls `cc1101_init()` per step) does not repeat it dozens of times, but a connection that starts failing hours into a run is now logged rather than swallowed by a boot-time one-shot.
+- **`MARCSTATE` is reported by name** in the diagnostic report. As a bare number a state such as `0x11` reads as a fault, when it is usually just a receiver parked with nothing draining the FIFO (`RXFIFO_OVERFLOW`).
+- **The diagnostic report decodes `FREQ2/1/0` into the actual carrier frequency** and prints it alongside the configured base. The two differ by whatever calibration offset is in effect, so reporting only the configured value hid a ~31 kHz discrepancy that could otherwise be spotted only by doing the register arithmetic by hand.
+- **Standalone MQTT publishes no longer build their topics as Arduino `String`s.** A single read published around 20 topics as `String(mqttBaseTopic) + "/suffix"`, allocating and freeing two heap blocks each time and fragmenting the ~40 KB ESP8266 heap over the life of the device. A `publishSub()` helper formats the topic into a stack buffer instead, consistent with how the rest of the file already builds topics.
+- **`StorageAbstraction::clearAll()` logs a warning on ESPHome** instead of silently returning `false`, so a factory-reset caller can tell the difference between a failure and a no-op. ESPHome's preference API has no bulk-erase primitive; individual keys must be cleared with `clearKey()`.
+
+### Fixed
+
+- **The unbounded `sprintf()` building the standalone `/json` payload** is now `snprintf()`, matching the rest of `src/main.cpp`.
+
+### Removed
+
+- **Dead diagnostic code in the CC1101 driver:** `cc1101_wait_for_packet()`, `cc1101_check_packet_received()` and `is_look_like_radian_frame()` had no callers and were not part of the `cc1101.h` public API. They also held the only unbounded call into the hex-dump helper. The live receive path is `receive_radian_frame()` and is unchanged.
+- **The unreachable carry branch in `setMHZ()`.** `freq0` is a `byte`, so `if (freq0 > 255)` could never be true; the loop above it already subtracts a whole FREQ1 step before `freq0` can reach 256.
 
 ## [v3.4.0] - 2026-07-30
 
@@ -120,7 +154,6 @@ scope_summary:
 - **RADIAN CRC now validates end-to-end on live frames for the first time.** Two stacked defects meant the CRC was never actually checked: the raw capture truncated the frame so the CRC trailer was never received, and `radian_validate_crc()` computed the checksum over the wrong range (it skipped the length byte). The frame is 124 bytes; the CRC-16/KERMIT is computed over bytes [0..121] (including the length byte) with the trailer at [122-123]. Verified against multiple live captures.
 - **`extract-meter-fixture.py` CRC check used the wrong convention**: it computed the CRC over bytes [1..], skipping the length byte, so captured fixtures were marked `crc_valid=0`. It now matches the firmware and covers bytes [0..].
 
-
 ## [v3.1.1] - 2026-07-08
 
 ### AI Metadata
@@ -138,8 +171,6 @@ scope_summary:
 ### Fixed
 
 - **Wake-up burst truncated to ~60ms on the second and later reads** ([#127](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/127)): `receive_radian_frame()` switches `MDMCFG4` to the 4x-oversampled 9.6 kbps RX rate, but `get_meter_data_for_meter()` never restored the 2.4 kbps TX rate before transmitting. Only the first read after boot worked (fresh from `cc1101_init()`); every later read clocked the wake-up burst out 4x too fast, draining the TX FIFO and hitting `TXFIFO_UNDERFLOW` (MARCSTATE 0x16) after ~60ms instead of the full ~2s burst. The TX phase now rewrites `MDMCFG4`/`MDMCFG3` to 2.4 kbps on every read.
-
-
 
 ## [v3.1.0] - 2026-07-07
 

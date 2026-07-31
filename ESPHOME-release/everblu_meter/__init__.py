@@ -108,6 +108,7 @@ CONF_REQUEST_READING_BUTTON = "request_reading_button"
 CONF_DEEP_SCAN_BUTTON = "deep_scan_button"
 CONF_RESET_FREQUENCY_BUTTON = "reset_frequency_button"
 CONF_STOP_READING_BUTTON = "stop_reading_button"
+CONF_DIAGNOSTIC_REPORT_BUTTON = "diagnostic_report_button"
 CONF_RX_ATTENUATION = "rx_attenuation"
 
 # Meter types
@@ -424,6 +425,11 @@ CONFIG_SCHEMA = (
                 icon="mdi:stop-circle-outline",
                 entity_category="config",
             ),
+            cv.Optional(CONF_DIAGNOSTIC_REPORT_BUTTON): button.button_schema(
+                EverbluMeterTriggerButton,
+                icon="mdi:clipboard-text-search-outline",
+                entity_category="diagnostic",
+            ),
         }
     )
     .extend(cv.polling_component_schema("24h"))
@@ -513,6 +519,11 @@ def validate_pins(config):
 
 CONFIG_SCHEMA = cv.All(
     CONFIG_SCHEMA,
+    # dump_config() and the diagnostic report render pin summaries with the buffer-based
+    # GPIOPin::dump_summary() and GPIO_SUMMARY_MAX_LEN, both of which first shipped in
+    # ESPHome 2026.1.0. Without this guard an older install passes validation and then
+    # fails deep inside the C++ compile with no indication of the real cause.
+    cv.require_esphome_version(2026, 1, 0),
     validate_gdo2_required,
     validate_esp32_framework,
     validate_pins,
@@ -744,3 +755,8 @@ async def to_code(config):
         btn = await button.new_button(config[CONF_STOP_READING_BUTTON])
         cg.add(btn.set_parent(var))
         cg.add(btn.set_stop(True))
+
+    if CONF_DIAGNOSTIC_REPORT_BUTTON in config:
+        btn = await button.new_button(config[CONF_DIAGNOSTIC_REPORT_BUTTON])
+        cg.add(btn.set_parent(var))
+        cg.add(btn.set_diagnostic(True))

@@ -12,6 +12,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 #ifdef USE_ESPHOME
 /**
  * @brief Configure CC1101 to use ESPHome SPI device
@@ -81,6 +82,161 @@ void cc1101_set_rx_attenuation(int db);
  * @return Cumulative count since boot. Always 0 when GDO2 is not configured.
  */
 uint32_t cc1101_get_gdo2_timeout_count(void);
+
+/**
+ * @brief Probe the SPI link to the CC1101 without configuring the radio.
+ *
+ * Performs the same reset + write/read-back self-test as cc1101_init(), but stops there.
+ * Intended to be called early (for example from an ESPHome setup()) so a dead or
+ * mis-wired SPI link is reported in the boot log, rather than only surfacing later when
+ * the first read is attempted. Failures are logged with the same remediation guidance.
+ *
+ * @param partnum_out Optional; receives the PARTNUM register value.
+ * @param version_out Optional; receives the VERSION register value.
+ * @return true when the radio answered and the bus is trustworthy.
+ */
+bool cc1101_probe_spi_link(uint8_t *partnum_out, uint8_t *version_out);
+
+/** Self-test verdict: the test has not run, so nothing is known either way. */
+#define CC1101_SELFTEST_NOT_RUN (-1)
+/** Self-test verdict: the test ran and passed. */
+#define CC1101_SELFTEST_PASSED (0)
+/** Self-test verdict: the test ran and failed. */
+#define CC1101_SELFTEST_FAILED (1)
+
+/**
+ * @brief Snapshot of radio identity, key registers and GDO line levels.
+ *
+ * Everything a support request needs in order to tell a wiring fault from an RF problem,
+ * captured in one pass so it can be logged as a single copy-pasteable block.
+ */
+typedef struct
+{
+  bool link_ok;      /**< SPI write/read-back self-test passed */
+  uint8_t partnum;   /**< PARTNUM: 0x00 on a genuine CC1101 */
+  uint8_t version;   /**< VERSION: 0x04 or 0x14 on known revisions */
+  uint8_t marcstate; /**< Main radio control state machine state */
+  uint8_t freq2;     /**< Carrier frequency, MSB */
+  uint8_t freq1;
+  uint8_t freq0;
+  /**
+   * Carrier frequency decoded from FREQ2/1/0, in MHz.
+   *
+   * Read back from the radio, so this is where it is actually tuned. It differs from the
+   * configured base frequency by whatever calibration offset is in effect, which is the
+   * point: a mismatch between the two is otherwise invisible without doing the arithmetic
+   * by hand.
+   */
+  float carrier_mhz;
+  uint8_t mdmcfg4; /**< RX filter bandwidth + data rate exponent */
+  uint8_t mdmcfg3;
+  uint8_t mdmcfg2;
+  uint8_t pktctrl0;
+  int8_t rssi_dbm; /**< Current RSSI, converted to dBm */
+  uint8_t lqi;
+  /**
+   * GDO0 line level: 0 = LOW, 1 = HIGH, -1 = unknown.
+   *
+   * Unknown means the pin has not been configured as an input yet (cc1101_init() has not
+   * run), so sampling it would report a floating pin rather than a signal.
+   */
+  int gdo0_level;
+  int gdo2_level; /**< GDO2 line level; same encoding as gdo0_level. */
+  /**
+   * Verdict of the GDO0 idle-level self-test run by cc1101_init(), as one of
+   * CC1101_SELFTEST_NOT_RUN / _PASSED / _FAILED.
+   *
+   * FAILED means GDO0 read HIGH while the radio was IDLE, so the pin is almost certainly
+   * on the wrong GPIO or not connected; sync-word waits then return instantly and
+   * "received" frames are noise. NOT_RUN is reported separately from PASSED because a
+   * diagnostic snapshot is most often taken when the radio never came up, which is
+   * exactly when the self-test has not had a chance to run.
+   */
+  int8_t gdo0_selftest;
+} cc1101_diagnostics_t;
+
+/**
+ * @brief Fill @p out with a one-shot diagnostic snapshot of the radio.
+ *
+ * Does not reset or reconfigure the radio, but it is not purely passive: the SPI
+ * read-back check borrows SYNC1/SYNC0 as scratch registers, so the radio is parked in
+ * IDLE for the duration and returned to RX afterwards if that is where it was. When the
+ * SPI link is untrustworthy, link_ok is false and the register values are meaningless.
+ *
+ * @param out Destination struct; ignored when NULL.
+ */
+void cc1101_collect_diagnostics(cc1101_diagnostics_t *out);
+
+/**
+ * @brief Caller-supplied context for cc1101_print_diagnostic_report().
+ *
+ * The driver knows the radio but not how the surrounding firmware was configured, so the
+ * caller passes in the parts of the report it owns. Pin descriptions are strings rather
+ * than numbers because ESPHome describes a pin as more than a GPIO number (inverted,
+ * pull-up, expander), and the MQTT build has no pin object at all.
+ *
+ * String members may be NULL; they are printed as "unknown" rather than crashing.
+ * A NULL pin description falls back to the GPIO numbers the driver is actually using.
+ */
+typedef struct
+{
+  const char *meter_code;         /**< Meter code as configured, e.g. "21-0123456". */
+  uint16_t meter_year;            /**< Two-digit production year parsed from the meter code. */
+  uint32_t meter_serial;          /**< Serial number parsed from the meter code. */
+  bool is_gas;                    /**< true for a gas meter, false for water. */
+  float configured_frequency_mhz; /**< Base frequency before any calibration offset. */
+  int rx_attenuation_db;          /**< Configured front-end RX attenuation. */
+  const char *cs_pin_text;        /**< Chip-select pin description; NULL to derive one. */
+  const char *gdo0_pin_text;      /**< GDO0 pin description; NULL to derive one. */
+  const char *gdo2_pin_text;      /**< GDO2 pin description; NULL to derive one. */
+  bool meter_initialised;         /**< Whether the meter reader finished setting up. */
+} cc1101_report_context_t;
+
+/**
+ * @brief Buffer size that always holds a complete diagnostic report, including the
+ *        terminating NUL.
+ *
+ * A worst-case report (every self-test failed, so every verdict is its long explanatory
+ * form) runs to a little under 1 kB. The report is truncated rather than overflowing if it
+ * ever outgrows this.
+ */
+#define CC1101_REPORT_BUFFER_SIZE 1280
+
+/**
+ * @brief Log a copy-pasteable diagnostic report covering wiring, link and radio state.
+ *
+ * Calls cc1101_collect_diagnostics() itself, then prints the snapshot alongside the
+ * caller-supplied configuration in @p ctx. Shared by the ESPHome component and the
+ * standalone MQTT firmware so both produce byte-for-byte comparable reports in a bug
+ * report. Safe to call before the radio has been initialised: the SPI and GDO0 verdicts
+ * then report "FAILED"/"NOT RUN" rather than a misleading pass.
+ *
+ * @param ctx Configuration context; a NULL pointer prints the radio half only.
+ * @return The same text that was logged, NUL-terminated, in a static buffer that stays
+ *         valid until the next call. Lets a caller publish the report as well as log it
+ *         without probing the radio a second time. Never NULL.
+ */
+const char *cc1101_print_diagnostic_report(const cc1101_report_context_t *ctx);
+
+/**
+ * @brief Human-readable name for a MARCSTATE value (datasheet Table 25).
+ *
+ * Reported as a bare number, a state such as 0x11 reads as a fault when it is usually
+ * just a receiver parked with nothing draining the FIFO.
+ *
+ * @param marcstate Raw MARCSTATE register value.
+ * @return Static string, never NULL; "unknown" for undefined values.
+ */
+const char *cc1101_marcstate_name(uint8_t marcstate);
+
+/**
+ * @brief Convert the CC1101 FREQ2/FREQ1/FREQ0 register triple to MHz.
+ *
+ * Inverse of setMHZ(): f_carrier = FREQ * f_xosc / 2^16, with a 26 MHz crystal.
+ *
+ * @return Carrier frequency in MHz.
+ */
+float cc1101_freq_registers_to_mhz(uint8_t freq2, uint8_t freq1, uint8_t freq0);
 
 /**
  * @enum ReadFailure

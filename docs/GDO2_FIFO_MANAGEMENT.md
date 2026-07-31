@@ -99,6 +99,11 @@ threshold signal.
 
 ### Current RX loop behaviour
 
+> **Historical note:** the loop below is the diagnostic `cc1101_wait_for_packet()` /
+> `cc1101_check_packet_received()` pair, which was never on the live read path and has since been
+> deleted. It is kept here because it is the loop the analysis in this section was written
+> against. The live RX path is `receive_radian_frame()`, which polls `RXBYTES` in the same shape.
+
 ```
 cc1101_wait_for_packet(ms)            // outer: delay(1) per iteration, polls GDO0
   └─ cc1101_check_packet_received()
