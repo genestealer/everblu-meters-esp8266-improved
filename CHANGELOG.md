@@ -26,6 +26,7 @@ Releases are created manually by tagging commits with version tags matching `v*.
 - **`dump_config()` reports the actual GPIO numbers** for the CS, GDO0 and GDO2 pins instead of just `configured`, and adds the RX attenuation setting and the SPI link self-test result. Support requests usually consist of this block alone, which could not be checked against a board pinout without the numbers.
 - **The SPI write/read-back probe restores the sync word it borrowed.** `SYNC1`/`SYNC0` are the scratch pair, and the last pattern written is `0x55`/`0xAA`. `cc1101_init()` rewrites them immediately afterwards, but `cc1101_collect_diagnostics()` runs against a configured, listening radio, so without the restore the operational sync word silently became `0x55AA`.
 - **`MARCSTATE` is reported by name** in the diagnostic report. As a bare number a state such as `0x11` reads as a fault, when it is usually just a receiver parked with nothing draining the FIFO (`RXFIFO_OVERFLOW`).
+- **The diagnostic report decodes `FREQ2/1/0` into the actual carrier frequency** and prints it alongside the configured base. The two differ by whatever calibration offset is in effect, so reporting only the configured value hid a ~31 kHz discrepancy that could otherwise be spotted only by doing the register arithmetic by hand.
 
 ## [v3.4.0] - 2026-07-30
 

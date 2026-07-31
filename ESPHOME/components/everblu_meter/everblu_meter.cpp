@@ -425,11 +425,11 @@ void EverbluMeterComponent::request_diagnostic_report() {
            diag.link_ok ? "PASSED" : "FAILED - the register values below are meaningless", diag.partnum, diag.version);
   ESP_LOGI(TAG,
            "  MARCSTATE: 0x%02X (%s), PKTCTRL0: 0x%02X\n"
-           "  FREQ2/1/0: 0x%02X 0x%02X 0x%02X\n"
+           "  FREQ2/1/0: 0x%02X 0x%02X 0x%02X -> carrier %.6f MHz (configured base %.6f MHz)\n"
            "  MDMCFG4/3/2: 0x%02X 0x%02X 0x%02X\n"
-           "  RSSI: %d dBm, LQI: %u",
+           "  RSSI: %d dBm, LQI: %u (last measurement; only meaningful after a frame arrives)",
            diag.marcstate, cc1101_marcstate_name(diag.marcstate), diag.pktctrl0, diag.freq2, diag.freq1, diag.freq0,
-           diag.mdmcfg4, diag.mdmcfg3, diag.mdmcfg2, diag.rssi_dbm, diag.lqi);
+           diag.carrier_mhz, this->frequency_, diag.mdmcfg4, diag.mdmcfg3, diag.mdmcfg2, diag.rssi_dbm, diag.lqi);
   ESP_LOGI(TAG,
            "  GDO0 level: %s (expect LOW while idle), GDO2 level: %s\n"
            "  GDO0 wiring self-test: %s\n"

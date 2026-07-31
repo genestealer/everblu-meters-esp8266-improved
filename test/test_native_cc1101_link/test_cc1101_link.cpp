@@ -253,6 +253,28 @@ void test_marcstate_names_cover_the_states_that_get_reported(void)
     TEST_ASSERT_EQUAL_STRING("unknown", cc1101_marcstate_name(0x1F));
 }
 
+void test_freq_registers_decode_to_the_tuned_carrier(void)
+{
+    // Taken from a real report: FREQ2/1/0 = 0x10 0xAF 0x65 on a device whose
+    // configured base was 433.782715 MHz. The ~31 kHz difference is the stored
+    // calibration offset, and showing only the base hid it completely.
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 433.8134f, cc1101_freq_registers_to_mhz(0x10, 0xAF, 0x65));
+}
+
+void test_diagnostics_report_where_the_radio_is_actually_tuned(void)
+{
+    // The decoded carrier has to come from the registers the radio is running
+    // on, not from the value the caller asked for, or it could never disagree.
+    nativeCC1101Install();
+    TEST_ASSERT_TRUE(cc1101_init(kTestFrequency));
+
+    cc1101_diagnostics_t diag;
+    cc1101_collect_diagnostics(&diag);
+
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, kTestFrequency, diag.carrier_mhz);
+    TEST_ASSERT_EQUAL_FLOAT(cc1101_freq_registers_to_mhz(diag.freq2, diag.freq1, diag.freq0), diag.carrier_mhz);
+}
+
 // ---------------------------------------------------------------------------
 // GDO0 wiring self-test
 // ---------------------------------------------------------------------------

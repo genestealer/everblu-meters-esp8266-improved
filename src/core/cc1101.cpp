@@ -810,6 +810,7 @@ void cc1101_collect_diagnostics(cc1101_diagnostics_t *out)
   out->mdmcfg3 = halRfReadReg(MDMCFG3);
   out->mdmcfg2 = halRfReadReg(MDMCFG2);
   out->pktctrl0 = halRfReadReg(PKTCTRL0);
+  out->carrier_mhz = cc1101_freq_registers_to_mhz(out->freq2, out->freq1, out->freq0);
   out->rssi_dbm = cc1100_rssi_convert2dbm(halRfReadReg(RSSI_ADDR));
   out->lqi = halRfReadReg(LQI_ADDR) & 0x7F;
   out->gdo0_disconnected = _gdo0_disconnected;
@@ -818,6 +819,12 @@ void cc1101_collect_diagnostics(cc1101_diagnostics_t *out)
     out->gdo0_level = (digitalRead(GET_GDO0_PIN()) == LOW) ? 0 : 1;
   if (GET_GDO2_PIN() >= 0)
     out->gdo2_level = (digitalRead(GET_GDO2_PIN()) == LOW) ? 0 : 1;
+}
+
+float cc1101_freq_registers_to_mhz(uint8_t freq2, uint8_t freq1, uint8_t freq0)
+{
+  const uint32_t freq = ((uint32_t) freq2 << 16) | ((uint32_t) freq1 << 8) | (uint32_t) freq0;
+  return (float) freq * 26.0f / 65536.0f;
 }
 
 const char *cc1101_marcstate_name(uint8_t marcstate)

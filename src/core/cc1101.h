@@ -111,6 +111,15 @@ typedef struct
   uint8_t freq2;     /**< Carrier frequency, MSB */
   uint8_t freq1;
   uint8_t freq0;
+  /**
+   * Carrier frequency decoded from FREQ2/1/0, in MHz.
+   *
+   * Read back from the radio, so this is where it is actually tuned. It differs from the
+   * configured base frequency by whatever calibration offset is in effect, which is the
+   * point: a mismatch between the two is otherwise invisible without doing the arithmetic
+   * by hand.
+   */
+  float carrier_mhz;
   uint8_t mdmcfg4; /**< RX filter bandwidth + data rate exponent */
   uint8_t mdmcfg3;
   uint8_t mdmcfg2;
@@ -147,6 +156,15 @@ void cc1101_collect_diagnostics(cc1101_diagnostics_t *out);
  * @return Static string, never NULL; "unknown" for undefined values.
  */
 const char *cc1101_marcstate_name(uint8_t marcstate);
+
+/**
+ * @brief Convert the CC1101 FREQ2/FREQ1/FREQ0 register triple to MHz.
+ *
+ * Inverse of setMHZ(): f_carrier = FREQ * f_xosc / 2^16, with a 26 MHz crystal.
+ *
+ * @return Carrier frequency in MHz.
+ */
+float cc1101_freq_registers_to_mhz(uint8_t freq2, uint8_t freq1, uint8_t freq0);
 
 /**
  * @enum ReadFailure
