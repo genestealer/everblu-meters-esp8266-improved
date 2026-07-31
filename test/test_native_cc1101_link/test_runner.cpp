@@ -24,6 +24,8 @@ void test_diagnostics_flag_an_untrustworthy_bus(void);
 void test_diagnostics_tolerate_a_null_destination(void);
 void test_diagnostics_leave_the_sync_word_intact(void);
 void test_marcstate_names_cover_the_states_that_get_reported(void);
+void test_marcstate_names_cover_every_datasheet_state(void);
+void test_marcstate_name_masks_off_the_unused_upper_bits(void);
 void test_freq_registers_decode_to_the_tuned_carrier(void);
 void test_diagnostics_report_where_the_radio_is_actually_tuned(void);
 void test_gdo0_self_test_passes_when_the_line_is_wired(void);
@@ -59,6 +61,8 @@ int main(int, char **)
     RUN_TEST(test_diagnostics_tolerate_a_null_destination);
     RUN_TEST(test_diagnostics_leave_the_sync_word_intact);
     RUN_TEST(test_marcstate_names_cover_the_states_that_get_reported);
+    RUN_TEST(test_marcstate_names_cover_every_datasheet_state);
+    RUN_TEST(test_marcstate_name_masks_off_the_unused_upper_bits);
     RUN_TEST(test_freq_registers_decode_to_the_tuned_carrier);
     RUN_TEST(test_diagnostics_report_where_the_radio_is_actually_tuned);
     RUN_TEST(test_gdo0_self_test_passes_when_the_line_is_wired);

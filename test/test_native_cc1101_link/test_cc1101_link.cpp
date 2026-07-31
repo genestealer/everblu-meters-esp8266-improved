@@ -253,6 +253,43 @@ void test_marcstate_names_cover_the_states_that_get_reported(void)
     TEST_ASSERT_EQUAL_STRING("unknown", cc1101_marcstate_name(0x1F));
 }
 
+void test_marcstate_names_cover_every_datasheet_state(void)
+{
+    // Table 25 defines every value 0x00-0x16; a wrong entry here would misreport a real
+    // MARCSTATE as something else in the diagnostic report, so every case is worth pinning
+    // down rather than trusting the handful of values a report happens to show.
+    static const struct
+    {
+        uint8_t value;
+        const char *name;
+    } kStates[] = {
+        {0x00, "SLEEP"},        {0x01, "IDLE"},          {0x02, "XOFF"},
+        {0x03, "VCOON_MC"},     {0x04, "REGON_MC"},      {0x05, "MANCAL"},
+        {0x06, "VCOON"},        {0x07, "REGON"},         {0x08, "STARTCAL"},
+        {0x09, "BWBOOST"},      {0x0A, "FS_LOCK"},       {0x0B, "IFADCON"},
+        {0x0C, "ENDCAL"},       {0x0D, "RX"},            {0x0E, "RX_END"},
+        {0x0F, "RX_RST"},       {0x10, "TXRX_SWITCH"},   {0x11, "RXFIFO_OVERFLOW"},
+        {0x12, "FSTXON"},       {0x13, "TX"},            {0x14, "TX_END"},
+        {0x15, "RXTX_SWITCH"},  {0x16, "TXFIFO_UNDERFLOW"},
+    };
+
+    for (const auto &state : kStates)
+    {
+        char message[32];
+        snprintf(message, sizeof(message), "MARCSTATE 0x%02X", state.value);
+        TEST_ASSERT_EQUAL_STRING_MESSAGE(state.name, cc1101_marcstate_name(state.value), message);
+    }
+}
+
+void test_marcstate_name_masks_off_the_unused_upper_bits(void)
+{
+    // MARCSTATE is a 5-bit field (bits 5-7 are reserved/read as other status). A caller
+    // passing the raw register byte must still get the right name even if a reserved bit
+    // happens to be set.
+    TEST_ASSERT_EQUAL_STRING("IDLE", cc1101_marcstate_name(0xE1));
+    TEST_ASSERT_EQUAL_STRING("TXFIFO_UNDERFLOW", cc1101_marcstate_name(0x36));
+}
+
 void test_freq_registers_decode_to_the_tuned_carrier(void)
 {
     // Taken from a real report: FREQ2/1/0 = 0x10 0xAF 0x65 on a device whose
