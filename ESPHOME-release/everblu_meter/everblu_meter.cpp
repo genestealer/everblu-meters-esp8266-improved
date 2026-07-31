@@ -470,36 +470,45 @@ void EverbluMeterComponent::dump_config() {
   char gdo0_text[GPIO_SUMMARY_MAX_LEN];
   char gdo2_text[GPIO_SUMMARY_MAX_LEN];
 
+  // Split across several calls for the same reason request_diagnostic_report() is: the
+  // logger truncates a single message at its transmit buffer (512 bytes by default),
+  // including the line header. As one block this ran to ~480 characters and was cut off
+  // mid-token at "SPI Link Self-Test: PASSED (P", losing the very field that was added so
+  // support requests would contain it. Keep each call well under the limit; do not merge
+  // them back into one.
   ESP_LOGCONFIG(TAG,
                 "EverBlu Meter:\n"
                 "  Meter Code: %s (year=%u, serial=%lu)\n"
                 "  Meter Type: %s\n"
                 "  Component Version: %s\n"
                 "  Frequency: %.2f MHz\n"
-                "  Auto Scan: %s\n"
+                "  Auto Scan: %s",
+                this->meter_code_.c_str(), this->meter_year_, (unsigned long) this->meter_serial_,
+                this->is_gas_ ? "Gas" : "Water", EVERBLU_FW_VERSION, this->frequency_,
+                this->auto_scan_ ? "Enabled" : "Disabled");
+  ESP_LOGCONFIG(TAG,
                 "  Reading Schedule: %s\n"
                 "  Read Time: %02d:%02d\n"
                 "  Timezone Offset: %d\n"
                 "  Auto Align Time: %s\n"
-                "  Auto Align Midpoint: %s\n"
+                "  Auto Align Midpoint: %s",
+                this->reading_schedule_.c_str(), this->read_hour_, this->read_minute_, this->timezone_offset_,
+                this->auto_align_time_ ? "Enabled" : "Disabled", this->auto_align_midpoint_ ? "Enabled" : "Disabled");
+  ESP_LOGCONFIG(TAG,
                 "  Max Retries: %d\n"
                 "  Retry Cooldown: %lu ms\n"
                 "  Initial Read On Boot: %s\n"
-                "  RX Attenuation: %d dB\n"
+                "  RX Attenuation: %d dB",
+                this->max_retries_, this->retry_cooldown_ms_, this->initial_read_on_boot_ ? "Enabled" : "Disabled",
+                this->rx_attenuation_db_);
+  ESP_LOGCONFIG(TAG,
                 "  CS Pin: %s\n"
                 "  GDO0 Pin: %s\n"
-                "  GDO2 Pin: %s\n"
-                "  SPI Link Self-Test: %s",
-                this->meter_code_.c_str(), this->meter_year_, (unsigned long) this->meter_serial_,
-                this->is_gas_ ? "Gas" : "Water", EVERBLU_FW_VERSION, this->frequency_,
-                this->auto_scan_ ? "Enabled" : "Disabled", this->reading_schedule_.c_str(), this->read_hour_,
-                this->read_minute_, this->timezone_offset_, this->auto_align_time_ ? "Enabled" : "Disabled",
-                this->auto_align_midpoint_ ? "Enabled" : "Disabled", this->max_retries_, this->retry_cooldown_ms_,
-                this->initial_read_on_boot_ ? "Enabled" : "Disabled", this->rx_attenuation_db_,
+                "  GDO2 Pin: %s",
                 pin_summary(this->cs_, cs_text, sizeof(cs_text), "NOT configured (error)"),
                 pin_summary(this->gdo0_pin_, gdo0_text, sizeof(gdo0_text), "NOT configured (error)"),
-                pin_summary(this->gdo2_pin_, gdo2_text, sizeof(gdo2_text), "disabled (legacy SPI polling fallback)"),
-                spi_selftest);
+                pin_summary(this->gdo2_pin_, gdo2_text, sizeof(gdo2_text), "disabled (legacy SPI polling fallback)"));
+  ESP_LOGCONFIG(TAG, "  SPI Link Self-Test: %s", spi_selftest);
   if (this->gdo2_pin_ != nullptr)
     ESP_LOGCONFIG(TAG, "    GDO2 mode: HW FIFO threshold, TX+RX dynamic");
   if (this->is_gas_)

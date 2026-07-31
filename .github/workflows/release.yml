@@ -15,103 +15,7 @@ permissions:
   contents: write
 
 jobs:
-  build-release:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        environment:
-          - name: huzzah
-            board: Adafruit HUZZAH ESP8266
-          - name: d1_mini_pro
-            board: WeMos D1 Mini Pro
-          - name: d1_mini
-            board: WeMos D1 Mini
-          - name: nodemcuv2
-            board: NodeMCU v2
-          - name: esp32dev
-            board: ESP32 Dev Module
-
-    name: Build Release for ${{ matrix.environment.board }}
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # Fetch all history for version info
-
-      - name: Get version from tag
-        id: version
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG="${{ github.event.inputs.tag }}"
-          else
-            TAG=${GITHUB_REF#refs/tags/}
-          fi
-          echo "tag=${TAG}" >> $GITHUB_OUTPUT
-          echo "version=${TAG#v}" >> $GITHUB_OUTPUT
-          echo "Building version: ${TAG}"
-
-      - name: Cache PlatformIO
-        uses: actions/cache@v4
-        with:
-          path: ~/.platformio
-          key: ${{ runner.os }}-pio-release-${{ hashFiles('**/platformio.ini') }}
-          restore-keys: |
-            ${{ runner.os }}-pio-release-
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install PlatformIO
-        run: |
-          python -m pip install --upgrade pip
-          pip install --upgrade platformio
-
-      - name: Create private.h from example if missing
-        run: |
-          if [ ! -f include/private.h ]; then
-            cp include/private.example.h include/private.h
-            echo "Created private.h from private.example.h"
-          fi
-
-      - name: Inject dummy values for CI build
-        run: |
-          sed -i 's/#define METER_CODE "xx-xxxxxxx-xxx"/#define METER_CODE "99-1234567-000"/g' include/private.h
-          echo "Injected dummy METER_CODE=99-1234567-000 for release build"
-
-      - name: Build PlatformIO Project
-        run: pio run -e ${{ matrix.environment.name }}
-
-      - name: Rename firmware with version
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          ENV="${{ matrix.environment.name }}"
-          cd .pio/build/$ENV
-
-          # Rename binary firmware
-          if [ -f firmware.bin ]; then
-            mv firmware.bin everblu-meters-${ENV}-${VERSION}.bin
-          fi
-
-          # Rename ELF file
-          if [ -f firmware.elf ]; then
-            mv firmware.elf everblu-meters-${ENV}-${VERSION}.elf
-          fi
-
-          ls -lh
-
-      - name: Upload firmware artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: firmware-${{ matrix.environment.name }}-${{ steps.version.outputs.version }}
-          path: |
-            .pio/build/${{ matrix.environment.name }}/everblu-meters-*.bin
-            .pio/build/${{ matrix.environment.name }}/everblu-meters-*.elf
-          retention-days: 90
-
   create-release:
-    needs: build-release
     runs-on: ubuntu-latest
     name: Create GitHub Release
 
@@ -130,18 +34,6 @@ jobs:
           fi
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
           echo "version=${TAG#v}" >> $GITHUB_OUTPUT
-
-      - name: Download all firmware artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: firmware-artifacts
-
-      - name: Organize release files
-        run: |
-          mkdir -p release-files
-          find firmware-artifacts -name "*.bin" -exec cp {} release-files/ \;
-          find firmware-artifacts -name "*.elf" -exec cp {} release-files/ \;
-          ls -lh release-files/
 
       - name: Generate release notes
         id: release_notes
@@ -173,10 +65,13 @@ jobs:
           echo "" >> release-notes.md
           echo "## Installation" >> release-notes.md
           echo "" >> release-notes.md
-          echo "1. Download the appropriate \`.bin\` file for your board" >> release-notes.md
-          echo "2. Flash using esptool.py or PlatformIO" >> release-notes.md
-          echo "3. Configure your meter settings in \`private.h\`" >> release-notes.md
-          echo "4. Upload and enjoy!" >> release-notes.md
+          echo "No prebuilt binaries are published, because the firmware has to be built with your own meter details." >> release-notes.md
+          echo "" >> release-notes.md
+          echo "1. Check out the repository at this tag" >> release-notes.md
+          echo "2. Copy \`include/private.example.h\` to \`include/private.h\` and fill in your Wi-Fi, MQTT and meter settings" >> release-notes.md
+          echo "3. Build and flash with PlatformIO, for example \`pio run -e huzzah -t upload\`" >> release-notes.md
+          echo "" >> release-notes.md
+          echo "For ESPHome, point your YAML at the external component in \`ESPHOME-release/\`." >> release-notes.md
           echo "" >> release-notes.md
           echo "## Documentation" >> release-notes.md
           echo "" >> release-notes.md
@@ -192,17 +87,11 @@ jobs:
           body_path: release-notes.md
           draft: false
           prerelease: false
-          files: |
-            release-files/*.bin
-            release-files/*.elf
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Release Summary
         run: |
-          echo "### Release ${{ steps.version.outputs.tag }} Created! 🎉" >> $GITHUB_STEP_SUMMARY
+          echo "### Release ${{ steps.version.outputs.tag }} created" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "View the release at: https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "#### Firmware Files" >> $GITHUB_STEP_SUMMARY
-          ls -lh release-files/ >> $GITHUB_STEP_SUMMARY
