@@ -404,34 +404,41 @@ void EverbluMeterComponent::request_diagnostic_report() {
   char gdo0_text[GPIO_SUMMARY_MAX_LEN];
   char gdo2_text[GPIO_SUMMARY_MAX_LEN];
 
+  // Emitted as several calls rather than one block: the logger truncates a single message
+  // at its transmit buffer (512 bytes by default), which cut the report off part-way
+  // through the GDO0 line and lost the wiring verdicts that matter most.
+  ESP_LOGI(TAG, "===== EverBlu diagnostic report =====");
   ESP_LOGI(TAG,
-           "===== EverBlu diagnostic report =====\n"
            "  Component Version: %s\n"
            "  Meter Code: %s (year=%u, serial=%lu, %s)\n"
            "  Configured Frequency: %.6f MHz\n"
-           "  RX Attenuation: %d dB\n"
-           "  CS Pin: %s, GDO0 Pin: %s, GDO2 Pin: %s\n"
+           "  RX Attenuation: %d dB",
+           EVERBLU_FW_VERSION, this->meter_code_.c_str(), this->meter_year_, (unsigned long) this->meter_serial_,
+           this->is_gas_ ? "Gas" : "Water", this->frequency_, this->rx_attenuation_db_);
+  ESP_LOGI(TAG, "  CS Pin: %s, GDO0 Pin: %s, GDO2 Pin: %s",
+           pin_summary(this->cs_, cs_text, sizeof(cs_text), "NOT configured"),
+           pin_summary(this->gdo0_pin_, gdo0_text, sizeof(gdo0_text), "NOT configured"),
+           pin_summary(this->gdo2_pin_, gdo2_text, sizeof(gdo2_text), "disabled"));
+  ESP_LOGI(TAG,
            "  SPI Link Self-Test: %s\n"
-           "  PARTNUM: 0x%02X (expect 0x00), VERSION: 0x%02X (expect 0x04 or 0x14)\n"
-           "  MARCSTATE: 0x%02X, PKTCTRL0: 0x%02X\n"
+           "  PARTNUM: 0x%02X (expect 0x00), VERSION: 0x%02X (expect 0x04 or 0x14)",
+           diag.link_ok ? "PASSED" : "FAILED - the register values below are meaningless", diag.partnum, diag.version);
+  ESP_LOGI(TAG,
+           "  MARCSTATE: 0x%02X (%s), PKTCTRL0: 0x%02X\n"
            "  FREQ2/1/0: 0x%02X 0x%02X 0x%02X\n"
            "  MDMCFG4/3/2: 0x%02X 0x%02X 0x%02X\n"
-           "  RSSI: %d dBm, LQI: %u\n"
+           "  RSSI: %d dBm, LQI: %u",
+           diag.marcstate, cc1101_marcstate_name(diag.marcstate), diag.pktctrl0, diag.freq2, diag.freq1, diag.freq0,
+           diag.mdmcfg4, diag.mdmcfg3, diag.mdmcfg2, diag.rssi_dbm, diag.lqi);
+  ESP_LOGI(TAG,
            "  GDO0 level: %s (expect LOW while idle), GDO2 level: %s\n"
            "  GDO0 wiring self-test: %s\n"
            "  GDO2 fault count: %lu\n"
-           "  Meter reader initialised: %s\n"
-           "===== end of report =====",
-           EVERBLU_FW_VERSION, this->meter_code_.c_str(), this->meter_year_, (unsigned long) this->meter_serial_,
-           this->is_gas_ ? "Gas" : "Water", this->frequency_, this->rx_attenuation_db_,
-           pin_summary(this->cs_, cs_text, sizeof(cs_text), "NOT configured"),
-           pin_summary(this->gdo0_pin_, gdo0_text, sizeof(gdo0_text), "NOT configured"),
-           pin_summary(this->gdo2_pin_, gdo2_text, sizeof(gdo2_text), "disabled"),
-           diag.link_ok ? "PASSED" : "FAILED - register values below are meaningless", diag.partnum, diag.version,
-           diag.marcstate, diag.pktctrl0, diag.freq2, diag.freq1, diag.freq0, diag.mdmcfg4, diag.mdmcfg3, diag.mdmcfg2,
-           diag.rssi_dbm, diag.lqi, level_text(diag.gdo0_level), level_text(diag.gdo2_level),
+           "  Meter reader initialised: %s",
+           level_text(diag.gdo0_level), level_text(diag.gdo2_level),
            diag.gdo0_disconnected ? "FAILED - GDO0 looks unconnected or on the wrong GPIO" : "passed",
            (unsigned long) cc1101_get_gdo2_timeout_count(), this->meter_initialized_ ? "yes" : "no");
+  ESP_LOGI(TAG, "===== end of report =====");
 }
 
 void EverbluMeterComponent::apply_radio_context() {

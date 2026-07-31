@@ -22,6 +22,8 @@ void test_probe_accepts_null_outputs(void);
 void test_diagnostics_capture_the_configured_radio_state(void);
 void test_diagnostics_flag_an_untrustworthy_bus(void);
 void test_diagnostics_tolerate_a_null_destination(void);
+void test_diagnostics_leave_the_sync_word_intact(void);
+void test_marcstate_names_cover_the_states_that_get_reported(void);
 void test_gdo0_self_test_passes_when_the_line_is_wired(void);
 void test_gdo0_self_test_detects_a_pin_pointed_at_nothing(void);
 void test_gdo0_verdict_clears_once_the_line_is_fixed(void);
@@ -53,6 +55,8 @@ int main(int, char **)
     RUN_TEST(test_diagnostics_capture_the_configured_radio_state);
     RUN_TEST(test_diagnostics_flag_an_untrustworthy_bus);
     RUN_TEST(test_diagnostics_tolerate_a_null_destination);
+    RUN_TEST(test_diagnostics_leave_the_sync_word_intact);
+    RUN_TEST(test_marcstate_names_cover_the_states_that_get_reported);
     RUN_TEST(test_gdo0_self_test_passes_when_the_line_is_wired);
     RUN_TEST(test_gdo0_self_test_detects_a_pin_pointed_at_nothing);
     RUN_TEST(test_gdo0_verdict_clears_once_the_line_is_fixed);

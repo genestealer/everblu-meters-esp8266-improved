@@ -138,6 +138,17 @@ typedef struct
 void cc1101_collect_diagnostics(cc1101_diagnostics_t *out);
 
 /**
+ * @brief Human-readable name for a MARCSTATE value (datasheet Table 25).
+ *
+ * Reported as a bare number, a state such as 0x11 reads as a fault when it is usually
+ * just a receiver parked with nothing draining the FIFO.
+ *
+ * @param marcstate Raw MARCSTATE register value.
+ * @return Static string, never NULL; "unknown" for undefined values.
+ */
+const char *cc1101_marcstate_name(uint8_t marcstate);
+
+/**
  * @enum ReadFailure
  * @brief Why a meter read produced no usable data
  *

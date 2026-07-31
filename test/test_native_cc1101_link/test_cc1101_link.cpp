@@ -227,6 +227,32 @@ void test_diagnostics_tolerate_a_null_destination(void)
     cc1101_collect_diagnostics(nullptr); // must not crash
 }
 
+void test_diagnostics_leave_the_sync_word_intact(void)
+{
+    // The report button is pressed on a configured, listening radio. The link probe writes
+    // its scratch patterns through SYNC1/SYNC0, and the last one it writes is 0x55/0xAA -
+    // so without a restore the operational sync word would silently become 0x55AA and the
+    // parked receiver would be matching on the wrong pattern.
+    nativeCC1101Install();
+    TEST_ASSERT_TRUE(cc1101_init(kTestFrequency));
+
+    cc1101_diagnostics_t diag;
+    cc1101_collect_diagnostics(&diag);
+
+    TEST_ASSERT_EQUAL_HEX8(0x55, nativeCC1101().config[kSync1Register]);
+    TEST_ASSERT_EQUAL_HEX8(0x00, nativeCC1101().config[kSync0Register]);
+}
+
+void test_marcstate_names_cover_the_states_that_get_reported(void)
+{
+    // These are the values users actually see in a report and mistake for faults.
+    TEST_ASSERT_EQUAL_STRING("IDLE", cc1101_marcstate_name(0x01));
+    TEST_ASSERT_EQUAL_STRING("RX", cc1101_marcstate_name(0x0D));
+    TEST_ASSERT_EQUAL_STRING("RXFIFO_OVERFLOW", cc1101_marcstate_name(0x11));
+    TEST_ASSERT_EQUAL_STRING("TXFIFO_UNDERFLOW", cc1101_marcstate_name(0x16));
+    TEST_ASSERT_EQUAL_STRING("unknown", cc1101_marcstate_name(0x1F));
+}
+
 // ---------------------------------------------------------------------------
 // GDO0 wiring self-test
 // ---------------------------------------------------------------------------

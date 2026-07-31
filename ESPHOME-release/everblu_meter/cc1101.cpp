@@ -690,6 +690,12 @@ static bool cc1101_verify_spi_link(uint8_t *partnum_out, uint8_t *version_out)
   // Round 1 then round 2 use complementary patterns, so between them every data bit is
   // driven both high and low in each direction.
   static const uint8_t kProbe[2][2] = {{0xAA, 0x55}, {0x55, 0xAA}};
+  // cc1101_init() rewrites the sync word straight afterwards, but
+  // cc1101_collect_diagnostics() runs against a configured, listening radio and must not
+  // leave the scratch pattern behind: SYNC0 would stay at 0xAA instead of the operational
+  // 0x00, so a parked receiver would be matching on the wrong sync word.
+  const uint8_t saved_sync1 = halRfReadReg(SYNC1);
+  const uint8_t saved_sync0 = halRfReadReg(SYNC0);
   bool readback_ok = true;
   for (uint8_t round = 0; round < 2 && readback_ok; round++)
   {
@@ -700,6 +706,8 @@ static bool cc1101_verify_spi_link(uint8_t *partnum_out, uint8_t *version_out)
       readback_ok = false;
     }
   }
+  halRfWriteReg(SYNC1, saved_sync1);
+  halRfWriteReg(SYNC0, saved_sync0);
 
   uint8_t partnum = halRfReadReg(PARTNUM_ADDR);
   uint8_t version = halRfReadReg(VERSION_ADDR);
@@ -782,7 +790,6 @@ bool cc1101_probe_spi_link(uint8_t *partnum_out, uint8_t *version_out)
 void cc1101_collect_diagnostics(cc1101_diagnostics_t *out)
 {
   int8_t cc1100_rssi_convert2dbm(uint8_t Rssi_dec); // defined below
-
   if (out == NULL)
     return;
 
@@ -811,6 +818,39 @@ void cc1101_collect_diagnostics(cc1101_diagnostics_t *out)
     out->gdo0_level = (digitalRead(GET_GDO0_PIN()) == LOW) ? 0 : 1;
   if (GET_GDO2_PIN() >= 0)
     out->gdo2_level = (digitalRead(GET_GDO2_PIN()) == LOW) ? 0 : 1;
+}
+
+const char *cc1101_marcstate_name(uint8_t marcstate)
+{
+  // Datasheet Table 25. Reported raw, a value such as 0x11 reads as a fault when it is
+  // usually just a receiver that has been parked with nothing draining the FIFO.
+  switch (marcstate & 0x1F)
+  {
+  case 0x00: return "SLEEP";
+  case 0x01: return "IDLE";
+  case 0x02: return "XOFF";
+  case 0x03: return "VCOON_MC";
+  case 0x04: return "REGON_MC";
+  case 0x05: return "MANCAL";
+  case 0x06: return "VCOON";
+  case 0x07: return "REGON";
+  case 0x08: return "STARTCAL";
+  case 0x09: return "BWBOOST";
+  case 0x0A: return "FS_LOCK";
+  case 0x0B: return "IFADCON";
+  case 0x0C: return "ENDCAL";
+  case 0x0D: return "RX";
+  case 0x0E: return "RX_END";
+  case 0x0F: return "RX_RST";
+  case 0x10: return "TXRX_SWITCH";
+  case 0x11: return "RXFIFO_OVERFLOW";
+  case 0x12: return "FSTXON";
+  case 0x13: return "TX";
+  case 0x14: return "TX_END";
+  case 0x15: return "RXTX_SWITCH";
+  case 0x16: return "TXFIFO_UNDERFLOW";
+  default: return "unknown";
+  }
 }
 
 bool cc1101_init(float freq)
