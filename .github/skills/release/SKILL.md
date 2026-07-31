@@ -189,13 +189,13 @@ Do not run any of the Phase 6 commands until the user approves. If the user want
    git push origin vX.Y.Z
    ```
 
-3. Pushing the tag triggers `.github/workflows/release.yml`, which builds firmware for huzzah, d1_mini_pro, d1_mini, nodemcuv2 and esp32dev, then creates the GitHub release with the binaries attached.
+3. Pushing the tag triggers `.github/workflows/release.yml`, which creates the GitHub release. No firmware binaries are built or attached: users build from source with their own `private.h`.
 
 4. **Replace the release body.** The workflow generates a generic body from the commit log, not the curated notes. Once the workflow finishes, tell the user to edit the release at
    `https://github.com/genestealer/everblu-meters-esp8266-improved/releases/tag/vX.Y.Z`
    and paste in the contents of `release_notes/RELEASE_NOTES_vX.Y.Z.md`. There is no `gh` CLI available to do this automatically.
 
-5. Confirm the workflow run succeeded and that all five `.bin` files are attached before calling the release done.
+5. Confirm the workflow run succeeded before calling the release done.
 
 ## Common mistakes
 
