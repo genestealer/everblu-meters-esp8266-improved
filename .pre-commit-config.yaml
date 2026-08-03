@@ -75,7 +75,7 @@ repos:
   # --- Markdown: markdownlint-cli2 (rules in .markdownlint-cli2.yaml) ---
   # Node-based hook; pre-commit / pre-commit.ci provision Node automatically.
   - repo: https://github.com/DavidAnson/markdownlint-cli2
-    rev: v0.23.0
+    rev: v0.23.2
     hooks:
       - id: markdownlint-cli2
 
