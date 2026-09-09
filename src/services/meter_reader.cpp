@@ -221,6 +221,19 @@ void MeterReader::loop()
         finishFrequencyScan();
     }
 
+    // The scan just decoded verified frames at the new tuning, so the meter is awake
+    // right now. Read it instead of sitting out the cooldown on a calibration that has
+    // only just been proven to work. Cleared before the read so it cannot re-arm itself.
+    if (m_postScanReadPending && !m_readingInProgress && m_publisher != nullptr && m_publisher->isReady())
+    {
+        m_postScanReadPending = false;
+        m_postScanConfirmRead = true;
+        m_readingInProgress = true;
+        m_publisher->publishStatusMessage("Confirming new calibration");
+        performReading();
+        return;
+    }
+
     if (!m_bootScanAttempted && !m_readingInProgress && m_timeProvider->isTimeSynced() &&
         m_publisher != nullptr && m_publisher->isReady())
     {
@@ -403,6 +416,7 @@ void MeterReader::handleSuccessfulRead(const tmeter_data &data)
 
     // Reset retry state
     resetRetryState();
+    m_inCooldown = false;
 
     // Allow a fresh failure-recovery frequency scan on the next failure streak
     m_autoScanAfterFailureDone = false;
@@ -448,6 +462,12 @@ void MeterReader::handleSuccessfulRead(const tmeter_data &data)
 
 void MeterReader::handleFailedRead(ReadFailure reason)
 {
+    // The confirmation read after a scan is a single attempt: the retry sequence that
+    // triggered the scan has already run, so a miss here ends the streak rather than
+    // starting a fresh one against tuning that was just swept.
+    const bool finalAttempt = m_postScanConfirmRead;
+    m_postScanConfirmRead = false;
+
     LOG_W("everblu_meter", "Read failed (attempt %d/%d)%s",
           m_retryCount + 1, m_config->getMaxRetries(),
           read_failure_log_suffix(reason));
@@ -460,7 +480,7 @@ void MeterReader::handleFailedRead(ReadFailure reason)
         m_retryFailureReason = reason;
     }
 
-    if (m_retryCount < m_config->getMaxRetries() - 1)
+    if (!finalAttempt && m_retryCount < m_config->getMaxRetries() - 1)
     {
         // Schedule retry after delay.
         // The "Active Reading" sensor and the radio state are re-asserted on
@@ -517,7 +537,9 @@ void MeterReader::handleFailedRead(ReadFailure reason)
         // that just exhausted its retries) - activateCallbackContext() was set
         // for it at the start of performReading(), so the scan's RF responses
         // come from the same meter, not whichever meter last pressed a button.
-        if (m_config->isAutoScanOnFailureEnabled() && !m_autoScanAfterFailureDone)
+        // finalAttempt means a scan has just finished, so sweeping again immediately
+        // would only repeat what was measured seconds ago.
+        if (!finalAttempt && m_config->isAutoScanOnFailureEnabled() && !m_autoScanAfterFailureDone)
         {
             m_autoScanAfterFailureDone = true;
             LOG_W("everblu_meter",
@@ -525,6 +547,7 @@ void MeterReader::handleFailedRead(ReadFailure reason)
                   "(disable with auto_scan_on_failure / AUTO_SCAN_ON_FAILURE_ENABLED)",
                   m_config->getMeterYear(), (unsigned long) m_config->getMeterSerial());
             m_publisher->publishStatusMessage("Auto frequency scan after failed reads");
+            m_offsetBeforeScan = FrequencyManager::getOffset();
             FrequencyManager::beginRecoveryScan(scanStatusCallback);
             m_scanInProgress = FrequencyManager::isScanInProgress();
         }
@@ -536,6 +559,7 @@ void MeterReader::resetRetryState()
     m_retryCount = 0;
     m_nextRetryTime = 0;
     m_retryFailureReason = ReadFailure::None;
+    m_postScanConfirmRead = false;
 }
 
 void MeterReader::stopReading()
@@ -581,6 +605,7 @@ void MeterReader::performFrequencyScan(bool deep)
           FrequencyManager::getBaseFrequency(), m_config->getFrequency());
 
     // Non-blocking: loop() steps the scan and publishes the result when it ends.
+    m_offsetBeforeScan = FrequencyManager::getOffset();
     if (deep) FrequencyManager::beginDeepFrequencyScan(0.150f, 0.010f, scanStatusCallback);
     else FrequencyManager::beginRecoveryScan(scanStatusCallback);
     m_scanInProgress = FrequencyManager::isScanInProgress();
@@ -636,8 +661,20 @@ void MeterReader::finishFrequencyScan()
 {
     m_scanInProgress = false;
     if (!m_publisher) return;
-    m_publisher->publishFrequencyOffset(getFrequencyOffset());
+    const float offset = getFrequencyOffset();
+    m_publisher->publishFrequencyOffset(offset);
     m_publisher->publishTunedFrequency(getTunedFrequency());
+
+    // Found means a candidate was verified against repeat decodes, so the meter answered.
+    // Requiring a changed offset keeps a scan that re-confirmed the existing tuning from
+    // queueing a read the caller did not ask for.
+    if (FrequencyManager::lastScanOutcome() == FrequencyManager::ScanOutcome::Found &&
+        offset != m_offsetBeforeScan)
+    {
+        m_postScanReadPending = true;
+        LOG_I("everblu_meter", "Scan stored a new offset (%.3f kHz) - taking one confirmation read",
+              offset * 1000.0);
+    }
 }
 
 void MeterReader::getStatistics(unsigned long &totalAttempts, unsigned long &successfulReads,

@@ -224,6 +224,9 @@ private:
     unsigned long m_lastFailedAttempt;
     unsigned long m_nextRetryTime;
     bool m_autoScanAfterFailureDone;  // Guards the failure-recovery frequency scan to once per failure streak
+    bool m_postScanReadPending = false;   // A scan stored new tuning; loop() owes one confirmation read
+    bool m_postScanConfirmRead = false;   // The read in flight is that confirmation, so a miss is final
+    float m_offsetBeforeScan = 0.0f;      // Offset when the running scan started, to spot a real change
     ReadFailure m_retryFailureReason; // Most informative failure seen so far in the current retry sequence
 
     // Statistics

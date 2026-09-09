@@ -664,6 +664,76 @@ void test_auto_scan_on_failure_stays_off_when_disabled(void)
     TEST_ASSERT_FALSE(g_publisher.sawStatus("Auto frequency scan after failed reads"));
 }
 
+void test_a_scan_that_stores_a_new_offset_takes_one_confirmation_read(void)
+{
+    // The sweep only reaches a Found outcome by decoding frames, so the meter is
+    // demonstrably awake. Publish that reading instead of waiting out the cooldown
+    // on tuning that was just proven to work.
+    g_config.maxRetries = 1;
+    g_config.autoScanOnFailure = true;
+    g_config.retryCooldownMs = 60000;
+    g_config.frequency = 433.82f;
+    fakeRadio().carrierFrequency = 433.88f; // Off the configured base, so the scan moves the offset
+
+    MeterReader reader = makeReader();
+    reader.triggerReading(false);
+    drainFrequencyScan(reader);
+
+    TEST_ASSERT_TRUE(FrequencyManager::lastScanOutcome() == FrequencyManager::ScanOutcome::Found);
+    TEST_ASSERT_TRUE(g_publisher.sawStatus("Confirming new calibration"));
+    TEST_ASSERT_EQUAL(1, (int)g_publisher.readings.size());
+}
+
+void test_a_scan_that_keeps_the_existing_offset_takes_no_extra_read(void)
+{
+    // Nothing changed, so a read here would be one the caller never asked for.
+    g_config.maxRetries = 1;
+    g_config.autoScanOnFailure = true;
+    g_config.retryCooldownMs = 1;
+    fakeRadio().responses.push_back(FakeRadio::failure(ReadFailure::NoReply));
+
+    MeterReader reader = makeReader();
+    reader.triggerReading(false);
+    drainFrequencyScan(reader);
+
+    TEST_ASSERT_FALSE(g_publisher.sawStatus("Confirming new calibration"));
+    TEST_ASSERT_EQUAL(0, (int)g_publisher.readings.size());
+}
+
+void test_a_failed_confirmation_read_ends_the_streak_without_rescanning(void)
+{
+    // One attempt only: the retry sequence that provoked the scan has already run,
+    // and sweeping again would just repeat what was measured seconds ago.
+    g_config.maxRetries = 3;
+    g_config.autoScanOnFailure = true;
+    g_config.retryCooldownMs = 60000;
+    g_config.frequency = 433.82f;
+    fakeRadio().carrierFrequency = 433.88f;
+
+    MeterReader reader = makeReader();
+    reader.triggerReading(false);
+
+    // Advance through the retry sequence and stop as soon as the sweep succeeds: the
+    // narrow window is empty at +60 kHz, so draining further would let the escalated
+    // sweep run and hide the point of the test.
+    int guard = 0;
+    while (guard++ < 5000 && FrequencyManager::lastScanOutcome() != FrequencyManager::ScanOutcome::Found)
+    {
+        advanceAndLoop(reader, RETRY_DELAY_MS);
+    }
+
+    // Take the carrier away so the queued confirmation read misses.
+    fakeRadio().carrierFrequency = 0.0f;
+    fakeRadio().responses.push_back(FakeRadio::failure(ReadFailure::NoReply));
+    g_publisher.reset();
+    reader.loop();
+
+    TEST_ASSERT_TRUE(g_publisher.sawStatus("Confirming new calibration"));
+    TEST_ASSERT_EQUAL_STRING("Failed after max retries", g_publisher.lastStatus().c_str());
+    TEST_ASSERT_FALSE(g_publisher.sawStatus("Retry scheduled"));
+    TEST_ASSERT_FALSE(FrequencyManager::isScanInProgress());
+}
+
 void test_a_scan_is_only_stepped_by_the_reader_that_started_it(void)
 {
     // FrequencyManager holds the calibration in static state shared by every
