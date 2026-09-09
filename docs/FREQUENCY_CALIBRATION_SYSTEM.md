@@ -98,72 +98,69 @@ The CC1101 has **no non-volatile memory**. Its FREQ registers are volatile and r
 
 $$\Delta f_\text{LSB} = \frac{F_{xosc}}{2^{14}} = \frac{26{,}000{,}000}{16{,}384} \approx 1{,}587 \text{ Hz} \approx 1.59 \text{ kHz/LSB}$$
 
-After one successful read, the adaptive correction can resolve the residual error to within ~0.8 kHz (50% of 1 LSB).
+Adaptive tracking averages the configured number of successful reads and applies
+half the error when it exceeds 2 kHz. It does not guarantee sub-kilohertz accuracy.
 
 ---
 
 ## 5. Deep frequency scan (fallback)
 
-Used when the CC1101's FOC cannot bridge the gap (crystal error > ±67.7 kHz, very weak signal, or first boot with no stored offset). The scan is a two-phase algorithm.
+Both targets use staged acquisition, two-sided bracketing, full-window refinement
+and repeated verification. ESPHome calibration profiles are independent per meter.
 
 ### Entry points
 
 | Trigger | Range | Step | Duration |
 |---|---|---|---|
-| MQTT `deep_scan` command or startup | ±150 kHz | 2.5 kHz | ≤ 6 min |
-| Auto-scan after `MAX_RETRIES` failures | ±20 kHz | 1 kHz | ≤ 2 min |
+| Deep Scan or startup | ±150 kHz around meter base | Nominal 10 kHz, then 2.5 kHz if empty | Variable; refinement adds minutes |
+| Scan or failed-read recovery | ±20 kHz around saved tuning, then Deep Scan if empty | Nominal 1 kHz locally | Variable |
 
-Auto-scan-on-failure uses the narrow call `performDeepFrequencyScan(0.020f, 0.001f)` because by the time MAX_RETRIES is reached the firmware is already close to the carrier.
+The scanner uses integer frequency words and a bounded finer acquisition fallback.
+See the [current scan policy](../ESPHOME/README.md#frequency-scans-in-multi-meter-setups).
 
 ### Phase 1 — Window mapping (coarse pass)
 
 ```
-for each freq step from baseFreq - range to baseFreq + range:
-    try to decode meter
-
-    if reads_counter > 0:
-        record firstHitFreq (first time)
-        update lastHitFreq
-        reset consecutiveMisses = 0
-
-    else if we have seen at least one hit:
-        consecutiveMisses++
-        if consecutiveMisses >= MISS_TOLERANCE (5):
-            break  ← window edge found
+search the full range in coarse steps until a valid reading is found
+if empty: repeat once with smaller steps
+if still empty: restore previous tuning and finish
+from a hit: probe downwards and upwards in smaller steps
+record lowest and highest successful settings
+stop each direction at five consecutive misses or the range limit
 ```
 
 This maps the full response band (`firstHitFreq` to `lastHitFreq`) without scanning to the end of the range unnecessarily.
 
-**Note on `reads_counter`:** this value is the meter's **lifetime internal read counter** extracted from the decoded payload — the same for every successful step. It is binary (zero = CRC fail, non-zero = CRC pass) and cannot be used to rank scan steps by quality.
+`reads_counter` is the meter's counter, not a byte count or quality score.
 
-**Note on consecutive misses:** the meter's 2-second broadcast cycle and the 3-second scan step window mean approximately 50% of on-frequency steps miss by timing. `MISS_TOLERANCE = 5` tolerates this without prematurely declaring the window closed.
+Each attempt actively sends a wake-up burst and interrogation. No fixed
+probability of an on-frequency timing miss has been established.
 
 ### Phase 2 — Zoom (fine pass)
 
 ```
-zoomStart = firstHitFreq - scanStep
-zoomEnd   = lastHitFreq  + scanStep
-zoomStep  = max(scanStep × 0.25,  CC1101_MIN_STEP_MHZ)  ← hardware minimum clamped
-
-for each zfreq from zoomStart to zoomEnd:
-    try to decode meter
-    if reads_counter > 0:
-        bestFreq = zfreq
-        break  ← first CRC-valid hit
+expand the observed window by one bracketing step, within range limits
+sample the complete fine window twice at each setting
+rank successful decodes, then average absolute FREQEST
+break ties towards the window midpoint
+require at least two successes in three candidate verification reads
+compare with three reads at an existing calibration before replacing it
 ```
 
-Falls back to `windowMidFreq` if all zoom steps miss (timing variance). The FREQEST adaptive tracking then refines from wherever the scan landed.
+An empty fine sweep or failed verification restores previous tuning. No midpoint
+or unverified candidate is saved, including on first boot.
 
-**Why stop at first zoom hit:** stopping at first CRC-valid hit is correct because (a) all successful steps return the same `reads_counter` value — there is no quality ranking possible; (b) RSSI varies by 1–3 dB across adjacent steps due to measurement noise and is not a reliable centre indicator; (c) the FREQEST loop provides the actual fine-tuning.
+The fine sweep does not stop on the first successful decode. FREQEST comes from
+data-frame sync, before decoding/logging delays. Fine tuning resolution does not
+guarantee equal measurement accuracy.
 
 ### CC1101 minimum frequency step (hardware limit)
 
 $$\Delta f_\text{min} = \frac{F_{xosc}}{2^{16}} = \frac{26{,}000{,}000}{65{,}536} \approx 396.7 \text{ Hz}$$
 
-Requesting a zoom step finer than this rounds consecutive steps to the same register value, retesting the identical physical frequency. The zoom step is clamped to at least `CC1101_MIN_STEP_MHZ = 26/65536/1000 ≈ 0.000397 MHz`.
-
-For the 1 kHz auto-scan: `1000 Hz × 0.25 = 250 Hz` → clamped to **397 Hz**.
-For the 2.5 kHz manual deep scan: `2500 Hz × 0.25 = 625 Hz` → already above limit, unchanged.
+The correct MHz expression is `26.0 / 65536.0`, without division by 1,000.
+Coarse acquisition uses 25 register steps (9.918 kHz), fallback/bracketing
+6 (2.380 kHz), and fine scanning 2 (793 Hz).
 
 ### Save and reinit
 
@@ -179,13 +176,11 @@ FREQEST adaptive tracking then refines and re-saves after subsequent successful 
 
 ## 6. Fast scan removal
 
-The **Fast frequency scan** (±150 kHz, 10 kHz steps) was removed entirely. It was redundant because:
+The old Fast Scan API was removed. Coarse acquisition now forms the first stage
+of Deep Scan, with one finer fallback so a coarse miss is not terminal.
 
-1. The two-phase Deep scan's Phase 1 coarse pass already does the equivalent acquisition in fewer wasted steps (exits at the window edge, not the end of the range).
-2. The 10 kHz steps give at best ±5 kHz accuracy before FREQEST; the Deep scan gives ±0.4 kHz.
-3. Most modules now lock without any scan due to the 270 kHz bandwidth change.
 
-**Removed from both builds:**
+**Earlier API removals:**
 - `FrequencyManager::performFastFrequencyScan()` (shared service)
 - `MeterReader::performFrequencyScan(bool deep)` → simplified to `performFrequencyScan()` (always deep)
 - `performFastFrequencyScan()` in `main.cpp` (MQTT standalone)
@@ -193,7 +188,8 @@ The **Fast frequency scan** (±150 kHz, 10 kHz steps) was removed entirely. It w
 - ESPHome `fast_scan_button` config option, `EverbluMeterTriggerButton::is_fast_scan_` flag, `request_fast_scan()`
 - `fast_scan_button` from all YAML examples, CI config, and README
 
-**Replacement:** use `deep_scan_button` / MQTT `deep_scan` command instead.
+**Current controls:** use `scan_button` or `deep_scan_button`; MQTT offers
+`scan`, `deep_scan` and `stop_scan` topics.
 
 ---
 
@@ -205,7 +201,7 @@ Tracked as [GitHub issue #109](https://github.com/genestealer/everblu-meters-esp
 
 ---
 
-## 8. Affected files
+## 8. Historical changes
 
 | File | Change |
 |---|---|

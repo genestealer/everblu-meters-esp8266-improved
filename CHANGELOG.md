@@ -16,7 +16,9 @@ Releases are created manually by tagging commits with version tags matching `v*.
 
 ### Changed
 
-- **`frequency_estimate` is now a per-meter sensor** in the ESPHome component. It was made static (first-registration wins) in [#96](https://github.com/genestealer/everblu-meters-esp8266-improved/pull/96) along with `frequency_offset` and `tuned_frequency`, but unlike those two it is not a radio-wide value: FREQEST is the CC1101's measurement of the carrier of the specific meter that was just read. Declaring it on every `everblu_meter:` entry now gives one sensor per meter, so the transmit-frequency spread between meters sharing a CC1101 can be measured. `frequency_offset` and `tuned_frequency` remain global.
+- **Per-meter ESPHome calibration:** each meter has independent base frequency, saved offset, adaptive tracking and frequency sensors. Add Scan, Deep Scan, Reset and Stop buttons to each entry. Reads reapply that meter's tuning; another meter cannot reset or cancel an active scan. Run a scan for each meter after upgrading: the old shared offset has no meter identity and is not imported.
+- **Staged scans in both targets:** wide acquisition uses nominal 10 kHz jumps, with one nominal 2.5 kHz fallback pass if empty. The scanner brackets both response edges, samples the complete window at 793 Hz intervals, ranks decode reliability before FREQEST, and confirms the candidate before saving. Local recovery starts around the saved tuning and widens if empty. MQTT scans now run from the main loop and support Scan and Stop Scan commands.
+- **Calibration safeguards:** cancelled or unsuccessful scans restore previous tuning, radio faults abort, first-time calibration requires verification, and stored offsets support the full ±150 kHz scan range. Frequency-word conversion now rounds to the nearest register value. FREQEST is captured at data-frame sync rather than after decoding and logging.
 
 ## [v3.5.0] - 2026-07-31
 

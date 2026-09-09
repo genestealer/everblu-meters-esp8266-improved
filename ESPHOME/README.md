@@ -594,78 +594,60 @@ EverbluMeterComponent (ESPHome)
 
 - **request_reading_button** - Trigger a manual reading
 - **stop_reading_button** - Cancel the current read/retry sequence. Also requests best-effort cancellation of an in-progress deep frequency scan (it bails at the next step; see [#133](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/133))
-- **deep_scan_button** - Trigger a Deep frequency scan (±150 kHz, fine 2.5 kHz steps, maps the response window then zooms to the carrier centre)
+- **scan_button** - Search within ±20 kHz of this meter's saved tuning, then run a full Deep Scan if no response is found.
+- **deep_scan_button** - Search ±150 kHz around this meter's configured frequency, then bracket and refine the response window.
 - **reset_frequency_button** - Reset the frequency offset
 - **diagnostic_report_button** - Print a single copy-pasteable block covering the configured pins, the live SPI link self-test, the key CC1101 registers and the current GDO0/GDO2 levels. Press this first when raising an issue; it captures in one place everything needed to tell a wiring fault from an RF problem, and it works even when the radio never came up. The standalone MQTT build prints the same block from its own **Diagnostic Report** button
 
 ### Frequency scans in multi-meter setups
 
-Frequency calibration is **radio-global, not per-meter**. There is one base
-frequency, one stored offset and one tuned frequency for the whole device, no
-matter how many `everblu_meter:` entries you declare. A scan therefore has two
-separate properties that can disagree:
+Each `everblu_meter:` entry has its own base `frequency`, saved offset and
+adaptive-tracking history. Entries can use different base frequencies. Before
+each read, the reader applies that meter's tuning to the shared CC1101.
 
-| Property | Scope |
-| --- | --- |
-| Which meter answers the scan | Per-entry: the meter on the `everblu_meter:` entry that triggered it |
-| Which frequency range is swept | Global: centred on the single base frequency |
-| Where the resulting offset is stored | Global: one value, applied to every meter |
+Declare `scan_button`, `deep_scan_button`, `reset_frequency_button`,
+`stop_reading_button`, `frequency_offset`, `tuned_frequency` and
+`frequency_estimate` on each meter, as shown in
+[example-multi-meter.yaml](example-multi-meter.yaml). Use the meter's `device_id`
+to put these entities on its Home Assistant sub-device. `tuned_frequency`
+reports that meter's saved setting, not an instantaneous read of radio registers.
+CC1101 connectivity, radio state and firmware version remain device-level entities.
 
-The meter that answers is whichever entry triggered the scan. For a manual
-`deep_scan_button` press that is the entry declaring the button. For the
-automatic scan run by `auto_scan_on_failure` (enabled by default) it is the
-meter that just exhausted its own `max_retries`, which need not be the entry
-the button was declared on. Both cases are named in the log:
+One scan owns the radio until it finishes. Other reads pause, and another scan
+or reset request is rejected while it is busy. A meter's Stop button cancels
+only its own scan or retries. A cancelled or unsuccessful scan restores the
+previous setting; a hardware fault may prevent the restore and is reported.
 
-```text
-Starting frequency scan using meter 20-0257750 (water)...
-Scan centred on 433.820007 MHz (this meter is configured for 433.782712 MHz)
-Running automatic frequency scan for meter 20-0259301 after failed reads...
-```
+Deep Scan follows the same policy in ESPHome and standalone MQTT:
 
-The swept range, however, is **not** per-meter. It is centred on the base
-frequency held in the shared `FrequencyManager`, which is set by whichever
-entry initialised **last** during boot. Because of this:
+1. Search ±150 kHz at nominal 10 kHz intervals.
+2. If the complete pass finds nothing, repeat once at nominal 2.5 kHz intervals.
+3. From a successful hit, probe downwards and upwards at the smaller interval.
+  Five consecutive misses close each edge, with the scan range as a hard limit.
+4. Sample the entire bracket twice per frequency at approximately 793 Hz intervals.
+5. Rank by successful decodes, then average absolute FREQEST. Break ties towards
+  the window midpoint. Require at least two of three confirmation reads before
+  saving; compare against three reads at an existing calibration before replacing it.
 
-> [!IMPORTANT]
-> Every `everblu_meter:` entry sharing one CC1101 must be given the **same**
-> `frequency:` value. If they differ, only the last entry's value takes effect
-> and the others are silently ignored, so scans (and normal reads) run at a
-> frequency that no longer matches those meters' configuration. The wide
-> ±150 kHz manual deep scan will usually still find the carrier, but the narrow
-> ±20 kHz `auto_scan_on_failure` window can end up centred well away from it.
+The scanner uses integer CC1101 register steps: approximately 9.918 kHz for
+coarse acquisition, 2.380 kHz for fallback/bracketing, and 793 Hz for fine scanning.
+These are tuning resolutions, not guarantees of carrier-estimation accuracy.
+Each read takes several seconds, so refinement can add minutes. Stop is handled
+between complete radio transactions. The phase and meter identity appear in the log.
 
-If you need genuinely independent calibration per meter, use one CC1101 (and
-one ESP) per meter. Declare `deep_scan_button`, `reset_frequency_button` and
-the offset/tuned-frequency sensors on the **first** meter entry only, as in
-[example-multi-meter.yaml](example-multi-meter.yaml); adding extra scan buttons
-on other entries only changes which meter answers, not the swept range or the
-shared offset.
+`auto_scan_on_failure` uses the Scan policy once per failure streak. `auto_scan`
+starts a Deep Scan once after time synchronises when that meter has no saved
+calibration. A stored zero offset is a valid calibration, not a request to scan again.
 
-#### Measuring the spread between your meters
+**Upgrade:** older versions saved a single `freq_offset` without a meter identity.
+The per-meter implementation does not import that ambiguous value. Run Deep Scan
+once per meter after upgrading, or enable `auto_scan`. Offsets use keys based on
+meter year and serial and survive reboot. Reset/recalibrate after changing a
+meter's base `frequency`. Standalone MQTT retains its existing storage key.
 
-The shared offset mostly corrects the CC1101 module's own crystal error, which
-is common to every meter on that radio. Each meter's transmitter has its own
-smaller error on top, and `adaptiveFrequencyTracking()` feeds FREQEST from all
-meters into one accumulator, so the stored offset settles near the average of
-them rather than on any single meter.
-
-To see how large that spread actually is, declare a **`frequency_estimate`
-sensor on every meter entry** (this sensor is per-meter, unlike the offset and
-tuned-frequency sensors). Each one reports the residual carrier error the
-CC1101 measured on that meter's own frame:
-
-```yaml
-    frequency_estimate:
-      name: "${meter_1_prefix} Frequency Estimate"
-      device_id: water_meter_device_1
-```
-
-A few kHz of difference is normal and well inside the 270 kHz receive filter
-and ±67.7 kHz hardware frequency-offset compensation. A persistent difference
-of tens of kHz, especially alongside one meter reading reliably while the other
-does not, is a sign that a single shared offset is not serving both meters and
-that a second CC1101 is warranted.
+FREQEST comes from the data-frame sync measurement. Compare each meter's tuned
+frequency and residual estimate; do not assume that nearby meters require the
+same tuning or that RSSI alone identifies a usable setting.
 
 ## Common Configuration Patterns
 
