@@ -77,28 +77,32 @@ tmeter_data MeterReader::meterReadCallback()
         s_active_reader->m_config->getMeterSerial());
 }
 
-void MeterReader::activateCallbackContext()
+bool MeterReader::activateCallbackContext()
 {
+    if (!FrequencyManager::activateCalibration(m_calibration)) return false;
     s_active_reader = this;
+    return true;
 }
 
 void MeterReader::begin()
 {
     LOG_I("everblu_meter", "Initializing...");
 
-    activateCallbackContext();
+    if (!activateCallbackContext()) return;
 
     // Register FrequencyManager callbacks
     FrequencyManager::setRadioInitCallback(MeterReader::radioInitCallback);
     FrequencyManager::setMeterReadCallback(MeterReader::meterReadCallback);
 
-    // Initialize FrequencyManager with configured frequency.
-    // NOTE: The frequency offset is a property of the RADIO, not the meter. It is held in
-    // FrequencyManager's static state and persisted under a single storage key, so it is shared
-    // by every meter that uses the same CC1101. In multi-meter setups all meters on one radio must
-    // therefore be configured with the same base `frequency` for the shared offset to be valid.
     float frequency = m_config->getFrequency();
-    FrequencyManager::begin(frequency);
+    char storageKey[24];
+#ifdef USE_ESPHOME
+    snprintf(storageKey, sizeof(storageKey), "freq_%02u_%07lu", m_config->getMeterYear(),
+             (unsigned long)m_config->getMeterSerial());
+#else
+    snprintf(storageKey, sizeof(storageKey), "freq_offset");
+#endif
+    FrequencyManager::initialiseCalibration(m_calibration, frequency, storageKey);
     FrequencyManager::setAutoScanEnabled(m_config->isAutoScanEnabled());
 
     // Note: Adaptive threshold is set by the platform (ESPHome/MQTT) after this method
@@ -207,22 +211,24 @@ void MeterReader::loop()
         {
             activateCallbackContext();
             FrequencyManager::loopScan();
+            if (!FrequencyManager::isScanInProgress()) finishFrequencyScan();
         }
         return;
     }
 
     if (m_scanInProgress)
     {
-        // The scan finished or was cancelled on the previous iteration: report the
-        // resulting tuning once, rather than polling it every loop.
-        m_scanInProgress = false;
-        LOG_I("everblu_meter", "Frequency scan complete");
+        finishFrequencyScan();
+    }
 
-        if (m_publisher)
+    if (!m_bootScanAttempted && !m_readingInProgress && m_timeProvider->isTimeSynced() &&
+        m_publisher != nullptr && m_publisher->isReady())
+    {
+        m_bootScanAttempted = true;
+        if (shouldPerformAutoScan())
         {
-            m_publisher->publishFrequencyOffset(FrequencyManager::getOffset());
-            m_publisher->publishTunedFrequency(FrequencyManager::getTunedFrequency());
-            m_publisher->publishRadioState("Idle");
+            performFrequencyScan();
+            return;
         }
     }
 
@@ -254,8 +260,8 @@ void MeterReader::loop()
         if (m_publisher->isReady())
         {
             m_publisher->publishStatistics(m_totalReadAttempts, m_successfulReads, m_failedReads);
-            m_publisher->publishFrequencyOffset(FrequencyManager::getOffset());
-            m_publisher->publishTunedFrequency(FrequencyManager::getTunedFrequency());
+            m_publisher->publishFrequencyOffset(getFrequencyOffset());
+            m_publisher->publishTunedFrequency(getTunedFrequency());
         }
     }
 }
@@ -321,6 +327,7 @@ bool MeterReader::shouldPerformScheduledRead()
 
 void MeterReader::triggerReading(bool isScheduled)
 {
+    if (!m_initialized) return;
     if (m_readingInProgress)
     {
         LOG_W("everblu_meter", "Reading already in progress, skipping trigger");
@@ -345,7 +352,7 @@ void MeterReader::triggerReading(bool isScheduled)
 
 void MeterReader::performReading()
 {
-    activateCallbackContext();
+    if (!activateCallbackContext()) return;
 
     if (!m_publisher->isReady())
     {
@@ -370,6 +377,13 @@ void MeterReader::performReading()
           currentFreq, currentOffset * 1000.0);
 
     // Perform actual meter read
+    if (!radioInitCallback(getTunedFrequency()))
+    {
+        m_radioConnected = false;
+        handleFailedRead(ReadFailure::NotAttempted);
+        return;
+    }
+    m_radioConnected = true;
     struct tmeter_data meter_data = meterReadCallback();
 
     // Validate data
@@ -511,12 +525,8 @@ void MeterReader::handleFailedRead(ReadFailure reason)
                   "(disable with auto_scan_on_failure / AUTO_SCAN_ON_FAILURE_ENABLED)",
                   m_config->getMeterYear(), (unsigned long) m_config->getMeterSerial());
             m_publisher->publishStatusMessage("Auto frequency scan after failed reads");
-            // Narrow ±20 kHz / 1 kHz scan: fast re-tune after drift failure.
-            // The full ±150 kHz deep scan is reserved for manual commands and
-            // first-boot with no stored offset (both called via performFrequencyScan).
-            // Started rather than run inline so loop() keeps stepping it (issue #133).
-            FrequencyManager::beginDeepFrequencyScan(0.020f, 0.001f);
-            m_scanInProgress = true;
+            FrequencyManager::beginRecoveryScan(scanStatusCallback);
+            m_scanInProgress = FrequencyManager::isScanInProgress();
         }
     }
 }
@@ -533,15 +543,14 @@ void MeterReader::stopReading()
     // A blocking RF transfer already in flight cannot be aborted mid-transaction;
     // this cancels any pending retry sequence and returns the reader to idle so
     // it stops retrying and won't start the next queued read.
-    const bool wasActive = m_readingInProgress || m_retryCount > 0 || m_nextRetryTime > 0 ||
-                           FrequencyManager::isScanInProgress();
+    const bool wasActive = m_readingInProgress || m_retryCount > 0 || m_nextRetryTime > 0 || m_scanInProgress;
 
     resetRetryState();
     m_readingInProgress = false;
 
     // Also ask any in-progress deep frequency scan to bail at its next step
     // boundary (it cannot be interrupted within a single blocking step).
-    FrequencyManager::requestScanCancel();
+    if (m_scanInProgress) FrequencyManager::requestScanCancel();
 
     if (wasActive)
     {
@@ -556,25 +565,15 @@ void MeterReader::stopReading()
     }
 }
 
-void MeterReader::performFrequencyScan()
+void MeterReader::performFrequencyScan(bool deep)
 {
-    activateCallbackContext();
-
-    if (FrequencyManager::isScanInProgress())
+    if (FrequencyManager::isScanInProgress() || m_readingInProgress || !m_initialized)
     {
         LOG_W("everblu_meter", "Frequency scan already running - ignoring request");
         return;
     }
 
-    // Two DIFFERENT things are being reported here, and in a multi-meter setup
-    // they can disagree:
-    //   - the meter INTERROGATED is this instance's meter (activateCallbackContext
-    //     above points the shared FrequencyManager callbacks at this reader);
-    //   - the frequency SWEPT is centred on FrequencyManager's single global
-    //     s_baseFrequency, which is whichever meter entry ran begin() LAST.
-    // If the two lines below show a centre that isn't this meter's configured
-    // frequency, the entries disagree on `frequency` and the scan window (and
-    // the narrow auto-scan-on-failure window especially) may be centred wrongly.
+    if (!activateCallbackContext()) return;
     LOG_I("everblu_meter", "Starting frequency scan using meter %02u-%06lu (%s)...",
           m_config->getMeterYear(), (unsigned long) m_config->getMeterSerial(),
           m_config->isMeterGas() ? "gas" : "water");
@@ -582,24 +581,27 @@ void MeterReader::performFrequencyScan()
           FrequencyManager::getBaseFrequency(), m_config->getFrequency());
 
     // Non-blocking: loop() steps the scan and publishes the result when it ends.
-    FrequencyManager::beginDeepFrequencyScan();
-    m_scanInProgress = true;
+    if (deep) FrequencyManager::beginDeepFrequencyScan(0.150f, 0.010f, scanStatusCallback);
+    else FrequencyManager::beginRecoveryScan(scanStatusCallback);
+    m_scanInProgress = FrequencyManager::isScanInProgress();
 
     if (m_publisher)
     {
         m_publisher->publishRadioState("Frequency Scanning");
-        m_publisher->publishStatusMessage("Deep frequency scan running");
+        m_publisher->publishStatusMessage(deep ? "Deep frequency scan running" : "Frequency scan running");
     }
 }
 
 void MeterReader::resetFrequencyOffset()
 {
-    activateCallbackContext();
+    if (FrequencyManager::isScanInProgress() || m_readingInProgress || !m_initialized) return;
+    if (!activateCallbackContext()) return;
 
     LOG_I("everblu_meter", "Resetting frequency offset to 0");
 
     // Reset offset to 0 and save
     FrequencyManager::saveFrequencyOffset(0.0);
+    FrequencyManager::resetAdaptiveTracking();
 
     // Reinitialize radio with base frequency
     float baseFrequency = FrequencyManager::getBaseFrequency();
@@ -621,6 +623,21 @@ void MeterReader::resetFrequencyOffset()
         m_publisher->publishFrequencyOffset(0.0);
         m_publisher->publishTunedFrequency(baseFrequency);
     }
+}
+
+void MeterReader::scanStatusCallback(const char *state, const char *message)
+{
+    if (!s_active_reader || !s_active_reader->m_publisher) return;
+    s_active_reader->m_publisher->publishStatusMessage(message);
+    s_active_reader->m_publisher->publishRadioState(state);
+}
+
+void MeterReader::finishFrequencyScan()
+{
+    m_scanInProgress = false;
+    if (!m_publisher) return;
+    m_publisher->publishFrequencyOffset(getFrequencyOffset());
+    m_publisher->publishTunedFrequency(getTunedFrequency());
 }
 
 void MeterReader::getStatistics(unsigned long &totalAttempts, unsigned long &successfulReads,

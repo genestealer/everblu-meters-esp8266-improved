@@ -241,6 +241,12 @@ void test_freq_scan_without_a_carrier_keeps_the_base_frequency(void)
     TEST_ASSERT_FLOAT_WITHIN(0.000001f, 0.0f, FrequencyManager::getOffset());
     TEST_ASSERT_FLOAT_WITHIN(0.000001f, BASE_FREQ, fakeRadio().lastInitFrequency());
     TEST_ASSERT_EQUAL(0, fakeStorage().saveCalls);
+
+    FrequencyManager::saveFrequencyOffset(0.060760f);
+    FrequencyManager::performDeepFrequencyScan(0.020f, 0.0025f);
+    TEST_ASSERT_FLOAT_WITHIN(0.000001f, BASE_FREQ + 0.060760f, fakeRadio().lastInitFrequency());
+    TEST_ASSERT_FLOAT_WITHIN(0.000001f, 0.060760f, FrequencyManager::getOffset());
+    TEST_ASSERT_EQUAL(1, fakeStorage().saveCalls);
 }
 
 void test_freq_scan_aborts_when_the_radio_stops_responding(void)
@@ -387,10 +393,10 @@ void test_freq_scan_reports_its_result_through_the_status_callback(void)
 
     FrequencyManager::performDeepFrequencyScan(0.050f, 0.0025f, recordScanStatus);
 
-    TEST_ASSERT_EQUAL(2, (int)g_scanStates.size());
+    TEST_ASSERT_GREATER_OR_EQUAL(2, (int)g_scanStates.size());
     TEST_ASSERT_EQUAL_STRING("Frequency Scanning", g_scanStates.front().c_str());
     TEST_ASSERT_EQUAL_STRING("Idle", g_scanStates.back().c_str());
-    TEST_ASSERT_EQUAL(0, (int)g_scanMessages.back().rfind("Deep scan complete: offset"));
+    TEST_ASSERT_EQUAL_STRING("Deep scan complete - verified calibration", g_scanMessages.back().c_str());
 }
 
 void test_freq_scan_reports_a_failed_sweep_through_the_status_callback(void)
@@ -402,7 +408,7 @@ void test_freq_scan_reports_a_failed_sweep_through_the_status_callback(void)
 
     TEST_ASSERT_EQUAL(2, (int)g_scanStates.size());
     TEST_ASSERT_EQUAL_STRING("Idle", g_scanStates.back().c_str());
-    TEST_ASSERT_EQUAL_STRING("Deep scan failed - check setup", g_scanMessages.back().c_str());
+    TEST_ASSERT_EQUAL_STRING("Deep scan failed - no meter response", g_scanMessages.back().c_str());
 }
 
 void test_freq_scan_keeps_the_stored_offset_when_the_candidate_stops_answering(void)
@@ -423,16 +429,15 @@ void test_freq_scan_keeps_the_stored_offset_when_the_candidate_stops_answering(v
 
 void test_freq_scan_falls_back_to_the_window_midpoint_when_the_zoom_cannot_retune(void)
 {
-    // The radio stops accepting new frequencies once the zoom starts. Rather
-    // than lose the sweep, the scan keeps the midpoint of the window it mapped.
     beginManager();
     placeCarrier(20.0f, 6.0f);
     failRadioInitWhenZoomStarts();
 
     FrequencyManager::performDeepFrequencyScan(0.050f, 0.0025f);
 
-    TEST_ASSERT_TRUE(FrequencyManager::getOffset() > 0.0f);
-    assertLockedInsideWindow(20.0f, 6.0f, 2.5f);
+    TEST_ASSERT_FLOAT_WITHIN(0.000001f, 0.0f, FrequencyManager::getOffset());
+    TEST_ASSERT_EQUAL(0, fakeStorage().saveCalls);
+    TEST_ASSERT_TRUE(FrequencyManager::lastScanOutcome() == FrequencyManager::ScanOutcome::Aborted);
 }
 
 // ---------------------------------------------------------------------------

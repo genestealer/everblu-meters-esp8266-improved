@@ -41,14 +41,19 @@ namespace
     }
 
     /// Step the auto-started frequency scan to completion, as the host loop does.
+    /// An empty narrow scan escalates to a full sweep on the trailing loop(), so
+    /// keep draining until no further scan is started.
     void drainFrequencyScan(MeterReader &reader)
     {
         int guard = 0;
-        while (FrequencyManager::isScanInProgress() && guard++ < 5000)
+        do
         {
-            reader.loop();
-        }
-        reader.loop(); // One more pass so the reader publishes the resulting tuning
+            while (FrequencyManager::isScanInProgress() && guard++ < 5000)
+            {
+                reader.loop();
+            }
+            reader.loop(); // One more pass so the reader publishes the resulting tuning
+        } while (FrequencyManager::isScanInProgress() && guard < 5000);
     }
 }
 
@@ -602,6 +607,49 @@ void test_auto_scan_on_failure_is_rearmed_by_a_success(void)
 
     TEST_ASSERT_TRUE(g_publisher.sawStatus("Auto frequency scan after failed reads"));
     drainFrequencyScan(reader);
+}
+
+void test_auto_scan_on_failure_escalates_to_a_full_sweep(void)
+{
+    // Crystal drift can exceed the narrow +-20 kHz recovery window. When that
+    // window sweeps clean, the reader must widen to the full +-150 kHz sweep
+    // rather than leave the meter unreachable until a manual Deep Scan.
+    g_config.maxRetries = 1;
+    g_config.autoScanOnFailure = true;
+    g_config.retryCooldownMs = 1;
+    g_config.frequency = 433.82f;
+    fakeRadio().carrierFrequency = 433.88f; // +60 kHz: outside the narrow window
+
+    MeterReader reader = makeReader();
+    reader.triggerReading(false);
+    drainFrequencyScan(reader);
+
+    TEST_ASSERT_TRUE(FrequencyManager::lastScanOutcome() == FrequencyManager::ScanOutcome::Found);
+    // The zoom locks on the first frequency that decodes, so the result sits at
+    // the lower edge of the simulated response window rather than its centre.
+    // What matters here is that it is beyond the narrow window's +-20 kHz reach.
+    TEST_ASSERT_TRUE(FrequencyManager::getOffset() > 0.020f);
+    TEST_ASSERT_FLOAT_WITHIN(0.011f, 0.060f, FrequencyManager::getOffset());
+}
+
+void test_auto_scan_on_failure_does_not_escalate_after_a_cancel(void)
+{
+    // A cancelled sweep would only repeat itself, so only an empty sweep widens.
+    g_config.maxRetries = 1;
+    g_config.autoScanOnFailure = true;
+    g_config.retryCooldownMs = 1;
+    g_config.frequency = 433.82f;
+    fakeRadio().responses.push_back(FakeRadio::failure(ReadFailure::NoReply));
+
+    MeterReader reader = makeReader();
+    reader.triggerReading(false);
+    TEST_ASSERT_TRUE(FrequencyManager::isScanInProgress());
+
+    reader.stopReading();
+    drainFrequencyScan(reader);
+
+    TEST_ASSERT_FALSE(g_publisher.sawStatus("Auto frequency scan (full sweep)"));
+    TEST_ASSERT_FALSE(FrequencyManager::isScanInProgress());
 }
 
 void test_auto_scan_on_failure_stays_off_when_disabled(void)

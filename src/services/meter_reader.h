@@ -98,7 +98,11 @@ public:
      * Returns immediately: the scan is then stepped from loop(), so the host stays
      * responsive and stopReading() can abort it mid-scan.
      */
-    void performFrequencyScan();
+    void performFrequencyScan(bool deep = true);
+    float getFrequencyOffset() const { return m_calibration.offset; }
+    float getTunedFrequency() const { return m_calibration.baseFrequency + m_calibration.offset; }
+    void setAdaptiveThreshold(int threshold) { m_calibration.adaptiveThreshold = threshold > 0 ? threshold : 1; }
+    bool shouldPerformAutoScan() const { return m_calibration.autoScan && !m_calibration.hasStored; }
 
     /**
      * @brief Check whether a deep frequency scan is currently running
@@ -160,7 +164,9 @@ private:
     static bool radioInitCallback(float freq);
     static tmeter_data meterReadCallback();
 
-    void activateCallbackContext();
+    bool activateCallbackContext();
+    static void scanStatusCallback(const char *state, const char *message);
+    void finishFrequencyScan();
     bool isReadingDayForConfiguredSchedule(const struct tm *ptm) const;
 
     /**
@@ -201,6 +207,8 @@ private:
     IConfigProvider *m_config;
     ITimeProvider *m_timeProvider;
     IDataPublisher *m_publisher;
+    FrequencyManager::Calibration m_calibration;
+    bool m_bootScanAttempted = false;
 
     // State tracking
     bool m_initialized;

@@ -483,25 +483,27 @@ void test_pub_wifi_details_and_discovery_are_no_ops(void)
 
 void test_pub_shared_sensors_keep_their_first_registration(void)
 {
-    // Calibration and radio entities describe the one shared CC1101, so a
-    // second meter instance in the same YAML must not steal them.
     Sensor secondOffset;
+    Sensor secondTuned;
     TextSensor secondRadioState;
     BinarySensor secondConnected;
 
     ESPHomeDataPublisher second;
     second.set_frequency_offset_sensor(&secondOffset);
+    second.set_tuned_frequency_sensor(&secondTuned);
     second.set_radio_state_sensor(&secondRadioState);
     second.set_radio_connected_sensor(&secondConnected);
 
     second.publishFrequencyOffset(0.010f);
+    second.publishTunedFrequency(433.83f);
     second.publishRadioState("Idle");
 
-    TEST_ASSERT_FALSE(secondOffset.published());
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 10.0f, secondOffset.last());
+    TEST_ASSERT_FLOAT_WITHIN(0.0001f, 433.83f, secondTuned.last());
     TEST_ASSERT_FALSE(secondRadioState.published());
     TEST_ASSERT_FALSE(secondConnected.published());
 
-    TEST_ASSERT_FLOAT_WITHIN(0.001f, 10.0f, g_sensors.frequencyOffset.last());
+    TEST_ASSERT_FALSE(g_sensors.frequencyOffset.published());
     TEST_ASSERT_EQUAL_STRING("Idle", g_sensors.radioState.last());
 }
 

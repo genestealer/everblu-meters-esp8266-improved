@@ -43,6 +43,47 @@ void esphomeReaderSetUp()
     g_publisher.reset();
 }
 
+void test_esphome_calibration_is_per_meter_and_scan_is_exclusive()
+{
+    FakeConfig otherConfig = g_config;
+    otherConfig.meterSerial = 654321;
+    otherConfig.frequency = 433.84f;
+    RecordingPublisher otherPublisher;
+    StorageAbstraction::saveFloat("freq_21_0123456", 0.060f, 0xABCD);
+    StorageAbstraction::saveFloat("freq_21_0654321", -0.020f, 0xABCD);
+    MeterReader first(&g_config, &g_time, &g_publisher);
+    MeterReader second(&otherConfig, &g_time, &otherPublisher);
+    first.begin();
+    second.begin();
+    fakeRadio().responses.push_back(FakeRadio::success());
+    first.triggerReading(false);
+    second.triggerReading(false);
+    TEST_ASSERT_FLOAT_WITHIN(0.0001f, 433.88f, fakeRadio().calls[0].frequency);
+    TEST_ASSERT_FLOAT_WITHIN(0.0001f, 433.82f, fakeRadio().calls[1].frequency);
+    TEST_ASSERT_EQUAL(123456, fakeRadio().calls[0].serial);
+    TEST_ASSERT_EQUAL(654321, fakeRadio().calls[1].serial);
+    nativeClockAdvance(300000);
+    first.loop();
+    second.loop();
+    TEST_ASSERT_FLOAT_WITHIN(0.0001f, 433.88f, g_publisher.tunedFrequencies.back());
+    TEST_ASSERT_FLOAT_WITHIN(0.0001f, 433.82f, otherPublisher.tunedFrequencies.back());
+    fakeRadio().responses.clear();
+    first.performFrequencyScan();
+    second.stopReading();
+    second.resetFrequencyOffset();
+    second.performFrequencyScan();
+    first.loop();
+    TEST_ASSERT_TRUE(FrequencyManager::isScanInProgress());
+    TEST_ASSERT_EQUAL(123456, fakeRadio().calls.back().serial);
+    first.stopReading();
+    first.loop();
+    TEST_ASSERT_FALSE(FrequencyManager::isScanInProgress());
+    TEST_ASSERT_FLOAT_WITHIN(0.0001f, 433.88f, fakeRadio().lastInitFrequency());
+    second.resetFrequencyOffset();
+    TEST_ASSERT_FLOAT_WITHIN(0.0001f, 0.060f, first.getFrequencyOffset());
+    TEST_ASSERT_FLOAT_WITHIN(0.0001f, 0.0f, second.getFrequencyOffset());
+}
+
 // ---------------------------------------------------------------------------
 // Boot behaviour
 // ---------------------------------------------------------------------------
@@ -68,7 +109,7 @@ void test_esphome_begin_publishes_settings_and_calibration(void)
 {
     // The stored calibration is published at boot so it is visible in Home
     // Assistant immediately, confirming it survived the reboot.
-    StorageAbstraction::saveFloat("freq_offset", 0.0125f, 0xABCD);
+    StorageAbstraction::saveFloat("freq_21_0123456", 0.0125f, 0xABCD);
     g_config.frequency = 433.82f;
 
     MeterReader reader(&g_config, &g_time, &g_publisher);
@@ -233,7 +274,7 @@ void test_esphome_stop_reading_returns_to_idle(void)
 
 void test_esphome_reset_frequency_offset_retunes_and_publishes(void)
 {
-    StorageAbstraction::saveFloat("freq_offset", 0.030f, 0xABCD);
+    StorageAbstraction::saveFloat("freq_21_0123456", 0.030f, 0xABCD);
     g_config.frequency = 433.82f;
 
     MeterReader reader(&g_config, &g_time, &g_publisher);

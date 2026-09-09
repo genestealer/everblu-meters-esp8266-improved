@@ -6,6 +6,7 @@
 #include <unity.h>
 
 void esphomeReaderSetUp();
+void test_esphome_calibration_is_per_meter_and_scan_is_exclusive();
 
 void test_esphome_begin_does_not_publish_idle_states(void);
 void test_esphome_begin_publishes_settings_and_calibration(void);
@@ -44,6 +45,7 @@ int main(int, char **)
     RUN_TEST(test_esphome_reset_frequency_offset_retunes_and_publishes);
     RUN_TEST(test_esphome_frequency_scan_publishes_the_new_offset);
     RUN_TEST(test_esphome_statistics_are_republished_periodically);
+    RUN_TEST(test_esphome_calibration_is_per_meter_and_scan_is_exclusive);
 
     return UNITY_END();
 }

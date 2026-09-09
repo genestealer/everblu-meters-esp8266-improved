@@ -41,6 +41,15 @@ void test_cooldown_applies_to_a_failure_at_time_zero(void);
 void test_statistics_are_republished_periodically(void);
 void test_auto_scan_on_failure_runs_once_per_failure_streak(void);
 void test_auto_scan_on_failure_is_rearmed_by_a_success(void);
+void test_staged_scan_falls_back_and_finds_a_narrow_carrier();
+void test_staged_scan_sweeps_both_sides_and_selects_the_centre();
+void test_calibration_profiles_keep_independent_storage_and_tracking();
+void test_staged_scan_cancels_every_phase_without_saving();
+void test_staged_scan_radio_faults_never_save_candidates();
+void test_staged_scan_requires_verification_without_prior_calibration();
+void test_staged_scan_prefers_reliable_decodes_over_lower_error();
+void test_auto_scan_on_failure_escalates_to_a_full_sweep(void);
+void test_auto_scan_on_failure_does_not_escalate_after_a_cancel(void);
 void test_auto_scan_on_failure_stays_off_when_disabled(void);
 void test_a_scan_is_only_stepped_by_the_reader_that_started_it(void);
 void test_a_running_scan_blocks_reads_and_further_scan_requests(void);
@@ -129,6 +138,8 @@ int main(int, char **)
     RUN_TEST(test_statistics_are_republished_periodically);
     RUN_TEST(test_auto_scan_on_failure_runs_once_per_failure_streak);
     RUN_TEST(test_auto_scan_on_failure_is_rearmed_by_a_success);
+    RUN_TEST(test_auto_scan_on_failure_escalates_to_a_full_sweep);
+    RUN_TEST(test_auto_scan_on_failure_does_not_escalate_after_a_cancel);
     RUN_TEST(test_auto_scan_on_failure_stays_off_when_disabled);
     RUN_TEST(test_a_scan_is_only_stepped_by_the_reader_that_started_it);
     RUN_TEST(test_a_running_scan_blocks_reads_and_further_scan_requests);
@@ -174,6 +185,14 @@ int main(int, char **)
     RUN_TEST(test_freq_adaptive_tracking_retunes_and_saves_after_adjusting);
     RUN_TEST(test_freq_reset_adaptive_tracking_discards_the_accumulator);
     RUN_TEST(test_freq_scan_result_is_a_plain_tmeter_data_by_value);
+
+    RUN_TEST(test_staged_scan_falls_back_and_finds_a_narrow_carrier);
+    RUN_TEST(test_staged_scan_sweeps_both_sides_and_selects_the_centre);
+    RUN_TEST(test_calibration_profiles_keep_independent_storage_and_tracking);
+    RUN_TEST(test_staged_scan_cancels_every_phase_without_saving);
+    RUN_TEST(test_staged_scan_radio_faults_never_save_candidates);
+    RUN_TEST(test_staged_scan_requires_verification_without_prior_calibration);
+    RUN_TEST(test_staged_scan_prefers_reliable_decodes_over_lower_error);
 
     return UNITY_END();
 }
