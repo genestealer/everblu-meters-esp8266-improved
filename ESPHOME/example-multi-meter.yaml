@@ -78,7 +78,7 @@ spi:
 
 everblu_meter:
   - id: water_meter_1
-    meter_code: "20-0257750-000"  # year=20, serial=257750 (dashed form, suffix 000 ignored)
+    meter_code: "XX-XXXXXXX-XXX"  # Replace with the first meter's code
     meter_type: water
     debug_cc1101: true
     spi_id: main_bus
@@ -207,7 +207,7 @@ everblu_meter:
       name: "CC1101 Connected"        # device-level (shared radio) - stays on main node
 
   - id: water_meter_2
-    meter_code: "20-0257751-000"  # year=20, serial=257751 (dashed form, suffix 000 ignored)
+    meter_code: "XX-XXXXXXX-XXX"  # Replace with the second meter's code
     meter_type: water
     debug_cc1101: true
     spi_id: main_bus
