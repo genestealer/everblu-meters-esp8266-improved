@@ -81,11 +81,10 @@ public:
         if (sensor != nullptr && tuned_frequency_sensor_ == nullptr)
             tuned_frequency_sensor_ = sensor;
     }
-    void set_frequency_estimate_sensor(esphome::sensor::Sensor *sensor)
-    {
-        if (sensor != nullptr && frequency_estimate_sensor_ == nullptr)
-            frequency_estimate_sensor_ = sensor;
-    }
+    // FREQEST is measured from THIS meter's received frame, so it is per-meter
+    // even though the offset it feeds is shared. Declare it on every meter to
+    // see the carrier spread between them.
+    void set_frequency_estimate_sensor(esphome::sensor::Sensor *sensor) { frequency_estimate_sensor_ = sensor; }
     void set_uptime_sensor(esphome::sensor::Sensor *sensor) { uptime_sensor_ = sensor; }
 
     // Text sensors
@@ -165,7 +164,8 @@ private:
     // Global (per-radio) frequency calibration sensors - shared across all instances.
     static esphome::sensor::Sensor *frequency_offset_sensor_;
     static esphome::sensor::Sensor *tuned_frequency_sensor_;
-    static esphome::sensor::Sensor *frequency_estimate_sensor_;
+    // Per-meter: FREQEST comes from this meter's own frame.
+    esphome::sensor::Sensor *frequency_estimate_sensor_{nullptr};
     esphome::sensor::Sensor *uptime_sensor_{nullptr};
 
     // Text sensors

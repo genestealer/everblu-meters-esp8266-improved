@@ -12,6 +12,12 @@ Releases are created manually by tagging commits with version tags matching `v*.
 - Keep PR coverage explicit per release so branch-only work is auditable against merge history.
 - Add new versions below, not above this section.
 
+## [Unreleased]
+
+### Changed
+
+- **`frequency_estimate` is now a per-meter sensor** in the ESPHome component. It was made static (first-registration wins) in [#96](https://github.com/genestealer/everblu-meters-esp8266-improved/pull/96) along with `frequency_offset` and `tuned_frequency`, but unlike those two it is not a radio-wide value: FREQEST is the CC1101's measurement of the carrier of the specific meter that was just read. Declaring it on every `everblu_meter:` entry now gives one sensor per meter, so the transmit-frequency spread between meters sharing a CC1101 can be measured. `frequency_offset` and `tuned_frequency` remain global.
+
 ## [v3.5.0] - 2026-07-31
 
 ### AI Metadata

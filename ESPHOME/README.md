@@ -566,7 +566,7 @@ EverbluMeterComponent (ESPHome)
 - **time_start** / **time_end** - Reading timing
 - **frequency_offset** - Current frequency offset (kHz)
 - **tuned_frequency** - Actual tuned frequency (MHz)
-- **frequency_estimate** - CC1101 frequency estimate from last reading (kHz) - helps monitor frequency drift
+- **frequency_estimate** - CC1101 FREQEST reading from this meter's last frame (kHz) - helps monitor frequency drift. Unlike `frequency_offset` and `tuned_frequency`, this one is **per-meter**: declare it on every `everblu_meter:` entry to compare how far apart your meters actually transmit
 - **total_attempts** / **successful_reads** / **failed_reads** - Statistics
 - **gdo2_timeouts** - GDO2 wiring faults since boot (failed boot self-test plus runtime FIFO-threshold timeouts). A non-zero, growing value points at a miswired or wrong-GPIO GDO2 rather than an RF problem
 
@@ -641,6 +641,31 @@ the offset/tuned-frequency sensors on the **first** meter entry only, as in
 [example-multi-meter.yaml](example-multi-meter.yaml); adding extra scan buttons
 on other entries only changes which meter answers, not the swept range or the
 shared offset.
+
+#### Measuring the spread between your meters
+
+The shared offset mostly corrects the CC1101 module's own crystal error, which
+is common to every meter on that radio. Each meter's transmitter has its own
+smaller error on top, and `adaptiveFrequencyTracking()` feeds FREQEST from all
+meters into one accumulator, so the stored offset settles near the average of
+them rather than on any single meter.
+
+To see how large that spread actually is, declare a **`frequency_estimate`
+sensor on every meter entry** (this sensor is per-meter, unlike the offset and
+tuned-frequency sensors). Each one reports the residual carrier error the
+CC1101 measured on that meter's own frame:
+
+```yaml
+    frequency_estimate:
+      name: "${meter_1_prefix} Frequency Estimate"
+      device_id: water_meter_device_1
+```
+
+A few kHz of difference is normal and well inside the 270 kHz receive filter
+and ±67.7 kHz hardware frequency-offset compensation. A persistent difference
+of tens of kHz, especially alongside one meter reading reliably while the other
+does not, is a sign that a single shared offset is not serving both meters and
+that a second CC1101 is warranted.
 
 ## Common Configuration Patterns
 

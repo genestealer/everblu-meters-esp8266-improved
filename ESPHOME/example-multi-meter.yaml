@@ -105,6 +105,7 @@ everblu_meter:
     # Frequency calibration is a property of the shared CC1101 radio, not the
     # meter. Declare these buttons/sensors on METER 1 ONLY - there is one base
     # frequency, one offset and one tuned frequency for the whole device.
+    # (`frequency_estimate` is the exception: see the sensor block below.)
     #
     # Every entry must use the SAME `frequency:` value (all entries here use the
     # default). FrequencyManager::begin() is called per entry and overwrites a
@@ -166,8 +167,12 @@ everblu_meter:
       name: "Radio Frequency Offset"
     tuned_frequency:
       name: "Radio Tuned Frequency (MHz)"
+    # frequency_estimate IS per-meter: it is the CC1101's FREQEST measurement of
+    # this meter's own carrier. Declare it on every entry to see how far apart
+    # your meters transmit; the shared offset settles near the average of them.
     frequency_estimate:
-      name: "Radio Frequency Estimate"
+      name: "${meter_1_prefix} Frequency Estimate"
+      device_id: water_meter_device_1
 
     meter_serial_sensor:
       name: "${meter_1_prefix} Meter Serial"
@@ -282,6 +287,10 @@ everblu_meter:
       device_id: water_meter_device_2
     failed_reads:
       name: "${meter_2_prefix} Failed Reads"
+      device_id: water_meter_device_2
+    # Per-meter FREQEST - compare with meter 1 to see the carrier spread.
+    frequency_estimate:
+      name: "${meter_2_prefix} Frequency Estimate"
       device_id: water_meter_device_2
 
     meter_serial_sensor:
