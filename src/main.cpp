@@ -196,13 +196,13 @@ const int ADAPT_THRESHOLD = ADAPTIVE_THRESHOLD;
 /**
  * @brief Perform a Deep frequency scan
  *
- * Scans +-150 kHz (default) around the configured frequency in fine 2.5 kHz steps,
- * mapping the response window then zooming to the exact carrier centre.
+ * Starts staged acquisition and refinement around the configured frequency.
  * Also used on first boot when no stored offset exists.
  *
  * Saves discovered offset to persistent storage on success.
  */
-void performDeepFrequencyScan(float scanRangeMHz = 0.150f, float scanStepMHz = 0.0025f);
+void performDeepFrequencyScan(float scanRangeMHz = 0.150f, float scanStepMHz = 0.010f);
+static void startRecoveryScan(bool retryRead);
 
 /**
  * @brief Reset the persisted frequency offset to zero and re-tune the radio.
@@ -303,6 +303,9 @@ bool g_inCooldown = false;
 const unsigned long RETRY_COOLDOWN = 3600000; // 1 hour cooldown in milliseconds
 bool g_autoScanAfterFailureDone = false;      // Guards the failure-recovery frequency scan to once per failure streak
 bool g_postScanReadAttempted = false;         // Guards the single post-scan re-read to once per failure streak
+bool g_scanActive = false;
+bool g_scanRetryRead = false;
+float g_scanPreviousOffset = 0.0f;
 ReadFailure g_retryFailureReason = ReadFailure::None; // Most informative failure seen so far in the current retry sequence
 
 // Global variable to store the reading schedule (default from private.h)
@@ -547,6 +550,7 @@ static const char *wifiStatusToString(wl_status_t st)
 //              Retries up to 10 times if data retrieval fails.
 void onUpdateData()
 {
+  if (FrequencyManager::isScanInProgress()) return;
   Serial.println("");
   EVB_PRINTLN("========================================");
   EVB_PRINTF("        METER READ - START (fw %s)\n", EVERBLU_FW_VERSION);
@@ -646,28 +650,7 @@ void onUpdateData()
       if (autoScanOnFailureEnabled && !g_autoScanAfterFailureDone)
       {
         g_autoScanAfterFailureDone = true;
-        TS_PRINTLN("[FREQ] Max retries reached - running narrow frequency scan (±20 kHz) to re-tune after drift... (disable: AUTO_SCAN_ON_FAILURE_ENABLED 0 in private.h)");
-        const float offsetBeforeScan = FrequencyManager::getOffset();
-        performDeepFrequencyScan(0.020f, 0.001f); // ±20 kHz, 1 kHz steps, ~41 steps, ~2 min
-        const float offsetAfterScan = FrequencyManager::getOffset();
-
-        // Only re-read if the scan actually found and stored a *new* offset: the
-        // carrier had drifted and the radio is now tuned to a frequency we have
-        // not yet tried this streak, so an immediate read is worthwhile instead
-        // of waiting out the 1-hour cooldown. Attempt exactly ONE more read.
-        // This cannot loop: g_autoScanAfterFailureDone (already set) blocks a
-        // second scan and g_postScanReadAttempted (set here) blocks a second
-        // re-read, so a still-failing re-read falls straight through to cooldown.
-        if (offsetAfterScan != offsetBeforeScan && !g_postScanReadAttempted)
-        {
-          g_postScanReadAttempted = true;
-          g_inCooldown = false;     // lift the cooldown for this single retry
-          lastFailedAttempt = 0;
-          _retry = max_retries - 1; // enter as the final attempt: one shot only
-          TS_PRINTF("[FREQ] New frequency offset found (%.3f -> %.3f kHz) - attempting one more read...\n",
-                    offsetBeforeScan * 1000.0, offsetAfterScan * 1000.0);
-          mqtt.executeDelayed(2000, onUpdateData);
-        }
+        startRecoveryScan(true);
       }
     }
     EVB_PRINTLN("========================================");
@@ -1233,6 +1216,18 @@ void publishHADiscovery()
   json += "}";
   publishDiscoveryMessage("button", "everblu_meter_deep_scan", json);
 
+  const char *scanCommands[] = {"scan", "stop_scan"};
+  const char *scanNames[] = {"Frequency Scan", "Stop Frequency Scan"};
+  const char *scanIcons[] = {"mdi:magnify", "mdi:stop-circle-outline"};
+  for (size_t index = 0; index < 2; index++)
+  {
+    String object = String("everblu_meter_") + scanCommands[index];
+    json = "{\"name\":\"" + String(scanNames[index]) + "\",\"uniq_id\":\"" + getMeterPrefix() + object;
+    json += "\",\"ic\":\"" + String(scanIcons[index]) + "\",\"cmd_t\":\"" + String(mqttBaseTopic) + "/" + scanCommands[index];
+    json += "\",\"pl_prs\":\"" + String(index == 0 ? "scan" : "stop") + "\",\"ent_cat\":\"config\",\"dev\":{" + buildDeviceJson() + "}}";
+    publishDiscoveryMessage("button", object.c_str(), json);
+  }
+
   json = "{\n";
   json += "  \"name\": \"Reset Frequency Offset\",\n";
   json += "  \"uniq_id\": \"" + getMeterPrefix() + "everblu_meter_reset_frequency\",\n";
@@ -1474,6 +1469,16 @@ void onConnectionEstablished()
     EVB_PRINTLN("Deep frequency scan command received via MQTT");
     performDeepFrequencyScan(); });
 
+  char scanTopic[MQTT_TOPIC_BUFFER_SIZE];
+  snprintf(scanTopic, sizeof(scanTopic), "%s/scan", mqttBaseTopic);
+  mqtt.subscribe(scanTopic, [](const String &message) {
+    if (message == "scan" && _retry == 0) startRecoveryScan(false);
+  });
+  snprintf(scanTopic, sizeof(scanTopic), "%s/stop_scan", mqttBaseTopic);
+  mqtt.subscribe(scanTopic, [](const String &message) {
+    if (message == "stop") FrequencyManager::requestScanCancel();
+  });
+
   char resetFrequencyTopic[MQTT_TOPIC_BUFFER_SIZE];
   snprintf(resetFrequencyTopic, sizeof(resetFrequencyTopic), "%s/reset_frequency", mqttBaseTopic);
   mqtt.subscribe(resetFrequencyTopic, [](const String &message)
@@ -1620,16 +1625,19 @@ static void publishFrequencyOffsetToMqtt()
 //              status + resulting offset topic).
 void performDeepFrequencyScan(float scanRangeMHz, float scanStepMHz)
 {
-  TS_PRINTLN("[FREQ] [NOTE] Wi-Fi/MQTT connections may temporarily drop and reconnect while the scan is running. This is expected.");
+  if (FrequencyManager::isScanInProgress() || _retry > 0) return;
+  g_scanRetryRead = false;
+  FrequencyManager::beginDeepFrequencyScan(scanRangeMHz, scanStepMHz, mqttFrequencyStatus);
+  g_scanActive = FrequencyManager::isScanInProgress();
+}
 
-  // FrequencyManager reports the final radio state via mqttFrequencyStatus
-  // ("Idle" on success/failure, "Error" if the radio did not respond), so we do
-  // NOT re-publish cc1101_state here. Doing so used the boot-time
-  // cc1101RadioConnected flag, which is still false during an early auto-scan and
-  // would wrongly overwrite the callback's "Idle" with "Not Connected".
-  FrequencyManager::performDeepFrequencyScan(scanRangeMHz, scanStepMHz, mqttFrequencyStatus);
-
-  publishFrequencyOffsetToMqtt();
+static void startRecoveryScan(bool retryRead)
+{
+  if (FrequencyManager::isScanInProgress()) return;
+  g_scanRetryRead = retryRead;
+  g_scanPreviousOffset = FrequencyManager::getOffset();
+  FrequencyManager::beginRecoveryScan(mqttFrequencyStatus);
+  g_scanActive = FrequencyManager::isScanInProgress();
 }
 
 // Function: resetFrequencyOffset
@@ -1640,6 +1648,7 @@ void performDeepFrequencyScan(float scanRangeMHz, float scanStepMHz)
 //              storage/re-tune logic stays single-sourced across both targets.
 void resetFrequencyOffset()
 {
+  if (FrequencyManager::isScanInProgress() || _retry > 0) return;
   TS_PRINTLN("[FREQ] Resetting frequency offset to 0");
 
   // Reset the stored offset to 0 and persist it.
@@ -1678,6 +1687,7 @@ void resetFrequencyOffset()
 //              know about, and the output matches the ESPHome "Diagnostic Report" button.
 void printDiagnosticReport()
 {
+  if (FrequencyManager::isScanInProgress()) return;
   cc1101_report_context_t ctx;
   ctx.meter_code = METER_CODE;
   ctx.meter_year = g_meterYear;
@@ -1968,18 +1978,16 @@ void setup()
   FrequencyManager::setMeterReadCallback(get_meter_data);
   FrequencyManager::setAutoScanEnabled(autoScanEnabled);
   FrequencyManager::setAdaptiveThreshold(ADAPT_THRESHOLD);
-  const float loadedOffset = FrequencyManager::begin(FREQUENCY);
-
-  const bool noStoredOffset = (loadedOffset == 0.0f);
+  FrequencyManager::begin(FREQUENCY);
 
   // If no valid frequency offset found and auto-scan is enabled, perform Deep scan.
   // FrequencyManager updates its own stored offset during the scan, so no reload.
-  if (noStoredOffset && autoScanEnabled)
+  if (FrequencyManager::shouldPerformAutoScan())
   {
     TS_PRINTLN("[FREQ] No stored frequency offset found. Performing Deep frequency scan...");
     performDeepFrequencyScan();
   }
-  else if (noStoredOffset)
+  else if (!autoScanEnabled)
   {
     TS_PRINTLN("[FREQ] AUTO_SCAN_ENABLED=0; skipping automatic frequency scan (offset remains 0.0 MHz).");
   }
@@ -2086,6 +2094,28 @@ void loop()
 #if WIFI_SERIAL_MONITOR_ENABLED
   wifiSerialLoop();
 #endif
+
+  if (g_scanActive)
+  {
+    FrequencyManager::loopScan();
+    if (!FrequencyManager::isScanInProgress())
+    {
+      g_scanActive = false;
+      publishFrequencyOffsetToMqtt();
+      if (g_scanRetryRead && !g_postScanReadAttempted &&
+          FrequencyManager::lastScanOutcome() == FrequencyManager::ScanOutcome::Found &&
+          FrequencyManager::getOffset() != g_scanPreviousOffset)
+      {
+        g_postScanReadAttempted = true;
+        g_inCooldown = false;
+        lastFailedAttempt = 0;
+        _retry = max_retries - 1;
+        mqtt.executeDelayed(2000, onUpdateData);
+      }
+      g_scanRetryRead = false;
+    }
+    return;
+  }
 
   // Update diagnostics and Wi-Fi details every 5 minutes
   if (millis() - lastWifiUpdate > 300000)
