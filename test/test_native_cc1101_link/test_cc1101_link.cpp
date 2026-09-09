@@ -335,6 +335,14 @@ void test_diagnostics_report_where_the_radio_is_actually_tuned(void)
 
     TEST_ASSERT_FLOAT_WITHIN(0.01f, kTestFrequency, diag.carrier_mhz);
     TEST_ASSERT_EQUAL_FLOAT(cc1101_freq_registers_to_mhz(diag.freq2, diag.freq1, diag.freq0), diag.carrier_mhz);
+    for (uint32_t word = 1093080; word < 1093850; word++)
+    {
+        float frequency = word * (26.0f / 65536.0f);
+        setMHZ(frequency);
+        cc1101_collect_diagnostics(&diag);
+        uint32_t actual = ((uint32_t)diag.freq2 << 16) | ((uint32_t)diag.freq1 << 8) | diag.freq0;
+        TEST_ASSERT_EQUAL_UINT32(word, actual);
+    }
 }
 
 // ---------------------------------------------------------------------------
