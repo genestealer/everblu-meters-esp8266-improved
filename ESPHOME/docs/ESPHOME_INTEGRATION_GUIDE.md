@@ -1,6 +1,6 @@
 # ESPHome Integration Guide
 
-This guide explains how to use the EverBlu Cyble Enhanced meter reader with ESPHome, allowing seamless integration with Home Assistant.
+This guide explains how to use the EverBlu Cyble Enhanced meter reader with ESPHome and Home Assistant.
 
 > **📖 Quick Navigation**:
 >
@@ -22,13 +22,13 @@ This guide explains how to use the EverBlu Cyble Enhanced meter reader with ESPH
 
 ## Overview
 
-The ESPHome integration allows you to read EverBlu Cyble Enhanced water and gas meters directly within the ESPHome ecosystem. Key features include:
+The ESPHome integration reads EverBlu Cyble Enhanced water and gas meters directly within ESPHome:
 
-- **Native ESPHome Component**: Integrates seamlessly with ESPHome's sensor framework
-- **Automatic Discovery**: Sensors appear automatically in Home Assistant
+- **Native ESPHome Component**: Works within ESPHome's sensor framework
+- **Automatic Discovery**: Sensors appear in Home Assistant without extra configuration
 - **Scheduled Readings**: Configure when and how often to read the meter
-- **Comprehensive Monitoring**: Track signal quality, battery life, and reading statistics
-- **Multiple Meter Types**: Supports both water and gas meters
+- **Signal and Battery Monitoring**: Tracks signal quality, battery life, and reading statistics
+- **Multiple Meter Types**: Works with both water and gas meters
 
 ## Requirements
 
@@ -186,7 +186,7 @@ everblu_meter:
 This is a design limitation inherited from the MQTT/standalone version:
 
 - **MQTT/Standalone mode**: Uses NTP which only provides UTC time, so manual offset is necessary
-- **ESPHome mode**: Could leverage ESPHome's timezone-aware time (which handles DST automatically), but currently doesn't
+- **ESPHome mode**: Could use ESPHome's timezone-aware time (which handles DST automatically), but currently doesn't
 
 **Current Workaround:**
 
@@ -194,7 +194,7 @@ This is a design limitation inherited from the MQTT/standalone version:
 - The offset is added to UTC to get your local time
 - Positive values for east of UTC, negative for west
 
-- This is a **static offset** - it doesn't automatically adjust for Daylight Saving Time
+- This is a **static offset** and does not adjust automatically for Daylight Saving Time
 
 Common timezone examples:
 
@@ -212,7 +212,7 @@ timezone_offset: -420  # US Pacific PDT (UTC-7) - Summer
 
 **Note on DST**: If your region observes Daylight Saving Time, you'll need to manually update `timezone_offset` when DST changes. Alternatively, you can choose a single offset (e.g., standard time year-round), but the meter will be read at different local clock times depending on DST.
 
-**Future Enhancement**: A future version could be enhanced to automatically use ESPHome's `timezone` setting, eliminating the need for manual offset and providing automatic DST handling.
+**Future Enhancement**: A future version could use ESPHome's `timezone` setting directly, removing the need for a manual offset and handling DST automatically.
 
 #### Time Alignment
 
@@ -259,7 +259,7 @@ The default frequency (433.82 MHz) works for most European meters. If you experi
 
 ## Sensors
 
-The component provides various sensors for monitoring your meter:
+The component exposes sensors for monitoring your meter:
 
 ### Numeric Sensors
 
@@ -454,7 +454,7 @@ See [example-advanced.yaml](example-advanced.yaml) for complete configuration.
 
 **Problem**: The `timezone` setting in the ESPHome `time:` component (e.g., `timezone: Australia/Melbourne`) is **not automatically used** by the `everblu_meter` component. This is a known design limitation.
 
-**Why**: The architecture was designed for both MQTT (which needs manual offset) and ESPHome modes using the same core logic. ESPHome's timezone-aware time API isn't currently leveraged, even though it could handle DST automatically.
+**Why**: The architecture was designed for both MQTT (which needs manual offset) and ESPHome modes using the same core logic. ESPHome's timezone-aware time API isn't used yet, even though it could handle DST automatically.
 
 **Solution**: You must explicitly set `timezone_offset` in the `everblu_meter` configuration:
 
@@ -538,7 +538,7 @@ sensor:
 
 ### Multiple Meters
 
-Multiple meters are supported by defining a YAML list under `everblu_meter`:
+Define multiple meters as a YAML list under `everblu_meter`:
 
 ```yaml
 everblu_meter:
@@ -580,7 +580,7 @@ ESPHome requires shared pins to be declared with `allow_other_uses: true`. Apply
 
 ### Architecture Overview
 
-The ESPHome component uses **dependency injection** to achieve maximum code reusability. The core meter reading logic is platform-agnostic and shared between standalone MQTT and ESPHome modes (~95% code sharing).
+The ESPHome component uses **dependency injection** so the core meter reading logic stays platform-agnostic, shared between standalone MQTT and ESPHome modes (~95% code sharing).
 
 #### Modular Components
 

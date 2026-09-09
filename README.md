@@ -147,7 +147,7 @@ A quick overview of what the firmware does:
 
 The firmware implements multiple layers of validation to ensure data integrity:
 
-1. **Custom Serial Decoding**: RADIAN protocol uses a proprietary serial encoding with 1 start bit + 8 data bits (LSB first) + 3 stop bits per byte. Each bit is oversampled 4x for noise immunity (logical '1' = 0xF0, logical '0' = 0x0F). The decoder verifies bit-level transitions, counts consecutive samples, validates start/stop bits, and extracts clean data bytes. This is NOT standard Manchester encoding-it's custom serial framing that must be decoded in software.
+1. **Custom Serial Decoding**: RADIAN protocol uses a proprietary serial encoding with 1 start bit + 8 data bits (LSB first) + 3 stop bits per byte. Each bit is oversampled 4x for noise immunity (logical '1' = 0xF0, logical '0' = 0x0F). The decoder verifies bit-level transitions, counts consecutive samples, validates start/stop bits, and extracts clean data bytes. This is custom serial framing, not standard Manchester encoding, and it must be decoded in software.
 
 2. **CRC-16/KERMIT Checksum**: Each RADIAN frame includes a 16-bit checksum (polynomial 0x8408, init 0x0000). Technically this is a Frame Check Sequence (FCS), not a true CRC, but it's highly effective at catching transmission errors and corrupted frames. The checksum is computed over the full 124-byte frame (bytes [0..121], including the length byte) and compared against the trailer in the last two bytes [122-123]. The firmware rejects any frame that fails this check.
 
@@ -603,7 +603,7 @@ When several ESP devices share one MQTT broker, the firmware appends the meter s
 
 **Recommended:** Create a Home Assistant Utility Meter helper to preserve historical data across platform or meter changes.
 
-**Why?** If you switch between MQTT and ESPHome, change meter serial numbers, or replace hardware, a utility meter helper acts as a stable interface. You simply update the source sensor in the helper configuration, and all your historical data, dashboards, and automations remain intact.
+**Why?** If you switch between MQTT and ESPHome, change meter serial numbers, or replace hardware, a utility meter helper acts as a stable interface. You update the source sensor in the helper configuration, and all your historical data, dashboards, and automations remain intact.
 
 **Setup:**
 
@@ -631,7 +631,7 @@ utility_meter:
     name: Master Water Meter
 ```
 
-When you change platforms or meters, simply update the `source` to point to the new sensor - your history remains unbroken.
+When you change platforms or meters, update the `source` to point to the new sensor. Your history remains unbroken.
 
 ### Migrating Sensor History Between Platforms
 
@@ -754,7 +754,7 @@ Both MQTT and ESPHome modes expose a **history sensor** containing up to 13 mont
 6. **Verify Meter Data**
    - After WiFi and MQTT connection is established (or after the initial frequency scan completes), the meter data should appear in the terminal (bottom panel) and be pushed to MQTT.
    - If Frequency Discovery is still enabled, its output will also be displayed during this step.
-   - **Note**: On first boot with no stored frequency offset, there will be a ~2 minute delay before any MQTT activity while the wide frequency scan runs. This is normal - monitor the serial output to see progress.
+   - **Note**: On first boot with no stored frequency offset, there will be a ~2 minute delay before any MQTT activity while the wide frequency scan runs. This is normal; monitor the serial output to see progress.
 
 7. **Automatic Meter Query**
    - The device will automatically query the meter once every 24 hours.
@@ -763,8 +763,7 @@ Both MQTT and ESPHome modes expose a **history sensor** containing up to 13 mont
 <details>
 <summary>Continuous Integration (for contributors)</summary>
 
-This project uses GitHub Actions for automated building, testing, and code quality checks.
-Every push and pull request triggers builds and quality checks to ensure code quality and compatibility.
+This project uses GitHub Actions to build, test, and run quality checks on every push and pull request, so both platforms stay compatible.
 
 The CI workflows include:
 
@@ -1044,7 +1043,7 @@ A CC1101 433 MHz module with an external wire-coil antenna typically reaches 300
 ## Important: Utility Read Counter Compatibility
 
 > [!IMPORTANT]
-> The meter includes a built-in **read counter** that increments each time it's queried. When your water/gas company performs wireless readings, they expect this counter to match their scheduled read count. **This is not an MQTT or ESP issue** - it's how the RADIAN protocol and meter hardware work.
+> The meter includes a built-in **read counter** that increments each time it's queried. When your water/gas company performs wireless readings, they expect this counter to match their scheduled read count. **This behaviour comes from the RADIAN protocol and meter hardware, not from MQTT or the ESP.**
 
 If you regularly read your meter yourself:
 
