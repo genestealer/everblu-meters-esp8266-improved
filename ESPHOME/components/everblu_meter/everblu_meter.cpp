@@ -59,6 +59,8 @@ void EverbluMeterTriggerButton::press_action() {
     this->parent_->request_stop_reading();
   } else if (this->is_deep_scan_) {
     this->parent_->request_deep_scan();
+  } else if (this->is_scan_) {
+    this->parent_->request_scan();
   } else if (this->is_reset_frequency_) {
     this->parent_->request_reset_frequency();
   } else if (this->is_diagnostic_) {
@@ -280,13 +282,13 @@ void EverbluMeterComponent::loop() {
       bool is_ha_connected = esphome::api::global_api_server->is_connected_with_state_subscription();
 
       // Initialize meter reader if not already done
-      if (!this->meter_initialized_ && is_ha_connected) {
+      if (!this->meter_initialized_ && is_ha_connected && !FrequencyManager::isScanInProgress()) {
         ESP_LOGI(TAG, "Home Assistant connected, initializing meter reader");
         this->apply_radio_context();
         this->meter_reader_->begin();
 
         // Set adaptive frequency tracking threshold
-        FrequencyManager::setAdaptiveThreshold(this->adaptive_threshold_);
+        this->meter_reader_->setAdaptiveThreshold(this->adaptive_threshold_);
 
         this->meter_initialized_ = true;
         ESP_LOGI(TAG, "Meter reader initialized successfully");
@@ -367,16 +369,28 @@ void EverbluMeterComponent::request_deep_scan() {
   this->meter_reader_->performFrequencyScan();
 }
 
+void EverbluMeterComponent::request_scan() {
+  if (this->meter_reader_ == nullptr || !this->meter_initialized_) {
+    ESP_LOGW(TAG, "Scan ignored: meter reader not ready");
+    return;
+  }
+  this->apply_radio_context();
+  this->meter_reader_->performFrequencyScan(false);
+}
+
 void EverbluMeterComponent::request_reset_frequency() {
-  if (this->meter_reader_ == nullptr) {
+  if (this->meter_reader_ == nullptr || !this->meter_initialized_) {
     ESP_LOGW(TAG, "Reset frequency ignored: meter reader not ready");
+    return;
+  }
+  if (FrequencyManager::isScanInProgress() || this->meter_reader_->isReadingInProgress()) {
+    ESP_LOGW(TAG, "Reset frequency ignored: radio operation in progress");
     return;
   }
 
   ESP_LOGI(TAG, "Reset frequency offset requested via button");
   this->apply_radio_context();
   this->meter_reader_->resetFrequencyOffset();
-  ESP_LOGI(TAG, "Frequency offset reset to 0.000 kHz");
 }
 
 void EverbluMeterComponent::request_stop_reading() {
@@ -390,6 +404,10 @@ void EverbluMeterComponent::request_stop_reading() {
 }
 
 void EverbluMeterComponent::request_diagnostic_report() {
+  if (FrequencyManager::isScanInProgress()) {
+    ESP_LOGW(TAG, "Diagnostic report ignored: frequency scan in progress");
+    return;
+  }
   // Deliberately does not require meter_reader_: the most common reason to press this is
   // that the radio never came up, and a report is most useful precisely then.
   this->apply_radio_context();

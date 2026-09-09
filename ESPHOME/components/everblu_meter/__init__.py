@@ -106,6 +106,7 @@ CONF_TUNED_FREQUENCY = "tuned_frequency"
 CONF_FREQUENCY_ESTIMATE = "frequency_estimate"
 CONF_REQUEST_READING_BUTTON = "request_reading_button"
 CONF_DEEP_SCAN_BUTTON = "deep_scan_button"
+CONF_SCAN_BUTTON = "scan_button"
 CONF_RESET_FREQUENCY_BUTTON = "reset_frequency_button"
 CONF_STOP_READING_BUTTON = "stop_reading_button"
 CONF_DIAGNOSTIC_REPORT_BUTTON = "diagnostic_report_button"
@@ -415,6 +416,11 @@ CONFIG_SCHEMA = (
             cv.Optional(CONF_DEEP_SCAN_BUTTON): button.button_schema(
                 EverbluMeterTriggerButton,
                 icon="mdi:radar",
+                entity_category="config",
+            ),
+            cv.Optional(CONF_SCAN_BUTTON): button.button_schema(
+                EverbluMeterTriggerButton,
+                icon="mdi:magnify",
                 entity_category="config",
             ),
             cv.Optional(CONF_RESET_FREQUENCY_BUTTON): button.button_schema(
@@ -744,6 +750,11 @@ async def to_code(config):
         cg.add(btn.set_parent(var))
         cg.add(btn.set_deep_scan(True))
         cg.add(btn.set_reset_frequency(False))
+
+    if CONF_SCAN_BUTTON in config:
+        btn = await button.new_button(config[CONF_SCAN_BUTTON])
+        cg.add(btn.set_parent(var))
+        cg.add(btn.set_scan(True))
 
     if CONF_RESET_FREQUENCY_BUTTON in config:
         btn = await button.new_button(config[CONF_RESET_FREQUENCY_BUTTON])

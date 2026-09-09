@@ -56,6 +56,8 @@ jobs:
           # Full coverage - every sensor, button, and non-default option on ESP8266
           - id: esp8266-full
             config: .ci/esphome/everblu_meter/test.esp8266-full.yaml
+          - id: esp8266-multi
+            config: .ci/esphome/everblu_meter/test.esp8266-multi.yaml
           # Legacy GDO2 opt-out path - disable_gdo2_fifo_management: true
           - id: esp8266-legacy-gdo2
             config: .ci/esphome/everblu_meter/test.esp8266-legacy-gdo2.yaml
@@ -135,6 +137,8 @@ jobs:
           # Xtensa / Arduino - all sensors, all options, all buttons
           - id: esp8266-full
             config: .ci/esphome/everblu_meter/test.esp8266-full.yaml
+          - id: esp8266-multi
+            config: .ci/esphome/everblu_meter/test.esp8266-multi.yaml
           # Xtensa / Arduino - legacy GDO2 polling (disable_gdo2_fifo_management: true)
           - id: esp8266-legacy-gdo2
             config: .ci/esphome/everblu_meter/test.esp8266-legacy-gdo2.yaml

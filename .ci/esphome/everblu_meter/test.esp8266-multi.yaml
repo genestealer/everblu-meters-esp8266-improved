@@ -1,0 +1,53 @@
+esphome:
+  name: ci-multi-meter
+esp8266:
+  board: d1_mini
+logger:
+api:
+wifi:
+  ssid: CI-WIFI
+  password: CI-PASSWORD
+external_components:
+  - source:
+      type: local
+      path: ../../../ESPHOME-release
+    components: [everblu_meter]
+spi:
+  id: ci_spi
+  clk_pin: GPIO14
+  miso_pin: GPIO12
+  mosi_pin: GPIO13
+time:
+  - platform: sntp
+    id: ci_time
+everblu_meter:
+  - id: first_meter
+    meter_code: "20-0257750"
+    frequency: 433.82
+    spi_id: ci_spi
+    time_id: ci_time
+    cs_pin: {number: GPIO15, allow_other_uses: true}
+    gdo0_pin: {number: GPIO5, allow_other_uses: true}
+    gdo2_pin: {number: GPIO4, allow_other_uses: true}
+    scan_button: {name: First Scan}
+    deep_scan_button: {name: First Deep Scan}
+    reset_frequency_button: {name: First Reset}
+    stop_reading_button: {name: First Stop}
+    frequency_offset: {name: First Offset}
+    tuned_frequency: {name: First Tuned}
+    frequency_estimate: {name: First Estimate}
+  - id: second_meter
+    meter_code: "20-0259301"
+    frequency: 433.84
+    spi_id: ci_spi
+    time_id: ci_time
+    cs_pin: {number: GPIO15, allow_other_uses: true}
+    gdo0_pin: {number: GPIO5, allow_other_uses: true}
+    gdo2_pin: {number: GPIO4, allow_other_uses: true}
+    scan_button: {name: Second Scan}
+    deep_scan_button: {name: Second Deep Scan}
+    reset_frequency_button: {name: Second Reset}
+    stop_reading_button: {name: Second Stop}
+    frequency_offset: {name: Second Offset}
+    tuned_frequency: {name: Second Tuned}
+    frequency_estimate: {name: Second Estimate}
