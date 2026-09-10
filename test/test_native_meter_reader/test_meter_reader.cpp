@@ -418,6 +418,34 @@ void test_scheduled_read_triggers_once_at_the_configured_time(void)
     TEST_ASSERT_EQUAL(1, (int)fakeRadio().calls.size());
 }
 
+void test_scheduled_read_fires_when_sampled_mid_minute(void)
+{
+    // The schedule check only runs every SCHEDULE_CHECK_INTERVAL_MS, so the loop
+    // may first observe the clock partway through the scheduled minute (for
+    // example if a blocking read or frequency scan spanned the :00 second).
+    // The read must still fire anywhere inside the scheduled minute, not only at
+    // exactly HH:MM:00.
+    // 2025-06-10 is a Tuesday.
+    g_config.schedule = "Monday-Friday";
+    g_config.readHourUTC = 10;
+    g_config.readMinuteUTC = 0;
+    fakeRadio().responses.push_back(FakeRadio::success());
+
+    MeterReader reader = makeReader();
+
+    // First sample of the day lands at 10:00:30 - the :00 second was never seen.
+    g_time.setUtc(2025, 6, 10, 10, 0, 30);
+    nativeClockAdvance(1000);
+    reader.loop();
+    TEST_ASSERT_EQUAL(1, (int)fakeRadio().calls.size());
+
+    // Still the same scheduled minute: the once-per-day guard must hold.
+    g_time.setUtc(2025, 6, 10, 10, 0, 45);
+    nativeClockAdvance(1000);
+    reader.loop();
+    TEST_ASSERT_EQUAL(1, (int)fakeRadio().calls.size());
+}
+
 void test_scheduled_read_is_skipped_on_a_non_reading_day(void)
 {
     // 2025-06-08 is a Sunday.

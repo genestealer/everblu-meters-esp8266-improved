@@ -49,7 +49,7 @@ static void logReadableSummary(const tmeter_data &data, const IConfigProvider *c
 }
 
 MeterReader::MeterReader(IConfigProvider *config, ITimeProvider *timeProvider, IDataPublisher *publisher)
-    : m_config(config), m_timeProvider(timeProvider), m_publisher(publisher), m_initialized(false), m_readingInProgress(false), m_isScheduledRead(false), m_haConnected(false), m_radioConnected(false), m_scanInProgress(false), m_retryCount(0), m_inCooldown(false), m_lastFailedAttempt(0), m_nextRetryTime(0), m_autoScanAfterFailureDone(false), m_retryFailureReason(ReadFailure::None), m_totalReadAttempts(0), m_successfulReads(0), m_failedReads(0), m_lastErrorMessage("None"), m_lastScheduleCheck(0), m_lastStatsPublish(0), m_readHourLocal(10), m_readMinuteLocal(0), m_lastReadDayMatch(false), m_lastReadTimeMatch(false)
+    : m_config(config), m_timeProvider(timeProvider), m_publisher(publisher), m_initialized(false), m_readingInProgress(false), m_isScheduledRead(false), m_haConnected(false), m_radioConnected(false), m_scanInProgress(false), m_retryCount(0), m_inCooldown(false), m_lastFailedAttempt(0), m_nextRetryTime(0), m_autoScanAfterFailureDone(false), m_retryFailureReason(ReadFailure::None), m_totalReadAttempts(0), m_successfulReads(0), m_failedReads(0), m_lastErrorMessage("None"), m_lastScheduleCheck(0), m_lastStatsPublish(0), m_readHourLocal(10), m_readMinuteLocal(0), m_lastScheduledReadYday(-1)
 {
 }
 
@@ -326,16 +326,21 @@ bool MeterReader::shouldPerformScheduledRead()
     // Check if today is a valid reading day
     bool isDayMatch = isReadingDayForConfiguredSchedule(ptm);
     bool isTimeMatch = (ptm->tm_hour == m_readHourLocal && ptm->tm_min == m_readMinuteLocal);
-    bool isSecondMatch = (ptm->tm_sec == 0);
 
-    // Trigger only on the first match (edge detection)
-    bool shouldTrigger = isDayMatch && isTimeMatch && isSecondMatch &&
-                         (!m_lastReadDayMatch || !m_lastReadTimeMatch);
+    // Fire once anywhere inside the scheduled minute, guarded to one read per day.
+    // The schedule check only runs every SCHEDULE_CHECK_INTERVAL_MS, so keying the
+    // trigger on tm_sec == 0 meant a blocking read or frequency scan that spanned
+    // the exact :00 second made the reader miss the one-second window and skip the
+    // whole day's read. Servicing the entire scheduled minute widens that window
+    // 60x; the tm_yday guard keeps it to a single read per occurrence. (A loop
+    // stall longer than the full scheduled minute can still miss it.)
+    if (isDayMatch && isTimeMatch && ptm->tm_yday != m_lastScheduledReadYday)
+    {
+        m_lastScheduledReadYday = ptm->tm_yday;
+        return true;
+    }
 
-    m_lastReadDayMatch = isDayMatch && isTimeMatch;
-    m_lastReadTimeMatch = isTimeMatch;
-
-    return shouldTrigger;
+    return false;
 }
 
 void MeterReader::triggerReading(bool isScheduled)

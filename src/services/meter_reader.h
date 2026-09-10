@@ -244,8 +244,7 @@ private:
     // Schedule state cache
     int m_readHourLocal;
     int m_readMinuteLocal;
-    bool m_lastReadDayMatch;
-    bool m_lastReadTimeMatch;
+    int m_lastScheduledReadYday;  // tm_yday of the last serviced scheduled read; -1 = none yet
 };
 
 #endif // METER_READER_H
