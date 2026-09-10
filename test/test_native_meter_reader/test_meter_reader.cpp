@@ -446,6 +446,34 @@ void test_scheduled_read_fires_when_sampled_mid_minute(void)
     TEST_ASSERT_EQUAL(1, (int)fakeRadio().calls.size());
 }
 
+void test_scheduled_read_clamps_out_of_range_hour(void)
+{
+    // A bad config (read_hour=27, read_minute=70) must not silently disable the
+    // daily read. MeterReader clamps to 23:59 via the shared ScheduleManager
+    // helper, so the read fires at the clamped time rather than at the wrapped
+    // time the raw arithmetic would produce (27:70 UTC -> 04:10 local).
+    // 2025-06-10 is a Tuesday.
+    g_config.schedule = "Monday-Friday";
+    g_config.readHourUTC = 27;
+    g_config.readMinuteUTC = 70;
+    g_config.timezoneOffsetMinutes = 0;
+    fakeRadio().responses.push_back(FakeRadio::success());
+
+    MeterReader reader = makeReader();
+
+    // The unclamped local time (04:10) must not trigger a read.
+    g_time.setUtc(2025, 6, 10, 4, 10, 0);
+    nativeClockAdvance(1000);
+    reader.loop();
+    TEST_ASSERT_EQUAL(0, (int)fakeRadio().calls.size());
+
+    // The clamped local time (23:59) must.
+    g_time.setUtc(2025, 6, 10, 23, 59, 0);
+    nativeClockAdvance(1000);
+    reader.loop();
+    TEST_ASSERT_EQUAL(1, (int)fakeRadio().calls.size());
+}
+
 void test_scheduled_read_is_skipped_on_a_non_reading_day(void)
 {
     // 2025-06-08 is a Sunday.

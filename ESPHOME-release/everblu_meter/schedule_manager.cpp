@@ -65,21 +65,31 @@ const char *ScheduleManager::getSchedule()
 
 bool ScheduleManager::isReadingDay(struct tm *ptm)
 {
+    return matchesReadingDay(s_schedule, ptm);
+}
+
+bool ScheduleManager::matchesReadingDay(const char *schedule, const struct tm *ptm)
+{
     if (!ptm)
         return false;
 
-    // ptm->tm_wday: 0=Sunday, 1=Monday, ..., 6=Saturday
-    int dayOfWeek = ptm->tm_wday;
+    if (schedule == nullptr)
+    {
+        schedule = "Monday-Friday";
+    }
 
-    if (strcmp(s_schedule, "Monday-Friday") == 0)
+    // ptm->tm_wday: 0=Sunday, 1=Monday, ..., 6=Saturday
+    const int dayOfWeek = ptm->tm_wday;
+
+    if (strcmp(schedule, "Monday-Friday") == 0)
     {
         return dayOfWeek >= 1 && dayOfWeek <= 5; // Monday-Friday
     }
-    else if (strcmp(s_schedule, "Monday-Saturday") == 0)
+    if (strcmp(schedule, "Monday-Saturday") == 0)
     {
         return dayOfWeek >= 1 && dayOfWeek <= 6; // Monday-Saturday
     }
-    else if (strcmp(s_schedule, "Monday-Sunday") == 0)
+    if (strcmp(schedule, "Monday-Sunday") == 0)
     {
         return true; // All days including Sunday (dayOfWeek 0-6)
     }
@@ -87,20 +97,23 @@ bool ScheduleManager::isReadingDay(struct tm *ptm)
     switch (dayOfWeek)
     {
     case 0:
-        return strcmp(s_schedule, "Sunday") == 0;
+        return strcmp(schedule, "Sunday") == 0;
     case 1:
-        return strcmp(s_schedule, "Monday") == 0;
+        return strcmp(schedule, "Monday") == 0;
     case 2:
-        return strcmp(s_schedule, "Tuesday") == 0;
+        return strcmp(schedule, "Tuesday") == 0;
     case 3:
-        return strcmp(s_schedule, "Wednesday") == 0;
+        return strcmp(schedule, "Wednesday") == 0;
     case 4:
-        return strcmp(s_schedule, "Thursday") == 0;
+        return strcmp(schedule, "Thursday") == 0;
     case 5:
-        return strcmp(s_schedule, "Friday") == 0;
+        return strcmp(schedule, "Friday") == 0;
     case 6:
-        return strcmp(s_schedule, "Saturday") == 0;
+        return strcmp(schedule, "Saturday") == 0;
     }
+
+    // Unknown schedule: skip the read rather than guessing a day.
+    LOG_W("everblu_meter", "Unknown reading_schedule '%s'; skipping scheduled read.", schedule);
     return false;
 }
 
@@ -185,16 +198,23 @@ void ScheduleManager::setTimezoneOffset(int offsetMinutes)
 
 void ScheduleManager::recalculateLocalFromUtc()
 {
-    int totalUtcMin = s_readHourUtc * 60 + s_readMinuteUtc;
-    int localMin = (totalUtcMin + s_timezoneOffsetMinutes) % (24 * 60);
+    localReadingTime(s_readHourUtc, s_readMinuteUtc, s_timezoneOffsetMinutes,
+                     s_readHourLocal, s_readMinuteLocal);
+}
+
+void ScheduleManager::localReadingTime(int hourUtc, int minuteUtc, int offsetMinutes,
+                                       int &hourLocalOut, int &minuteLocalOut)
+{
+    const int totalUtcMin = constrain(hourUtc, 0, 23) * 60 + constrain(minuteUtc, 0, 59);
+    int localMin = (totalUtcMin + offsetMinutes) % (24 * 60);
 
     if (localMin < 0)
     {
         localMin += 24 * 60;
     }
 
-    s_readHourLocal = localMin / 60;
-    s_readMinuteLocal = localMin % 60;
+    hourLocalOut = localMin / 60;
+    minuteLocalOut = localMin % 60;
 }
 
 void ScheduleManager::recalculateUtcFromLocal()

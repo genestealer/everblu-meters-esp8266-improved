@@ -34,6 +34,7 @@ void test_stop_cancels_a_pending_retry(void);
 void test_stop_when_idle_does_not_publish_state(void);
 void test_scheduled_read_triggers_once_at_the_configured_time(void);
 void test_scheduled_read_fires_when_sampled_mid_minute(void);
+void test_scheduled_read_clamps_out_of_range_hour(void);
 void test_scheduled_read_is_skipped_on_a_non_reading_day(void);
 void test_reading_day_gate_covers_every_schedule_string(void);
 void test_scheduled_read_waits_for_time_sync(void);
@@ -135,6 +136,7 @@ int main(int, char **)
     RUN_TEST(test_stop_when_idle_does_not_publish_state);
     RUN_TEST(test_scheduled_read_triggers_once_at_the_configured_time);
     RUN_TEST(test_scheduled_read_fires_when_sampled_mid_minute);
+    RUN_TEST(test_scheduled_read_clamps_out_of_range_hour);
     RUN_TEST(test_scheduled_read_is_skipped_on_a_non_reading_day);
     RUN_TEST(test_reading_day_gate_covers_every_schedule_string);
     RUN_TEST(test_scheduled_read_waits_for_time_sync);

@@ -72,6 +72,36 @@ public:
     static bool isReadingDay(struct tm *ptm);
 
     /**
+     * @brief Stateless day-of-week match for an arbitrary schedule string
+     *
+     * The single source of truth for the reading-day rules. ScheduleManager uses
+     * it against its own configured schedule; MeterReader uses it against each
+     * instance's live config, so multi-meter setups keep independent schedules
+     * without duplicating the matching logic.
+     *
+     * @param schedule Schedule string; nullptr is treated as "Monday-Friday"
+     * @param ptm Current date/time (nullptr returns false). tm_wday is used.
+     * @return true if the schedule includes ptm's weekday
+     */
+    static bool matchesReadingDay(const char *schedule, const struct tm *ptm);
+
+    /**
+     * @brief Stateless UTC-to-local reading time conversion with clamping
+     *
+     * Clamps the inputs to valid ranges (hour 0-23, minute 0-59) before
+     * converting, so an out-of-range configuration cannot produce a reading
+     * time that never matches the clock.
+     *
+     * @param hourUtc Reading hour in UTC
+     * @param minuteUtc Reading minute in UTC
+     * @param offsetMinutes Timezone offset from UTC in minutes
+     * @param hourLocalOut Output: local hour (0-23)
+     * @param minuteLocalOut Output: local minute (0-59)
+     */
+    static void localReadingTime(int hourUtc, int minuteUtc, int offsetMinutes,
+                                 int &hourLocalOut, int &minuteLocalOut);
+
+    /**
      * @brief Update reading time from local (UTC+offset) time
      *
      * Automatically calculates and stores equivalent UTC time.

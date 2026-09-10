@@ -5,6 +5,7 @@
 
 #include "meter_reader.h"
 #include "meter_history.h"
+#include "schedule_manager.h"
 
 // Conditional includes based on build environment
 #ifdef USE_ESPHOME
@@ -114,18 +115,17 @@ void MeterReader::begin()
     bool radio_ok = cc1101_init(effectiveFrequency);
     m_radioConnected = radio_ok; // Store radio initialization status for republish checks
 
-    // Calculate local reading time from UTC and timezone offset
-    int utcHour = m_config->getReadHourUTC();
-    int utcMinute = m_config->getReadMinuteUTC();
+    // Calculate local reading time from UTC and timezone offset. Clamp the
+    // configured hour/minute to valid ranges first: a bad config (e.g.
+    // read_hour=27) would otherwise compute a local time that never matches the
+    // clock, so the read would never fire. Shared with ScheduleManager so the
+    // clamping and conversion rules live in exactly one place.
+    int utcHour = constrain(m_config->getReadHourUTC(), 0, 23);
+    int utcMinute = constrain(m_config->getReadMinuteUTC(), 0, 59);
     int offsetMinutes = m_config->getTimezoneOffsetMinutes();
 
-    int totalUtcMin = utcHour * 60 + utcMinute;
-    int localMin = (totalUtcMin + offsetMinutes) % (24 * 60);
-    if (localMin < 0)
-        localMin += 24 * 60;
-
-    m_readHourLocal = localMin / 60;
-    m_readMinuteLocal = localMin % 60;
+    ScheduleManager::localReadingTime(utcHour, utcMinute, offsetMinutes,
+                                      m_readHourLocal, m_readMinuteLocal);
 
     LOG_I("everblu_meter", "Scheduled reading time: %02d:%02d UTC (%02d:%02d local)",
           utcHour, utcMinute, m_readHourLocal, m_readMinuteLocal);
@@ -697,50 +697,8 @@ void MeterReader::setHAConnected(bool connected)
 
 bool MeterReader::isReadingDayForConfiguredSchedule(const struct tm *ptm) const
 {
-    if (ptm == nullptr)
-    {
-        return false;
-    }
-
-    const char *schedule = m_config->getReadingSchedule();
-    if (schedule == nullptr)
-    {
-        schedule = "Monday-Friday";
-    }
-
-    const int dayOfWeek = ptm->tm_wday; // 0=Sunday, 1=Monday, ... 6=Saturday
-    if (strcmp(schedule, "Monday-Friday") == 0)
-    {
-        return dayOfWeek >= 1 && dayOfWeek <= 5;
-    }
-    if (strcmp(schedule, "Monday-Saturday") == 0)
-    {
-        return dayOfWeek >= 1 && dayOfWeek <= 6;
-    }
-    if (strcmp(schedule, "Monday-Sunday") == 0)
-    {
-        return true;
-    }
-    // check for single day reading schedule
-    switch(dayOfWeek)
-    {
-        case 0:
-            return strcmp(schedule, "Sunday") == 0;
-        case 1:
-            return strcmp(schedule, "Monday") == 0;
-        case 2:
-            return strcmp(schedule, "Tuesday") == 0;
-        case 3:
-            return strcmp(schedule, "Wednesday") == 0;
-        case 4:
-            return strcmp(schedule, "Thursday") == 0;
-        case 5:
-            return strcmp(schedule, "Friday") == 0;
-        case 6:
-            return strcmp(schedule, "Saturday") == 0;
-    }
-
-    // Unknown schedule: log warning and skip read to avoid misconfiguration
-    LOG_W("everblu_meter", "Unknown reading_schedule '%s'; skipping scheduled read.", schedule);
-    return false;
+    // Read the schedule live from this instance's config (multi-meter setups run
+    // independent schedules) but defer the matching rules to the shared,
+    // stateless helper so there is only one implementation of them.
+    return ScheduleManager::matchesReadingDay(m_config->getReadingSchedule(), ptm);
 }
