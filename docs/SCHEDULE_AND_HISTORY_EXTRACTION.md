@@ -65,7 +65,7 @@ int months = MeterHistory::countValidMonths(history);
 
 // Calculate statistics
 HistoryStats stats = MeterHistory::calculateStats(history, currentVolume);
-// stats.currentMonthUsage, stats.monthCount, stats.averageMonthlyUsage, etc.
+// stats.currentMonthUsage, stats.monthCount, stats.totalUsage, etc.
 
 // Generate JSON
 char json[1024];

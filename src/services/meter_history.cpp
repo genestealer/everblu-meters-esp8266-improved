@@ -84,7 +84,6 @@ HistoryStats MeterHistory::calculateStats(const uint32_t history[13], uint32_t c
     }
 
     stats.totalUsage = totalUsage + stats.currentMonthUsage;
-    stats.averageMonthlyUsage = (stats.monthCount > 0) ? (stats.totalUsage / (stats.monthCount + 1)) : 0;
 
     return stats;
 }
