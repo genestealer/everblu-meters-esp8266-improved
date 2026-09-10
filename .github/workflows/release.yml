@@ -26,9 +26,15 @@ jobs:
 
       - name: Get version from tag
         id: version
+        env:
+          # Never interpolate ${{ github.event.inputs.* }} directly into the shell
+          # script: a crafted tag would be executed. Pass it through the environment
+          # and reference the quoted variable instead.
+          TAG_INPUT: ${{ github.event.inputs.tag }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG="${{ github.event.inputs.tag }}"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            TAG="$TAG_INPUT"
           else
             TAG=${GITHUB_REF#refs/tags/}
           fi
