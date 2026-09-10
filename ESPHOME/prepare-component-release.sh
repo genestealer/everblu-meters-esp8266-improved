@@ -68,7 +68,10 @@ echo "Rewriting include paths for flattened layout..."
 find "$RELEASE_DIR" -type f \( -name "*.h" -o -name "*.cpp" \) -print0 | while IFS= read -r -d '' file; do
     # Strip path prefixes like core/, services/, adapters/, src/, adapters/implementations/
     # Keep includes that start with esphome/
-    sed -i.bak -E 's|#include\s+"(esphome/[^\"]+)"|#include "\1"|; t; s|#include\s+"([^"]*/)+([^"/]+)"|#include "\2"|g' "$file" && rm -f "$file.bak"
+    # \s is a GNU-sed extension that BSD/macOS sed treats as a literal 's', so it
+    # would silently no-op there and leave broken include paths. Use the portable
+    # POSIX class [[:space:]] instead.
+    sed -i.bak -E 's|#include[[:space:]]+"(esphome/[^\"]+)"|#include "\1"|; t; s|#include[[:space:]]+"([^"]*/)+([^"/]+)"|#include "\2"|g' "$file" && rm -f "$file.bak"
 done
 
 # Add explicit WARNING and DO_NOT_EDIT markers, then mark files read-only
