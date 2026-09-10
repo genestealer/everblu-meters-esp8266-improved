@@ -299,3 +299,65 @@ void test_history_print_to_serial_is_safe(void)
 
     TEST_PASS();
 }
+
+/**
+ * Test: the compact payload drops the cumulative "history" array and keeps only
+ * usage deltas (issue #67)
+ */
+void test_history_json_compact_typical(void)
+{
+    uint32_t history[13];
+    const uint32_t values[] = {100, 150, 220};
+    makeHistory(history, values, 3);
+
+    char buffer[256];
+    const int written = MeterHistory::generateHistoryJsonCompact(history, 260, buffer, sizeof(buffer));
+
+    const char *expected =
+        "{\"monthly_usage\":[50,70],"
+        "\"current_month_usage\":40,"
+        "\"months_available\":3}";
+
+    TEST_ASSERT_EQUAL_STRING(expected, buffer);
+    TEST_ASSERT_EQUAL_INT((int)strlen(expected), written);
+}
+
+/**
+ * Test: an empty history yields a valid, parseable empty document (not 0), so
+ * Home Assistant never shows the text sensor as "unknown"/"unavailable"
+ */
+void test_history_json_compact_empty_is_valid(void)
+{
+    uint32_t history[13];
+    memset(history, 0, sizeof(history));
+
+    char buffer[256];
+    const int written = MeterHistory::generateHistoryJsonCompact(history, 500, buffer, sizeof(buffer));
+
+    TEST_ASSERT_TRUE(written > 0);
+    TEST_ASSERT_EQUAL_STRING(
+        "{\"monthly_usage\":[],\"current_month_usage\":0,\"months_available\":0}",
+        buffer);
+}
+
+/**
+ * Test: a full 13-month history with large 7-digit volumes stays within Home
+ * Assistant's 255-char text-sensor state limit - the whole point of the compact
+ * form (issue #67)
+ */
+void test_history_json_compact_full_thirteen_under_255(void)
+{
+    uint32_t history[13];
+    for (int i = 0; i < 13; i++)
+    {
+        history[i] = 1000000u + (uint32_t)i * 4321u;
+    }
+
+    char buffer[256];
+    const int written = MeterHistory::generateHistoryJsonCompact(history, 1060000u, buffer, sizeof(buffer));
+
+    TEST_ASSERT_TRUE(written > 0);
+    TEST_ASSERT_TRUE(written <= 255);
+    TEST_ASSERT_EQUAL_INT((int)strlen(buffer), written);
+    TEST_ASSERT_EQUAL_CHAR('}', buffer[written - 1]);
+}

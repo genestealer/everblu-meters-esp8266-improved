@@ -74,6 +74,39 @@ public:
                                    char *outputBuffer, int bufferSize);
 
     /**
+     * @brief Generate a compact JSON representation that fits within Home
+     *        Assistant's 255-character text-sensor state limit
+     *
+     * Home Assistant rejects entity STATE strings longer than 255 characters and
+     * renders the entity as "unknown". The full generateHistoryJson() payload
+     * carries the cumulative "history" array, whose 7-digit meter volumes push a
+     * 13-month document past 255 chars. This compact form omits that array and
+     * publishes only the month-over-month usage deltas (small numbers), which is
+     * what Home Assistant template sensors actually consume:
+     *   {"monthly_usage":[...],"current_month_usage":X,"months_available":Y}
+     *
+     * monthly_usage omits the oldest month (no earlier baseline), matching
+     * generateHistoryJson(): it holds (months_available - 1) deltas.
+     *
+     * When there is no valid history, a valid EMPTY document is emitted
+     * ({"monthly_usage":[],"current_month_usage":0,"months_available":0}) rather
+     * than returning 0, so Home Assistant always receives a parseable state and
+     * never shows "unknown"/"unavailable".
+     *
+     * The full cumulative series remains available over MQTT, where it is
+     * published as an attribute (attributes have no 255-char limit).
+     *
+     * @param history Array of 13 uint32_t values (may be all-zero / empty)
+     * @param currentVolume Current meter reading
+     * @param outputBuffer Buffer to write JSON to (256 bytes is sufficient)
+     * @param bufferSize Size of output buffer
+     * @return Number of characters written, excluding the null terminator, or 0
+     *         only if the buffer is too small to hold even the empty document.
+     */
+    static int generateHistoryJsonCompact(const uint32_t history[13], uint32_t currentVolume,
+                                           char *outputBuffer, int bufferSize);
+
+    /**
      * @brief Get string description of a history month (relative to current)
      *
      * Returns human-readable string like "-03" for 3 months ago, "Now" for current month.

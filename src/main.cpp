@@ -714,9 +714,11 @@ void onUpdateData()
 
   // Publish historical data as JSON attributes for Home Assistant.
   // The 13-month history table, monthly-usage math and JSON formatting all live
-  // in the shared MeterHistory service (src/services/meter_history.cpp) - the
-  // SAME code the ESPHome build uses - so the published format stays
-  // single-sourced across both targets.
+  // in the shared MeterHistory service (src/services/meter_history.cpp). MQTT
+  // publishes the FULL payload (cumulative history + usage) as an attribute,
+  // which has no length limit. The ESPHome build publishes a compact usage-only
+  // variant (generateHistoryJsonCompact) because a text-sensor STATE is capped at
+  // 255 chars by Home Assistant.
   if (meter_data.history_available && MeterHistory::isHistoryValid(meter_data.history))
   {
     const uint32_t currentVolume = static_cast<uint32_t>(meter_data.volume);
