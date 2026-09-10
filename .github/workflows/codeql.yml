@@ -25,8 +25,17 @@ jobs:
         include:
           - language: python
             build-mode: none
-          # C/C++ analysis requires a full toolchain build via PlatformIO.
-          # Uncomment and configure the manual build step below to enable it.
+          # C/C++ is DELIBERATELY not scanned by CodeQL here. Analysing it needs a
+          # full manual toolchain build (build-mode: manual) that cross-compiles the
+          # firmware with PlatformIO for an embedded target, seeded from a synthetic
+          # include/private.h. That is slow, fragile against toolchain/board changes,
+          # and only covers one board variant, so it would add a flaky long-pole job
+          # for limited extra coverage. The security-sensitive C/C++ (radio framing,
+          # RADIAN parse, CRC, buffer handling) is instead exercised by the host
+          # unit-test suites (env:native*, which build that code natively with
+          # -fstack-protector-all) and by pre-commit static analysis (cppcheck).
+          # To enable CodeQL for C/C++, uncomment the entry below and the matching
+          # manual build step.
           # - language: c-cpp
           #   build-mode: manual
     steps:
