@@ -593,3 +593,33 @@ void test_report_is_truncated_rather_than_overrunning_its_buffer(void)
     TEST_ASSERT_LESS_THAN_UINT(CC1101_REPORT_BUFFER_SIZE, (unsigned) strlen(report));
     assertReportContains(report, "===== EverBlu diagnostic report =====");
 }
+
+void test_rssi_convert2dbm_matches_the_datasheet(void)
+{
+    // Strong-signal half of the register range (Rssi_dec < 128): raw/2 - 74.
+    TEST_ASSERT_EQUAL_INT(-74, cc1100_rssi_convert2dbm(0));
+    TEST_ASSERT_EQUAL_INT(-11, cc1100_rssi_convert2dbm(127));
+
+    // Weak-signal half (Rssi_dec >= 128): (raw - 256)/2 - 74.
+    TEST_ASSERT_EQUAL_INT(-74, cc1100_rssi_convert2dbm(255));
+    TEST_ASSERT_EQUAL_INT(-137, cc1100_rssi_convert2dbm(129));
+}
+
+void test_rssi_convert2dbm_does_not_wrap_below_int8_min(void)
+{
+    // Regression for the int8_t underflow: Rssi_dec in ~128..146 maps below
+    // -128 dBm. In an int8_t those wrapped positive (e.g. -138 -> +118), which
+    // would falsely satisfy the "> -50 dBm" near-field-saturation heuristic for
+    // a very weak signal. The result must stay negative.
+    TEST_ASSERT_EQUAL_INT(-138, cc1100_rssi_convert2dbm(128)); // most negative
+    TEST_ASSERT_EQUAL_INT(-129, cc1100_rssi_convert2dbm(146)); // just past int8_t min
+
+    // Every raw value must convert to a plausible, negative dBm figure - never a
+    // positive one that the saturation check would misread.
+    for (int raw = 0; raw <= 255; raw++)
+    {
+        const int dbm = cc1100_rssi_convert2dbm(static_cast<uint8_t>(raw));
+        TEST_ASSERT_TRUE(dbm < 0);
+        TEST_ASSERT_TRUE(dbm >= -138 && dbm <= -11);
+    }
+}
