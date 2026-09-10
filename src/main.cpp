@@ -2016,6 +2016,12 @@ void setup()
   validateReadingSchedule();
   TS_PRINTF("[SCHEDULE] Reading schedule (effective): %s\n", readingSchedule);
 
+  // Wire the effective schedule into ScheduleManager. Without this, onScheduled()
+  // calls ScheduleManager::isReadingDay(), which reads the static default
+  // ("Monday-Friday") - so a configured DEFAULT_READING_SCHEDULE was honoured in
+  // the logs and HA discovery but silently ignored when deciding the reading day.
+  ScheduleManager::setSchedule(readingSchedule);
+
   // Log effective frequency and warn if default is used
   TS_PRINTF("[FREQ] Frequency (effective): %.6f MHz\n", (double)FREQUENCY);
 #if FREQUENCY_DEFINED_DEFAULT
