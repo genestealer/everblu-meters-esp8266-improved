@@ -149,6 +149,15 @@ public:
 #endif
         }
 
+        bool areScheduledReadingsDisabled() const override
+        {
+#ifdef DISABLE_SCHEDULED_READINGS
+                return DISABLE_SCHEDULED_READINGS != 0;
+#else
+                return false;
+#endif
+        }
+
         // Retry configuration
         int getMaxRetries() const override
         {
@@ -229,6 +238,7 @@ public:
         int getTimezoneOffsetMinutes() const override { return 0; }
         bool isAutoAlignReadingTime() const override { return true; }
         bool useAutoAlignMidpoint() const override { return true; }
+        bool areScheduledReadingsDisabled() const override { return false; }
         int getMaxRetries() const override { return 5; }
         unsigned long getRetryCooldownMs() const override { return 3600000; }
         const char *getWiFiSSID() const override { return ""; }

@@ -67,6 +67,7 @@ CONF_READ_MINUTE = "read_minute"
 CONF_TIMEZONE_OFFSET = "timezone_offset"
 CONF_AUTO_ALIGN_TIME = "auto_align_time"
 CONF_AUTO_ALIGN_MIDPOINT = "auto_align_midpoint"
+CONF_DISABLE_SCHEDULED_READINGS = "disable_scheduled_readings"
 CONF_MAX_RETRIES = "max_retries"
 CONF_RETRY_COOLDOWN = "retry_cooldown"
 CONF_INITIAL_READ_ON_BOOT = "initial_read_on_boot"
@@ -253,6 +254,7 @@ CONFIG_SCHEMA = (
             ),
             cv.Optional(CONF_AUTO_ALIGN_TIME, default=True): cv.boolean,
             cv.Optional(CONF_AUTO_ALIGN_MIDPOINT, default=True): cv.boolean,
+            cv.Optional(CONF_DISABLE_SCHEDULED_READINGS, default=False): cv.boolean,
             cv.Optional(CONF_MAX_RETRIES, default=5): cv.int_range(min=1, max=50),
             cv.Optional(
                 CONF_RETRY_COOLDOWN, default="1h"
@@ -576,6 +578,7 @@ async def to_code(config):
     cg.add(var.set_timezone_offset(config[CONF_TIMEZONE_OFFSET]))
     cg.add(var.set_auto_align_time(config[CONF_AUTO_ALIGN_TIME]))
     cg.add(var.set_auto_align_midpoint(config[CONF_AUTO_ALIGN_MIDPOINT]))
+    cg.add(var.set_disable_scheduled_readings(config[CONF_DISABLE_SCHEDULED_READINGS]))
     cg.add(var.set_max_retries(config[CONF_MAX_RETRIES]))
     cg.add(var.set_retry_cooldown(config[CONF_RETRY_COOLDOWN]))  # Already in ms
     cg.add(var.set_initial_read_on_boot(config[CONF_INITIAL_READ_ON_BOOT]))

@@ -44,6 +44,7 @@ public:
     void setTimezoneOffsetMinutes(int offset) { timezone_offset_minutes_ = offset; }
     void setAutoAlignReadingTime(bool enabled) { auto_align_enabled_ = enabled; }
     void setUseAutoAlignMidpoint(bool enabled) { auto_align_midpoint_ = enabled; }
+    void setScheduledReadingsDisabled(bool disabled) { scheduled_readings_disabled_ = disabled; }
     void setMaxRetries(int retries) { max_retries_ = retries; }
     void setRetryCooldownMs(unsigned long ms) { retry_cooldown_ms_ = ms; }
 
@@ -61,6 +62,7 @@ public:
     int getTimezoneOffsetMinutes() const override { return timezone_offset_minutes_; }
     bool isAutoAlignReadingTime() const override { return auto_align_enabled_; }
     bool useAutoAlignMidpoint() const override { return auto_align_midpoint_; }
+    bool areScheduledReadingsDisabled() const override { return scheduled_readings_disabled_; }
     int getMaxRetries() const override { return max_retries_; }
     unsigned long getRetryCooldownMs() const override { return retry_cooldown_ms_; }
 
@@ -93,6 +95,7 @@ private:
     int timezone_offset_minutes_{0};
     bool auto_align_enabled_{true};
     bool auto_align_midpoint_{true};
+    bool scheduled_readings_disabled_{false};
 
     // Retry configuration
     int max_retries_{5};

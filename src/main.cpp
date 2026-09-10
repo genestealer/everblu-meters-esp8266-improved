@@ -108,6 +108,13 @@ static const unsigned long OFFLINE_LED_BLINK_MS = 500UL;
 #define AUTO_ALIGN_READING_TIME 1
 #endif
 
+// Disable automatic scheduled readings entirely. Manual reads (the request-read
+// MQTT command / button) still work. 0 = scheduled readings enabled (default),
+// 1 = disabled. Opt-in, mirroring the negative-form flags elsewhere.
+#ifndef DISABLE_SCHEDULED_READINGS
+#define DISABLE_SCHEDULED_READINGS 0
+#endif
+
 // Alignment strategy: 0 = use time_start, 1 = use midpoint of [time_start, time_end]
 #ifndef AUTO_ALIGN_USE_MIDPOINT
 #define AUTO_ALIGN_USE_MIDPOINT 1
@@ -1571,7 +1578,11 @@ void onConnectionEstablished()
   TS_PRINTLN("[STATUS] Setup done");
   EVB_PRINTLN("================================\n");
 
+#if DISABLE_SCHEDULED_READINGS
+  TS_PRINTLN("[SCHEDULE] Scheduled readings disabled (DISABLE_SCHEDULED_READINGS); manual reads only.");
+#else
   onScheduled();
+#endif
 }
 
 // ============================================================================
