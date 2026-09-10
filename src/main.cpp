@@ -141,6 +141,12 @@ static int g_readMinuteLocal = DEFAULT_READING_MINUTE_UTC;
 // Used to control whether auto-alignment should be applied to future scheduled reads
 static bool g_isScheduledRead = false;
 
+// Day-of-year (tm_yday) of the last scheduled read, or -1 if none yet. Guards the
+// scheduled read to once per day across the whole scheduled minute (see onScheduled).
+// onScheduled() is re-armed on every reconnect, so several poll chains can run at
+// once; this latch keeps them collectively to a single read per occurrence.
+static int g_lastScheduledReadYday = -1;
+
 // Define a default meter frequency if missing from private.h.
 // RADIAN protocol nominal center frequency for EverBlu is 433.82 MHz.
 #ifndef FREQUENCY
@@ -841,7 +847,6 @@ void onUpdateData()
 }
 
 // Function: onScheduled
-// Function: onScheduled
 // Description: Schedules daily meter readings at the configured local-offset time.
 void onScheduled()
 {
@@ -853,9 +858,17 @@ void onScheduled()
   // Check if today is a valid reading day
   const bool timeMatch = (ptm->tm_hour == g_readHourLocal && ptm->tm_min == g_readMinuteLocal);
 
-  if (ScheduleManager::isReadingDay(ptm) && timeMatch && ptm->tm_sec == 0)
+  // Fire once anywhere inside the scheduled minute, guarded to one read per day
+  // by tm_yday. Keying the trigger on tm_sec == 0 (as before) meant a blocking
+  // read, frequency scan or reconnect that spanned the exact :00 second made the
+  // 500 ms poll miss the one-second window and skip the whole day's read, with
+  // nothing logged. Servicing the entire scheduled minute widens the window 60x.
+  // (A loop stall longer than the full scheduled minute can still miss it.)
+  if (ScheduleManager::isReadingDay(ptm) && timeMatch && ptm->tm_yday != g_lastScheduledReadYday)
   {
-    // Check if we're still in cooldown period after failed attempts
+    // Check if we're still in cooldown period after failed attempts.
+    // Defer without latching the day so the read can still fire later once the
+    // cooldown clears (while the scheduled minute is still current).
     if (g_inCooldown && (millis() - lastFailedAttempt) < RETRY_COOLDOWN)
     {
       unsigned long remainingCooldown = (RETRY_COOLDOWN - (millis() - lastFailedAttempt)) / 1000;
@@ -873,6 +886,10 @@ void onScheduled()
     // Cooldown period is over, reset and proceed
     g_inCooldown = false;
     lastFailedAttempt = 0;
+
+    // Mark today serviced so this occurrence reads exactly once, even if another
+    // poll (or a second poll chain) observes the same minute.
+    g_lastScheduledReadYday = ptm->tm_yday;
 
     // Call back in 23 hours
     mqtt.executeDelayed(1000 * 60 * 60 * 23, onScheduled);

@@ -31,6 +31,7 @@ Touches `src/services/meter_reader.cpp` (+ the generated `ESPHOME-release/` copy
 - ✅ **CodeQL C/C++ coverage** — documented the intentional exclusion (native host suites + cppcheck cover C/C++) in `codeql.yml` (`0e28374`).
 - ✅ **P1 #10 MeterReader/ScheduleManager consolidation** — extracted stateless `matchesReadingDay`/`localReadingTime` helpers as the single source of truth (both classes delegate), which also clamps out-of-range configured read times; added a clamp host test (`0597fa2`).
 - ✅ **MQTT NTP de-blocking** — the connect callback now kicks off `configTzTime()` and returns immediately; a non-blocking `pollNtpSync()` in `loop()` watches the clock and logs the outcome once, so `mqtt.loop()`/OTA are no longer stalled by the up-to-10 s wait on every reconnect. Compile-checked (`pio run -e d1_mini`); `src/main.cpp` has no host test coverage, so unverified on hardware.
+- ✅ **Standalone `onScheduled()` scheduled-read skip** — the same defect as #2, but in the MQTT firmware's independent scheduler (`src/main.cpp`): the read keyed on `tm_sec == 0`, a one-second window a stalled loop could jump. Now it fires anywhere inside the scheduled minute, guarded once-per-day by a `tm_yday` latch (which also dedups the multiple poll chains started on each reconnect). Compile-checked; no host test coverage for `main.cpp`.
 - ⏭️ **Not fixed by request:** unauthenticated OTA; the never-failing clang-format/cppcheck/dependency-check CI gates.
 
 ## How the review was performed
