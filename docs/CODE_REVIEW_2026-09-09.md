@@ -25,6 +25,12 @@ Touches `src/services/meter_reader.cpp` (+ the generated `ESPHOME-release/` copy
 - ✅ **P1 #3 advanced example** — added the missing `id: meter_status` (`8138ed1`).
 - ✅ **`prepare-component-release.sh` `\s`** — switched to POSIX `[[:space:]]+` for BSD/macOS sed portability (`1515f42`).
 - ✅ **Doc corrections** — `auto_scan` default `true→false` in the integration guide; the three superseded frequency docs (`ADAPTIVE_FREQUENCY_FEATURES.md`, `QUICK_REFERENCE.md`, `IMPROVEMENTS_SUMMARY.md`) now carry a "historical" banner; the timestamp `device_class` finding was confirmed a non-defect (see below).
+- ✅ **`release.yml` injection hardening** — moved `github.event.inputs.tag`/`event_name` into `env:` and referenced them quoted, out of the inline `run:` script (`c176280`).
+- ✅ **P1 #8 button-guard consistency** — `request_manual_read()`/`request_deep_scan()` now honour the same `meter_initialized_`/in-progress guards as the other command entry points (`1fa3bda`).
+- ✅ **P1 #9 RSSI dBm type widening** — `cc1100_rssi_convert2dbm` return type and the diagnostic struct field widened `int8_t→int` so a valid negative dBm can't underflow; added datasheet + full-sweep host tests (`fb57c02`).
+- ✅ **CodeQL C/C++ coverage** — documented the intentional exclusion (native host suites + cppcheck cover C/C++) in `codeql.yml` (`0e28374`).
+- ✅ **P1 #10 MeterReader/ScheduleManager consolidation** — extracted stateless `matchesReadingDay`/`localReadingTime` helpers as the single source of truth (both classes delegate), which also clamps out-of-range configured read times; added a clamp host test (`0597fa2`).
+- ✅ **MQTT NTP de-blocking** — the connect callback now kicks off `configTzTime()` and returns immediately; a non-blocking `pollNtpSync()` in `loop()` watches the clock and logs the outcome once, so `mqtt.loop()`/OTA are no longer stalled by the up-to-10 s wait on every reconnect. Compile-checked (`pio run -e d1_mini`); `src/main.cpp` has no host test coverage, so unverified on hardware.
 - ⏭️ **Not fixed by request:** unauthenticated OTA; the never-failing clang-format/cppcheck/dependency-check CI gates.
 
 ## How the review was performed
@@ -81,7 +87,7 @@ The recurring theme is **drift between the code and everything around it**: one 
 
 ## Medium — HA/ESPHome idiom & MQTT
 
-- **MEDIUM** `src/main.cpp:1310` — Blocking NTP wait (up to 10 s `delay` loop) inside the MQTT connect callback; stalls `mqtt.loop()`/OTA on every reconnect. Make it non-blocking in `loop()`.
+- ~~**MEDIUM** `src/main.cpp:1310` — Blocking NTP wait (up to 10 s `delay` loop) inside the MQTT connect callback; stalls `mqtt.loop()`/OTA on every reconnect. Make it non-blocking in `loop()`.~~ **RESOLVED (`fix/code-review-2026-09`).** Connect callback now kicks off `configTzTime()` and returns; `pollNtpSync()` in `loop()` polls the clock and logs the outcome once. Compile-checked; unverified on hardware (no host tests for `main.cpp`).
 - **MEDIUM** `src/main.cpp:269` — MQTT is plaintext on port 1883; credentials + command topics are sniffable. Offer/document a TLS build (8883). Reasonable for local-only brokers, but state it.
 - **MEDIUM** `ESPHOME/components/everblu_meter/everblu_meter.cpp:465` — `PollingComponent`/`update_interval` is exposed but `update()` is a no-op; the advanced example's `update_interval: 30s` + "fast updates" comment misleads. Drop polling or remove the comment.
 - ~~**MEDIUM** `ESPHOME/components/everblu_meter/__init__.py:369` — `timestamp` text sensor uses `device_class: timestamp`, which HA requires to be strict ISO-8601 + timezone or the entity goes unavailable. Confirm the publisher's format.~~ **RESOLVED — not a defect.** The publisher formats the string with `strftime(..., "%FT%TZ", gmtime(&now))` (`meter_reader.cpp:434`), i.e. `2026-09-10T10:00:00Z` — valid ISO-8601 with a `Z` timezone designator. No change needed.

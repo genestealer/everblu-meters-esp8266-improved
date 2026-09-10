@@ -308,6 +308,14 @@ bool g_scanRetryRead = false;
 float g_scanPreviousOffset = 0.0f;
 ReadFailure g_retryFailureReason = ReadFailure::None; // Most informative failure seen so far in the current retry sequence
 
+// Non-blocking NTP synchronisation state. configTzTime() is kicked off in
+// onConnectionEstablished() and the clock is polled from loop() so MQTT
+// keep-alives and OTA are never stalled by a blocking wait on every reconnect.
+const time_t NTP_MIN_VALID_EPOCH = 1609459200; // 2021-01-01
+const unsigned long NTP_SYNC_TIMEOUT_MS = 10000;
+bool g_awaitingNtpSync = false;
+unsigned long g_ntpSyncStartMs = 0;
+
 // Global variable to store the reading schedule (default from private.h)
 const char *readingSchedule = DEFAULT_READING_SCHEDULE;
 
@@ -1298,49 +1306,18 @@ void onConnectionEstablished()
 {
   TS_PRINTLN("[MQTT] Connected to MQTT Broker");
 
-  TS_PRINTLN("[TIME] Configure time from NTP server. Please wait...");
+  TS_PRINTLN("[TIME] Configuring time from NTP server (non-blocking)...");
   // Note, my VLAN has no WAN/internet, so I am useing Home Assistant Community Add-on: chrony to proxy the time
   configTzTime("UTC0", SECRET_NTP_SERVER);
 
-  // Wait briefly for NTP to set the clock and report status
-  const time_t MIN_VALID_EPOCH = 1609459200; // 2021-01-01
-  const unsigned long NTP_SYNC_TIMEOUT_MS = 10000;
-  bool timeSynced = false;
-  unsigned long waitStart = millis();
-  while (millis() - waitStart < NTP_SYNC_TIMEOUT_MS)
-  {
-    time_t probe = time(nullptr);
-    if (probe >= MIN_VALID_EPOCH)
-    {
-      timeSynced = true;
-      break;
-    }
-    delay(200);
-  }
+  // Kick off NTP without blocking. Previously this callback spun in a delay()
+  // loop for up to NTP_SYNC_TIMEOUT_MS, stalling mqtt.loop()/OTA on every
+  // reconnect. pollNtpSync() in loop() now watches the clock and logs the
+  // outcome once it is set (or the timeout elapses).
+  g_awaitingNtpSync = true;
+  g_ntpSyncStartMs = millis();
 
-  time_t tnow = time(nullptr);
-  if (timeSynced)
-  {
-    TS_PRINTF("[TIME] ✓ NTP sync successful after %lu ms\n", (unsigned long)(millis() - waitStart));
-  }
-  else
-  {
-    TS_PRINTF("[WARNING] NTP sync failed within %lu ms. Clock may be unset (epoch=%ld).\n",
-                  (unsigned long)(millis() - waitStart), (long)tnow);
-  }
-
-  struct tm *ptm = gmtime(&tnow);
-  TS_PRINTF("[TIME] current date (UTC) : %04d/%02d/%02d %02d:%02d:%02d - %ld\n", ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, (long)tnow);
-  // Print simple offset and derived local time for debugging
-  int offsetMin = TIMEZONE_OFFSET_MINUTES;
-  time_t tlocal = tnow + (time_t)offsetMin * 60;
-  struct tm *plocal = gmtime(&tlocal);
-  TS_PRINTF("[TIME] Configured UTC offset: %+d minutes\n", offsetMin);
-  TS_PRINTF("[TIME] Current date (UTC+offset): %04d/%02d/%02d %02d:%02d:%02d - %ld\n",
-                plocal->tm_year + 1900, plocal->tm_mon + 1, plocal->tm_mday,
-                plocal->tm_hour, plocal->tm_min, plocal->tm_sec, (long)tlocal);
-
-  // Initialize schedule caches using validated UTC defaults
+  // Initialize schedule caches using validated UTC defaults (time-independent)
   updateResolvedScheduleFromUtc(DEFAULT_READING_HOUR_UTC, DEFAULT_READING_MINUTE_UTC);
 
   TS_PRINTLN("[OTA] Configure Arduino OTA flash.");
@@ -2082,6 +2059,50 @@ void setup()
 // ============================================================================
 
 /**
+ * @brief Non-blocking NTP sync poll
+ *
+ * Counterpart to the NTP kick-off in onConnectionEstablished(). Called from
+ * loop(); logs the sync result (and the current UTC / local time) exactly once,
+ * either when the clock becomes valid or when NTP_SYNC_TIMEOUT_MS elapses
+ * without a sync. Schedule caches are time-independent and are set on connect.
+ */
+void pollNtpSync()
+{
+  if (!g_awaitingNtpSync)
+    return;
+
+  const time_t tnow = time(nullptr);
+  const bool synced = tnow >= NTP_MIN_VALID_EPOCH;
+  const unsigned long elapsed = millis() - g_ntpSyncStartMs;
+
+  if (!synced && elapsed < NTP_SYNC_TIMEOUT_MS)
+    return; // still waiting for the clock to be set
+
+  g_awaitingNtpSync = false;
+
+  if (synced)
+  {
+    TS_PRINTF("[TIME] ✓ NTP sync successful after %lu ms\n", elapsed);
+  }
+  else
+  {
+    TS_PRINTF("[WARNING] NTP sync failed within %lu ms. Clock may be unset (epoch=%ld).\n",
+                  elapsed, (long)tnow);
+  }
+
+  struct tm *ptm = gmtime(&tnow);
+  TS_PRINTF("[TIME] current date (UTC) : %04d/%02d/%02d %02d:%02d:%02d - %ld\n", ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, (long)tnow);
+  // Print simple offset and derived local time for debugging
+  int offsetMin = TIMEZONE_OFFSET_MINUTES;
+  time_t tlocal = tnow + (time_t)offsetMin * 60;
+  struct tm *plocal = gmtime(&tlocal);
+  TS_PRINTF("[TIME] Configured UTC offset: %+d minutes\n", offsetMin);
+  TS_PRINTF("[TIME] Current date (UTC+offset): %04d/%02d/%02d %02d:%02d:%02d - %ld\n",
+                plocal->tm_year + 1900, plocal->tm_mon + 1, plocal->tm_mday,
+                plocal->tm_hour, plocal->tm_min, plocal->tm_sec, (long)tlocal);
+}
+
+/**
  * @brief Main loop function
  *
  * Handles MQTT communication, OTA updates, state machine execution,
@@ -2094,6 +2115,8 @@ void loop()
 #if WIFI_SERIAL_MONITOR_ENABLED
   wifiSerialLoop();
 #endif
+
+  pollNtpSync();
 
   if (g_scanActive)
   {
