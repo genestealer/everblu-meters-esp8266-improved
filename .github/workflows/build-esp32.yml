@@ -89,7 +89,10 @@ jobs:
       - name: Build PlatformIO Project (${{ matrix.environment.board }})
         run: |
           echo "Building with warning analysis..."
-          pio run -e ${{ matrix.environment.name }} -v 2>&1 | tee build-output.log
+          # No -v: PIOVERBOSE makes the espressif32 elf2image builder run with an
+          # unnamed action, which current SCons cannot print (TypeError: '_Null' + 'str').
+          # Compiler warnings are still emitted, so the analysis below is unaffected.
+          pio run -e ${{ matrix.environment.name }} 2>&1 | tee build-output.log
 
           # Check build status
           if [ ${PIPESTATUS[0]} -ne 0 ]; then
