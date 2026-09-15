@@ -285,6 +285,11 @@ bool MeterReader::shouldPerformScheduledRead()
     if (m_readingInProgress)
         return false;
 
+    // Honour the opt-out. Manual / on-demand reads bypass this method entirely,
+    // so they remain available when scheduled readings are disabled.
+    if (m_config->areScheduledReadingsDisabled())
+        return false;
+
 #ifdef USE_ESPHOME
     // In ESPHome builds, avoid scheduled reads until HA API is connected
     if (!m_haConnected)

@@ -99,6 +99,7 @@ class EverbluMeterComponent final : public PollingComponent,
   void set_timezone_offset(int offset) { this->timezone_offset_ = offset; }
   void set_auto_align_time(bool enabled) { this->auto_align_time_ = enabled; }
   void set_auto_align_midpoint(bool enabled) { this->auto_align_midpoint_ = enabled; }
+  void set_disable_scheduled_readings(bool disabled) { this->disable_scheduled_readings_ = disabled; }
   void set_max_retries(int retries) { this->max_retries_ = retries; }
   void set_retry_cooldown(unsigned long ms) { this->retry_cooldown_ms_ = ms; }
   void set_time_component(time::RealTimeClock *time) { this->time_component_ = time; }
@@ -166,6 +167,7 @@ class EverbluMeterComponent final : public PollingComponent,
   int timezone_offset_{0};
   bool auto_align_time_{true};
   bool auto_align_midpoint_{true};
+  bool disable_scheduled_readings_{false};
   int max_retries_{5};
   unsigned long retry_cooldown_ms_{3600000};
   int adaptive_threshold_{1};

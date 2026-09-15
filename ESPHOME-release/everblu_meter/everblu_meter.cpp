@@ -95,6 +95,7 @@ void EverbluMeterComponent::setup() {
   this->config_provider_->setTimezoneOffsetMinutes(this->timezone_offset_);
   this->config_provider_->setAutoAlignReadingTime(this->auto_align_time_);
   this->config_provider_->setUseAutoAlignMidpoint(this->auto_align_midpoint_);
+  this->config_provider_->setScheduledReadingsDisabled(this->disable_scheduled_readings_);
   this->config_provider_->setMaxRetries(this->max_retries_);
   this->config_provider_->setRetryCooldownMs(this->retry_cooldown_ms_);
 
