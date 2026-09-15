@@ -143,6 +143,7 @@ public:
     int timezoneOffsetMinutes = 0;
     bool autoAlign = false;
     bool autoAlignMidpoint = false;
+    bool scheduledReadingsDisabled = false;
 
     int maxRetries = 3;
     unsigned long retryCooldownMs = 60000;
@@ -162,6 +163,7 @@ public:
     int getTimezoneOffsetMinutes() const override { return timezoneOffsetMinutes; }
     bool isAutoAlignReadingTime() const override { return autoAlign; }
     bool useAutoAlignMidpoint() const override { return autoAlignMidpoint; }
+    bool areScheduledReadingsDisabled() const override { return scheduledReadingsDisabled; }
 
     int getMaxRetries() const override { return maxRetries; }
     unsigned long getRetryCooldownMs() const override { return retryCooldownMs; }
