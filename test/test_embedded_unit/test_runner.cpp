@@ -40,6 +40,7 @@ void test_schedule_empty(void);
 void test_schedule_null(void);
 void test_all_schedules_all_days(void);
 void test_schedule_null_tm_is_not_a_reading_day(void);
+void test_date_key_is_year_aware(void);
 void test_reading_time_utc_to_local_positive_offset(void);
 void test_reading_time_utc_to_local_negative_offset(void);
 void test_reading_time_local_to_utc_roundtrip(void);
@@ -119,6 +120,7 @@ int main(int argc, char **argv)
     RUN_TEST(test_schedule_null);
     RUN_TEST(test_all_schedules_all_days);
     RUN_TEST(test_schedule_null_tm_is_not_a_reading_day);
+    RUN_TEST(test_date_key_is_year_aware);
     RUN_TEST(test_reading_time_utc_to_local_positive_offset);
     RUN_TEST(test_reading_time_utc_to_local_negative_offset);
     RUN_TEST(test_reading_time_local_to_utc_roundtrip);

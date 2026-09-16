@@ -1,7 +1,7 @@
 # Quick Reference Guide - New Features
 
 > **⚠️ Historical document.** Some figures here no longer match the code. The
-> frequency scan is not "±30 kHz, 5 kHz step, best RSSI" — it sweeps ±150/±20 kHz
+> frequency scan is not "±30 kHz, 5 kHz step, best RSSI": it sweeps ±150/±20 kHz
 > and ranks candidates by decode success then |FREQEST| (RSSI was abandoned, see
 > issue #104). `frequency_offset` is expressed in **kHz**, not MHz, and the offset
 > limit is ±0.15 MHz (not ±0.1). For current behaviour see

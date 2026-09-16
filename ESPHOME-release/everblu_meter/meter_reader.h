@@ -244,7 +244,7 @@ private:
     // Schedule state cache
     int m_readHourLocal;
     int m_readMinuteLocal;
-    int m_lastScheduledReadYday;  // tm_yday of the last serviced scheduled read; -1 = none yet
+    int m_lastScheduledReadDateKey;  // ScheduleManager::dateKey() of the last serviced scheduled read; -1 = none yet
 };
 
 #endif // METER_READER_H

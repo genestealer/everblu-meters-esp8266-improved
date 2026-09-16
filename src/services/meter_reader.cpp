@@ -50,7 +50,7 @@ static void logReadableSummary(const tmeter_data &data, const IConfigProvider *c
 }
 
 MeterReader::MeterReader(IConfigProvider *config, ITimeProvider *timeProvider, IDataPublisher *publisher)
-    : m_config(config), m_timeProvider(timeProvider), m_publisher(publisher), m_initialized(false), m_readingInProgress(false), m_isScheduledRead(false), m_haConnected(false), m_radioConnected(false), m_scanInProgress(false), m_retryCount(0), m_inCooldown(false), m_lastFailedAttempt(0), m_nextRetryTime(0), m_autoScanAfterFailureDone(false), m_retryFailureReason(ReadFailure::None), m_totalReadAttempts(0), m_successfulReads(0), m_failedReads(0), m_lastErrorMessage("None"), m_lastScheduleCheck(0), m_lastStatsPublish(0), m_readHourLocal(10), m_readMinuteLocal(0), m_lastScheduledReadYday(-1)
+    : m_config(config), m_timeProvider(timeProvider), m_publisher(publisher), m_initialized(false), m_readingInProgress(false), m_isScheduledRead(false), m_haConnected(false), m_radioConnected(false), m_scanInProgress(false), m_retryCount(0), m_inCooldown(false), m_lastFailedAttempt(0), m_nextRetryTime(0), m_autoScanAfterFailureDone(false), m_retryFailureReason(ReadFailure::None), m_totalReadAttempts(0), m_successfulReads(0), m_failedReads(0), m_lastErrorMessage("None"), m_lastScheduleCheck(0), m_lastStatsPublish(0), m_readHourLocal(10), m_readMinuteLocal(0), m_lastScheduledReadDateKey(-1)
 {
 }
 
@@ -285,6 +285,12 @@ bool MeterReader::shouldPerformScheduledRead()
     if (m_readingInProgress)
         return false;
 
+    // A running scan owns the radio, so triggerReading() would drop this read.
+    // Return false without latching the day, so the read still fires once the
+    // scan finishes and the scheduled minute is re-sampled.
+    if (FrequencyManager::isScanInProgress())
+        return false;
+
 #ifdef USE_ESPHOME
     // In ESPHome builds, avoid scheduled reads until HA API is connected
     if (!m_haConnected)
@@ -332,11 +338,12 @@ bool MeterReader::shouldPerformScheduledRead()
     // trigger on tm_sec == 0 meant a blocking read or frequency scan that spanned
     // the exact :00 second made the reader miss the one-second window and skip the
     // whole day's read. Servicing the entire scheduled minute widens that window
-    // 60x; the tm_yday guard keeps it to a single read per occurrence. (A loop
+    // 60x; the date-key guard keeps it to a single read per occurrence. (A loop
     // stall longer than the full scheduled minute can still miss it.)
-    if (isDayMatch && isTimeMatch && ptm->tm_yday != m_lastScheduledReadYday)
+    const int today = ScheduleManager::dateKey(ptm);
+    if (isDayMatch && isTimeMatch && today != m_lastScheduledReadDateKey)
     {
-        m_lastScheduledReadYday = ptm->tm_yday;
+        m_lastScheduledReadDateKey = today;
         return true;
     }
 

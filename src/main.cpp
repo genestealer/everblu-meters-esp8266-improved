@@ -141,11 +141,12 @@ static int g_readMinuteLocal = DEFAULT_READING_MINUTE_UTC;
 // Used to control whether auto-alignment should be applied to future scheduled reads
 static bool g_isScheduledRead = false;
 
-// Day-of-year (tm_yday) of the last scheduled read, or -1 if none yet. Guards the
-// scheduled read to once per day across the whole scheduled minute (see onScheduled).
-// onScheduled() is re-armed on every reconnect, so several poll chains can run at
-// once; this latch keeps them collectively to a single read per occurrence.
-static int g_lastScheduledReadYday = -1;
+// Year-aware date key (see ScheduleManager::dateKey) of the last scheduled read,
+// or -1 if none yet. Guards the scheduled read to once per day across the whole
+// scheduled minute (see onScheduled). onScheduled() is re-armed on every reconnect,
+// so several poll chains can run at once; this latch keeps them collectively to a
+// single read per occurrence.
+static int g_lastScheduledReadDateKey = -1;
 
 // Define a default meter frequency if missing from private.h.
 // RADIAN protocol nominal center frequency for EverBlu is 433.82 MHz.
@@ -851,6 +852,17 @@ void onUpdateData()
 void onScheduled()
 {
   time_t tnow = time(nullptr);
+
+  // The clock is set asynchronously by NTP, so it can still read 1970-01-01
+  // 00:00 UTC here. That date satisfies schedules such as "Monday-Sunday" at
+  // 00:00 and would fire a spurious read and latch the day before real time
+  // arrives, so wait for the same minimum epoch pollNtpSync() uses.
+  if (tnow < NTP_MIN_VALID_EPOCH)
+  {
+    mqtt.executeDelayed(500, onScheduled);
+    return;
+  }
+
   // Compute local-offset time by adding offset minutes to UTC epoch
   time_t tlocal = tnow + (time_t)TIMEZONE_OFFSET_MINUTES * 60;
   struct tm *ptm = gmtime(&tlocal);
@@ -859,12 +871,13 @@ void onScheduled()
   const bool timeMatch = (ptm->tm_hour == g_readHourLocal && ptm->tm_min == g_readMinuteLocal);
 
   // Fire once anywhere inside the scheduled minute, guarded to one read per day
-  // by tm_yday. Keying the trigger on tm_sec == 0 (as before) meant a blocking
+  // by the date key. Keying the trigger on tm_sec == 0 (as before) meant a blocking
   // read, frequency scan or reconnect that spanned the exact :00 second made the
   // 500 ms poll miss the one-second window and skip the whole day's read, with
   // nothing logged. Servicing the entire scheduled minute widens the window 60x.
   // (A loop stall longer than the full scheduled minute can still miss it.)
-  if (ScheduleManager::isReadingDay(ptm) && timeMatch && ptm->tm_yday != g_lastScheduledReadYday)
+  const int today = ScheduleManager::dateKey(ptm);
+  if (ScheduleManager::isReadingDay(ptm) && timeMatch && today != g_lastScheduledReadDateKey)
   {
     // Check if we're still in cooldown period after failed attempts.
     // Defer without latching the day so the read can still fire later once the
@@ -887,9 +900,18 @@ void onScheduled()
     g_inCooldown = false;
     lastFailedAttempt = 0;
 
+    // A running scan owns the radio and onUpdateData() would return immediately.
+    // Defer without latching the day, as for cooldown, so the read still fires
+    // once the scan finishes (while the scheduled minute is still current).
+    if (FrequencyManager::isScanInProgress())
+    {
+      mqtt.executeDelayed(500, onScheduled);
+      return;
+    }
+
     // Mark today serviced so this occurrence reads exactly once, even if another
     // poll (or a second poll chain) observes the same minute.
-    g_lastScheduledReadYday = ptm->tm_yday;
+    g_lastScheduledReadDateKey = today;
 
     // Call back in 23 hours
     mqtt.executeDelayed(1000 * 60 * 60 * 23, onScheduled);
