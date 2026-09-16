@@ -86,6 +86,17 @@ public:
     static bool matchesReadingDay(const char *schedule, const struct tm *ptm);
 
     /**
+     * @brief Year-aware identity for a calendar date, for once-per-day latches
+     *
+     * tm_yday alone restarts at 0 every January, so a latch keyed on it would
+     * suppress the next year's occurrence of the same day-of-year.
+     *
+     * @param ptm Current date/time (nullptr returns -1, the "no date" sentinel)
+     * @return An integer that differs for every calendar date
+     */
+    static int dateKey(const struct tm *ptm);
+
+    /**
      * @brief Stateless UTC-to-local reading time conversion with clamping
      *
      * Clamps the inputs to valid ranges (hour 0-23, minute 0-59) before

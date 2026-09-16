@@ -117,6 +117,14 @@ bool ScheduleManager::matchesReadingDay(const char *schedule, const struct tm *p
     return false;
 }
 
+int ScheduleManager::dateKey(const struct tm *ptm)
+{
+    if (!ptm)
+        return -1;
+
+    return (ptm->tm_year + 1900) * 1000 + ptm->tm_yday;
+}
+
 void ScheduleManager::setReadingTimeFromLocal(int hourLocal, int minuteLocal)
 {
     s_readHourLocal = constrain(hourLocal, 0, 23);

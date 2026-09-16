@@ -37,6 +37,8 @@ void test_scheduled_read_fires_when_sampled_mid_minute(void);
 void test_scheduled_read_clamps_out_of_range_hour(void);
 void test_scheduled_read_is_skipped_on_a_non_reading_day(void);
 void test_reading_day_gate_covers_every_schedule_string(void);
+void test_scheduled_read_fires_again_on_the_same_day_of_year_next_year(void);
+void test_scheduled_read_survives_a_scan_holding_the_radio(void);
 void test_scheduled_read_waits_for_time_sync(void);
 void test_cooldown_blocks_scheduled_reads_until_it_expires(void);
 void test_cooldown_applies_to_a_failure_at_time_zero(void);
@@ -139,6 +141,8 @@ int main(int, char **)
     RUN_TEST(test_scheduled_read_clamps_out_of_range_hour);
     RUN_TEST(test_scheduled_read_is_skipped_on_a_non_reading_day);
     RUN_TEST(test_reading_day_gate_covers_every_schedule_string);
+    RUN_TEST(test_scheduled_read_fires_again_on_the_same_day_of_year_next_year);
+    RUN_TEST(test_scheduled_read_survives_a_scan_holding_the_radio);
     RUN_TEST(test_scheduled_read_waits_for_time_sync);
     RUN_TEST(test_cooldown_blocks_scheduled_reads_until_it_expires);
     RUN_TEST(test_cooldown_applies_to_a_failure_at_time_zero);

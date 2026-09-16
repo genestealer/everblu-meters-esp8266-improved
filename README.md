@@ -32,7 +32,7 @@ Two independent deployment targets share the same core radio/protocol logic:
 **Supports both water meters (readings in litres) and gas meters (readings in cubic metres)**.
 
 > [!NOTE]
-> **This project runs on both ESP8266 and ESP32.** Despite the `esp8266` in the repository name (kept for historical continuity), the firmware fully supports ESP32 and ESP32-C3 as well. Both deployment targets — the standalone MQTT firmware and the ESPHome component — are built and CI-tested on ESP8266 **and** ESP32 (see the ESP32 Build badge above). Ready-to-use PlatformIO environments ship for both families: `huzzah`, `d1_mini`, `d1_mini_pro`, `nodemcuv2` (ESP8266) and `esp32dev`, `esp32-c3-ard` (ESP32/ESP32-C3). There is also a [Nano ESP32 ESPHome example](ESPHOME/example-nano-esp32.yaml).
+> **This project runs on both ESP8266 and ESP32.** Despite the `esp8266` in the repository name (kept for historical continuity), the firmware fully supports ESP32 and ESP32-C3 as well. Both deployment targets, the standalone MQTT firmware and the ESPHome component, are built and CI-tested on ESP8266 **and** ESP32 (see the ESP32 Build badge above). Ready-to-use PlatformIO environments ship for both families: `huzzah`, `d1_mini`, `d1_mini_pro`, `nodemcuv2` (ESP8266) and `esp32dev`, `esp32-c3-ard` (ESP32/ESP32-C3). There is also a [Nano ESP32 ESPHome example](ESPHOME/example-nano-esp32.yaml).
 
 ---
 
