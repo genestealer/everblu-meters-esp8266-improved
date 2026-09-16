@@ -93,7 +93,6 @@ void test_history_stats_typical(void)
 
     TEST_ASSERT_EQUAL_UINT32(40, stats.currentMonthUsage);
     TEST_ASSERT_EQUAL_UINT32(160, stats.totalUsage);            // 0 + 50 + 70 + 40
-    TEST_ASSERT_EQUAL_UINT32(40, stats.averageMonthlyUsage);    // 160 / (3 + 1)
 }
 
 /**
@@ -110,7 +109,6 @@ void test_history_stats_empty(void)
     TEST_ASSERT_EQUAL_UINT32(500, stats.currentVolume);
     TEST_ASSERT_EQUAL_UINT32(0, stats.currentMonthUsage);
     TEST_ASSERT_EQUAL_UINT32(0, stats.totalUsage);
-    TEST_ASSERT_EQUAL_UINT32(0, stats.averageMonthlyUsage);
 }
 
 /**

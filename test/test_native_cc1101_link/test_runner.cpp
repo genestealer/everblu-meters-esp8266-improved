@@ -41,6 +41,8 @@ void test_report_works_without_any_context(void);
 void test_report_says_the_register_values_are_meaningless_on_a_stuck_bus(void);
 void test_report_calls_out_a_gdo0_line_that_is_not_wired(void);
 void test_report_is_truncated_rather_than_overrunning_its_buffer(void);
+void test_rssi_convert2dbm_matches_the_datasheet(void);
+void test_rssi_convert2dbm_does_not_wrap_below_int8_min(void);
 
 void setUp(void)
 {
@@ -90,6 +92,8 @@ int main(int, char **)
     RUN_TEST(test_report_says_the_register_values_are_meaningless_on_a_stuck_bus);
     RUN_TEST(test_report_calls_out_a_gdo0_line_that_is_not_wired);
     RUN_TEST(test_report_is_truncated_rather_than_overrunning_its_buffer);
+    RUN_TEST(test_rssi_convert2dbm_matches_the_datasheet);
+    RUN_TEST(test_rssi_convert2dbm_does_not_wrap_below_int8_min);
 
     return UNITY_END();
 }

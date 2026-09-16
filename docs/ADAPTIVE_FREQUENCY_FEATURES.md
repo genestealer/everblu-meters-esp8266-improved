@@ -1,5 +1,14 @@
 # Adaptive Frequency Management Features
 
+> **⚠️ Historical document.** This describes an earlier iteration of the frequency
+> handling and no longer matches the code. Known discrepancies: it refers to a
+> `performWideInitialScan()` that no longer exists, `FOCCFG=0x1D` (now `0x1E`), a
+> default adaptive threshold of 10 (now 1), and a removed MQTT `frequency_scan`
+> topic. The scan now ranks candidates by decode success then |FREQEST| (RSSI was
+> abandoned, see issue #104). For current behaviour see
+> [ESPHOME_INTEGRATION_GUIDE.md](../ESPHOME/docs/ESPHOME_INTEGRATION_GUIDE.md) and
+> the source in `src/services/frequency_manager.*`. Kept for history.
+
 ## Overview
 
 Three new features have been implemented to make the firmware work reliably with any CC1101 module out-of-the-box, without requiring manual frequency tuning. These features address CC1101 module manufacturing tolerances that can cause frequency offsets.

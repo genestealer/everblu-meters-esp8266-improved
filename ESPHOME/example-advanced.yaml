@@ -227,6 +227,7 @@ everblu_meter:
   # Status sensors
   status:
     name: "Meter Status"
+    id: meter_status
     on_value:
       then:
         - if:

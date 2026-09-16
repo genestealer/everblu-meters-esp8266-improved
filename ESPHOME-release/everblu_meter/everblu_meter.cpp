@@ -348,8 +348,12 @@ void EverbluMeterComponent::loop() {
 }
 
 void EverbluMeterComponent::request_manual_read() {
-  if (this->meter_reader_ == nullptr) {
+  if (this->meter_reader_ == nullptr || !this->meter_initialized_) {
     ESP_LOGW(TAG, "Manual read ignored: meter reader not ready");
+    return;
+  }
+  if (FrequencyManager::isScanInProgress() || this->meter_reader_->isReadingInProgress()) {
+    ESP_LOGW(TAG, "Manual read ignored: radio operation in progress");
     return;
   }
 
@@ -359,8 +363,12 @@ void EverbluMeterComponent::request_manual_read() {
 }
 
 void EverbluMeterComponent::request_deep_scan() {
-  if (this->meter_reader_ == nullptr) {
+  if (this->meter_reader_ == nullptr || !this->meter_initialized_) {
     ESP_LOGW(TAG, "Deep scan ignored: meter reader not ready");
+    return;
+  }
+  if (FrequencyManager::isScanInProgress() || this->meter_reader_->isReadingInProgress()) {
+    ESP_LOGW(TAG, "Deep scan ignored: radio operation in progress");
     return;
   }
 

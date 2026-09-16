@@ -26,7 +26,6 @@ struct HistoryStats
     uint32_t currentMonthUsage;   // Usage in current month (current - previous)
     uint32_t monthlyUsage[13];    // Monthly usage for each historical month
     uint32_t totalUsage;          // Sum of all months
-    uint32_t averageMonthlyUsage; // Average usage per month
 };
 
 /**

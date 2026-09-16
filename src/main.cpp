@@ -141,6 +141,13 @@ static int g_readMinuteLocal = DEFAULT_READING_MINUTE_UTC;
 // Used to control whether auto-alignment should be applied to future scheduled reads
 static bool g_isScheduledRead = false;
 
+// Year-aware date key (see ScheduleManager::dateKey) of the last scheduled read,
+// or -1 if none yet. Guards the scheduled read to once per day across the whole
+// scheduled minute (see onScheduled). onScheduled() is re-armed on every reconnect,
+// so several poll chains can run at once; this latch keeps them collectively to a
+// single read per occurrence.
+static int g_lastScheduledReadDateKey = -1;
+
 // Define a default meter frequency if missing from private.h.
 // RADIAN protocol nominal center frequency for EverBlu is 433.82 MHz.
 #ifndef FREQUENCY
@@ -307,6 +314,14 @@ bool g_scanActive = false;
 bool g_scanRetryRead = false;
 float g_scanPreviousOffset = 0.0f;
 ReadFailure g_retryFailureReason = ReadFailure::None; // Most informative failure seen so far in the current retry sequence
+
+// Non-blocking NTP synchronisation state. configTzTime() is kicked off in
+// onConnectionEstablished() and the clock is polled from loop() so MQTT
+// keep-alives and OTA are never stalled by a blocking wait on every reconnect.
+const time_t NTP_MIN_VALID_EPOCH = 1609459200; // 2021-01-01
+const unsigned long NTP_SYNC_TIMEOUT_MS = 10000;
+bool g_awaitingNtpSync = false;
+unsigned long g_ntpSyncStartMs = 0;
 
 // Global variable to store the reading schedule (default from private.h)
 const char *readingSchedule = DEFAULT_READING_SCHEDULE;
@@ -833,11 +848,21 @@ void onUpdateData()
 }
 
 // Function: onScheduled
-// Function: onScheduled
 // Description: Schedules daily meter readings at the configured local-offset time.
 void onScheduled()
 {
   time_t tnow = time(nullptr);
+
+  // The clock is set asynchronously by NTP, so it can still read 1970-01-01
+  // 00:00 UTC here. That date satisfies schedules such as "Monday-Sunday" at
+  // 00:00 and would fire a spurious read and latch the day before real time
+  // arrives, so wait for the same minimum epoch pollNtpSync() uses.
+  if (tnow < NTP_MIN_VALID_EPOCH)
+  {
+    mqtt.executeDelayed(500, onScheduled);
+    return;
+  }
+
   // Compute local-offset time by adding offset minutes to UTC epoch
   time_t tlocal = tnow + (time_t)TIMEZONE_OFFSET_MINUTES * 60;
   struct tm *ptm = gmtime(&tlocal);
@@ -845,9 +870,18 @@ void onScheduled()
   // Check if today is a valid reading day
   const bool timeMatch = (ptm->tm_hour == g_readHourLocal && ptm->tm_min == g_readMinuteLocal);
 
-  if (ScheduleManager::isReadingDay(ptm) && timeMatch && ptm->tm_sec == 0)
+  // Fire once anywhere inside the scheduled minute, guarded to one read per day
+  // by the date key. Keying the trigger on tm_sec == 0 (as before) meant a blocking
+  // read, frequency scan or reconnect that spanned the exact :00 second made the
+  // 500 ms poll miss the one-second window and skip the whole day's read, with
+  // nothing logged. Servicing the entire scheduled minute widens the window 60x.
+  // (A loop stall longer than the full scheduled minute can still miss it.)
+  const int today = ScheduleManager::dateKey(ptm);
+  if (ScheduleManager::isReadingDay(ptm) && timeMatch && today != g_lastScheduledReadDateKey)
   {
-    // Check if we're still in cooldown period after failed attempts
+    // Check if we're still in cooldown period after failed attempts.
+    // Defer without latching the day so the read can still fire later once the
+    // cooldown clears (while the scheduled minute is still current).
     if (g_inCooldown && (millis() - lastFailedAttempt) < RETRY_COOLDOWN)
     {
       unsigned long remainingCooldown = (RETRY_COOLDOWN - (millis() - lastFailedAttempt)) / 1000;
@@ -865,6 +899,19 @@ void onScheduled()
     // Cooldown period is over, reset and proceed
     g_inCooldown = false;
     lastFailedAttempt = 0;
+
+    // A running scan owns the radio and onUpdateData() would return immediately.
+    // Defer without latching the day, as for cooldown, so the read still fires
+    // once the scan finishes (while the scheduled minute is still current).
+    if (FrequencyManager::isScanInProgress())
+    {
+      mqtt.executeDelayed(500, onScheduled);
+      return;
+    }
+
+    // Mark today serviced so this occurrence reads exactly once, even if another
+    // poll (or a second poll chain) observes the same minute.
+    g_lastScheduledReadDateKey = today;
 
     // Call back in 23 hours
     mqtt.executeDelayed(1000 * 60 * 60 * 23, onScheduled);
@@ -1298,49 +1345,18 @@ void onConnectionEstablished()
 {
   TS_PRINTLN("[MQTT] Connected to MQTT Broker");
 
-  TS_PRINTLN("[TIME] Configure time from NTP server. Please wait...");
+  TS_PRINTLN("[TIME] Configuring time from NTP server (non-blocking)...");
   // Note, my VLAN has no WAN/internet, so I am useing Home Assistant Community Add-on: chrony to proxy the time
   configTzTime("UTC0", SECRET_NTP_SERVER);
 
-  // Wait briefly for NTP to set the clock and report status
-  const time_t MIN_VALID_EPOCH = 1609459200; // 2021-01-01
-  const unsigned long NTP_SYNC_TIMEOUT_MS = 10000;
-  bool timeSynced = false;
-  unsigned long waitStart = millis();
-  while (millis() - waitStart < NTP_SYNC_TIMEOUT_MS)
-  {
-    time_t probe = time(nullptr);
-    if (probe >= MIN_VALID_EPOCH)
-    {
-      timeSynced = true;
-      break;
-    }
-    delay(200);
-  }
+  // Kick off NTP without blocking. Previously this callback spun in a delay()
+  // loop for up to NTP_SYNC_TIMEOUT_MS, stalling mqtt.loop()/OTA on every
+  // reconnect. pollNtpSync() in loop() now watches the clock and logs the
+  // outcome once it is set (or the timeout elapses).
+  g_awaitingNtpSync = true;
+  g_ntpSyncStartMs = millis();
 
-  time_t tnow = time(nullptr);
-  if (timeSynced)
-  {
-    TS_PRINTF("[TIME] ✓ NTP sync successful after %lu ms\n", (unsigned long)(millis() - waitStart));
-  }
-  else
-  {
-    TS_PRINTF("[WARNING] NTP sync failed within %lu ms. Clock may be unset (epoch=%ld).\n",
-                  (unsigned long)(millis() - waitStart), (long)tnow);
-  }
-
-  struct tm *ptm = gmtime(&tnow);
-  TS_PRINTF("[TIME] current date (UTC) : %04d/%02d/%02d %02d:%02d:%02d - %ld\n", ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, (long)tnow);
-  // Print simple offset and derived local time for debugging
-  int offsetMin = TIMEZONE_OFFSET_MINUTES;
-  time_t tlocal = tnow + (time_t)offsetMin * 60;
-  struct tm *plocal = gmtime(&tlocal);
-  TS_PRINTF("[TIME] Configured UTC offset: %+d minutes\n", offsetMin);
-  TS_PRINTF("[TIME] Current date (UTC+offset): %04d/%02d/%02d %02d:%02d:%02d - %ld\n",
-                plocal->tm_year + 1900, plocal->tm_mon + 1, plocal->tm_mday,
-                plocal->tm_hour, plocal->tm_min, plocal->tm_sec, (long)tlocal);
-
-  // Initialize schedule caches using validated UTC defaults
+  // Initialize schedule caches using validated UTC defaults (time-independent)
   updateResolvedScheduleFromUtc(DEFAULT_READING_HOUR_UTC, DEFAULT_READING_MINUTE_UTC);
 
   TS_PRINTLN("[OTA] Configure Arduino OTA flash.");
@@ -2022,6 +2038,12 @@ void setup()
   validateReadingSchedule();
   TS_PRINTF("[SCHEDULE] Reading schedule (effective): %s\n", readingSchedule);
 
+  // Wire the effective schedule into ScheduleManager. Without this, onScheduled()
+  // calls ScheduleManager::isReadingDay(), which reads the static default
+  // ("Monday-Friday") - so a configured DEFAULT_READING_SCHEDULE was honoured in
+  // the logs and HA discovery but silently ignored when deciding the reading day.
+  ScheduleManager::setSchedule(readingSchedule);
+
   // Log effective frequency and warn if default is used
   TS_PRINTF("[FREQ] Frequency (effective): %.6f MHz\n", (double)FREQUENCY);
 #if FREQUENCY_DEFINED_DEFAULT
@@ -2082,6 +2104,50 @@ void setup()
 // ============================================================================
 
 /**
+ * @brief Non-blocking NTP sync poll
+ *
+ * Counterpart to the NTP kick-off in onConnectionEstablished(). Called from
+ * loop(); logs the sync result (and the current UTC / local time) exactly once,
+ * either when the clock becomes valid or when NTP_SYNC_TIMEOUT_MS elapses
+ * without a sync. Schedule caches are time-independent and are set on connect.
+ */
+void pollNtpSync()
+{
+  if (!g_awaitingNtpSync)
+    return;
+
+  const time_t tnow = time(nullptr);
+  const bool synced = tnow >= NTP_MIN_VALID_EPOCH;
+  const unsigned long elapsed = millis() - g_ntpSyncStartMs;
+
+  if (!synced && elapsed < NTP_SYNC_TIMEOUT_MS)
+    return; // still waiting for the clock to be set
+
+  g_awaitingNtpSync = false;
+
+  if (synced)
+  {
+    TS_PRINTF("[TIME] ✓ NTP sync successful after %lu ms\n", elapsed);
+  }
+  else
+  {
+    TS_PRINTF("[WARNING] NTP sync failed within %lu ms. Clock may be unset (epoch=%ld).\n",
+                  elapsed, (long)tnow);
+  }
+
+  struct tm *ptm = gmtime(&tnow);
+  TS_PRINTF("[TIME] current date (UTC) : %04d/%02d/%02d %02d:%02d:%02d - %ld\n", ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, (long)tnow);
+  // Print simple offset and derived local time for debugging
+  int offsetMin = TIMEZONE_OFFSET_MINUTES;
+  time_t tlocal = tnow + (time_t)offsetMin * 60;
+  struct tm *plocal = gmtime(&tlocal);
+  TS_PRINTF("[TIME] Configured UTC offset: %+d minutes\n", offsetMin);
+  TS_PRINTF("[TIME] Current date (UTC+offset): %04d/%02d/%02d %02d:%02d:%02d - %ld\n",
+                plocal->tm_year + 1900, plocal->tm_mon + 1, plocal->tm_mday,
+                plocal->tm_hour, plocal->tm_min, plocal->tm_sec, (long)tlocal);
+}
+
+/**
  * @brief Main loop function
  *
  * Handles MQTT communication, OTA updates, state machine execution,
@@ -2094,6 +2160,8 @@ void loop()
 #if WIFI_SERIAL_MONITOR_ENABLED
   wifiSerialLoop();
 #endif
+
+  pollNtpSync();
 
   if (g_scanActive)
   {

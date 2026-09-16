@@ -556,7 +556,7 @@ void CC1101_CMD(uint8_t spi_instr)
 
 void echo_cc1101_version(void);
 void show_cc1101_registers_settings(void);
-int8_t cc1100_rssi_convert2dbm(uint8_t Rssi_dec);
+// cc1100_rssi_convert2dbm() is declared in cc1101.h
 
 //---------------[CC1100 reset function]-----------------------
 // Reset CC1101 via software reset strobe command (per datasheet §19.1)
@@ -1142,9 +1142,11 @@ bool cc1101_init(float freq)
   return true;
 }
 
-int8_t cc1100_rssi_convert2dbm(uint8_t Rssi_dec)
+int cc1100_rssi_convert2dbm(uint8_t Rssi_dec)
 {
-  int8_t rssi_dbm;
+  // int, not int8_t: weak signals map below -128 dBm (Rssi_dec 128 -> -138),
+  // which would wrap to a positive value in an int8_t.
+  int rssi_dbm;
   if (Rssi_dec >= 128)
   {
     rssi_dbm = ((Rssi_dec - 256) / 2) - 74; // rssi_offset via datasheet
@@ -1690,7 +1692,7 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
   // lost. (8 + 4) = 12 bits sizes the capture to cover the whole frame.
   uint16_t l_radian_frame_size_byte = ((size_byte * (8 + 4)) / 8) + 1;
   int l_tmo = 0;
-  int8_t l_Rssi_dbm;
+  int l_Rssi_dbm;
   uint8_t l_lqi, l_freq_est;
 
   echo_debug(debug_out, "[RX] size_byte=%d  l_radian_frame_size_byte=%d\n", size_byte, l_radian_frame_size_byte);
@@ -2284,7 +2286,7 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
     echo_debug(1, "[METER] Validating CRC...\n");
     // Read RSSI now while the channel is still active so we can use it to
     // diagnose the cause of a CRC failure (saturation vs. weak signal).
-    int8_t frame_rssi_dbm = cc1100_rssi_convert2dbm(halRfReadReg(RSSI_ADDR));
+    int frame_rssi_dbm = cc1100_rssi_convert2dbm(halRfReadReg(RSSI_ADDR));
     if (validate_radian_crc(meter_data, meter_data_size))
     {
       echo_debug(1, "[METER] CRC valid - parsing meter data\n");
