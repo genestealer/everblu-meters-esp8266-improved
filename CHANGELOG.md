@@ -14,9 +14,26 @@ Releases are created manually by tagging commits with version tags matching `v*.
 
 ## [Unreleased]
 
+> **⚠️ BREAKING CHANGE** - The ESPHome `history` text sensor no longer carries the cumulative `history` array. Home Assistant templates that read `history.history[...]` require migration (see below). The MQTT / standalone build is unaffected.
+
+### Breaking Changes
+
+- **Cumulative `history` array removed from the ESPHome history JSON** ([#67](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/67)): Home Assistant rejects entity states longer than 255 characters and renders the entity as `unknown`. Thirteen seven-digit cumulative readings pushed the document past that limit, which is why the sensor went unknown. The payload is now:
+
+  ```json
+  {"monthly_usage": [16773, 16703, ...], "current_month_usage": 7276, "months_available": 13}
+  ```
+
+  The deltas in `monthly_usage` are small enough to always fit. The MQTT build publishes history as an attribute, which has no length limit, so it is unchanged and still carries the full cumulative series.
+
+### Migration Required
+
+- **If you have a template reading `history.history[-1]`** (the newest cumulative snapshot), derive it from the volume sensor instead: `volume - current_month_usage`. The two are equal by definition, since `current_month_usage` is that difference. Updated templates are in `ESPHOME/docs/ESPHOME_HOME_ASSISTANT_INTEGRATION.md`.
+- **If you only use `monthly_usage`, `current_month_usage` or `months_available`**, no action is needed.
+
 ### Changed
 
-- **ESPHome history sensor no longer carries the cumulative `history` array** ([#67](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/67)): Home Assistant rejects entity states over 255 characters and shows the entity as `unknown`, and 13 seven-digit cumulative readings exceeded that limit. The sensor now publishes only `monthly_usage`, `current_month_usage` and `months_available`, which always fit. A reading that decoded no history, and the state published at boot, are now a valid empty document rather than `unavailable`, so templates parsing the JSON never see `unknown`. Templates that read `history.history[-1]` should use `volume - current_month_usage` instead; see `ESPHOME/docs/ESPHOME_HOME_ASSISTANT_INTEGRATION.md`. The MQTT build is unchanged and still publishes the full cumulative series as an attribute.
+- **ESPHome history sensor always publishes a parseable document** ([#67](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/67)): a reading that decoded no history, and the state published at boot, are now a valid empty document rather than `unavailable`, so templates parsing the JSON never see `unknown`. History is published on every successful read, so a read without history clears the sensor rather than leaving the previous reading's payload in place.
 - **Per-meter ESPHome calibration:** each meter has independent base frequency, saved offset, adaptive tracking and frequency sensors. Add Scan, Deep Scan, Reset and Stop buttons to each entry. Reads reapply that meter's tuning; another meter cannot reset or cancel an active scan. Run a scan for each meter after upgrading: the old shared offset has no meter identity and is not imported.
 - **Staged scans in both targets:** wide acquisition uses nominal 10 kHz jumps, with one nominal 2.5 kHz fallback pass if empty. The scanner brackets both response edges, samples the complete window at 793 Hz intervals, ranks decode reliability before FREQEST, and confirms the candidate before saving. Local recovery starts around the saved tuning and widens if empty. MQTT scans now run from the main loop and support Scan and Stop Scan commands.
 - **Calibration safeguards:** cancelled or unsuccessful scans restore previous tuning, radio faults abort, first-time calibration requires verification, and stored offsets support the full ±150 kHz scan range. Frequency-word conversion now rounds to the nearest register value. FREQEST is captured at data-frame sync rather than after decoding and logging.
