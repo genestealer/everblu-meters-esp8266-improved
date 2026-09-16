@@ -524,7 +524,12 @@ void test_report_falls_back_to_the_pins_the_driver_is_using(void)
 
     const char *report = cc1101_print_diagnostic_report(&ctx);
     assertReportContains(report, "Meter Code: unknown ");
+#ifdef GDO2
     assertReportContains(report, "CS Pin: GPIO15 (hardware SPI SS), GDO0 Pin: GPIO5, GDO2 Pin: GPIO4");
+#else
+    // DISABLE_GDO2_FIFO_MANAGEMENT build: there is no GDO2 pin to name.
+    assertReportContains(report, "CS Pin: GPIO15 (hardware SPI SS), GDO0 Pin: GPIO5");
+#endif
 }
 
 void test_report_works_without_any_context(void)

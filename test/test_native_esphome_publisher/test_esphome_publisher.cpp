@@ -10,11 +10,13 @@
 
 #include <unity.h>
 
+#include <algorithm>
 #include <string>
 
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
+#include "esphome/core/log.h"
 
 #include "esphome_data_publisher.h"
 #include "utils.h"
@@ -532,4 +534,25 @@ void test_pub_per_meter_sensors_are_not_shared(void)
     TEST_ASSERT_EQUAL_STRING("Ready", secondStatus.last());
     TEST_ASSERT_FALSE(g_sensors.volume.published());
     TEST_ASSERT_FALSE(g_sensors.status.published());
+}
+
+// ---------------------------------------------------------------------------
+// Shared logging, built the ESPHome way
+// ---------------------------------------------------------------------------
+
+void test_echo_debug_routes_through_the_esphome_logger(void)
+{
+    // In ESPHome builds echo_debug() must reach ESP_LOGI so the line appears in
+    // the API/WiFi log, not just on the UART, and the trailing newline the
+    // MQTT formatting relies on has to be stripped because ESP_LOG adds its own.
+    std::string captured;
+    esphome::native_log_capture() = &captured;
+    echo_debug(true, "[METER] esphome routed line\n");
+    echo_debug(false, "[METER] suppressed line\n");
+    esphome::native_log_capture() = nullptr;
+
+    TEST_ASSERT_TRUE(captured.find("[METER] esphome routed line") != std::string::npos);
+    TEST_ASSERT_TRUE(captured.find("suppressed") == std::string::npos);
+    // One log record, so the newline inside the message was removed.
+    TEST_ASSERT_EQUAL(1, (int)std::count(captured.begin(), captured.end(), '\n'));
 }

@@ -40,6 +40,7 @@ void test_schedule_empty(void);
 void test_schedule_null(void);
 void test_all_schedules_all_days(void);
 void test_schedule_null_tm_is_not_a_reading_day(void);
+void test_matches_reading_day_defaults_a_null_schedule_to_weekdays(void);
 void test_date_key_is_year_aware(void);
 void test_reading_time_utc_to_local_positive_offset(void);
 void test_reading_time_utc_to_local_negative_offset(void);
@@ -58,6 +59,15 @@ void test_crc_different_data(void);
 void test_crc_deterministic(void);
 void test_crc_detects_single_bit_flip(void);
 void test_crc_is_order_sensitive(void);
+void test_meter_summary_ignores_a_null_reading(void);
+void test_meter_summary_falls_back_to_the_default_gas_divisor(void);
+void test_meter_summary_reports_litres_for_a_water_meter(void);
+void test_meter_summary_clamps_an_out_of_range_time_window(void);
+void test_echo_debug_is_silent_when_the_caller_disables_it(void);
+void test_echo_debug_is_silent_inside_a_quiet_guard(void);
+void test_echo_debug_colourises_a_recognised_tag(void);
+void test_echo_debug_leaves_an_unrecognised_line_uncoloured(void);
+void test_print_time_emits_a_formatted_timestamp(void);
 
 // --- test_meter_history.cpp ---
 void test_history_count_valid_months(void);
@@ -126,6 +136,7 @@ int main(int argc, char **argv)
     RUN_TEST(test_schedule_null);
     RUN_TEST(test_all_schedules_all_days);
     RUN_TEST(test_schedule_null_tm_is_not_a_reading_day);
+    RUN_TEST(test_matches_reading_day_defaults_a_null_schedule_to_weekdays);
     RUN_TEST(test_date_key_is_year_aware);
     RUN_TEST(test_reading_time_utc_to_local_positive_offset);
     RUN_TEST(test_reading_time_utc_to_local_negative_offset);
@@ -143,6 +154,15 @@ int main(int argc, char **argv)
     RUN_TEST(test_crc_deterministic);
     RUN_TEST(test_crc_detects_single_bit_flip);
     RUN_TEST(test_crc_is_order_sensitive);
+    RUN_TEST(test_meter_summary_ignores_a_null_reading);
+    RUN_TEST(test_meter_summary_falls_back_to_the_default_gas_divisor);
+    RUN_TEST(test_meter_summary_reports_litres_for_a_water_meter);
+    RUN_TEST(test_meter_summary_clamps_an_out_of_range_time_window);
+    RUN_TEST(test_echo_debug_is_silent_when_the_caller_disables_it);
+    RUN_TEST(test_echo_debug_is_silent_inside_a_quiet_guard);
+    RUN_TEST(test_echo_debug_colourises_a_recognised_tag);
+    RUN_TEST(test_echo_debug_leaves_an_unrecognised_line_uncoloured);
+    RUN_TEST(test_print_time_emits_a_formatted_timestamp);
 
     RUN_TEST(test_history_count_valid_months);
     RUN_TEST(test_history_is_valid);

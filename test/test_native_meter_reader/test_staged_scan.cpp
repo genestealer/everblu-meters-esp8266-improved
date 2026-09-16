@@ -38,6 +38,31 @@ namespace
         return data;
     }
     tmeter_data readScanMeter() { return get_meter_data_for_meter(20, 257750); }
+
+    // Model a meter that dozes off for one stretch of the fine sweep and answers
+    // again by the time the probe re-reads the seed. The probe also runs at each
+    // bracket edge, so the carrier is only silenced on the first fine-sweep report.
+    float dozingCarrier = 0.0f;
+    bool dozeUsed = false;
+    bool probeRan = false;
+    int fineSweepReports = 0;
+    void dozingScanProgress(const char *, const char *message)
+    {
+        if (strcmp(message, "Fine window scan") == 0)
+        {
+            fineSweepReports++;
+            if (!dozeUsed)
+            {
+                dozeUsed = true;
+                fakeRadio().carrierFrequency = 0.0f;
+            }
+        }
+        else if (strcmp(message, "Checking meter is awake") == 0)
+        {
+            probeRan = true;
+            fakeRadio().carrierFrequency = dozingCarrier;
+        }
+    }
     void startManager()
     {
         FrequencyManager::setRadioInitCallback(cc1101_init);
@@ -46,6 +71,9 @@ namespace
         targetPhase = nullptr;
         targetVisited = fineSampling = upperEdgeVisited = false;
         sampleCount = 0;
+        dozingCarrier = 0.0f;
+        dozeUsed = probeRan = false;
+        fineSweepReports = 0;
     }
 }
 
@@ -212,4 +240,22 @@ void test_staged_scan_stops_when_the_meter_goes_quiet_mid_sweep()
     for (const auto &call : fakeRadio().calls)
         if (call.frequency > BASE + 0.040f) zoomCalls++;
     TEST_ASSERT_LESS_THAN(40, zoomCalls);
+}
+
+// The counterpart to the test above: meters duty-cycle, so a quiet stretch is not
+// proof the calibration is wrong. Once the probe shows the meter is still awake the
+// fine sweep has to carry on from where it stopped rather than abandon the window.
+void test_staged_scan_resumes_the_fine_sweep_after_a_quiet_spell()
+{
+    startManager();
+    fakeRadio().carrierFrequency = BASE + 0.060f;
+    fakeRadio().carrierWidthMHz = 0.0075f;
+    dozingCarrier = fakeRadio().carrierFrequency;
+    FrequencyManager::performDeepFrequencyScan(0.150f, 0.010f, dozingScanProgress);
+
+    TEST_ASSERT_TRUE(probeRan);
+    // Two "Fine window scan" reports: the original one and the resume after the probe.
+    TEST_ASSERT_GREATER_OR_EQUAL(2, fineSweepReports);
+    TEST_ASSERT_TRUE(FrequencyManager::lastScanOutcome() == FrequencyManager::ScanOutcome::Found);
+    TEST_ASSERT_FLOAT_WITHIN(0.004f, fakeRadio().carrierFrequency, FrequencyManager::getTunedFrequency());
 }

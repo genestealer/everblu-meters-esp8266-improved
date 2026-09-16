@@ -1118,3 +1118,80 @@ void test_stop_reading_cancels_a_scan_with_no_read_in_progress(void)
     drainFrequencyScan(reader);
     TEST_ASSERT_FALSE(FrequencyManager::isScanInProgress());
 }
+
+void test_boot_scan_runs_once_when_the_meter_has_no_stored_calibration(void)
+{
+    // An uncalibrated meter with auto-scan enabled sweeps on the first loop()
+    // that has both a synced clock and a ready publisher, then never again.
+    g_config.autoScan = true;
+    g_config.frequency = 433.82f;
+
+    MeterReader reader = makeReader();
+    nativeClockAdvance(1000);
+    reader.loop();
+
+    TEST_ASSERT_TRUE(reader.isScanInProgress());
+    drainFrequencyScan(reader);
+
+    // The boot scan is armed once per boot, so a second pass must not restart it.
+    nativeClockAdvance(1000);
+    reader.loop();
+    TEST_ASSERT_FALSE(reader.isScanInProgress());
+}
+
+void test_boot_scan_is_skipped_when_a_calibration_is_already_stored(void)
+{
+    StorageAbstraction::saveFloat("freq_offset", 0.012f, 0xABCD);
+    g_config.autoScan = true;
+    g_config.frequency = 433.82f;
+
+    MeterReader reader = makeReader();
+    nativeClockAdvance(1000);
+    reader.loop();
+
+    TEST_ASSERT_FALSE(reader.isScanInProgress());
+}
+
+void test_a_recovery_scan_stays_local_and_reports_itself_as_such(void)
+{
+    // The Scan button asks for the local sweep around the current tuning; the
+    // Deep Scan button asks for the full range. Ordinary crystal drift is small,
+    // so the local sweep is what recovers it without minutes of sweeping.
+    g_config.frequency = 433.82f;
+    fakeRadio().carrierFrequency = 433.826f;
+    fakeRadio().carrierWidthMHz = 0.003f;
+
+    MeterReader reader = makeReader();
+    reader.performFrequencyScan(false);
+
+    TEST_ASSERT_TRUE(reader.isScanInProgress());
+    TEST_ASSERT_EQUAL_STRING("Frequency Scanning", g_publisher.lastRadioState().c_str());
+    TEST_ASSERT_EQUAL_STRING("Frequency scan running", g_publisher.lastStatus().c_str());
+
+    drainFrequencyScan(reader);
+
+    TEST_ASSERT_FALSE(FrequencyManager::isScanInProgress());
+    // Nothing was tried outside the local window, so the sweep never widened.
+    for (const auto &call : fakeRadio().calls)
+    {
+        TEST_ASSERT_TRUE(call.frequency > 433.79f && call.frequency < 433.85f);
+    }
+    TEST_ASSERT_FLOAT_WITHIN(0.002f, 433.826f, reader.getTunedFrequency());
+}
+
+void test_a_radio_fault_fails_the_read_before_the_meter_is_contacted(void)
+{
+    // cc1101_init() is the last thing between the reader and the air. If it
+    // fails the attempt must be recorded as a failure, not silently skipped,
+    // and the radio must be reported as disconnected.
+    MeterReader reader = makeReader();
+    fakeRadio().initSucceeds = false;
+
+    const int before = (int)fakeRadio().calls.size();
+    reader.triggerReading(false);
+
+    TEST_ASSERT_FALSE(reader.isRadioConnected());
+    TEST_ASSERT_EQUAL(before, (int)fakeRadio().calls.size());
+    TEST_ASSERT_EQUAL(0, (int)g_publisher.readings.size());
+    TEST_ASSERT_TRUE(g_publisher.sawStatus("Retry scheduled"));
+}

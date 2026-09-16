@@ -40,6 +40,7 @@ void test_pub_is_always_ready(void);
 void test_pub_wifi_details_and_discovery_are_no_ops(void);
 void test_pub_shared_sensors_keep_their_first_registration(void);
 void test_pub_per_meter_sensors_are_not_shared(void);
+void test_echo_debug_routes_through_the_esphome_logger(void);
 
 void setUp(void) { esphomePublisherSetUp(); }
 void tearDown(void) { esphomePublisherTearDown(); }
@@ -85,6 +86,7 @@ int main(int, char **)
 
     RUN_TEST(test_pub_shared_sensors_keep_their_first_registration);
     RUN_TEST(test_pub_per_meter_sensors_are_not_shared);
+    RUN_TEST(test_echo_debug_routes_through_the_esphome_logger);
 
     return UNITY_END();
 }

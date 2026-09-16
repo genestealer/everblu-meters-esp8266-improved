@@ -114,6 +114,9 @@ struct FakeStorage
     int beginCalls = 0;
     int saveCalls = 0;
 
+    // Model a backend that rejects the write (worn flash, failed verify read-back).
+    bool failSaves = false;
+
     void clear();
     const Entry *find(const char *key) const;
 };

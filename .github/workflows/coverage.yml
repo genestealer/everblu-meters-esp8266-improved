@@ -82,13 +82,16 @@ jobs:
           pio test -e native -v
           pio test -e native_esphome -v
           pio test -e native_cc1101 -v
+          pio test -e native_cc1101_debug -v
+          pio test -e native_cc1101_legacy -v
 
       - name: Collect coverage
-        # --object-directory spans both native environments, which compile several
-        # of these sources twice under different preprocessor settings (USE_ESPHOME
-        # on and off). gcovr merges the two runs per source file, so the totals are
-        # sound but per-line figures in #ifdef-heavy files read as the union of
-        # both configurations. Worth remembering when a coverage delta looks odd.
+        # --object-directory spans every native environment, which compile several
+        # of these sources more than once under different preprocessor settings
+        # (USE_ESPHOME on and off, DEBUG_CC1101 on and off, GDO2 wired or opted
+        # out). gcovr merges those runs per source file, so the totals are sound
+        # but per-line figures in #ifdef-heavy files read as the union of all of
+        # them. Worth remembering when a coverage delta looks odd.
         run: |
           gcovr \
             --root . \

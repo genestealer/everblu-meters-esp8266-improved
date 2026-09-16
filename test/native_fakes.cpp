@@ -168,6 +168,7 @@ void FakeStorage::clear()
     entries.clear();
     beginCalls = 0;
     saveCalls = 0;
+    failSaves = false;
 }
 
 const FakeStorage::Entry *FakeStorage::find(const char *key) const
@@ -192,6 +193,10 @@ bool StorageAbstraction::saveFloat(const char *key, float value, uint16_t magic)
 {
     FakeStorage &storage = fakeStorage();
     storage.saveCalls++;
+    if (storage.failSaves)
+    {
+        return false;
+    }
     for (FakeStorage::Entry &entry : storage.entries)
     {
         if (entry.key == key)

@@ -26,8 +26,25 @@ namespace esphome
         return on;
     }
 
+    /// Tests that assert on log output point this at their own buffer.
+    inline std::string *&native_log_capture()
+    {
+        static std::string *sink = nullptr;
+        return sink;
+    }
+
     inline void native_log(const char *level, const char *tag, const char *fmt, ...)
     {
+        if (native_log_capture() != nullptr)
+        {
+            char buf[512];
+            va_list args;
+            va_start(args, fmt);
+            std::vsnprintf(buf, sizeof(buf), fmt, args);
+            va_end(args);
+            native_log_capture()->append(buf);
+            native_log_capture()->push_back('\n');
+        }
         if (!native_log_enabled())
         {
             return;

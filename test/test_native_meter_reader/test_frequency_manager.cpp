@@ -183,6 +183,61 @@ void test_freq_auto_scan_is_requested_only_while_uncalibrated(void)
     TEST_ASSERT_FALSE(FrequencyManager::shouldPerformAutoScan());
 }
 
+void test_freq_stored_offset_is_readable_without_reloading_the_manager(void)
+{
+    // loadFrequencyOffset() reports what is on the device, which is not always
+    // the live offset: adaptive tracking moves the in-memory value between saves.
+    beginManager();
+    FrequencyManager::saveFrequencyOffset(0.0225f);
+    FrequencyManager::setOffset(-0.0400f);
+
+    TEST_ASSERT_FLOAT_WITHIN(0.000001f, 0.0225f, FrequencyManager::loadFrequencyOffset());
+    TEST_ASSERT_FLOAT_WITHIN(0.000001f, -0.0400f, FrequencyManager::getOffset());
+}
+
+void test_freq_releasing_the_active_calibration_ends_its_scan(void)
+{
+    // A calibration outlives the scan it started only if the meter that owns it
+    // stays alive. Tearing it down mid-sweep must stop the state machine too,
+    // or the next loopScan() would step against a destroyed profile.
+    beginManager();
+    {
+        FrequencyManager::Calibration calibration;
+        FrequencyManager::initialiseCalibration(calibration, BASE_FREQ, "freq_transient");
+        TEST_ASSERT_TRUE(FrequencyManager::activateCalibration(calibration));
+
+        placeCarrier(30.0f, 6.0f);
+        FrequencyManager::beginDeepFrequencyScan();
+        FrequencyManager::loopScan();
+        TEST_ASSERT_TRUE(FrequencyManager::isScanInProgress());
+    }
+
+    TEST_ASSERT_FALSE(FrequencyManager::isScanInProgress());
+    TEST_ASSERT_TRUE(FrequencyManager::lastScanOutcome() == FrequencyManager::ScanOutcome::Aborted);
+    TEST_ASSERT_EQUAL(0, fakeStorage().saveCalls);
+
+    // The default calibration is active again, so the manager is usable.
+    const size_t before = fakeRadio().calls.size();
+    FrequencyManager::loopScan();
+    TEST_ASSERT_EQUAL(before, fakeRadio().calls.size());
+}
+
+void test_freq_scan_that_cannot_persist_its_result_is_abandoned(void)
+{
+    // Storage that refuses the write leaves the radio tuned to a calibration no
+    // reboot would restore, so the scan has to report the failure rather than
+    // pretend it succeeded.
+    beginManager();
+    placeCarrier(30.0f, 6.0f);
+    fakeStorage().failSaves = true;
+
+    FrequencyManager::performDeepFrequencyScan(0.050f, 0.0025f);
+
+    TEST_ASSERT_TRUE(FrequencyManager::lastScanOutcome() == FrequencyManager::ScanOutcome::Aborted);
+    TEST_ASSERT_NULL(fakeStorage().find("freq_offset"));
+    TEST_ASSERT_FLOAT_WITHIN(0.000001f, 0.0f, FrequencyManager::getOffset());
+}
+
 // ---------------------------------------------------------------------------
 // Deep scan
 // ---------------------------------------------------------------------------

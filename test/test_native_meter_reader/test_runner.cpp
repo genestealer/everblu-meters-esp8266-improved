@@ -55,6 +55,7 @@ void test_staged_scan_radio_faults_never_save_candidates();
 void test_staged_scan_requires_verification_without_prior_calibration();
 void test_staged_scan_prefers_reliable_decodes_over_lower_error();
 void test_staged_scan_stops_when_the_meter_goes_quiet_mid_sweep();
+void test_staged_scan_resumes_the_fine_sweep_after_a_quiet_spell();
 void test_auto_scan_on_failure_escalates_to_a_full_sweep(void);
 void test_auto_scan_on_failure_does_not_escalate_after_a_cancel(void);
 void test_auto_scan_on_failure_stays_off_when_disabled(void);
@@ -73,6 +74,10 @@ void test_read_without_history_still_publishes_to_clear_the_sensor(void);
 void test_misconfigured_gas_volume_divisor_falls_back_without_failing_the_read(void);
 void test_negative_timezone_offset_wraps_reading_time_to_previous_day(void);
 void test_stop_reading_cancels_a_scan_with_no_read_in_progress(void);
+void test_boot_scan_runs_once_when_the_meter_has_no_stored_calibration(void);
+void test_boot_scan_is_skipped_when_a_calibration_is_already_stored(void);
+void test_a_recovery_scan_stays_local_and_reports_itself_as_such(void);
+void test_a_radio_fault_fails_the_read_before_the_meter_is_contacted(void);
 
 // test_frequency_manager.cpp
 void test_freq_begin_without_callbacks_is_refused(void);
@@ -81,6 +86,9 @@ void test_freq_offset_survives_a_reboot(void);
 void test_freq_offset_outside_the_valid_range_is_discarded(void);
 void test_freq_offset_with_a_wrong_magic_is_discarded(void);
 void test_freq_auto_scan_is_requested_only_while_uncalibrated(void);
+void test_freq_stored_offset_is_readable_without_reloading_the_manager(void);
+void test_freq_releasing_the_active_calibration_ends_its_scan(void);
+void test_freq_scan_that_cannot_persist_its_result_is_abandoned(void);
 void test_freq_scan_finds_a_carrier_above_the_base_frequency(void);
 void test_freq_scan_finds_a_carrier_below_the_base_frequency(void);
 void test_freq_scan_persists_its_result(void);
@@ -173,6 +181,10 @@ int main(int, char **)
     RUN_TEST(test_misconfigured_gas_volume_divisor_falls_back_without_failing_the_read);
     RUN_TEST(test_negative_timezone_offset_wraps_reading_time_to_previous_day);
     RUN_TEST(test_stop_reading_cancels_a_scan_with_no_read_in_progress);
+    RUN_TEST(test_boot_scan_runs_once_when_the_meter_has_no_stored_calibration);
+    RUN_TEST(test_boot_scan_is_skipped_when_a_calibration_is_already_stored);
+    RUN_TEST(test_a_recovery_scan_stays_local_and_reports_itself_as_such);
+    RUN_TEST(test_a_radio_fault_fails_the_read_before_the_meter_is_contacted);
 
     // FrequencyManager
     RUN_TEST(test_freq_begin_without_callbacks_is_refused);
@@ -181,6 +193,9 @@ int main(int, char **)
     RUN_TEST(test_freq_offset_outside_the_valid_range_is_discarded);
     RUN_TEST(test_freq_offset_with_a_wrong_magic_is_discarded);
     RUN_TEST(test_freq_auto_scan_is_requested_only_while_uncalibrated);
+    RUN_TEST(test_freq_stored_offset_is_readable_without_reloading_the_manager);
+    RUN_TEST(test_freq_releasing_the_active_calibration_ends_its_scan);
+    RUN_TEST(test_freq_scan_that_cannot_persist_its_result_is_abandoned);
     RUN_TEST(test_freq_scan_finds_a_carrier_above_the_base_frequency);
     RUN_TEST(test_freq_scan_finds_a_carrier_below_the_base_frequency);
     RUN_TEST(test_freq_scan_persists_its_result);
@@ -215,6 +230,7 @@ int main(int, char **)
     RUN_TEST(test_staged_scan_requires_verification_without_prior_calibration);
     RUN_TEST(test_staged_scan_prefers_reliable_decodes_over_lower_error);
     RUN_TEST(test_staged_scan_stops_when_the_meter_goes_quiet_mid_sweep);
+    RUN_TEST(test_staged_scan_resumes_the_fine_sweep_after_a_quiet_spell);
 
     return UNITY_END();
 }
