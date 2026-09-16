@@ -36,16 +36,23 @@ jobs:
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             TAG="$TAG_INPUT"
           else
-            TAG=${GITHUB_REF#refs/tags/}
+            TAG="${GITHUB_REF#refs/tags/}"
           fi
-          echo "tag=${TAG}" >> $GITHUB_OUTPUT
-          echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+          # Reject anything that is not a plain version tag, so no downstream step
+          # can be fed shell metacharacters through the dispatch input.
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.]+)?$ ]]; then
+            echo "Refusing to release '$TAG': expected a vMAJOR.MINOR.PATCH tag" >&2
+            exit 1
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
 
       - name: Generate release notes
         id: release_notes
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          REPO: ${{ github.repository }}
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
-
           # Get previous tag
           PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
 
@@ -81,7 +88,7 @@ jobs:
           echo "" >> release-notes.md
           echo "## Documentation" >> release-notes.md
           echo "" >> release-notes.md
-          echo "See [README.md](https://github.com/${{ github.repository }}/blob/main/README.md) for full documentation." >> release-notes.md
+          echo "See [README.md](https://github.com/${REPO}/blob/main/README.md) for full documentation." >> release-notes.md
 
           cat release-notes.md
 
@@ -97,7 +104,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Release Summary
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          REPO: ${{ github.repository }}
         run: |
-          echo "### Release ${{ steps.version.outputs.tag }} created" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "View the release at: https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "### Release ${TAG} created" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "View the release at: https://github.com/${REPO}/releases/tag/${TAG}" >> "$GITHUB_STEP_SUMMARY"
