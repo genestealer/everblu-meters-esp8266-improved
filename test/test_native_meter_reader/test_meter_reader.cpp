@@ -621,6 +621,45 @@ void test_scheduled_read_waits_for_time_sync(void)
     TEST_ASSERT_EQUAL(1, (int)fakeRadio().calls.size());
 }
 
+void test_disabled_scheduled_readings_block_the_daily_read(void)
+{
+    // Issue #159: the opt-out must suppress the automatic daily read even on a
+    // matching day at the configured minute.
+    // 2025-06-10 is a Tuesday.
+    g_config.schedule = "Monday-Friday";
+    g_config.readHourUTC = 10;
+    g_config.readMinuteUTC = 0;
+    g_config.scheduledReadingsDisabled = true;
+    fakeRadio().responses.push_back(FakeRadio::success());
+
+    MeterReader reader = makeReader();
+
+    g_time.setUtc(2025, 6, 10, 10, 0, 0);
+    nativeClockAdvance(1000);
+    reader.loop();
+    TEST_ASSERT_EQUAL(0, (int)fakeRadio().calls.size());
+
+    // Re-enabling must restore the schedule without needing a restart.
+    g_config.scheduledReadingsDisabled = false;
+    g_time.setUtc(2025, 6, 10, 10, 0, 30);
+    nativeClockAdvance(1000);
+    reader.loop();
+    TEST_ASSERT_EQUAL(1, (int)fakeRadio().calls.size());
+}
+
+void test_disabled_scheduled_readings_still_allow_manual_reads(void)
+{
+    // The opt-out only gates shouldPerformScheduledRead(); on-demand reads must
+    // keep working (issue #159).
+    g_config.scheduledReadingsDisabled = true;
+    fakeRadio().responses.push_back(FakeRadio::success());
+
+    MeterReader reader = makeReader();
+    reader.triggerReading(true);
+
+    TEST_ASSERT_EQUAL(1, (int)fakeRadio().calls.size());
+}
+
 void test_cooldown_blocks_scheduled_reads_until_it_expires(void)
 {
     g_config.maxRetries = 1;

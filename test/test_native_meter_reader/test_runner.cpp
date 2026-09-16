@@ -40,6 +40,8 @@ void test_reading_day_gate_covers_every_schedule_string(void);
 void test_scheduled_read_fires_again_on_the_same_day_of_year_next_year(void);
 void test_scheduled_read_survives_a_scan_holding_the_radio(void);
 void test_scheduled_read_waits_for_time_sync(void);
+void test_disabled_scheduled_readings_block_the_daily_read(void);
+void test_disabled_scheduled_readings_still_allow_manual_reads(void);
 void test_cooldown_blocks_scheduled_reads_until_it_expires(void);
 void test_cooldown_applies_to_a_failure_at_time_zero(void);
 void test_statistics_are_republished_periodically(void);
@@ -144,6 +146,8 @@ int main(int, char **)
     RUN_TEST(test_scheduled_read_fires_again_on_the_same_day_of_year_next_year);
     RUN_TEST(test_scheduled_read_survives_a_scan_holding_the_radio);
     RUN_TEST(test_scheduled_read_waits_for_time_sync);
+    RUN_TEST(test_disabled_scheduled_readings_block_the_daily_read);
+    RUN_TEST(test_disabled_scheduled_readings_still_allow_manual_reads);
     RUN_TEST(test_cooldown_blocks_scheduled_reads_until_it_expires);
     RUN_TEST(test_cooldown_applies_to_a_failure_at_time_zero);
     RUN_TEST(test_statistics_are_republished_periodically);

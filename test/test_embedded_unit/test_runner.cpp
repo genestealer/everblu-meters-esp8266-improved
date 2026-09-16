@@ -77,6 +77,9 @@ void test_history_print_to_serial_is_safe(void);
 void test_history_json_compact_typical(void);
 void test_history_json_compact_empty_is_valid(void);
 void test_history_json_compact_full_thirteen_under_255(void);
+void test_history_json_compact_single_month(void);
+void test_history_json_compact_null_buffer(void);
+void test_history_json_compact_rejects_undersized_buffer(void);
 
 // --- test_hex_dump.cpp ---
 void test_hex_dump_handles_a_full_radian_frame(void);
@@ -158,6 +161,9 @@ int main(int argc, char **argv)
     RUN_TEST(test_history_json_compact_typical);
     RUN_TEST(test_history_json_compact_empty_is_valid);
     RUN_TEST(test_history_json_compact_full_thirteen_under_255);
+    RUN_TEST(test_history_json_compact_single_month);
+    RUN_TEST(test_history_json_compact_null_buffer);
+    RUN_TEST(test_history_json_compact_rejects_undersized_buffer);
 
     RUN_TEST(test_hex_dump_handles_a_full_radian_frame);
     RUN_TEST(test_hex_dump_handles_an_oversized_buffer);
