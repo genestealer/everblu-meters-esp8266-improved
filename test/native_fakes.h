@@ -230,6 +230,7 @@ public:
     std::vector<Stats> statistics;
 
     int historyPublishes = 0;
+    std::vector<bool> historyAvailableFlags;
     int settingsPublishes = 0;
     int discoveryPublishes = 0;
 

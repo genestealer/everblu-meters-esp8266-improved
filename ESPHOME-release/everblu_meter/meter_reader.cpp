@@ -456,11 +456,9 @@ void MeterReader::handleSuccessfulRead(const tmeter_data &data)
     // Publish meter data
     m_publisher->publishMeterReading(data, iso8601);
 
-    // Publish historical data if available
-    if (data.history_available)
-    {
-        m_publisher->publishHistory(data.history, true);
-    }
+    // Published unconditionally: a reading that decoded no history must clear the
+    // sensor rather than leave the previous reading's JSON in place.
+    m_publisher->publishHistory(data.history, data.history_available);
 
     // Publish updated statistics
     m_publisher->publishStatistics(m_totalReadAttempts, m_successfulReads, m_failedReads);

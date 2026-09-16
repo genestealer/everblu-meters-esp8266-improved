@@ -155,7 +155,7 @@ void test_successful_read_passes_configured_meter_identity(void)
     TEST_ASSERT_EQUAL_UINT32(987654, fakeRadio().calls[0].serial);
 }
 
-void test_successful_read_publishes_history_only_when_available(void)
+void test_successful_read_always_publishes_history_with_its_availability(void)
 {
     tmeter_data withHistory = FakeRadio::success();
     withHistory.history_available = true;
@@ -169,9 +169,13 @@ void test_successful_read_publishes_history_only_when_available(void)
     MeterReader reader = makeReader();
     reader.triggerReading(false);
     TEST_ASSERT_EQUAL(1, g_publisher.historyPublishes);
+    TEST_ASSERT_TRUE(g_publisher.historyAvailableFlags[0]);
 
+    // The second read decoded no history, so it must publish again with
+    // historyAvailable=false rather than leaving the first read's JSON behind.
     reader.triggerReading(false);
-    TEST_ASSERT_EQUAL(1, g_publisher.historyPublishes);
+    TEST_ASSERT_EQUAL(2, g_publisher.historyPublishes);
+    TEST_ASSERT_FALSE(g_publisher.historyAvailableFlags[1]);
 }
 
 void test_reading_is_skipped_when_publisher_not_ready(void)
@@ -1038,6 +1042,22 @@ void test_history_available_but_all_zero_is_not_treated_as_valid(void)
     // history_available, independent of MeterHistory::isHistoryValid().
     TEST_ASSERT_EQUAL(1, (int)g_publisher.readings.size());
     TEST_ASSERT_EQUAL(1, g_publisher.historyPublishes);
+}
+
+void test_read_without_history_still_publishes_to_clear_the_sensor(void)
+{
+    // publishHistory() must run on every successful read, not only when history
+    // decoded. Skipping it leaves the previous reading's JSON on the sensor.
+    tmeter_data noHistory = FakeRadio::success();
+    noHistory.history_available = false;
+    fakeRadio().responses.push_back(noHistory);
+
+    MeterReader reader = makeReader();
+    reader.triggerReading(false);
+
+    TEST_ASSERT_EQUAL(1, g_publisher.historyPublishes);
+    TEST_ASSERT_EQUAL(1, (int)g_publisher.historyAvailableFlags.size());
+    TEST_ASSERT_FALSE(g_publisher.historyAvailableFlags[0]);
 }
 
 void test_misconfigured_gas_volume_divisor_falls_back_without_failing_the_read(void)

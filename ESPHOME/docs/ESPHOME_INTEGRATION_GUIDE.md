@@ -59,7 +59,7 @@ Connect the CC1101 to your ESP board:
 > **Integrated boards with a shared SPI bus (e.g. LilyGO T-Embed CC1101 Plus).**
 > On boards where the CC1101 shares the SPI bus with a display and/or SD card,
 > every other device's chip-select (CS) line must be driven **high (inactive)** so
-> it does not contend for MISO — a floating display/SD CS pin makes MISO read a
+> it does not contend for MISO. A floating display/SD CS pin makes MISO read a
 > stuck value (commonly `0x0F`), which looks like "the radio received data that
 > decodes to nothing". Also confirm `gdo0_pin` maps to the pin actually routed to
 > the CC1101 GDO0 on your board (on some T-Embed variants GDO0 is on GPIO3, not the
@@ -272,7 +272,7 @@ The default frequency (433.82 MHz) works for most European meters. If you experi
 
 **Overriding the base frequency.** The `frequency:` key sets the base (centre)
 frequency the radio tunes to and is the ESPHome equivalent of the `-D FREQUENCY`
-build flag used by the standalone/`.ino` build — that build flag has **no effect**
+build flag used by the standalone/`.ino` build. That build flag has **no effect**
 in ESPHome, so set `frequency:` in the `everblu_meter:` block instead:
 
 ```yaml
@@ -282,11 +282,11 @@ everblu_meter:
 ```
 
 If your meter consistently transmits well off 433.82 MHz (for example some
-AnyQuest Cyble variants), prefer **recentring** with `frequency:` over relying on
-a large auto-scan offset. The persisted scan offset is intentionally bounded
-(±150 kHz); a meter that sits outside that window is found by a scan but the
-offset cannot be stored, so it is re-discovered on every boot. Recentring the
-base frequency keeps the residual offset small and within the persistable range.
+AnyQuest Cyble variants), you must **recentre** with `frequency:` before scanning.
+The scan window is clamped to ±150 kHz around the base frequency, so a carrier
+outside that range is never swept and `auto_scan` will not find it however long it
+runs. Move the base frequency towards the meter first, then scan: the remaining
+offset is then both discoverable and small enough to persist.
 
 ## Sensors
 
