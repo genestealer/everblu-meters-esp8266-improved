@@ -296,32 +296,19 @@ void FrequencyManager::stepAcquire()
 
 // Stage 2: walk out from the first response in both directions to find where the
 // meter stops answering. MISS_TOLERANCE consecutive misses close an edge, so a single
-// unanswered attempt is not mistaken for the boundary.
+// unanswered attempt is not mistaken for the boundary. Silence is checked against the
+// seed first, because a meter that has gone to sleep looks exactly like an edge.
 void FrequencyManager::stepBracket()
 {
     bool lower = s_scan.phase == ScanPhase::Lower;
-    if (s_scan.current < s_scan.start || s_scan.current > s_scan.end || s_scan.misses >= MISS_TOLERANCE)
+    if (s_scan.misses >= MISS_TOLERANCE)
     {
-        s_scan.misses = 0;
-        if (lower)
-        {
-            s_scan.current = s_scan.seed + MAP_STEP;
-            s_scan.phase = ScanPhase::Upper;
-            reportPhase("Bracketing upper edge");
-        }
-        else
-        {
-            s_scan.zoomStart = s_scan.firstHit - MAP_STEP;
-            if (s_scan.zoomStart < s_scan.start) s_scan.zoomStart = s_scan.start;
-            s_scan.zoomEnd = s_scan.lastHit + MAP_STEP;
-            if (s_scan.zoomEnd > s_scan.end) s_scan.zoomEnd = s_scan.end;
-            s_scan.current = s_scan.zoomStart;
-            s_scan.phase = ScanPhase::Zoom;
-            reportPhase("Fine window scan");
-            LOG_I("everblu_meter", "Window %.6f - %.6f MHz; full fine sweep at %.3f kHz",
-                  s_scan.firstHit * CC1101_MIN_STEP_MHZ, s_scan.lastHit * CC1101_MIN_STEP_MHZ,
-                  ZOOM_STEP * CC1101_MIN_STEP_MHZ * 1000.0f);
-        }
+        beginProbe();
+        return;
+    }
+    if (s_scan.current < s_scan.start || s_scan.current > s_scan.end)
+    {
+        closeEdge(lower);
         return;
     }
     tmeter_data data{};
@@ -334,6 +321,61 @@ void FrequencyManager::stepBracket()
     }
     else s_scan.misses++;
     s_scan.current += lower ? -MAP_STEP : MAP_STEP;
+}
+
+// Declare one bracket edge found and move on: lower hands over to the upper walk,
+// upper opens the fine sweep.
+void FrequencyManager::closeEdge(bool lower)
+{
+    s_scan.misses = 0;
+    if (lower)
+    {
+        s_scan.current = s_scan.seed + MAP_STEP;
+        s_scan.phase = ScanPhase::Upper;
+        reportPhase("Bracketing upper edge");
+        return;
+    }
+    s_scan.zoomStart = s_scan.firstHit - MAP_STEP;
+    if (s_scan.zoomStart < s_scan.start) s_scan.zoomStart = s_scan.start;
+    s_scan.zoomEnd = s_scan.lastHit + MAP_STEP;
+    if (s_scan.zoomEnd > s_scan.end) s_scan.zoomEnd = s_scan.end;
+    s_scan.current = s_scan.zoomStart;
+    s_scan.zoomMisses = 0;
+    s_scan.phase = ScanPhase::Zoom;
+    reportPhase("Fine window scan");
+    LOG_I("everblu_meter", "Window %.6f - %.6f MHz; full fine sweep at %.3f kHz",
+          s_scan.zoomStart * CC1101_MIN_STEP_MHZ, s_scan.zoomEnd * CC1101_MIN_STEP_MHZ,
+          ZOOM_STEP * CC1101_MIN_STEP_MHZ * 1000.0f);
+}
+
+// A run of misses means either the wrong frequency or a meter that has stopped
+// answering (they duty-cycle, and a long sweep is itself enough to quieten one).
+// Re-reading the seed, which is known to answer, tells the two apart; without it a
+// sleeping meter is mapped as hundreds of dead frequencies.
+void FrequencyManager::beginProbe()
+{
+    s_scan.resumePhase = s_scan.phase;
+    s_scan.phase = ScanPhase::Probe;
+    reportPhase("Checking meter is awake");
+}
+
+void FrequencyManager::stepProbe()
+{
+    tmeter_data data{};
+    if (!readAt(s_scan.seed * CC1101_MIN_STEP_MHZ, data)) return;
+    if (!(data.reads_counter > 0 && data.volume > 0))
+    {
+        finishScan(ScanOutcome::Aborted, "Meter stopped answering - scan stopped, try again later");
+        return;
+    }
+    s_scan.zoomMisses = 0;
+    if (s_scan.resumePhase == ScanPhase::Zoom)
+    {
+        s_scan.phase = ScanPhase::Zoom;
+        reportPhase("Fine window scan");
+        return;
+    }
+    closeEdge(s_scan.resumePhase == ScanPhase::Lower);
 }
 
 // Stage 3: sample the WHOLE bracket, twice per frequency, and keep the best. Stopping
@@ -363,8 +405,12 @@ void FrequencyManager::stepZoom()
         s_scan.best = s_scan.current;
         s_scan.bestQuality = s_scan.sample;
     }
+    if (s_scan.sample.successes == 0) s_scan.zoomMisses++;
+    else s_scan.zoomMisses = 0;
     s_scan.sample = Quality{};
     s_scan.current += ZOOM_STEP;
+    // Advanced first, so resuming after the probe carries on rather than re-testing.
+    if (s_scan.zoomMisses >= MISS_TOLERANCE) beginProbe();
 }
 
 // Stage 4: confirm before persisting. The candidate must decode at least twice out of
@@ -416,6 +462,7 @@ void FrequencyManager::loopScan()
     case ScanPhase::Acquire: stepAcquire(); break;
     case ScanPhase::Lower:
     case ScanPhase::Upper: stepBracket(); break;
+    case ScanPhase::Probe: stepProbe(); break;
     case ScanPhase::Zoom: stepZoom(); break;
     case ScanPhase::VerifyCandidate:
     case ScanPhase::VerifyStored: stepVerify(); break;

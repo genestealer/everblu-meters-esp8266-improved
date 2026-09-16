@@ -39,6 +39,13 @@ Releases are created manually by tagging commits with version tags matching `v*.
 - **Calibration safeguards:** cancelled or unsuccessful scans restore previous tuning, radio faults abort, first-time calibration requires verification, and stored offsets support the full ±150 kHz scan range. Frequency-word conversion now rounds to the nearest register value. FREQEST is captured at data-frame sync rather than after decoding and logging.
 - **Confirmation read after a scan stores new tuning:** a scan only reaches its verified outcome by decoding frames, so the meter is awake at that moment. Previously the reader published the new offset and went idle, leaving a recovery scan to sit out the full `retry_cooldown` on a calibration that had just been proven to work. It now takes one read on the new tuning, reported as `Confirming new calibration`. It is a single attempt: a miss ends the failure streak rather than starting a fresh retry cycle, and does not trigger another scan. A scan that re-confirms the existing offset queues nothing.
 
+### Fixed
+
+- **A frequency scan no longer maps a sleeping meter as hundreds of dead frequencies.** Meters answer on a duty cycle, and a long sweep is itself enough to quieten one. Every scan stage treated "no reply" as "wrong frequency", so a meter that went quiet part way through was recorded as a miss at every remaining step: one reported scan spent 25 minutes sweeping frequencies that had answered minutes earlier, then failed and restored the old tuning anyway. The scan now re-reads the frequency that first responded whenever misses build up, and stops with `Meter stopped answering - scan stopped, try again later` if that is silent too. The existing calibration is left untouched, so retrying later costs nothing. Both builds are affected.
+- **Pressing Stop on the wrong meter no longer appears to do nothing.** One CC1101 is shared, but each meter has its own Stop button and only the meter that started a scan can cancel it. The other meters now log and publish `Scan belongs to meter NN-NNNNNN - use that meter's Stop button` to their Last Error sensor instead of silently ignoring the press. ESPHome multi-meter setups only.
+- **Frame hex dumps are suppressed during a frequency scan.** `debug_cc1101: true` made every scan step dump the raw and decoded frames, which is what the scan's own log suppression was meant to prevent; the hex dumper wrote to the log directly and escaped it. One reported scan log was 35% frame dumps. High-level scan progress is unchanged.
+- **The fine sweep window in the log now matches the window actually swept.** It reported the bracket edges rather than the sweep bounds, understating each end by one bracketing step (~2.4 kHz).
+
 ## [v3.5.0] - 2026-07-31
 
 ### AI Metadata

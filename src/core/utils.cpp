@@ -32,13 +32,16 @@
 // When true, echo_debug() output is suppressed (see utils.h).
 bool g_echo_debug_quiet = false;
 
-// Emit the accumulated line and start a new one.
+// Emit the accumulated line and start a new one. Honours g_echo_debug_quiet for the
+// same reason echo_debug() does: a frequency scan performs a full read per step, and
+// the frame dumps are noise there.
 static void flush_hex_line(char *line_buf, int &line_pos)
 {
 	if (line_pos > 0)
 	{
 		line_buf[line_pos] = '\0';
-		LOG_D("everblu_meter", "%s", line_buf);
+		if (!g_echo_debug_quiet)
+			LOG_D("everblu_meter", "%s", line_buf);
 		line_pos = 0;
 	}
 }

@@ -70,6 +70,8 @@ void test_esphome_calibration_is_per_meter_and_scan_is_exclusive()
     fakeRadio().responses.clear();
     first.performFrequencyScan();
     second.stopReading();
+    // Meter 2 cannot cancel meter 1's scan, so it must say which button does.
+    TEST_ASSERT_TRUE(otherPublisher.lastError().find("123456") != std::string::npos);
     second.resetFrequencyOffset();
     second.performFrequencyScan();
     first.loop();

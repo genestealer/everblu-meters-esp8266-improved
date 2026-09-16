@@ -579,6 +579,23 @@ void MeterReader::resetRetryState()
 
 void MeterReader::stopReading()
 {
+    // One CC1101 is shared, but each meter has its own Stop button. Only the meter
+    // that started a scan can cancel it, so tell the user which button to press
+    // instead of appearing to do nothing.
+    if (FrequencyManager::isScanInProgress() && !m_scanInProgress)
+    {
+        char message[96];
+        if (s_active_reader && s_active_reader->m_config)
+            snprintf(message, sizeof(message), "Scan belongs to meter %02u-%06lu - use that meter's Stop button",
+                     s_active_reader->m_config->getMeterYear(),
+                     (unsigned long) s_active_reader->m_config->getMeterSerial());
+        else
+            snprintf(message, sizeof(message), "Scan belongs to another meter - use that meter's Stop button");
+        LOG_W("everblu_meter", "%s", message);
+        if (m_publisher) m_publisher->publishError(message);
+        return;
+    }
+
     // A blocking RF transfer already in flight cannot be aborted mid-transaction;
     // this cancels any pending retry sequence and returns the reader to idle so
     // it stops retrying and won't start the next queued read.

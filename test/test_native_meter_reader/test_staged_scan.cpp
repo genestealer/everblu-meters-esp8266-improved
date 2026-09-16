@@ -187,3 +187,29 @@ void test_staged_scan_prefers_reliable_decodes_over_lower_error()
     TEST_ASSERT_GREATER_OR_EQUAL(0.0015f, fabsf(FrequencyManager::getTunedFrequency() - fakeRadio().carrierFrequency));
     TEST_ASSERT_FLOAT_WITHIN(0.004f, fakeRadio().carrierFrequency, FrequencyManager::getTunedFrequency());
 }
+
+// A meter that stops answering part way through looks identical to a long run of
+// wrong frequencies. Without the seed probe the sweep maps the whole window as dead
+// and burns tens of minutes doing it, so the scan must notice and stand down.
+void test_staged_scan_stops_when_the_meter_goes_quiet_mid_sweep()
+{
+    startManager();
+    FrequencyManager::saveFrequencyOffset(-0.020f);
+    fakeRadio().carrierFrequency = BASE + 0.060f;
+    fakeRadio().carrierWidthMHz = 0.0075f;
+    // Silence the meter for good the moment the fine sweep starts.
+    targetPhase = "Fine window scan";
+    phaseAction = 3;
+    FrequencyManager::performDeepFrequencyScan(0.150f, 0.010f, scanProgress);
+    TEST_ASSERT_TRUE(targetVisited);
+    TEST_ASSERT_TRUE(FrequencyManager::lastScanOutcome() == FrequencyManager::ScanOutcome::Aborted);
+    // The known-good offset survives, and nothing new was written.
+    TEST_ASSERT_EQUAL(1, fakeStorage().saveCalls);
+    TEST_ASSERT_FLOAT_WITHIN(0.0001f, -0.020f, FrequencyManager::getOffset());
+    // MISS_TOLERANCE frequencies at two reads each, plus the probe, is the budget;
+    // sweeping the whole window instead would be an order of magnitude more.
+    int zoomCalls = 0;
+    for (const auto &call : fakeRadio().calls)
+        if (call.frequency > BASE + 0.040f) zoomCalls++;
+    TEST_ASSERT_LESS_THAN(40, zoomCalls);
+}

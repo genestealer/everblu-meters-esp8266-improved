@@ -244,7 +244,9 @@ private:
      *
      * Acquire finds any response; Lower/Upper map the edges of the response window;
      * Zoom samples the whole window finely; the Verify stages confirm a candidate
-     * against repeat reads before Finalise persists it.
+     * against repeat reads before Finalise persists it. Probe interrupts the middle
+     * three to re-check the seed when a run of misses could mean a sleeping meter
+     * rather than a wrong frequency.
      */
     enum class ScanPhase : uint8_t
     {
@@ -253,6 +255,7 @@ private:
         Lower,
         Upper,
         Zoom,
+        Probe,
         VerifyCandidate,
         VerifyStored,
         Finalise
@@ -293,6 +296,8 @@ private:
         int32_t zoomEnd = 0;        // Last word of the fine sweep
         int32_t best = 0;           // Best candidate word found by the fine sweep
         int misses = 0;             // Consecutive misses while bracketing an edge
+        int zoomMisses = 0;         // Consecutive fine-sweep frequencies that did not decode
+        ScanPhase resumePhase = ScanPhase::Idle; // Phase to return to after a Probe
         bool expandOnMiss = false;  // Recovery scan: widen to full range if local is empty
         bool finerFallback = false; // One finer acquisition pass is still available
         bool quietPrevious = false; // Saved g_echo_debug_quiet (RAII cannot span loops)
@@ -342,6 +347,9 @@ private:
     static void finishScan(ScanOutcome outcome, const char *message);
     static void stepAcquire();
     static void stepBracket();
+    static void closeEdge(bool lower);
+    static void beginProbe();
+    static void stepProbe();
     static void stepZoom();
     static void stepVerify();
 
