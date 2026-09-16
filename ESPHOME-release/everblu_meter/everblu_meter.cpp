@@ -95,6 +95,7 @@ void EverbluMeterComponent::setup() {
   this->config_provider_->setTimezoneOffsetMinutes(this->timezone_offset_);
   this->config_provider_->setAutoAlignReadingTime(this->auto_align_time_);
   this->config_provider_->setUseAutoAlignMidpoint(this->auto_align_midpoint_);
+  this->config_provider_->setScheduledReadingsDisabled(this->disable_scheduled_readings_);
   this->config_provider_->setMaxRetries(this->max_retries_);
   this->config_provider_->setRetryCooldownMs(this->retry_cooldown_ms_);
 
@@ -217,6 +218,10 @@ void EverbluMeterComponent::publish_boot_states() {
   this->data_publisher_->publishStatusMessage("Ready");
   this->data_publisher_->publishError("None");
   this->data_publisher_->publishActiveReading(false);
+
+  // Seed the history sensor with the valid empty document so template sensors
+  // parsing it never see "unknown" before the first read (issue #67).
+  this->data_publisher_->publishHistory(nullptr, false);
 }
 
 void EverbluMeterComponent::republish_initial_states() {

@@ -484,7 +484,6 @@ The ESPHome component exposes a **history text sensor** containing up to 13 mont
 
 ```json
 {
-  "history": [667441, 684214, 700917, 712720, 721549, 728836, 736957, 744959, 752026, 759559, 770165, 779789, 792364],
   "monthly_usage": [16773, 16703, 11803, 8829, 7287, 8121, 8002, 7067, 7533, 10606, 9624, 12575],
   "current_month_usage": 7276,
   "months_available": 13
@@ -493,10 +492,23 @@ The ESPHome component exposes a **history text sensor** containing up to 13 mont
 
 **Data Structure:**
 
-- `history`: up to 13 monthly readings (oldest to newest) in L or m³
-- `monthly_usage`: monthly consumption values (differences between successive history snapshots)
+- `monthly_usage`: monthly consumption values (differences between successive monthly snapshots), oldest to newest
 - `current_month_usage`: Current month consumption
 - `months_available`: Months of data (typically 13)
+
+> [!IMPORTANT]
+> **Changed in this release: the cumulative `history` array was removed from this
+> sensor.** Home Assistant rejects entity states longer than 255 characters and
+> shows the entity as `unknown`, and 13 seven-digit cumulative readings pushed the
+> document well past that limit ([#67](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/67)).
+> The deltas in `monthly_usage` are small enough to always fit.
+>
+> If you had a template reading `history.history[-1]` (the newest cumulative
+> snapshot), derive it instead from the `volume` sensor:
+> `volume - current_month_usage`. See
+> [ESPHOME_HOME_ASSISTANT_INTEGRATION.md](docs/ESPHOME_HOME_ASSISTANT_INTEGRATION.md)
+> for the updated templates. The full cumulative series is still published in the
+> MQTT (standalone) build, where history is an attribute and has no length limit.
 
 **Use Cases:**
 

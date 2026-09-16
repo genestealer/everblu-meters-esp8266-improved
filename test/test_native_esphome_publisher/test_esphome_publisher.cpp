@@ -304,25 +304,33 @@ void test_pub_history_publishes_json_payload(void)
     publisher().publishMeterReading(data, "t"); // caches the current volume
     publisher().publishHistory(history, true);
 
+    // The ESPHome text-sensor state uses the compact usage-only form (no
+    // cumulative "history" array) to stay within HA's 255-char state limit (#67).
     TEST_ASSERT_EQUAL_STRING(
-        "{\"history\":[100,150,220],\"monthly_usage\":[50,70],"
+        "{\"monthly_usage\":[50,70],"
         "\"current_month_usage\":40,\"months_available\":3}",
         g_sensors.history.last());
 }
 
-void test_pub_history_reports_unavailable_when_not_decoded(void)
+void test_pub_history_publishes_empty_json_when_not_decoded(void)
 {
     uint32_t history[13] = {0};
     publisher().publishHistory(history, false);
 
-    TEST_ASSERT_EQUAL_STRING("unavailable", g_sensors.history.last());
+    // A valid empty document rather than "unavailable", so HA never shows the
+    // sensor as unknown and template parsing does not throw (#67).
+    TEST_ASSERT_EQUAL_STRING(
+        "{\"monthly_usage\":[],\"current_month_usage\":0,\"months_available\":0}",
+        g_sensors.history.last());
 }
 
-void test_pub_history_reports_unavailable_for_a_null_array(void)
+void test_pub_history_publishes_empty_json_for_a_null_array(void)
 {
     publisher().publishHistory(nullptr, true);
 
-    TEST_ASSERT_EQUAL_STRING("unavailable", g_sensors.history.last());
+    TEST_ASSERT_EQUAL_STRING(
+        "{\"monthly_usage\":[],\"current_month_usage\":0,\"months_available\":0}",
+        g_sensors.history.last());
 }
 
 void test_pub_history_without_a_sensor_is_safe(void)

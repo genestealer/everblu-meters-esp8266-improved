@@ -91,6 +91,11 @@
 // 1 = align to midpoint of [time_start, time_end]
 #define AUTO_ALIGN_USE_MIDPOINT 0
 
+// Disable automatic scheduled readings entirely.
+// 0 = scheduled readings enabled (default)
+// 1 = disabled (manual reads via the request-read command/button still work)
+#define DISABLE_SCHEDULED_READINGS 0
+
 // ============================================================================
 // METER IDENTIFICATION
 // ============================================================================

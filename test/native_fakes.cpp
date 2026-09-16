@@ -346,6 +346,7 @@ void RecordingPublisher::reset()
     tunedFrequencies.clear();
     statistics.clear();
     historyPublishes = 0;
+    historyAvailableFlags.clear();
     settingsPublishes = 0;
     discoveryPublishes = 0;
 }
@@ -374,7 +375,11 @@ void RecordingPublisher::publishMeterReading(const tmeter_data &data, const char
     readings.push_back({data, timestamp ? timestamp : ""});
 }
 
-void RecordingPublisher::publishHistory(const uint32_t *, bool) { historyPublishes++; }
+void RecordingPublisher::publishHistory(const uint32_t *, bool historyAvailable)
+{
+    historyPublishes++;
+    historyAvailableFlags.push_back(historyAvailable);
+}
 
 void RecordingPublisher::publishWiFiDetails(const char *, int, int, const char *, const char *, const char *) {}
 

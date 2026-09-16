@@ -285,6 +285,11 @@ bool MeterReader::shouldPerformScheduledRead()
     if (m_readingInProgress)
         return false;
 
+    // Honour the opt-out. Manual / on-demand reads bypass this method entirely,
+    // so they remain available when scheduled readings are disabled.
+    if (m_config->areScheduledReadingsDisabled())
+        return false;
+
     // A running scan owns the radio, so triggerReading() would drop this read.
     // Return false without latching the day, so the read still fires once the
     // scan finishes and the scheduled minute is re-sampled.
@@ -451,11 +456,9 @@ void MeterReader::handleSuccessfulRead(const tmeter_data &data)
     // Publish meter data
     m_publisher->publishMeterReading(data, iso8601);
 
-    // Publish historical data if available
-    if (data.history_available)
-    {
-        m_publisher->publishHistory(data.history, true);
-    }
+    // Published unconditionally: a reading that decoded no history must clear the
+    // sensor rather than leave the previous reading's JSON in place.
+    m_publisher->publishHistory(data.history, data.history_available);
 
     // Publish updated statistics
     m_publisher->publishStatistics(m_totalReadAttempts, m_successfulReads, m_failedReads);

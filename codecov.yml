@@ -12,6 +12,14 @@ coverage:
         threshold: 1%        # allow small coverage drops (e.g. new defensive branches)
         base: auto
         informational: true  # report coverage changes but never fail/block the PR
+    # Patch coverage uses the same tolerance as the project check. Without an
+    # explicit threshold, a diff that is a fraction of a percent below the
+    # project average fails the PR.
+    patch:
+      default:
+        target: auto
+        threshold: 1%
+        base: auto
 
 # Show full project coverage changes (not just patch/diff) on the PR comment.
 # https://docs.codecov.com/docs/common-recipe-list#show-project-coverage-changes-on-the-pull-request-comment

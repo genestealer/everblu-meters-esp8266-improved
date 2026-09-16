@@ -20,8 +20,8 @@ void test_pub_lqi_percentage_masks_the_crc_ok_bit(void);
 void test_pub_rssi_percentage_matches_the_shared_helper(void);
 void test_pub_rssi_percentage_is_clamped_to_0_100(void);
 void test_pub_history_publishes_json_payload(void);
-void test_pub_history_reports_unavailable_when_not_decoded(void);
-void test_pub_history_reports_unavailable_for_a_null_array(void);
+void test_pub_history_publishes_empty_json_when_not_decoded(void);
+void test_pub_history_publishes_empty_json_for_a_null_array(void);
 void test_pub_history_without_a_sensor_is_safe(void);
 void test_pub_radio_state_drives_the_connected_binary_sensor(void);
 void test_pub_radio_state_null_is_ignored(void);
@@ -62,8 +62,8 @@ int main(int, char **)
     RUN_TEST(test_pub_rssi_percentage_is_clamped_to_0_100);
 
     RUN_TEST(test_pub_history_publishes_json_payload);
-    RUN_TEST(test_pub_history_reports_unavailable_when_not_decoded);
-    RUN_TEST(test_pub_history_reports_unavailable_for_a_null_array);
+    RUN_TEST(test_pub_history_publishes_empty_json_when_not_decoded);
+    RUN_TEST(test_pub_history_publishes_empty_json_for_a_null_array);
     RUN_TEST(test_pub_history_without_a_sensor_is_safe);
 
     RUN_TEST(test_pub_radio_state_drives_the_connected_binary_sensor);

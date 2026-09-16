@@ -11,16 +11,26 @@ The ESPHome component publishes meter data through two primary sensors:
 
 ## Accessing Historical Data
 
-The `history` text sensor contains a JSON object with monthly readings:
+The `history` text sensor contains a JSON object with monthly usage:
 
 ```json
 {
-  "history": [667441, 684214, 700917, 712720, 721549, 728836, 736957, 744959, 752026, 759559, 770165, 779789, 792364],
   "monthly_usage": [16773, 16703, 11803, 8829, 7287, 8121, 8002, 7067, 7533, 10606, 9624, 12575],
   "current_month_usage": 7276,
   "months_available": 13
 }
 ```
+
+`monthly_usage` holds the month-over-month consumption deltas, oldest to newest.
+
+> [!IMPORTANT]
+> **Changed in this release: the cumulative `history` array was removed.** Home
+> Assistant rejects entity states longer than 255 characters and renders the
+> entity as `unknown`; 13 seven-digit cumulative readings exceeded that limit
+> ([#67](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/67)).
+> Templates that read `history.history[...]` need updating, as shown below. The
+> full cumulative series is still available in the MQTT (standalone) build, where
+> history is published as an attribute rather than a state.
 
 ### Creating Template Sensors from History
 
@@ -41,14 +51,19 @@ template:
         availability: >
           {{ states('sensor.everblu_meter_history') not in ['unavailable', 'unknown', 'none'] }}
 
-      # Extract last month's total
+      # Last month's closing total. The cumulative snapshot is no longer in the
+      # payload, so derive it by backing this month's usage out of the volume.
       - name: "Water Meter Last Month Total"
         unique_id: everblu_last_month_total
         unit_of_measurement: "L"
         device_class: water
         state: >
           {% set history = states('sensor.everblu_meter_history') | from_json %}
-          {{ history.history[-1] if history and history.history|length > 0 else 0 }}
+          {% set volume = states('sensor.everblu_meter_volume') | float(0) %}
+          {{ (volume - (history.current_month_usage | float(0))) | round(0) if history else 0 }}
+        availability: >
+          {{ states('sensor.everblu_meter_history') not in ['unavailable', 'unknown', 'none']
+             and states('sensor.everblu_meter_volume') not in ['unavailable', 'unknown', 'none'] }}
 
       # Calculate last month's usage
       - name: "Water Meter Last Month Usage"

@@ -46,6 +46,9 @@ public:
     virtual int getTimezoneOffsetMinutes() const = 0;
     virtual bool isAutoAlignReadingTime() const = 0;
     virtual bool useAutoAlignMidpoint() const = 0;
+    // When true, automatic scheduled readings are suppressed entirely. Manual /
+    // on-demand reads are unaffected.
+    virtual bool areScheduledReadingsDisabled() const = 0;
 
     // Retry configuration
     virtual int getMaxRetries() const = 0;

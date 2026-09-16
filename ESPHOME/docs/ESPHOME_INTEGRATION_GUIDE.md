@@ -55,6 +55,18 @@ Connect the CC1101 to your ESP board:
 
 ⚠️ **Important**: The CC1101 requires 3.3V power. Do not connect to 5V!
 
+> [!NOTE]
+> **Integrated boards with a shared SPI bus (e.g. LilyGO T-Embed CC1101 Plus).**
+> On boards where the CC1101 shares the SPI bus with a display and/or SD card,
+> every other device's chip-select (CS) line must be driven **high (inactive)** so
+> it does not contend for MISO. A floating display/SD CS pin makes MISO read a
+> stuck value (commonly `0x0F`), which looks like "the radio received data that
+> decodes to nothing". Also confirm `gdo0_pin` maps to the pin actually routed to
+> the CC1101 GDO0 on your board (on some T-Embed variants GDO0 is on GPIO3, not the
+> IR-receiver pin). The firmware runs an SPI link self-test at boot and logs
+> `CC1101 SPI self-test FAILED ... MISO is stuck` when it detects this, so check the
+> boot log first if reads return no/garbage data on an integrated board.
+
 ### Software
 
 - ESPHome 2023.x or later
@@ -178,6 +190,7 @@ everblu_meter:
 | `read_hour`        | int    | `10`            | Hour to perform reading (0-23, in UTC)                                                                  |
 | `read_minute`      | int    | `0`             | Minute to perform reading (0-59)                                                                        |
 | `timezone_offset`  | int    | `0`             | **Minutes** offset from UTC (-720 to +720). Example: `660` for UTC+11, `-300` for UTC-5                 |
+| `disable_scheduled_readings` | bool | `false` | Set `true` to suppress automatic scheduled reads entirely. Manual/on-demand reads (the read button / service) still work. |
 
 **Important: Timezone Configuration**
 
@@ -256,6 +269,24 @@ The default frequency (433.82 MHz) works for most European meters. If you experi
 2. Check logs for detected frequency
 3. Set `frequency` to the detected value
 4. Set `auto_scan: false` again for faster readings
+
+**Overriding the base frequency.** The `frequency:` key sets the base (centre)
+frequency the radio tunes to and is the ESPHome equivalent of the `-D FREQUENCY`
+build flag used by the standalone/`.ino` build. That build flag has **no effect**
+in ESPHome, so set `frequency:` in the `everblu_meter:` block instead:
+
+```yaml
+everblu_meter:
+  # ...
+  frequency: 433.90   # MHz, base/centre frequency
+```
+
+If your meter consistently transmits well off 433.82 MHz (for example some
+AnyQuest Cyble variants), you must **recentre** with `frequency:` before scanning.
+The scan window is clamped to ±150 kHz around the base frequency, so a carrier
+outside that range is never swept and `auto_scan` will not find it however long it
+runs. Move the base frequency towards the meter first, then scan: the remaining
+offset is then both discoverable and small enough to persist.
 
 ## Sensors
 

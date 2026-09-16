@@ -155,7 +155,7 @@ void test_successful_read_passes_configured_meter_identity(void)
     TEST_ASSERT_EQUAL_UINT32(987654, fakeRadio().calls[0].serial);
 }
 
-void test_successful_read_publishes_history_only_when_available(void)
+void test_successful_read_always_publishes_history_with_its_availability(void)
 {
     tmeter_data withHistory = FakeRadio::success();
     withHistory.history_available = true;
@@ -169,9 +169,13 @@ void test_successful_read_publishes_history_only_when_available(void)
     MeterReader reader = makeReader();
     reader.triggerReading(false);
     TEST_ASSERT_EQUAL(1, g_publisher.historyPublishes);
+    TEST_ASSERT_TRUE(g_publisher.historyAvailableFlags[0]);
 
+    // The second read decoded no history, so it must publish again with
+    // historyAvailable=false rather than leaving the first read's JSON behind.
     reader.triggerReading(false);
-    TEST_ASSERT_EQUAL(1, g_publisher.historyPublishes);
+    TEST_ASSERT_EQUAL(2, g_publisher.historyPublishes);
+    TEST_ASSERT_FALSE(g_publisher.historyAvailableFlags[1]);
 }
 
 void test_reading_is_skipped_when_publisher_not_ready(void)
@@ -621,6 +625,45 @@ void test_scheduled_read_waits_for_time_sync(void)
     TEST_ASSERT_EQUAL(1, (int)fakeRadio().calls.size());
 }
 
+void test_disabled_scheduled_readings_block_the_daily_read(void)
+{
+    // Issue #159: the opt-out must suppress the automatic daily read even on a
+    // matching day at the configured minute.
+    // 2025-06-10 is a Tuesday.
+    g_config.schedule = "Monday-Friday";
+    g_config.readHourUTC = 10;
+    g_config.readMinuteUTC = 0;
+    g_config.scheduledReadingsDisabled = true;
+    fakeRadio().responses.push_back(FakeRadio::success());
+
+    MeterReader reader = makeReader();
+
+    g_time.setUtc(2025, 6, 10, 10, 0, 0);
+    nativeClockAdvance(1000);
+    reader.loop();
+    TEST_ASSERT_EQUAL(0, (int)fakeRadio().calls.size());
+
+    // Re-enabling must restore the schedule without needing a restart.
+    g_config.scheduledReadingsDisabled = false;
+    g_time.setUtc(2025, 6, 10, 10, 0, 30);
+    nativeClockAdvance(1000);
+    reader.loop();
+    TEST_ASSERT_EQUAL(1, (int)fakeRadio().calls.size());
+}
+
+void test_disabled_scheduled_readings_still_allow_manual_reads(void)
+{
+    // The opt-out only gates shouldPerformScheduledRead(); on-demand reads must
+    // keep working (issue #159).
+    g_config.scheduledReadingsDisabled = true;
+    fakeRadio().responses.push_back(FakeRadio::success());
+
+    MeterReader reader = makeReader();
+    reader.triggerReading(true);
+
+    TEST_ASSERT_EQUAL(1, (int)fakeRadio().calls.size());
+}
+
 void test_cooldown_blocks_scheduled_reads_until_it_expires(void)
 {
     g_config.maxRetries = 1;
@@ -999,6 +1042,22 @@ void test_history_available_but_all_zero_is_not_treated_as_valid(void)
     // history_available, independent of MeterHistory::isHistoryValid().
     TEST_ASSERT_EQUAL(1, (int)g_publisher.readings.size());
     TEST_ASSERT_EQUAL(1, g_publisher.historyPublishes);
+}
+
+void test_read_without_history_still_publishes_to_clear_the_sensor(void)
+{
+    // publishHistory() must run on every successful read, not only when history
+    // decoded. Skipping it leaves the previous reading's JSON on the sensor.
+    tmeter_data noHistory = FakeRadio::success();
+    noHistory.history_available = false;
+    fakeRadio().responses.push_back(noHistory);
+
+    MeterReader reader = makeReader();
+    reader.triggerReading(false);
+
+    TEST_ASSERT_EQUAL(1, g_publisher.historyPublishes);
+    TEST_ASSERT_EQUAL(1, (int)g_publisher.historyAvailableFlags.size());
+    TEST_ASSERT_FALSE(g_publisher.historyAvailableFlags[0]);
 }
 
 void test_misconfigured_gas_volume_divisor_falls_back_without_failing_the_read(void)

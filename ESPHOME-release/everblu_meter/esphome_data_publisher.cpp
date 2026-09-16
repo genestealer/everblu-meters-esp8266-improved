@@ -119,22 +119,41 @@ void ESPHomeDataPublisher::publishHistory(const uint32_t *history, bool historyA
         return; // Not configured
     }
 
+    // Valid, parseable empty document rather than "unavailable": Home Assistant
+    // renders a text sensor whose state is "unavailable"/absent as unknown, which
+    // breaks template sensors that parse this JSON (issue #67).
+    static const char EMPTY_HISTORY_JSON[] =
+        "{\"monthly_usage\":[],\"current_month_usage\":0,\"months_available\":0}";
+
     if (!historyAvailable || history == nullptr)
     {
-        history_sensor_->publish_state("unavailable");
+        history_sensor_->publish_state(EMPTY_HISTORY_JSON);
         return;
     }
 
-    // Build a JSON payload matching the legacy MQTT attributes
-    char history_json[512];
+    // Compact payload (usage deltas only): the full cumulative "history" array
+    // carries 7-digit volumes that push a 13-month document past Home Assistant's
+    // 255-char text-sensor state limit, which is what made this sensor go
+    // "unknown" (issue #67). The full cumulative series is still published over
+    // MQTT, where history is an attribute (no length limit).
+    char history_json[256];
     const uint32_t current_volume = have_last_volume_ ? last_volume_ : 0;
-    int written = MeterHistory::generateHistoryJson(history, current_volume, history_json, sizeof(history_json));
+    int written = MeterHistory::generateHistoryJsonCompact(history, current_volume, history_json, sizeof(history_json));
 
     if (written <= 0)
     {
-        ESP_LOGW(TAG_PUB, "History JSON generation failed (buffer=%u)", (unsigned)sizeof(history_json));
-        history_sensor_->publish_state("unavailable");
+        // The compact document is small enough that this should not happen; fall
+        // back to the empty document so the state stays valid and parseable.
+        ESP_LOGW(TAG_PUB, "History JSON generation returned empty; publishing empty document");
+        history_sensor_->publish_state(EMPTY_HISTORY_JSON);
         return;
+    }
+
+    if (written > 255)
+    {
+        // Guard against a future format change silently shipping a state that HA
+        // will reject (and render as "unknown").
+        ESP_LOGW(TAG_PUB, "History JSON is %d bytes, exceeding Home Assistant's 255-char state limit", written);
     }
 
     ESP_LOGD(TAG_PUB, "Publishing history JSON (%d bytes)", written);
