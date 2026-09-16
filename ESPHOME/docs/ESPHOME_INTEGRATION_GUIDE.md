@@ -252,10 +252,10 @@ Example label format: `YY-SSSSSSS-NNN`
 
 The default frequency (433.82 MHz) works for most European meters. If you experience reading issues:
 
-1. Enable `auto_scan: true` (default)
+1. Set `auto_scan: true` (it is `false` by default, so the startup scan is opt-in)
 2. Check logs for detected frequency
 3. Set `frequency` to the detected value
-4. Disable `auto_scan: false` for faster readings
+4. Set `auto_scan: false` again for faster readings
 
 ## Sensors
 
@@ -399,7 +399,7 @@ See [example-advanced.yaml](example-advanced.yaml) for complete configuration.
 **Solutions**:
 
 1. **Check wiring**: Verify all CC1101 connections
-2. **Check frequency**: Enable `auto_scan: true` and monitor logs
+2. **Check frequency**: Set `auto_scan: true` (opt-in, off by default) and monitor logs
 3. **Check distance**: Move ESP closer to meter (max ~10m)
 4. **Check schedule**: Ensure current day/time matches configuration
 5. **Check time sync**: Verify time component is synchronized
