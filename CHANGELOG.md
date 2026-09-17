@@ -12,12 +12,6 @@ Releases are created manually by tagging commits with version tags matching `v*.
 - Keep PR coverage explicit per release so branch-only work is auditable against merge history.
 - Add new versions below, not above this section.
 
-## [Unreleased]
-
-### Fixed
-
-- **Reset Frequency Offset now returns the meter to uncalibrated instead of storing a zero.** The button used to persist an offset of 0.0, which still counts as a saved calibration. That left a reset meter unable to start a first-boot automatic scan, and made any frequency a later scan found compete against the zero offset in the stored-calibration quality guard, so a good candidate could be rejected in favour of a tuning the user had asked the firmware to forget. The stored value is now erased, so `Calibration ...: not stored` is reported on the next boot and both behaviours re-arm. If the erase is refused by flash, the offset is left alone and the reason is published to the Last Error sensor rather than silently reporting success. Affects both the ESPHome and MQTT builds ([#104](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/104)).
-
 ## [v3.6.0] - 2026-09-16
 
 ### AI Metadata
@@ -35,6 +29,7 @@ scope_summary:
   - "Frequency calibration is per meter: each entry has its own base frequency, saved offset, adaptive tracking, sensors and scan controls"
   - "Scans are staged (coarse acquisition, fine fallback, edge bracketing, ranked refinement, verification) and step from the main loop on both targets"
   - "A scan stands down when the meter goes quiet instead of mapping a sleeping meter as hundreds of dead frequencies, and leaves the stored calibration untouched"
+  - "Reset Frequency Offset erases the stored calibration rather than saving a zero, so auto-scan and the calibration quality guard re-arm"
   - "New opt-in to disable automatic scheduled readings on both targets, plus Scan and Stop Scan buttons on the standalone MQTT build"
   - "Scheduler correctness: the configured day of week is honoured on MQTT, reads fire anywhere in the scheduled minute, the schedule waits for a valid clock and defers during a scan"
   - "NTP sync no longer blocks the MQTT connect callback on the standalone build"
@@ -78,6 +73,7 @@ scope_summary:
 
 ### Fixed
 
+- **Reset Frequency Offset now clears the stored calibration instead of saving a zero.** A stored zero still counts as calibrated, so a reset meter could not start a first-boot automatic scan, and any frequency a later scan found had to beat that zero in the stored-calibration quality guard. The value is now erased. If flash refuses the erase, the offset is left alone and the reason is published to the Last Error sensor rather than reporting a silent success. Both builds ([#104](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/104)).
 - **A frequency scan no longer maps a sleeping meter as hundreds of dead frequencies.** Meters answer on a duty cycle, and a long sweep is itself enough to quieten one. Every scan stage treated "no reply" as "wrong frequency", so a meter that went quiet part way through was recorded as a miss at every remaining step: one reported scan spent 25 minutes sweeping frequencies that had answered minutes earlier, then failed and restored the old tuning anyway. The scan now re-reads the frequency that first responded whenever misses build up, and stops with `Meter stopped answering - scan stopped, try again later` if that is silent too. The existing calibration is left untouched, so retrying later costs nothing. Both builds are affected.
 - **Pressing Stop on the wrong meter no longer appears to do nothing.** One CC1101 is shared, but each meter has its own Stop button and only the meter that started a scan can cancel it. The other meters now log and publish `Scan belongs to meter NN-NNNNNN - use that meter's Stop button` to their Last Error sensor instead of silently ignoring the press. ESPHome multi-meter setups only.
 - **Frame hex dumps are suppressed during a frequency scan.** `debug_cc1101: true` made every scan step dump the raw and decoded frames, which is what the scan's own log suppression was meant to prevent; the hex dumper wrote to the log directly and escaped it. One reported scan log was 35% frame dumps. High-level scan progress is unchanged.
