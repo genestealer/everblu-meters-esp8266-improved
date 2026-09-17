@@ -376,6 +376,11 @@ bool MeterReader::shouldPerformScheduledRead()
 
     m_pendingScheduledReadDateKey = -1;
     m_lastScheduledReadDateKey = today;
+    // A scan that swept while the meter happened to be silent must not disable
+    // recovery for good: only a successful read cleared this guard, so the drift
+    // it exists to correct went unscanned from then on. Each scheduled occurrence
+    // arms one fresh attempt, which keeps the per-cooldown scanning it prevents.
+    m_autoScanAfterFailureDone = false;
     return true;
 }
 
@@ -581,6 +586,7 @@ void MeterReader::handleFailedRead(ReadFailure reason)
         if (!finalAttempt && m_config->isAutoScanOnFailureEnabled() && !m_autoScanAfterFailureDone)
         {
             m_autoScanAfterFailureDone = true;
+            m_scanIsRecovery = true;
             LOG_W("everblu_meter",
                   "Running automatic frequency scan for meter %02u-%06lu after failed reads... "
                   "(disable with auto_scan_on_failure / AUTO_SCAN_ON_FAILURE_ENABLED)",
@@ -662,6 +668,7 @@ void MeterReader::performFrequencyScan(bool deep)
 
     // Non-blocking: loop() steps the scan and publishes the result when it ends.
     m_offsetBeforeScan = FrequencyManager::getOffset();
+    m_scanIsRecovery = false; // Asked for by the user, not owed a reading
     if (deep) FrequencyManager::beginDeepFrequencyScan(0.150f, 0.010f, scanStatusCallback);
     else FrequencyManager::beginRecoveryScan(scanStatusCallback);
     m_scanInProgress = FrequencyManager::isScanInProgress();
@@ -722,20 +729,24 @@ void MeterReader::scanStatusCallback(const char *state, const char *message)
 void MeterReader::finishFrequencyScan()
 {
     m_scanInProgress = false;
+    const bool recovery = m_scanIsRecovery;
+    m_scanIsRecovery = false;
     if (!m_publisher) return;
     const float offset = getFrequencyOffset();
     m_publisher->publishFrequencyOffset(offset);
     m_publisher->publishTunedFrequency(getTunedFrequency());
 
     // Found means a candidate was verified against repeat decodes, so the meter answered.
-    // Requiring a changed offset keeps a scan that re-confirmed the existing tuning from
-    // queueing a read the caller did not ask for.
+    // A recovery scan still owes the read that provoked it, even when the tuning it
+    // confirmed is the one already stored: a meter that went quiet and came back on the
+    // same frequency would otherwise sit out the cooldown despite having just answered.
+    // A scan the user asked for owes nothing, so there an unchanged offset queues nothing.
     if (FrequencyManager::lastScanOutcome() == FrequencyManager::ScanOutcome::Found &&
-        offset != m_offsetBeforeScan)
+        (recovery || offset != m_offsetBeforeScan))
     {
         m_postScanReadPending = true;
-        LOG_I("everblu_meter", "Scan stored a new offset (%.3f kHz) - taking one confirmation read",
-              offset * 1000.0);
+        LOG_I("everblu_meter", "Scan verified %.6f MHz (offset %.3f kHz) - taking one confirmation read",
+              getTunedFrequency(), offset * 1000.0);
     }
 }
 

@@ -326,7 +326,6 @@ bool g_autoScanAfterFailureDone = false;      // Guards the failure-recovery fre
 bool g_postScanReadAttempted = false;         // Guards the single post-scan re-read to once per failure streak
 bool g_scanActive = false;
 bool g_scanRetryRead = false;
-float g_scanPreviousOffset = 0.0f;
 ReadFailure g_retryFailureReason = ReadFailure::None; // Most informative failure seen so far in the current retry sequence
 
 // Non-blocking NTP synchronisation state. configTzTime() is kicked off in
@@ -936,6 +935,12 @@ void onScheduled()
     // poll (or a second poll chain) observes the same minute.
     g_pendingScheduledReadDateKey = -1;
     g_lastScheduledReadDateKey = today;
+
+    // Arm one fresh recovery scan for this occurrence. Only a successful read used
+    // to clear these, so a scan that swept while the meter happened to be silent
+    // left the drift it exists to correct unscanned from then on.
+    g_autoScanAfterFailureDone = false;
+    g_postScanReadAttempted = false;
 
     // Call back in 23 hours
     mqtt.executeDelayed(1000 * 60 * 60 * 23, onScheduled);
@@ -1679,7 +1684,6 @@ static void startRecoveryScan(bool retryRead)
 {
   if (FrequencyManager::isScanInProgress()) return;
   g_scanRetryRead = retryRead;
-  g_scanPreviousOffset = FrequencyManager::getOffset();
   FrequencyManager::beginRecoveryScan(mqttFrequencyStatus);
   g_scanActive = FrequencyManager::isScanInProgress();
 }
@@ -2203,9 +2207,11 @@ void loop()
     {
       g_scanActive = false;
       publishFrequencyOffsetToMqtt();
+      // A scan started by a failed read still owes that reading once it has verified a
+      // tuning, even when that tuning is the one already stored: a meter that went quiet
+      // and came back on the same frequency would otherwise wait out the whole cooldown.
       if (g_scanRetryRead && !g_postScanReadAttempted &&
-          FrequencyManager::lastScanOutcome() == FrequencyManager::ScanOutcome::Found &&
-          FrequencyManager::getOffset() != g_scanPreviousOffset)
+          FrequencyManager::lastScanOutcome() == FrequencyManager::ScanOutcome::Found)
       {
         g_postScanReadAttempted = true;
         g_inCooldown = false;
