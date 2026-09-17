@@ -30,6 +30,36 @@ If you need to change generated content, edit the source files and regenerate:
 bash ./ESPHOME/prepare-component-release.sh
 ```
 
+## Renaming a YAML config key
+
+If you rename a key in the ESPHome component schema, wrap `CONFIG_SCHEMA` in
+[`cv.rename_key`](https://developers.esphome.io/contributing/code/) rather than letting the
+old spelling fail validation:
+
+```python
+CONFIG_SCHEMA = cv.All(
+    cv.rename_key(
+        CONF_OLD, CONF_NEW, removed_in="<version>", component="everblu_meter"
+    ),
+    cv.Schema({...}),
+)
+```
+
+ESPHome then accepts the old key, migrates it in memory and logs a deprecation warning
+naming the replacement and the removal version. Users get a window to update their YAML
+instead of a hard failure on upgrade. Announce the rename in [CHANGELOG.md](CHANGELOG.md)
+and drop the validator once the removal version ships.
+
+Note that this only covers one-to-one key renames. Structural changes (a new required key,
+a block being restructured, stricter value validation) still need a documented manual
+migration.
+
+ESPHome Device Builder's one-click config migration does not apply here. Its rules come
+from Device Builder's own hand-written set plus a generated index built by scanning the
+upstream ESPHome package, so keys belonging to an external component are never discovered.
+`cv.rename_key` is the mechanism available to us, and it works everywhere: CLI, the Home
+Assistant add-on and Device Builder alike.
+
 ## Pull request expectations
 
 Before opening a PR, run the same checks CI runs:
