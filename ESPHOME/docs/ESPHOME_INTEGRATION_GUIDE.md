@@ -1,6 +1,6 @@
 # ESPHome Integration Guide
 
-This guide explains how to use the EverBlu Cyble Enhanced meter reader with ESPHome, allowing seamless integration with Home Assistant.
+This guide explains how to use the EverBlu Cyble Enhanced meter reader with ESPHome and Home Assistant.
 
 > **📖 Quick Navigation**:
 >
@@ -22,13 +22,13 @@ This guide explains how to use the EverBlu Cyble Enhanced meter reader with ESPH
 
 ## Overview
 
-The ESPHome integration allows you to read EverBlu Cyble Enhanced water and gas meters directly within the ESPHome ecosystem. Key features include:
+The ESPHome integration reads EverBlu Cyble Enhanced water and gas meters directly within ESPHome:
 
-- **Native ESPHome Component**: Integrates seamlessly with ESPHome's sensor framework
-- **Automatic Discovery**: Sensors appear automatically in Home Assistant
+- **Native ESPHome Component**: Works within ESPHome's sensor framework
+- **Automatic Discovery**: Sensors appear in Home Assistant without extra configuration
 - **Scheduled Readings**: Configure when and how often to read the meter
-- **Comprehensive Monitoring**: Track signal quality, battery life, and reading statistics
-- **Multiple Meter Types**: Supports both water and gas meters
+- **Signal and Battery Monitoring**: Tracks signal quality, battery life, and reading statistics
+- **Multiple Meter Types**: Works with both water and gas meters
 
 ## Requirements
 
@@ -54,6 +54,18 @@ Connect the CC1101 to your ESP board:
 | GDO2       | D2 (GPIO4)        | GPIO27 |
 
 ⚠️ **Important**: The CC1101 requires 3.3V power. Do not connect to 5V!
+
+> [!NOTE]
+> **Integrated boards with a shared SPI bus (e.g. LilyGO T-Embed CC1101 Plus).**
+> On boards where the CC1101 shares the SPI bus with a display and/or SD card,
+> every other device's chip-select (CS) line must be driven **high (inactive)** so
+> it does not contend for MISO. A floating display/SD CS pin makes MISO read a
+> stuck value (commonly `0x0F`), which looks like "the radio received data that
+> decodes to nothing". Also confirm `gdo0_pin` maps to the pin actually routed to
+> the CC1101 GDO0 on your board (on some T-Embed variants GDO0 is on GPIO3, not the
+> IR-receiver pin). The firmware runs an SPI link self-test at boot and logs
+> `CC1101 SPI self-test FAILED ... MISO is stuck` when it detects this, so check the
+> boot log first if reads return no/garbage data on an integrated board.
 
 ### Software
 
@@ -167,7 +179,7 @@ everblu_meter:
 | Parameter   | Type  | Default  | Description                              |
 | ----------- | ----- | -------- | ---------------------------------------- |
 | `frequency` | float | `433.82` | RF frequency in MHz (433.0-434.8)        |
-| `auto_scan` | bool  | `true`   | Automatically scan for optimal frequency |
+| `auto_scan` | bool  | `false`  | Automatically scan for optimal frequency |
 | `auto_scan_on_failure` | bool | `true` | Automatically run a frequency scan (once) when reads keep failing and the component enters cooldown, to recover from carrier-frequency (crystal) drift |
 
 #### Schedule Configuration
@@ -178,6 +190,7 @@ everblu_meter:
 | `read_hour`        | int    | `10`            | Hour to perform reading (0-23, in UTC)                                                                  |
 | `read_minute`      | int    | `0`             | Minute to perform reading (0-59)                                                                        |
 | `timezone_offset`  | int    | `0`             | **Minutes** offset from UTC (-720 to +720). Example: `660` for UTC+11, `-300` for UTC-5                 |
+| `disable_scheduled_readings` | bool | `false` | Set `true` to suppress automatic scheduled reads entirely. Manual/on-demand reads (the read button / service) still work. |
 
 **Important: Timezone Configuration**
 
@@ -186,7 +199,7 @@ everblu_meter:
 This is a design limitation inherited from the MQTT/standalone version:
 
 - **MQTT/Standalone mode**: Uses NTP which only provides UTC time, so manual offset is necessary
-- **ESPHome mode**: Could leverage ESPHome's timezone-aware time (which handles DST automatically), but currently doesn't
+- **ESPHome mode**: Could use ESPHome's timezone-aware time (which handles DST automatically), but currently doesn't
 
 **Current Workaround:**
 
@@ -194,7 +207,7 @@ This is a design limitation inherited from the MQTT/standalone version:
 - The offset is added to UTC to get your local time
 - Positive values for east of UTC, negative for west
 
-- This is a **static offset** - it doesn't automatically adjust for Daylight Saving Time
+- This is a **static offset** and does not adjust automatically for Daylight Saving Time
 
 Common timezone examples:
 
@@ -212,7 +225,7 @@ timezone_offset: -420  # US Pacific PDT (UTC-7) - Summer
 
 **Note on DST**: If your region observes Daylight Saving Time, you'll need to manually update `timezone_offset` when DST changes. Alternatively, you can choose a single offset (e.g., standard time year-round), but the meter will be read at different local clock times depending on DST.
 
-**Future Enhancement**: A future version could be enhanced to automatically use ESPHome's `timezone` setting, eliminating the need for manual offset and providing automatic DST handling.
+**Future Enhancement**: A future version could use ESPHome's `timezone` setting directly, removing the need for a manual offset and handling DST automatically.
 
 #### Time Alignment
 
@@ -252,14 +265,32 @@ Example label format: `YY-SSSSSSS-NNN`
 
 The default frequency (433.82 MHz) works for most European meters. If you experience reading issues:
 
-1. Enable `auto_scan: true` (default)
+1. Set `auto_scan: true` (it is `false` by default, so the startup scan is opt-in)
 2. Check logs for detected frequency
 3. Set `frequency` to the detected value
-4. Disable `auto_scan: false` for faster readings
+4. Set `auto_scan: false` again for faster readings
+
+**Overriding the base frequency.** The `frequency:` key sets the base (centre)
+frequency the radio tunes to and is the ESPHome equivalent of the `-D FREQUENCY`
+build flag used by the standalone/`.ino` build. That build flag has **no effect**
+in ESPHome, so set `frequency:` in the `everblu_meter:` block instead:
+
+```yaml
+everblu_meter:
+  # ...
+  frequency: 433.90   # MHz, base/centre frequency
+```
+
+If your meter consistently transmits well off 433.82 MHz (for example some
+AnyQuest Cyble variants), you must **recentre** with `frequency:` before scanning.
+The scan window is clamped to ±150 kHz around the base frequency, so a carrier
+outside that range is never swept and `auto_scan` will not find it however long it
+runs. Move the base frequency towards the meter first, then scan: the remaining
+offset is then both discoverable and small enough to persist.
 
 ## Sensors
 
-The component provides various sensors for monitoring your meter:
+The component exposes sensors for monitoring your meter:
 
 ### Numeric Sensors
 
@@ -399,7 +430,7 @@ See [example-advanced.yaml](example-advanced.yaml) for complete configuration.
 **Solutions**:
 
 1. **Check wiring**: Verify all CC1101 connections
-2. **Check frequency**: Enable `auto_scan: true` and monitor logs
+2. **Check frequency**: Set `auto_scan: true` (opt-in, off by default) and monitor logs
 3. **Check distance**: Move ESP closer to meter (max ~10m)
 4. **Check schedule**: Ensure current day/time matches configuration
 5. **Check time sync**: Verify time component is synchronized
@@ -454,7 +485,7 @@ See [example-advanced.yaml](example-advanced.yaml) for complete configuration.
 
 **Problem**: The `timezone` setting in the ESPHome `time:` component (e.g., `timezone: Australia/Melbourne`) is **not automatically used** by the `everblu_meter` component. This is a known design limitation.
 
-**Why**: The architecture was designed for both MQTT (which needs manual offset) and ESPHome modes using the same core logic. ESPHome's timezone-aware time API isn't currently leveraged, even though it could handle DST automatically.
+**Why**: The architecture was designed for both MQTT (which needs manual offset) and ESPHome modes using the same core logic. ESPHome's timezone-aware time API isn't used yet, even though it could handle DST automatically.
 
 **Solution**: You must explicitly set `timezone_offset` in the `everblu_meter` configuration:
 
@@ -538,7 +569,7 @@ sensor:
 
 ### Multiple Meters
 
-Multiple meters are supported by defining a YAML list under `everblu_meter`:
+Define multiple meters as a YAML list under `everblu_meter`:
 
 ```yaml
 everblu_meter:
@@ -580,7 +611,7 @@ ESPHome requires shared pins to be declared with `allow_other_uses: true`. Apply
 
 ### Architecture Overview
 
-The ESPHome component uses **dependency injection** to achieve maximum code reusability. The core meter reading logic is platform-agnostic and shared between standalone MQTT and ESPHome modes (~95% code sharing).
+The ESPHome component uses **dependency injection** so the core meter reading logic stays platform-agnostic, shared between standalone MQTT and ESPHome modes (~95% code sharing).
 
 #### Modular Components
 

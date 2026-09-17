@@ -168,6 +168,8 @@ void FakeStorage::clear()
     entries.clear();
     beginCalls = 0;
     saveCalls = 0;
+    failSaves = false;
+    failClears = false;
 }
 
 const FakeStorage::Entry *FakeStorage::find(const char *key) const
@@ -192,6 +194,10 @@ bool StorageAbstraction::saveFloat(const char *key, float value, uint16_t magic)
 {
     FakeStorage &storage = fakeStorage();
     storage.saveCalls++;
+    if (storage.failSaves)
+    {
+        return false;
+    }
     for (FakeStorage::Entry &entry : storage.entries)
     {
         if (entry.key == key)
@@ -228,6 +234,10 @@ bool StorageAbstraction::hasKey(const char *key)
 bool StorageAbstraction::clearKey(const char *key)
 {
     FakeStorage &storage = fakeStorage();
+    if (storage.failClears)
+    {
+        return false;
+    }
     for (size_t i = 0; i < storage.entries.size(); i++)
     {
         if (storage.entries[i].key == key)
@@ -346,6 +356,7 @@ void RecordingPublisher::reset()
     tunedFrequencies.clear();
     statistics.clear();
     historyPublishes = 0;
+    historyAvailableFlags.clear();
     settingsPublishes = 0;
     discoveryPublishes = 0;
 }
@@ -374,7 +385,11 @@ void RecordingPublisher::publishMeterReading(const tmeter_data &data, const char
     readings.push_back({data, timestamp ? timestamp : ""});
 }
 
-void RecordingPublisher::publishHistory(const uint32_t *, bool) { historyPublishes++; }
+void RecordingPublisher::publishHistory(const uint32_t *, bool historyAvailable)
+{
+    historyPublishes++;
+    historyAvailableFlags.push_back(historyAvailable);
+}
 
 void RecordingPublisher::publishWiFiDetails(const char *, int, int, const char *, const char *, const char *) {}
 

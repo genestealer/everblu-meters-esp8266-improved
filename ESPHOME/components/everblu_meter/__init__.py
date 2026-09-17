@@ -67,6 +67,7 @@ CONF_READ_MINUTE = "read_minute"
 CONF_TIMEZONE_OFFSET = "timezone_offset"
 CONF_AUTO_ALIGN_TIME = "auto_align_time"
 CONF_AUTO_ALIGN_MIDPOINT = "auto_align_midpoint"
+CONF_DISABLE_SCHEDULED_READINGS = "disable_scheduled_readings"
 CONF_MAX_RETRIES = "max_retries"
 CONF_RETRY_COOLDOWN = "retry_cooldown"
 CONF_INITIAL_READ_ON_BOOT = "initial_read_on_boot"
@@ -106,6 +107,7 @@ CONF_TUNED_FREQUENCY = "tuned_frequency"
 CONF_FREQUENCY_ESTIMATE = "frequency_estimate"
 CONF_REQUEST_READING_BUTTON = "request_reading_button"
 CONF_DEEP_SCAN_BUTTON = "deep_scan_button"
+CONF_SCAN_BUTTON = "scan_button"
 CONF_RESET_FREQUENCY_BUTTON = "reset_frequency_button"
 CONF_STOP_READING_BUTTON = "stop_reading_button"
 CONF_DIAGNOSTIC_REPORT_BUTTON = "diagnostic_report_button"
@@ -252,6 +254,7 @@ CONFIG_SCHEMA = (
             ),
             cv.Optional(CONF_AUTO_ALIGN_TIME, default=True): cv.boolean,
             cv.Optional(CONF_AUTO_ALIGN_MIDPOINT, default=True): cv.boolean,
+            cv.Optional(CONF_DISABLE_SCHEDULED_READINGS, default=False): cv.boolean,
             cv.Optional(CONF_MAX_RETRIES, default=5): cv.int_range(min=1, max=50),
             cv.Optional(
                 CONF_RETRY_COOLDOWN, default="1h"
@@ -417,6 +420,11 @@ CONFIG_SCHEMA = (
                 icon="mdi:radar",
                 entity_category="config",
             ),
+            cv.Optional(CONF_SCAN_BUTTON): button.button_schema(
+                EverbluMeterTriggerButton,
+                icon="mdi:magnify",
+                entity_category="config",
+            ),
             cv.Optional(CONF_RESET_FREQUENCY_BUTTON): button.button_schema(
                 EverbluMeterTriggerButton, icon="mdi:restore", entity_category="config"
             ),
@@ -570,6 +578,7 @@ async def to_code(config):
     cg.add(var.set_timezone_offset(config[CONF_TIMEZONE_OFFSET]))
     cg.add(var.set_auto_align_time(config[CONF_AUTO_ALIGN_TIME]))
     cg.add(var.set_auto_align_midpoint(config[CONF_AUTO_ALIGN_MIDPOINT]))
+    cg.add(var.set_disable_scheduled_readings(config[CONF_DISABLE_SCHEDULED_READINGS]))
     cg.add(var.set_max_retries(config[CONF_MAX_RETRIES]))
     cg.add(var.set_retry_cooldown(config[CONF_RETRY_COOLDOWN]))  # Already in ms
     cg.add(var.set_initial_read_on_boot(config[CONF_INITIAL_READ_ON_BOOT]))
@@ -744,6 +753,11 @@ async def to_code(config):
         cg.add(btn.set_parent(var))
         cg.add(btn.set_deep_scan(True))
         cg.add(btn.set_reset_frequency(False))
+
+    if CONF_SCAN_BUTTON in config:
+        btn = await button.new_button(config[CONF_SCAN_BUTTON])
+        cg.add(btn.set_parent(var))
+        cg.add(btn.set_scan(True))
 
     if CONF_RESET_FREQUENCY_BUTTON in config:
         btn = await button.new_button(config[CONF_RESET_FREQUENCY_BUTTON])

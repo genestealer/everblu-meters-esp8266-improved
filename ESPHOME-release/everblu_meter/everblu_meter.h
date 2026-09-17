@@ -46,6 +46,7 @@ class EverbluMeterTriggerButton final : public button::Button {
  public:
   void set_parent(EverbluMeterComponent *parent) { this->parent_ = parent; }
   void set_deep_scan(bool is_deep_scan) { this->is_deep_scan_ = is_deep_scan; }
+  void set_scan(bool is_scan) { this->is_scan_ = is_scan; }
   void set_reset_frequency(bool is_reset) { this->is_reset_frequency_ = is_reset; }
   void set_stop(bool is_stop) { this->is_stop_ = is_stop; }
   void set_diagnostic(bool is_diagnostic) { this->is_diagnostic_ = is_diagnostic; }
@@ -56,6 +57,7 @@ class EverbluMeterTriggerButton final : public button::Button {
  private:
   EverbluMeterComponent *parent_{nullptr};
   bool is_deep_scan_{false};
+  bool is_scan_{false};
   bool is_reset_frequency_{false};
   bool is_stop_{false};
   bool is_diagnostic_{false};
@@ -97,6 +99,7 @@ class EverbluMeterComponent final : public PollingComponent,
   void set_timezone_offset(int offset) { this->timezone_offset_ = offset; }
   void set_auto_align_time(bool enabled) { this->auto_align_time_ = enabled; }
   void set_auto_align_midpoint(bool enabled) { this->auto_align_midpoint_ = enabled; }
+  void set_disable_scheduled_readings(bool disabled) { this->disable_scheduled_readings_ = disabled; }
   void set_max_retries(int retries) { this->max_retries_ = retries; }
   void set_retry_cooldown(unsigned long ms) { this->retry_cooldown_ms_ = ms; }
   void set_time_component(time::RealTimeClock *time) { this->time_component_ = time; }
@@ -143,6 +146,7 @@ class EverbluMeterComponent final : public PollingComponent,
   // External actions
   void request_manual_read();
   void request_deep_scan();
+  void request_scan();
   void request_reset_frequency();
   void request_stop_reading();
   void request_diagnostic_report();
@@ -163,6 +167,7 @@ class EverbluMeterComponent final : public PollingComponent,
   int timezone_offset_{0};
   bool auto_align_time_{true};
   bool auto_align_midpoint_{true};
+  bool disable_scheduled_readings_{false};
   int max_retries_{5};
   unsigned long retry_cooldown_ms_{3600000};
   int adaptive_threshold_{1};

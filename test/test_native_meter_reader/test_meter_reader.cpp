@@ -41,14 +41,19 @@ namespace
     }
 
     /// Step the auto-started frequency scan to completion, as the host loop does.
+    /// An empty narrow scan escalates to a full sweep on the trailing loop(), so
+    /// keep draining until no further scan is started.
     void drainFrequencyScan(MeterReader &reader)
     {
         int guard = 0;
-        while (FrequencyManager::isScanInProgress() && guard++ < 5000)
+        do
         {
-            reader.loop();
-        }
-        reader.loop(); // One more pass so the reader publishes the resulting tuning
+            while (FrequencyManager::isScanInProgress() && guard++ < 5000)
+            {
+                reader.loop();
+            }
+            reader.loop(); // One more pass so the reader publishes the resulting tuning
+        } while (FrequencyManager::isScanInProgress() && guard < 5000);
     }
 }
 
@@ -150,7 +155,7 @@ void test_successful_read_passes_configured_meter_identity(void)
     TEST_ASSERT_EQUAL_UINT32(987654, fakeRadio().calls[0].serial);
 }
 
-void test_successful_read_publishes_history_only_when_available(void)
+void test_successful_read_always_publishes_history_with_its_availability(void)
 {
     tmeter_data withHistory = FakeRadio::success();
     withHistory.history_available = true;
@@ -164,9 +169,13 @@ void test_successful_read_publishes_history_only_when_available(void)
     MeterReader reader = makeReader();
     reader.triggerReading(false);
     TEST_ASSERT_EQUAL(1, g_publisher.historyPublishes);
+    TEST_ASSERT_TRUE(g_publisher.historyAvailableFlags[0]);
 
+    // The second read decoded no history, so it must publish again with
+    // historyAvailable=false rather than leaving the first read's JSON behind.
     reader.triggerReading(false);
-    TEST_ASSERT_EQUAL(1, g_publisher.historyPublishes);
+    TEST_ASSERT_EQUAL(2, g_publisher.historyPublishes);
+    TEST_ASSERT_FALSE(g_publisher.historyAvailableFlags[1]);
 }
 
 void test_reading_is_skipped_when_publisher_not_ready(void)
@@ -413,6 +422,62 @@ void test_scheduled_read_triggers_once_at_the_configured_time(void)
     TEST_ASSERT_EQUAL(1, (int)fakeRadio().calls.size());
 }
 
+void test_scheduled_read_fires_when_sampled_mid_minute(void)
+{
+    // The schedule check only runs every SCHEDULE_CHECK_INTERVAL_MS, so the loop
+    // may first observe the clock partway through the scheduled minute (for
+    // example if a blocking read or frequency scan spanned the :00 second).
+    // The read must still fire anywhere inside the scheduled minute, not only at
+    // exactly HH:MM:00.
+    // 2025-06-10 is a Tuesday.
+    g_config.schedule = "Monday-Friday";
+    g_config.readHourUTC = 10;
+    g_config.readMinuteUTC = 0;
+    fakeRadio().responses.push_back(FakeRadio::success());
+
+    MeterReader reader = makeReader();
+
+    // First sample of the day lands at 10:00:30 - the :00 second was never seen.
+    g_time.setUtc(2025, 6, 10, 10, 0, 30);
+    nativeClockAdvance(1000);
+    reader.loop();
+    TEST_ASSERT_EQUAL(1, (int)fakeRadio().calls.size());
+
+    // Still the same scheduled minute: the once-per-day guard must hold.
+    g_time.setUtc(2025, 6, 10, 10, 0, 45);
+    nativeClockAdvance(1000);
+    reader.loop();
+    TEST_ASSERT_EQUAL(1, (int)fakeRadio().calls.size());
+}
+
+void test_scheduled_read_clamps_out_of_range_hour(void)
+{
+    // A bad config (read_hour=27, read_minute=70) must not silently disable the
+    // daily read. MeterReader clamps to 23:59 via the shared ScheduleManager
+    // helper, so the read fires at the clamped time rather than at the wrapped
+    // time the raw arithmetic would produce (27:70 UTC -> 04:10 local).
+    // 2025-06-10 is a Tuesday.
+    g_config.schedule = "Monday-Friday";
+    g_config.readHourUTC = 27;
+    g_config.readMinuteUTC = 70;
+    g_config.timezoneOffsetMinutes = 0;
+    fakeRadio().responses.push_back(FakeRadio::success());
+
+    MeterReader reader = makeReader();
+
+    // The unclamped local time (04:10) must not trigger a read.
+    g_time.setUtc(2025, 6, 10, 4, 10, 0);
+    nativeClockAdvance(1000);
+    reader.loop();
+    TEST_ASSERT_EQUAL(0, (int)fakeRadio().calls.size());
+
+    // The clamped local time (23:59) must.
+    g_time.setUtc(2025, 6, 10, 23, 59, 0);
+    nativeClockAdvance(1000);
+    reader.loop();
+    TEST_ASSERT_EQUAL(1, (int)fakeRadio().calls.size());
+}
+
 void test_scheduled_read_is_skipped_on_a_non_reading_day(void)
 {
     // 2025-06-08 is a Sunday.
@@ -484,6 +549,172 @@ void test_reading_day_gate_covers_every_schedule_string(void)
     }
 }
 
+void test_scheduled_read_fires_again_on_the_same_day_of_year_next_year(void)
+{
+    // The once-per-day latch must be keyed on a full date. tm_yday alone restarts
+    // at 0 every January, so day 160 of 2026 would compare equal to day 160 of
+    // 2025 and the whole occurrence would be suppressed.
+    // 2025-06-10 (Tuesday) and 2026-06-10 (Wednesday) share tm_yday 160.
+    g_config.schedule = "Monday-Friday";
+    g_config.readHourUTC = 10;
+    g_config.readMinuteUTC = 0;
+    fakeRadio().responses.push_back(FakeRadio::success());
+    fakeRadio().responses.push_back(FakeRadio::success());
+
+    MeterReader reader = makeReader();
+
+    g_time.setUtc(2025, 6, 10, 10, 0, 0);
+    nativeClockAdvance(1000);
+    reader.loop();
+    TEST_ASSERT_EQUAL(1, (int)fakeRadio().calls.size());
+
+    g_time.setUtc(2026, 6, 10, 10, 0, 0);
+    nativeClockAdvance(1000);
+    reader.loop();
+    TEST_ASSERT_EQUAL(2, (int)fakeRadio().calls.size());
+}
+
+void test_scheduled_read_survives_a_scan_holding_the_radio(void)
+{
+    // A running scan owns the radio, so triggerReading() drops the read. The day
+    // must not be latched in that case, or the occurrence is lost until tomorrow.
+    g_config.schedule = "Monday-Friday";
+    g_config.readHourUTC = 10;
+    g_config.readMinuteUTC = 0;
+    g_config.frequency = 433.82f;
+
+    MeterReader reader = makeReader();
+    MeterReader scanOwner = makeReader();
+
+    scanOwner.performFrequencyScan();
+    TEST_ASSERT_TRUE(FrequencyManager::isScanInProgress());
+
+    // The scheduled minute arrives while the scan still holds the radio.
+    g_time.setUtc(2025, 6, 10, 10, 0, 0);
+    nativeClockAdvance(1000);
+    int before = (int)fakeRadio().calls.size();
+    reader.loop();
+    TEST_ASSERT_EQUAL(before, (int)fakeRadio().calls.size());
+
+    FrequencyManager::requestScanCancel();
+    drainFrequencyScan(scanOwner);
+
+    // Same scheduled minute, scan finished: the read must still happen.
+    fakeRadio().responses.push_back(FakeRadio::success());
+    before = (int)fakeRadio().calls.size();
+    g_time.setUtc(2025, 6, 10, 10, 0, 40);
+    nativeClockAdvance(1000);
+    reader.loop();
+    TEST_ASSERT_EQUAL(before + 1, (int)fakeRadio().calls.size());
+}
+
+void test_scheduled_read_survives_a_scan_that_outlasts_the_minute(void)
+{
+    // A staged scan easily runs for several minutes. Deferring only while the
+    // clock is still inside the scheduled minute meant the occurrence was dropped
+    // whenever the scan finished after it, so the day was skipped anyway. The
+    // reader must remember the occurrence and service it when the radio is free.
+    g_config.schedule = "Monday-Friday";
+    g_config.readHourUTC = 10;
+    g_config.readMinuteUTC = 0;
+    g_config.frequency = 433.82f;
+
+    MeterReader reader = makeReader();
+    MeterReader scanOwner = makeReader();
+
+    scanOwner.performFrequencyScan();
+    TEST_ASSERT_TRUE(FrequencyManager::isScanInProgress());
+
+    // The whole scheduled minute passes while the scan holds the radio.
+    int before = (int)fakeRadio().calls.size();
+    g_time.setUtc(2025, 6, 10, 10, 0, 20);
+    nativeClockAdvance(1000);
+    reader.loop();
+    g_time.setUtc(2025, 6, 10, 10, 5, 0);
+    nativeClockAdvance(1000);
+    reader.loop();
+    TEST_ASSERT_EQUAL(before, (int)fakeRadio().calls.size());
+
+    FrequencyManager::requestScanCancel();
+    drainFrequencyScan(scanOwner);
+
+    // Long past the scheduled minute, and the owed read must still happen.
+    fakeRadio().responses.push_back(FakeRadio::success());
+    before = (int)fakeRadio().calls.size();
+    g_time.setUtc(2025, 6, 10, 10, 7, 0);
+    nativeClockAdvance(1000);
+    reader.loop();
+    TEST_ASSERT_EQUAL(before + 1, (int)fakeRadio().calls.size());
+
+    // Still one read per day: servicing the occurrence clears it.
+    before = (int)fakeRadio().calls.size();
+    g_time.setUtc(2025, 6, 10, 10, 8, 0);
+    nativeClockAdvance(1000);
+    reader.loop();
+    TEST_ASSERT_EQUAL(before, (int)fakeRadio().calls.size());
+}
+
+void test_scheduled_read_survives_a_cooldown_that_outlasts_the_minute(void)
+{
+    // The post-failure cooldown defers the occurrence for the same reason, and
+    // outlasts the scheduled minute by design (the default is an hour).
+    g_config.schedule = "Monday-Friday";
+    g_config.readHourUTC = 10;
+    g_config.readMinuteUTC = 0;
+    g_config.maxRetries = 1;
+    g_config.retryCooldownMs = 120000;
+    fakeRadio().responses.push_back(FakeRadio::failure(ReadFailure::NoReply));
+
+    MeterReader reader = makeReader();
+    reader.triggerReading(false);
+    TEST_ASSERT_EQUAL(1, (int)fakeRadio().calls.size());
+
+    // The scheduled minute arrives and passes while the cooldown is still running.
+    g_time.setUtc(2025, 6, 10, 10, 0, 30);
+    nativeClockAdvance(1000);
+    reader.loop();
+    TEST_ASSERT_EQUAL(1, (int)fakeRadio().calls.size());
+
+    // Cooldown expired, minute long gone: the owed read must still happen.
+    fakeRadio().responses.push_back(FakeRadio::success());
+    g_time.setUtc(2025, 6, 10, 10, 3, 0);
+    nativeClockAdvance(g_config.retryCooldownMs);
+    reader.loop();
+    TEST_ASSERT_EQUAL(2, (int)fakeRadio().calls.size());
+}
+
+void test_scheduled_read_is_not_owed_after_the_day_rolls_over(void)
+{
+    // An occurrence deferred by a scan belongs to the day it was due on. If the
+    // blocker clears the next day, that day's own schedule decides, not the
+    // stale occurrence: 2025-06-14 is a Saturday and not a reading day.
+    g_config.schedule = "Monday-Friday";
+    g_config.readHourUTC = 10;
+    g_config.readMinuteUTC = 0;
+    g_config.frequency = 433.82f;
+
+    MeterReader reader = makeReader();
+    MeterReader scanOwner = makeReader();
+
+    scanOwner.performFrequencyScan();
+    TEST_ASSERT_TRUE(FrequencyManager::isScanInProgress());
+
+    // 2025-06-13 is a Friday: the occurrence is due, and deferred by the scan.
+    g_time.setUtc(2025, 6, 13, 10, 0, 10);
+    nativeClockAdvance(1000);
+    reader.loop();
+
+    FrequencyManager::requestScanCancel();
+    drainFrequencyScan(scanOwner);
+
+    fakeRadio().responses.push_back(FakeRadio::success());
+    int before = (int)fakeRadio().calls.size();
+    g_time.setUtc(2025, 6, 14, 11, 0, 0);
+    nativeClockAdvance(1000);
+    reader.loop();
+    TEST_ASSERT_EQUAL(before, (int)fakeRadio().calls.size());
+}
+
 void test_scheduled_read_waits_for_time_sync(void)
 {
     fakeRadio().responses.push_back(FakeRadio::success());
@@ -498,6 +729,45 @@ void test_scheduled_read_waits_for_time_sync(void)
     g_time.synced = true;
     nativeClockAdvance(1000);
     reader.loop();
+    TEST_ASSERT_EQUAL(1, (int)fakeRadio().calls.size());
+}
+
+void test_disabled_scheduled_readings_block_the_daily_read(void)
+{
+    // Issue #159: the opt-out must suppress the automatic daily read even on a
+    // matching day at the configured minute.
+    // 2025-06-10 is a Tuesday.
+    g_config.schedule = "Monday-Friday";
+    g_config.readHourUTC = 10;
+    g_config.readMinuteUTC = 0;
+    g_config.scheduledReadingsDisabled = true;
+    fakeRadio().responses.push_back(FakeRadio::success());
+
+    MeterReader reader = makeReader();
+
+    g_time.setUtc(2025, 6, 10, 10, 0, 0);
+    nativeClockAdvance(1000);
+    reader.loop();
+    TEST_ASSERT_EQUAL(0, (int)fakeRadio().calls.size());
+
+    // Re-enabling must restore the schedule without needing a restart.
+    g_config.scheduledReadingsDisabled = false;
+    g_time.setUtc(2025, 6, 10, 10, 0, 30);
+    nativeClockAdvance(1000);
+    reader.loop();
+    TEST_ASSERT_EQUAL(1, (int)fakeRadio().calls.size());
+}
+
+void test_disabled_scheduled_readings_still_allow_manual_reads(void)
+{
+    // The opt-out only gates shouldPerformScheduledRead(); on-demand reads must
+    // keep working (issue #159).
+    g_config.scheduledReadingsDisabled = true;
+    fakeRadio().responses.push_back(FakeRadio::success());
+
+    MeterReader reader = makeReader();
+    reader.triggerReading(true);
+
     TEST_ASSERT_EQUAL(1, (int)fakeRadio().calls.size());
 }
 
@@ -604,6 +874,82 @@ void test_auto_scan_on_failure_is_rearmed_by_a_success(void)
     drainFrequencyScan(reader);
 }
 
+void test_auto_scan_on_failure_is_rearmed_by_the_next_scheduled_read(void)
+{
+    // A scan only sweeps what the meter answers at that moment, so one that runs
+    // while the meter is silent proves nothing. Re-arming solely on a successful
+    // read left recovery switched off from then on, and the drift it exists to
+    // correct was never scanned for again.
+    g_config.maxRetries = 1;
+    g_config.autoScanOnFailure = true;
+    g_config.frequency = 433.82f;
+    StorageAbstraction::saveFloat("freq_offset", 0.0f, 0xABCD);
+
+    MeterReader reader = makeReader();
+    g_time.setUtc(2025, 6, 10, 10, 0, 0);
+    nativeClockAdvance(1000);
+    reader.loop(); // The day's read fails and its recovery scan sweeps an empty band
+    drainFrequencyScan(reader);
+    TEST_ASSERT_TRUE(FrequencyManager::lastScanOutcome() == FrequencyManager::ScanOutcome::NotFound);
+
+    // The meter is reachable again the next day, well outside the narrow window.
+    fakeRadio().carrierFrequency = 433.88f;
+    fakeRadio().carrierWidthMHz = 0.006f;
+    g_publisher.reset();
+    g_time.setUtc(2025, 6, 11, 10, 0, 0);
+    nativeClockAdvance(86400000UL);
+    reader.loop();
+
+    TEST_ASSERT_TRUE(g_publisher.sawStatus("Auto frequency scan after failed reads"));
+    drainFrequencyScan(reader);
+    TEST_ASSERT_TRUE(FrequencyManager::lastScanOutcome() == FrequencyManager::ScanOutcome::Found);
+    TEST_ASSERT_TRUE(FrequencyManager::getOffset() > 0.020f);
+    TEST_ASSERT_EQUAL(1, (int)g_publisher.readings.size());
+}
+
+void test_auto_scan_on_failure_escalates_to_a_full_sweep(void)
+{
+    // Crystal drift can exceed the narrow +-20 kHz recovery window. When that
+    // window sweeps clean, the reader must widen to the full +-150 kHz sweep
+    // rather than leave the meter unreachable until a manual Deep Scan.
+    g_config.maxRetries = 1;
+    g_config.autoScanOnFailure = true;
+    g_config.retryCooldownMs = 1;
+    g_config.frequency = 433.82f;
+    fakeRadio().carrierFrequency = 433.88f; // +60 kHz: outside the narrow window
+
+    MeterReader reader = makeReader();
+    reader.triggerReading(false);
+    drainFrequencyScan(reader);
+
+    TEST_ASSERT_TRUE(FrequencyManager::lastScanOutcome() == FrequencyManager::ScanOutcome::Found);
+    // The zoom locks on the first frequency that decodes, so the result sits at
+    // the lower edge of the simulated response window rather than its centre.
+    // What matters here is that it is beyond the narrow window's +-20 kHz reach.
+    TEST_ASSERT_TRUE(FrequencyManager::getOffset() > 0.020f);
+    TEST_ASSERT_FLOAT_WITHIN(0.011f, 0.060f, FrequencyManager::getOffset());
+}
+
+void test_auto_scan_on_failure_does_not_escalate_after_a_cancel(void)
+{
+    // A cancelled sweep would only repeat itself, so only an empty sweep widens.
+    g_config.maxRetries = 1;
+    g_config.autoScanOnFailure = true;
+    g_config.retryCooldownMs = 1;
+    g_config.frequency = 433.82f;
+    fakeRadio().responses.push_back(FakeRadio::failure(ReadFailure::NoReply));
+
+    MeterReader reader = makeReader();
+    reader.triggerReading(false);
+    TEST_ASSERT_TRUE(FrequencyManager::isScanInProgress());
+
+    reader.stopReading();
+    drainFrequencyScan(reader);
+
+    TEST_ASSERT_FALSE(g_publisher.sawStatus("Auto frequency scan (full sweep)"));
+    TEST_ASSERT_FALSE(FrequencyManager::isScanInProgress());
+}
+
 void test_auto_scan_on_failure_stays_off_when_disabled(void)
 {
     g_config.maxRetries = 1;
@@ -614,6 +960,125 @@ void test_auto_scan_on_failure_stays_off_when_disabled(void)
     reader.triggerReading(false);
 
     TEST_ASSERT_FALSE(g_publisher.sawStatus("Auto frequency scan after failed reads"));
+}
+
+void test_a_scan_that_stores_a_new_offset_takes_one_confirmation_read(void)
+{
+    // The sweep only reaches a Found outcome by decoding frames, so the meter is
+    // demonstrably awake. Publish that reading instead of waiting out the cooldown
+    // on tuning that was just proven to work.
+    g_config.maxRetries = 1;
+    g_config.autoScanOnFailure = true;
+    g_config.retryCooldownMs = 60000;
+    g_config.frequency = 433.82f;
+    fakeRadio().carrierFrequency = 433.88f; // Off the configured base, so the scan moves the offset
+
+    MeterReader reader = makeReader();
+    reader.triggerReading(false);
+    drainFrequencyScan(reader);
+
+    TEST_ASSERT_TRUE(FrequencyManager::lastScanOutcome() == FrequencyManager::ScanOutcome::Found);
+    TEST_ASSERT_TRUE(g_publisher.sawStatus("Confirming new calibration"));
+    TEST_ASSERT_EQUAL(1, (int)g_publisher.readings.size());
+}
+
+void test_a_scan_that_keeps_the_existing_offset_takes_no_extra_read(void)
+{
+    // The sweep found nothing, so there is no tuning to confirm a reading on.
+    g_config.maxRetries = 1;
+    g_config.autoScanOnFailure = true;
+    g_config.retryCooldownMs = 1;
+    fakeRadio().responses.push_back(FakeRadio::failure(ReadFailure::NoReply));
+
+    MeterReader reader = makeReader();
+    reader.triggerReading(false);
+    drainFrequencyScan(reader);
+
+    TEST_ASSERT_FALSE(g_publisher.sawStatus("Confirming new calibration"));
+    TEST_ASSERT_EQUAL(0, (int)g_publisher.readings.size());
+}
+
+void test_a_recovery_scan_that_keeps_the_offset_still_takes_a_confirmation_read(void)
+{
+    // A meter that goes quiet and comes back on the frequency already stored leaves
+    // the scan with nothing to change. It answered during the sweep all the same, so
+    // the read that provoked the scan is still owed rather than held for the cooldown.
+    g_config.maxRetries = 1;
+    g_config.autoScanOnFailure = true;
+    g_config.retryCooldownMs = 60000;
+    g_config.frequency = 433.82f;
+    StorageAbstraction::saveFloat("freq_offset", 0.0f, 0xABCD);
+
+    MeterReader reader = makeReader();
+    reader.triggerReading(false); // Fails: the meter is not answering yet
+
+    fakeRadio().carrierFrequency = 433.82f; // It returns on the stored tuning
+    fakeRadio().carrierWidthMHz = 0.006f;
+    drainFrequencyScan(reader);
+
+    TEST_ASSERT_TRUE(FrequencyManager::lastScanOutcome() == FrequencyManager::ScanOutcome::Found);
+    TEST_ASSERT_FLOAT_WITHIN(0.000001f, 0.0f, reader.getFrequencyOffset());
+    TEST_ASSERT_TRUE(g_publisher.sawStatus("Confirming new calibration"));
+    TEST_ASSERT_EQUAL(1, (int)g_publisher.readings.size());
+}
+
+void test_a_manual_scan_that_keeps_the_existing_offset_takes_no_extra_read(void)
+{
+    // The counterpart bound: a scan the user pressed owes no reading, so re-confirming
+    // the stored tuning must not produce one nobody asked for.
+    g_config.frequency = 433.82f;
+    StorageAbstraction::saveFloat("freq_offset", 0.0f, 0xABCD);
+    fakeRadio().carrierFrequency = 433.82f;
+    fakeRadio().carrierWidthMHz = 0.006f;
+
+    MeterReader reader = makeReader();
+    reader.performFrequencyScan(false);
+    drainFrequencyScan(reader);
+
+    TEST_ASSERT_TRUE(FrequencyManager::lastScanOutcome() == FrequencyManager::ScanOutcome::Found);
+    TEST_ASSERT_FLOAT_WITHIN(0.000001f, 0.0f, reader.getFrequencyOffset());
+    TEST_ASSERT_FALSE(g_publisher.sawStatus("Confirming new calibration"));
+    TEST_ASSERT_EQUAL(0, (int)g_publisher.readings.size());
+}
+
+void test_a_failed_confirmation_read_ends_the_streak_without_rescanning(void)
+{
+    // One attempt only: the retry sequence that provoked the scan has already run,
+    // and sweeping again would just repeat what was measured seconds ago.
+    g_config.maxRetries = 3;
+    g_config.autoScanOnFailure = true;
+    g_config.retryCooldownMs = 60000;
+    g_config.frequency = 433.82f;
+    fakeRadio().carrierFrequency = 433.88f;
+
+    MeterReader reader = makeReader();
+    reader.triggerReading(false);
+
+    // Advance through the retry sequence, then step this reader's own scan to the end.
+    // drainFrequencyScan() would take the queued confirmation read as well, and this
+    // test needs to control the radio before that happens. The scan state is keyed on
+    // the reader rather than on lastScanOutcome(), which outlives a single test.
+    int guard = 0;
+    while (guard++ < 5000 && !reader.isScanInProgress())
+    {
+        advanceAndLoop(reader, RETRY_DELAY_MS);
+    }
+    while (guard++ < 5000 && FrequencyManager::isScanInProgress())
+    {
+        reader.loop();
+    }
+    TEST_ASSERT_TRUE(FrequencyManager::lastScanOutcome() == FrequencyManager::ScanOutcome::Found);
+
+    // Take the carrier away so the queued confirmation read misses.
+    fakeRadio().carrierFrequency = 0.0f;
+    fakeRadio().responses.push_back(FakeRadio::failure(ReadFailure::NoReply));
+    g_publisher.reset();
+    reader.loop();
+
+    TEST_ASSERT_TRUE(g_publisher.sawStatus("Confirming new calibration"));
+    TEST_ASSERT_EQUAL_STRING("Failed after max retries", g_publisher.lastStatus().c_str());
+    TEST_ASSERT_FALSE(g_publisher.sawStatus("Retry scheduled"));
+    TEST_ASSERT_FALSE(FrequencyManager::isScanInProgress());
 }
 
 void test_a_scan_is_only_stepped_by_the_reader_that_started_it(void)
@@ -692,9 +1157,43 @@ void test_reset_frequency_offset_clears_storage_and_retunes(void)
     reader.resetFrequencyOffset();
 
     TEST_ASSERT_FLOAT_WITHIN(0.0001f, 433.82f, fakeRadio().lastInitFrequency());
-    TEST_ASSERT_FLOAT_WITHIN(0.0001f, 0.0f, StorageAbstraction::loadFloat("freq_offset", 99.0f, 0xABCD));
+    // Erased, not overwritten with a zero: loadFloat must fall back to the default.
+    TEST_ASSERT_FALSE(StorageAbstraction::hasKey("freq_offset"));
+    TEST_ASSERT_FLOAT_WITHIN(0.0001f, 99.0f, StorageAbstraction::loadFloat("freq_offset", 99.0f, 0xABCD));
     TEST_ASSERT_FALSE(g_publisher.frequencyOffsets.empty());
     TEST_ASSERT_FLOAT_WITHIN(0.0001f, 0.0f, g_publisher.frequencyOffsets.back());
+}
+
+void test_reset_frequency_offset_rearms_auto_scan(void)
+{
+    // A stored zero still satisfies hasStored, which suppressed the first-boot
+    // auto scan and made a scan candidate compete against a forgotten tuning.
+    StorageAbstraction::saveFloat("freq_offset", 0.030f, 0xABCD);
+    g_config.frequency = 433.82f;
+    g_config.autoScan = true;
+
+    MeterReader reader = makeReader();
+    TEST_ASSERT_FALSE(FrequencyManager::shouldPerformAutoScan());
+
+    reader.resetFrequencyOffset();
+
+    TEST_ASSERT_TRUE(FrequencyManager::shouldPerformAutoScan());
+    TEST_ASSERT_FLOAT_WITHIN(0.0001f, 0.0f, FrequencyManager::getOffset());
+}
+
+void test_reset_frequency_offset_reports_storage_failure(void)
+{
+    // A refused erase must not silently leave the user believing the meter was reset.
+    StorageAbstraction::saveFloat("freq_offset", 0.030f, 0xABCD);
+    g_config.frequency = 433.82f;
+
+    MeterReader reader = makeReader();
+    fakeStorage().failClears = true;
+
+    reader.resetFrequencyOffset();
+
+    TEST_ASSERT_FLOAT_WITHIN(0.0001f, 0.030f, FrequencyManager::getOffset());
+    TEST_ASSERT_TRUE(g_publisher.lastError().find("reset failed") != std::string::npos);
 }
 
 void test_successful_reads_feed_adaptive_frequency_tracking(void)
@@ -768,6 +1267,22 @@ void test_history_available_but_all_zero_is_not_treated_as_valid(void)
     TEST_ASSERT_EQUAL(1, g_publisher.historyPublishes);
 }
 
+void test_read_without_history_still_publishes_to_clear_the_sensor(void)
+{
+    // publishHistory() must run on every successful read, not only when history
+    // decoded. Skipping it leaves the previous reading's JSON on the sensor.
+    tmeter_data noHistory = FakeRadio::success();
+    noHistory.history_available = false;
+    fakeRadio().responses.push_back(noHistory);
+
+    MeterReader reader = makeReader();
+    reader.triggerReading(false);
+
+    TEST_ASSERT_EQUAL(1, g_publisher.historyPublishes);
+    TEST_ASSERT_EQUAL(1, (int)g_publisher.historyAvailableFlags.size());
+    TEST_ASSERT_FALSE(g_publisher.historyAvailableFlags[0]);
+}
+
 void test_misconfigured_gas_volume_divisor_falls_back_without_failing_the_read(void)
 {
     // getGasVolumeDivisor() <= 0 is only used to pick a fallback divisor for the
@@ -825,4 +1340,81 @@ void test_stop_reading_cancels_a_scan_with_no_read_in_progress(void)
 
     drainFrequencyScan(reader);
     TEST_ASSERT_FALSE(FrequencyManager::isScanInProgress());
+}
+
+void test_boot_scan_runs_once_when_the_meter_has_no_stored_calibration(void)
+{
+    // An uncalibrated meter with auto-scan enabled sweeps on the first loop()
+    // that has both a synced clock and a ready publisher, then never again.
+    g_config.autoScan = true;
+    g_config.frequency = 433.82f;
+
+    MeterReader reader = makeReader();
+    nativeClockAdvance(1000);
+    reader.loop();
+
+    TEST_ASSERT_TRUE(reader.isScanInProgress());
+    drainFrequencyScan(reader);
+
+    // The boot scan is armed once per boot, so a second pass must not restart it.
+    nativeClockAdvance(1000);
+    reader.loop();
+    TEST_ASSERT_FALSE(reader.isScanInProgress());
+}
+
+void test_boot_scan_is_skipped_when_a_calibration_is_already_stored(void)
+{
+    StorageAbstraction::saveFloat("freq_offset", 0.012f, 0xABCD);
+    g_config.autoScan = true;
+    g_config.frequency = 433.82f;
+
+    MeterReader reader = makeReader();
+    nativeClockAdvance(1000);
+    reader.loop();
+
+    TEST_ASSERT_FALSE(reader.isScanInProgress());
+}
+
+void test_a_recovery_scan_stays_local_and_reports_itself_as_such(void)
+{
+    // The Scan button asks for the local sweep around the current tuning; the
+    // Deep Scan button asks for the full range. Ordinary crystal drift is small,
+    // so the local sweep is what recovers it without minutes of sweeping.
+    g_config.frequency = 433.82f;
+    fakeRadio().carrierFrequency = 433.826f;
+    fakeRadio().carrierWidthMHz = 0.003f;
+
+    MeterReader reader = makeReader();
+    reader.performFrequencyScan(false);
+
+    TEST_ASSERT_TRUE(reader.isScanInProgress());
+    TEST_ASSERT_EQUAL_STRING("Frequency Scanning", g_publisher.lastRadioState().c_str());
+    TEST_ASSERT_EQUAL_STRING("Frequency scan running", g_publisher.lastStatus().c_str());
+
+    drainFrequencyScan(reader);
+
+    TEST_ASSERT_FALSE(FrequencyManager::isScanInProgress());
+    // Nothing was tried outside the local window, so the sweep never widened.
+    for (const auto &call : fakeRadio().calls)
+    {
+        TEST_ASSERT_TRUE(call.frequency > 433.79f && call.frequency < 433.85f);
+    }
+    TEST_ASSERT_FLOAT_WITHIN(0.002f, 433.826f, reader.getTunedFrequency());
+}
+
+void test_a_radio_fault_fails_the_read_before_the_meter_is_contacted(void)
+{
+    // cc1101_init() is the last thing between the reader and the air. If it
+    // fails the attempt must be recorded as a failure, not silently skipped,
+    // and the radio must be reported as disconnected.
+    MeterReader reader = makeReader();
+    fakeRadio().initSucceeds = false;
+
+    const int before = (int)fakeRadio().calls.size();
+    reader.triggerReading(false);
+
+    TEST_ASSERT_FALSE(reader.isRadioConnected());
+    TEST_ASSERT_EQUAL(before, (int)fakeRadio().calls.size());
+    TEST_ASSERT_EQUAL(0, (int)g_publisher.readings.size());
+    TEST_ASSERT_TRUE(g_publisher.sawStatus("Retry scheduled"));
 }

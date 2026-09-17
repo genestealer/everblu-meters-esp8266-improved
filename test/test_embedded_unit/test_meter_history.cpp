@@ -93,7 +93,6 @@ void test_history_stats_typical(void)
 
     TEST_ASSERT_EQUAL_UINT32(40, stats.currentMonthUsage);
     TEST_ASSERT_EQUAL_UINT32(160, stats.totalUsage);            // 0 + 50 + 70 + 40
-    TEST_ASSERT_EQUAL_UINT32(40, stats.averageMonthlyUsage);    // 160 / (3 + 1)
 }
 
 /**
@@ -110,7 +109,6 @@ void test_history_stats_empty(void)
     TEST_ASSERT_EQUAL_UINT32(500, stats.currentVolume);
     TEST_ASSERT_EQUAL_UINT32(0, stats.currentMonthUsage);
     TEST_ASSERT_EQUAL_UINT32(0, stats.totalUsage);
-    TEST_ASSERT_EQUAL_UINT32(0, stats.averageMonthlyUsage);
 }
 
 /**
@@ -300,4 +298,130 @@ void test_history_print_to_serial_is_safe(void)
     MeterHistory::printToSerial(history, 260, "[HISTORY]");
 
     TEST_PASS();
+}
+
+/**
+ * Test: the compact payload drops the cumulative "history" array and keeps only
+ * usage deltas (issue #67)
+ */
+void test_history_json_compact_typical(void)
+{
+    uint32_t history[13];
+    const uint32_t values[] = {100, 150, 220};
+    makeHistory(history, values, 3);
+
+    char buffer[256];
+    const int written = MeterHistory::generateHistoryJsonCompact(history, 260, buffer, sizeof(buffer));
+
+    const char *expected =
+        "{\"monthly_usage\":[50,70],"
+        "\"current_month_usage\":40,"
+        "\"months_available\":3}";
+
+    TEST_ASSERT_EQUAL_STRING(expected, buffer);
+    TEST_ASSERT_EQUAL_INT((int)strlen(expected), written);
+}
+
+/**
+ * Test: an empty history yields a valid, parseable empty document (not 0), so
+ * Home Assistant never shows the text sensor as "unknown"/"unavailable"
+ */
+void test_history_json_compact_empty_is_valid(void)
+{
+    uint32_t history[13];
+    memset(history, 0, sizeof(history));
+
+    char buffer[256];
+    const int written = MeterHistory::generateHistoryJsonCompact(history, 500, buffer, sizeof(buffer));
+
+    TEST_ASSERT_TRUE(written > 0);
+    TEST_ASSERT_EQUAL_STRING(
+        "{\"monthly_usage\":[],\"current_month_usage\":0,\"months_available\":0}",
+        buffer);
+}
+
+/**
+ * Test: a full 13-month history with large 7-digit volumes stays within Home
+ * Assistant's 255-char text-sensor state limit - the whole point of the compact
+ * form (issue #67)
+ */
+void test_history_json_compact_full_thirteen_under_255(void)
+{
+    uint32_t history[13];
+    for (int i = 0; i < 13; i++)
+    {
+        history[i] = 1000000u + (uint32_t)i * 4321u;
+    }
+
+    char buffer[256];
+    const int written = MeterHistory::generateHistoryJsonCompact(history, 1060000u, buffer, sizeof(buffer));
+
+    TEST_ASSERT_TRUE(written > 0);
+    TEST_ASSERT_TRUE(written <= 255);
+    TEST_ASSERT_EQUAL_INT((int)strlen(buffer), written);
+    TEST_ASSERT_EQUAL_CHAR('}', buffer[written - 1]);
+}
+
+/**
+ * Test: a single stored month yields an empty delta array (no earlier baseline)
+ * but still reports the current month's usage against it
+ */
+void test_history_json_compact_single_month(void)
+{
+    uint32_t history[13];
+    const uint32_t values[] = {100};
+    makeHistory(history, values, 1);
+
+    char buffer[256];
+    const int written = MeterHistory::generateHistoryJsonCompact(history, 175, buffer, sizeof(buffer));
+
+    const char *expected =
+        "{\"monthly_usage\":[],"
+        "\"current_month_usage\":75,"
+        "\"months_available\":1}";
+
+    TEST_ASSERT_EQUAL_STRING(expected, buffer);
+    TEST_ASSERT_EQUAL_INT((int)strlen(expected), written);
+}
+
+/**
+ * Test: the compact form rejects a null or unusably small buffer
+ */
+void test_history_json_compact_null_buffer(void)
+{
+    uint32_t history[13];
+    const uint32_t values[] = {100, 150};
+    makeHistory(history, values, 2);
+
+    TEST_ASSERT_EQUAL_INT(0, MeterHistory::generateHistoryJsonCompact(history, 200, nullptr, 256));
+
+    char buffer[2] = {'\x7F', '\x7F'};
+    TEST_ASSERT_EQUAL_INT(0, MeterHistory::generateHistoryJsonCompact(history, 200, buffer, 1));
+    TEST_ASSERT_EQUAL_HEX8('\x7F', (unsigned char)buffer[0]);
+}
+
+/**
+ * Test: an undersized buffer reports failure rather than a truncated document
+ *
+ * The publisher treats a positive return as "publish this", so a partial payload
+ * would reach Home Assistant as unparseable state.
+ */
+void test_history_json_compact_rejects_undersized_buffer(void)
+{
+    uint32_t history[13];
+    const uint32_t values[] = {100, 150, 220};
+    makeHistory(history, values, 3);
+
+    for (int size = 2; size < 70; size++)
+    {
+        char buffer[128];
+        memset(buffer, '\xAA', sizeof(buffer));
+
+        const int written = MeterHistory::generateHistoryJsonCompact(history, 260, buffer, size);
+
+        TEST_ASSERT_EQUAL_INT(0, written);
+        TEST_ASSERT_EQUAL_CHAR('\0', buffer[0]);
+        // Nothing beyond the declared buffer size may be touched
+        TEST_ASSERT_EQUAL_HEX8('\xAA', (unsigned char)buffer[size]);
+    }
 }

@@ -47,8 +47,35 @@ inline unsigned long &nativeClockMillisRef()
     return ms;
 }
 
+/**
+ * Optional hook fired whenever the virtual clock moves.
+ *
+ * Simulated peripherals use it to age their own state (a draining FIFO, a line
+ * that should have been re-asserted by now) while the firmware sits in a
+ * delay() loop doing no bus traffic of its own.
+ */
+using NativeClockTickHandler = void (*)(unsigned long);
+
+inline NativeClockTickHandler &nativeClockTickHandlerRef()
+{
+    static NativeClockTickHandler handler = nullptr;
+    return handler;
+}
+
+inline void nativeClockSetTickHandler(NativeClockTickHandler handler)
+{
+    nativeClockTickHandlerRef() = handler;
+}
+
 inline void nativeClockSet(unsigned long ms) { nativeClockMillisRef() = ms; }
-inline void nativeClockAdvance(unsigned long ms) { nativeClockMillisRef() += ms; }
+inline void nativeClockAdvance(unsigned long ms)
+{
+    nativeClockMillisRef() += ms;
+    if (nativeClockTickHandlerRef() != nullptr)
+    {
+        nativeClockTickHandlerRef()(ms);
+    }
+}
 inline void nativeClockReset() { nativeClockMillisRef() = 0; }
 
 inline unsigned long millis() { return nativeClockMillisRef(); }
@@ -154,6 +181,10 @@ public:
 
     size_t write(uint8_t c) override
     {
+        if (capture() != nullptr)
+        {
+            capture()->push_back((char)c);
+        }
         if (enabled())
         {
             fputc((int)c, stdout);
@@ -165,6 +196,13 @@ public:
     {
         static const bool on = (std::getenv("EVERBLU_NATIVE_SERIAL") != nullptr);
         return on;
+    }
+
+    /// Tests that assert on log output point this at their own buffer.
+    static std::string *&capture()
+    {
+        static std::string *sink = nullptr;
+        return sink;
     }
 };
 

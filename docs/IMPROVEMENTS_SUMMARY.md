@@ -1,5 +1,11 @@
 # Improvements Summary
 
+> **⚠️ Historical document.** This is a point-in-time change log and repeats
+> frequency-scan/offset figures and a removed `frequency_scan` MQTT topic that no
+> longer match the code. For current behaviour see
+> [ESPHOME_INTEGRATION_GUIDE.md](../ESPHOME/docs/ESPHOME_INTEGRATION_GUIDE.md) and
+> the source in `src/services/frequency_manager.*`. Kept for history.
+
 ## Overview
 
 This document summarizes the improvements made to the EverBlu Meters ESP8266/ESP32 project to enhance performance, reliability, and diagnostics.

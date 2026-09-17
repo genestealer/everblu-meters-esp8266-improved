@@ -64,7 +64,7 @@ everblu_meter:
   # The 3-digit suffix is optional.
   # Example (with suffix):    '22-8765432-100' -> meter_code: '22-8765432-100'
   # Example (without suffix): '22-8765432-100' -> meter_code: '22-8765432'
-  meter_code: "22-8765432-100"  # Replace with your meter's code
+  meter_code: "XX-XXXXXXX-XXX"  # Replace with your meter's code
   cs_pin: GPIO25              # ESP32 CC1101 CS / NSS — GPIO25 is safe (non-strapping, non-SPI)
   gdo0_pin: GPIO4             # ESP32 GPIO4 -> CC1101 GDO0
   gdo2_pin: GPIO27            # REQUIRED (v3.0.0+): CC1101 GDO2 -> ESP32 GPIO27, hardware FIFO threshold.
@@ -97,6 +97,8 @@ everblu_meter:
   # Control button (optional but handy)
   request_reading_button:
     name: "Read Gas Meter Now"
+  scan_button:
+    name: "Frequency Scan"
   deep_scan_button:
     name: "Deep Frequency Scan"
   reset_frequency_button:

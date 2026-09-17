@@ -114,6 +114,12 @@ struct FakeStorage
     int beginCalls = 0;
     int saveCalls = 0;
 
+    // Model a backend that rejects the write (worn flash, failed verify read-back).
+    bool failSaves = false;
+
+    // Model a backend that rejects the erase, so the reset path can be tested.
+    bool failClears = false;
+
     void clear();
     const Entry *find(const char *key) const;
 };
@@ -143,6 +149,7 @@ public:
     int timezoneOffsetMinutes = 0;
     bool autoAlign = false;
     bool autoAlignMidpoint = false;
+    bool scheduledReadingsDisabled = false;
 
     int maxRetries = 3;
     unsigned long retryCooldownMs = 60000;
@@ -162,6 +169,7 @@ public:
     int getTimezoneOffsetMinutes() const override { return timezoneOffsetMinutes; }
     bool isAutoAlignReadingTime() const override { return autoAlign; }
     bool useAutoAlignMidpoint() const override { return autoAlignMidpoint; }
+    bool areScheduledReadingsDisabled() const override { return scheduledReadingsDisabled; }
 
     int getMaxRetries() const override { return maxRetries; }
     unsigned long getRetryCooldownMs() const override { return retryCooldownMs; }
@@ -228,6 +236,7 @@ public:
     std::vector<Stats> statistics;
 
     int historyPublishes = 0;
+    std::vector<bool> historyAvailableFlags;
     int settingsPublishes = 0;
     int discoveryPublishes = 0;
 

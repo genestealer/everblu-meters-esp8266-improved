@@ -255,6 +255,43 @@ void test_schedule_null_tm_is_not_a_reading_day(void)
 }
 
 /**
+ * Test: matchesReadingDay() defaults a null schedule to Monday-Friday
+ *
+ * setSchedule() substitutes its own default, so this branch is only reachable
+ * through the stateless entry point that MeterReader calls with whatever its
+ * config provider returns.
+ */
+void test_matches_reading_day_defaults_a_null_schedule_to_weekdays(void)
+{
+    struct tm monday = createTmForDay(1);
+    struct tm saturday = createTmForDay(6);
+
+    TEST_ASSERT_TRUE(ScheduleManager::matchesReadingDay(nullptr, &monday));
+    TEST_ASSERT_FALSE(ScheduleManager::matchesReadingDay(nullptr, &saturday));
+}
+
+/**
+ * Test: dateKey distinguishes the same day-of-year in different years
+ */
+void test_date_key_is_year_aware(void)
+{
+    struct tm day = {};
+    day.tm_year = 125; // 2025
+    day.tm_yday = 160;
+
+    struct tm sameDayNextYear = day;
+    sameDayNextYear.tm_year = 126; // 2026
+
+    struct tm nextDay = day;
+    nextDay.tm_yday = 161;
+
+    TEST_ASSERT_EQUAL(ScheduleManager::dateKey(&day), ScheduleManager::dateKey(&day));
+    TEST_ASSERT_NOT_EQUAL(ScheduleManager::dateKey(&day), ScheduleManager::dateKey(&sameDayNextYear));
+    TEST_ASSERT_NOT_EQUAL(ScheduleManager::dateKey(&day), ScheduleManager::dateKey(&nextDay));
+    TEST_ASSERT_EQUAL(-1, ScheduleManager::dateKey(nullptr));
+}
+
+/**
  * Test: All days of week for each schedule type (comprehensive)
  */
 void test_all_schedules_all_days(void)

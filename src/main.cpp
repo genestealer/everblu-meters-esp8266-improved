@@ -108,6 +108,13 @@ static const unsigned long OFFLINE_LED_BLINK_MS = 500UL;
 #define AUTO_ALIGN_READING_TIME 1
 #endif
 
+// Disable automatic scheduled readings entirely. Manual reads (the request-read
+// MQTT command / button) still work. 0 = scheduled readings enabled (default),
+// 1 = disabled. Opt-in, mirroring the negative-form flags elsewhere.
+#ifndef DISABLE_SCHEDULED_READINGS
+#define DISABLE_SCHEDULED_READINGS 0
+#endif
+
 // Alignment strategy: 0 = use time_start, 1 = use midpoint of [time_start, time_end]
 #ifndef AUTO_ALIGN_USE_MIDPOINT
 #define AUTO_ALIGN_USE_MIDPOINT 1
@@ -140,6 +147,20 @@ static int g_readMinuteLocal = DEFAULT_READING_MINUTE_UTC;
 // Flag to indicate if current data read is from scheduled trigger (vs manual MQTT command)
 // Used to control whether auto-alignment should be applied to future scheduled reads
 static bool g_isScheduledRead = false;
+
+// Year-aware date key (see ScheduleManager::dateKey) of the last scheduled read,
+// or -1 if none yet. Guards the scheduled read to once per day across the whole
+// scheduled minute (see onScheduled). onScheduled() is re-armed on every reconnect,
+// so several poll chains can run at once; this latch keeps them collectively to a
+// single read per occurrence.
+static int g_lastScheduledReadDateKey = -1;
+
+// Date key of an occurrence that was due but deferred by a cooldown or a running
+// scan, or -1 if none is owed. A staged scan can outlast the scheduled minute, so
+// re-sampling the clock once it finishes would no longer match and the day would
+// be skipped; the occurrence is remembered instead and serviced when the blocker
+// clears. Cleared on the day rolling over, since that occurrence is then gone.
+static int g_pendingScheduledReadDateKey = -1;
 
 // Define a default meter frequency if missing from private.h.
 // RADIAN protocol nominal center frequency for EverBlu is 433.82 MHz.
@@ -196,16 +217,16 @@ const int ADAPT_THRESHOLD = ADAPTIVE_THRESHOLD;
 /**
  * @brief Perform a Deep frequency scan
  *
- * Scans +-150 kHz (default) around the configured frequency in fine 2.5 kHz steps,
- * mapping the response window then zooming to the exact carrier centre.
+ * Starts staged acquisition and refinement around the configured frequency.
  * Also used on first boot when no stored offset exists.
  *
  * Saves discovered offset to persistent storage on success.
  */
-void performDeepFrequencyScan(float scanRangeMHz = 0.150f, float scanStepMHz = 0.0025f);
+void performDeepFrequencyScan(float scanRangeMHz = 0.150f, float scanStepMHz = 0.010f);
+static void startRecoveryScan(bool retryRead);
 
 /**
- * @brief Reset the persisted frequency offset to zero and re-tune the radio.
+ * @brief Erase the persisted frequency calibration and re-tune the radio.
  */
 void resetFrequencyOffset();
 
@@ -303,7 +324,17 @@ bool g_inCooldown = false;
 const unsigned long RETRY_COOLDOWN = 3600000; // 1 hour cooldown in milliseconds
 bool g_autoScanAfterFailureDone = false;      // Guards the failure-recovery frequency scan to once per failure streak
 bool g_postScanReadAttempted = false;         // Guards the single post-scan re-read to once per failure streak
+bool g_scanActive = false;
+bool g_scanRetryRead = false;
 ReadFailure g_retryFailureReason = ReadFailure::None; // Most informative failure seen so far in the current retry sequence
+
+// Non-blocking NTP synchronisation state. configTzTime() is kicked off in
+// onConnectionEstablished() and the clock is polled from loop() so MQTT
+// keep-alives and OTA are never stalled by a blocking wait on every reconnect.
+const time_t NTP_MIN_VALID_EPOCH = 1609459200; // 2021-01-01
+const unsigned long NTP_SYNC_TIMEOUT_MS = 10000;
+bool g_awaitingNtpSync = false;
+unsigned long g_ntpSyncStartMs = 0;
 
 // Global variable to store the reading schedule (default from private.h)
 const char *readingSchedule = DEFAULT_READING_SCHEDULE;
@@ -547,6 +578,7 @@ static const char *wifiStatusToString(wl_status_t st)
 //              Retries up to 10 times if data retrieval fails.
 void onUpdateData()
 {
+  if (FrequencyManager::isScanInProgress()) return;
   Serial.println("");
   EVB_PRINTLN("========================================");
   EVB_PRINTF("        METER READ - START (fw %s)\n", EVERBLU_FW_VERSION);
@@ -646,28 +678,7 @@ void onUpdateData()
       if (autoScanOnFailureEnabled && !g_autoScanAfterFailureDone)
       {
         g_autoScanAfterFailureDone = true;
-        TS_PRINTLN("[FREQ] Max retries reached - running narrow frequency scan (±20 kHz) to re-tune after drift... (disable: AUTO_SCAN_ON_FAILURE_ENABLED 0 in private.h)");
-        const float offsetBeforeScan = FrequencyManager::getOffset();
-        performDeepFrequencyScan(0.020f, 0.001f); // ±20 kHz, 1 kHz steps, ~41 steps, ~2 min
-        const float offsetAfterScan = FrequencyManager::getOffset();
-
-        // Only re-read if the scan actually found and stored a *new* offset: the
-        // carrier had drifted and the radio is now tuned to a frequency we have
-        // not yet tried this streak, so an immediate read is worthwhile instead
-        // of waiting out the 1-hour cooldown. Attempt exactly ONE more read.
-        // This cannot loop: g_autoScanAfterFailureDone (already set) blocks a
-        // second scan and g_postScanReadAttempted (set here) blocks a second
-        // re-read, so a still-failing re-read falls straight through to cooldown.
-        if (offsetAfterScan != offsetBeforeScan && !g_postScanReadAttempted)
-        {
-          g_postScanReadAttempted = true;
-          g_inCooldown = false;     // lift the cooldown for this single retry
-          lastFailedAttempt = 0;
-          _retry = max_retries - 1; // enter as the final attempt: one shot only
-          TS_PRINTF("[FREQ] New frequency offset found (%.3f -> %.3f kHz) - attempting one more read...\n",
-                    offsetBeforeScan * 1000.0, offsetAfterScan * 1000.0);
-          mqtt.executeDelayed(2000, onUpdateData);
-        }
+        startRecoveryScan(true);
       }
     }
     EVB_PRINTLN("========================================");
@@ -710,9 +721,11 @@ void onUpdateData()
 
   // Publish historical data as JSON attributes for Home Assistant.
   // The 13-month history table, monthly-usage math and JSON formatting all live
-  // in the shared MeterHistory service (src/services/meter_history.cpp) - the
-  // SAME code the ESPHome build uses - so the published format stays
-  // single-sourced across both targets.
+  // in the shared MeterHistory service (src/services/meter_history.cpp). MQTT
+  // publishes the FULL payload (cumulative history + usage) as an attribute,
+  // which has no length limit. The ESPHome build publishes a compact usage-only
+  // variant (generateHistoryJsonCompact) because a text-sensor STATE is capped at
+  // 255 chars by Home Assistant.
   if (meter_data.history_available && MeterHistory::isHistoryValid(meter_data.history))
   {
     const uint32_t currentVolume = static_cast<uint32_t>(meter_data.volume);
@@ -850,11 +863,21 @@ void onUpdateData()
 }
 
 // Function: onScheduled
-// Function: onScheduled
 // Description: Schedules daily meter readings at the configured local-offset time.
 void onScheduled()
 {
   time_t tnow = time(nullptr);
+
+  // The clock is set asynchronously by NTP, so it can still read 1970-01-01
+  // 00:00 UTC here. That date satisfies schedules such as "Monday-Sunday" at
+  // 00:00 and would fire a spurious read and latch the day before real time
+  // arrives, so wait for the same minimum epoch pollNtpSync() uses.
+  if (tnow < NTP_MIN_VALID_EPOCH)
+  {
+    mqtt.executeDelayed(500, onScheduled);
+    return;
+  }
+
   // Compute local-offset time by adding offset minutes to UTC epoch
   time_t tlocal = tnow + (time_t)TIMEZONE_OFFSET_MINUTES * 60;
   struct tm *ptm = gmtime(&tlocal);
@@ -862,9 +885,23 @@ void onScheduled()
   // Check if today is a valid reading day
   const bool timeMatch = (ptm->tm_hour == g_readHourLocal && ptm->tm_min == g_readMinuteLocal);
 
-  if (ScheduleManager::isReadingDay(ptm) && timeMatch && ptm->tm_sec == 0)
+  // Fire once anywhere inside the scheduled minute, guarded to one read per day
+  // by the date key. Keying the trigger on tm_sec == 0 (as before) meant a blocking
+  // read, frequency scan or reconnect that spanned the exact :00 second made the
+  // 500 ms poll miss the one-second window and skip the whole day's read, with
+  // nothing logged. Servicing the entire scheduled minute widens the window 60x.
+  // (A loop stall longer than the full scheduled minute can still miss it.)
+  const int today = ScheduleManager::dateKey(ptm);
+
+  // An occurrence owed by an earlier day is stale: that day is over.
+  if (g_pendingScheduledReadDateKey != today) g_pendingScheduledReadDateKey = -1;
+
+  const bool dueNow = ScheduleManager::isReadingDay(ptm) && timeMatch;
+  if ((dueNow || g_pendingScheduledReadDateKey == today) && today != g_lastScheduledReadDateKey)
   {
-    // Check if we're still in cooldown period after failed attempts
+    // Check if we're still in cooldown period after failed attempts.
+    // Defer without latching the day, remembering the occurrence so the read can
+    // still fire once the cooldown clears, even past the scheduled minute.
     if (g_inCooldown && (millis() - lastFailedAttempt) < RETRY_COOLDOWN)
     {
       unsigned long remainingCooldown = (RETRY_COOLDOWN - (millis() - lastFailedAttempt)) / 1000;
@@ -875,6 +912,7 @@ void onScheduled()
       char topicBuffer[MQTT_TOPIC_BUFFER_SIZE];
       snprintf(topicBuffer, sizeof(topicBuffer), "%s/status_message", mqttBaseTopic);
       mqtt.publish(topicBuffer, cooldownMsg, true);
+      g_pendingScheduledReadDateKey = today;
       mqtt.executeDelayed(500, onScheduled);
       return;
     }
@@ -882,6 +920,27 @@ void onScheduled()
     // Cooldown period is over, reset and proceed
     g_inCooldown = false;
     lastFailedAttempt = 0;
+
+    // A running scan owns the radio and onUpdateData() would return immediately.
+    // Defer without latching the day, as for cooldown, so the read still fires
+    // once the scan finishes however long that takes.
+    if (FrequencyManager::isScanInProgress())
+    {
+      g_pendingScheduledReadDateKey = today;
+      mqtt.executeDelayed(500, onScheduled);
+      return;
+    }
+
+    // Mark today serviced so this occurrence reads exactly once, even if another
+    // poll (or a second poll chain) observes the same minute.
+    g_pendingScheduledReadDateKey = -1;
+    g_lastScheduledReadDateKey = today;
+
+    // Arm one fresh recovery scan for this occurrence. Only a successful read used
+    // to clear these, so a scan that swept while the meter happened to be silent
+    // left the drift it exists to correct unscanned from then on.
+    g_autoScanAfterFailureDone = false;
+    g_postScanReadAttempted = false;
 
     // Call back in 23 hours
     mqtt.executeDelayed(1000 * 60 * 60 * 23, onScheduled);
@@ -1233,6 +1292,18 @@ void publishHADiscovery()
   json += "}";
   publishDiscoveryMessage("button", "everblu_meter_deep_scan", json);
 
+  const char *scanCommands[] = {"scan", "stop_scan"};
+  const char *scanNames[] = {"Frequency Scan", "Stop Frequency Scan"};
+  const char *scanIcons[] = {"mdi:magnify", "mdi:stop-circle-outline"};
+  for (size_t index = 0; index < 2; index++)
+  {
+    String object = String("everblu_meter_") + scanCommands[index];
+    json = "{\"name\":\"" + String(scanNames[index]) + "\",\"uniq_id\":\"" + getMeterPrefix() + object;
+    json += "\",\"ic\":\"" + String(scanIcons[index]) + "\",\"cmd_t\":\"" + String(mqttBaseTopic) + "/" + scanCommands[index];
+    json += "\",\"pl_prs\":\"" + String(index == 0 ? "scan" : "stop") + "\",\"ent_cat\":\"config\",\"dev\":{" + buildDeviceJson() + "}}";
+    publishDiscoveryMessage("button", object.c_str(), json);
+  }
+
   json = "{\n";
   json += "  \"name\": \"Reset Frequency Offset\",\n";
   json += "  \"uniq_id\": \"" + getMeterPrefix() + "everblu_meter_reset_frequency\",\n";
@@ -1303,49 +1374,18 @@ void onConnectionEstablished()
 {
   TS_PRINTLN("[MQTT] Connected to MQTT Broker");
 
-  TS_PRINTLN("[TIME] Configure time from NTP server. Please wait...");
+  TS_PRINTLN("[TIME] Configuring time from NTP server (non-blocking)...");
   // Note, my VLAN has no WAN/internet, so I am useing Home Assistant Community Add-on: chrony to proxy the time
   configTzTime("UTC0", SECRET_NTP_SERVER);
 
-  // Wait briefly for NTP to set the clock and report status
-  const time_t MIN_VALID_EPOCH = 1609459200; // 2021-01-01
-  const unsigned long NTP_SYNC_TIMEOUT_MS = 10000;
-  bool timeSynced = false;
-  unsigned long waitStart = millis();
-  while (millis() - waitStart < NTP_SYNC_TIMEOUT_MS)
-  {
-    time_t probe = time(nullptr);
-    if (probe >= MIN_VALID_EPOCH)
-    {
-      timeSynced = true;
-      break;
-    }
-    delay(200);
-  }
+  // Kick off NTP without blocking. Previously this callback spun in a delay()
+  // loop for up to NTP_SYNC_TIMEOUT_MS, stalling mqtt.loop()/OTA on every
+  // reconnect. pollNtpSync() in loop() now watches the clock and logs the
+  // outcome once it is set (or the timeout elapses).
+  g_awaitingNtpSync = true;
+  g_ntpSyncStartMs = millis();
 
-  time_t tnow = time(nullptr);
-  if (timeSynced)
-  {
-    TS_PRINTF("[TIME] ✓ NTP sync successful after %lu ms\n", (unsigned long)(millis() - waitStart));
-  }
-  else
-  {
-    TS_PRINTF("[WARNING] NTP sync failed within %lu ms. Clock may be unset (epoch=%ld).\n",
-                  (unsigned long)(millis() - waitStart), (long)tnow);
-  }
-
-  struct tm *ptm = gmtime(&tnow);
-  TS_PRINTF("[TIME] current date (UTC) : %04d/%02d/%02d %02d:%02d:%02d - %ld\n", ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, (long)tnow);
-  // Print simple offset and derived local time for debugging
-  int offsetMin = TIMEZONE_OFFSET_MINUTES;
-  time_t tlocal = tnow + (time_t)offsetMin * 60;
-  struct tm *plocal = gmtime(&tlocal);
-  TS_PRINTF("[TIME] Configured UTC offset: %+d minutes\n", offsetMin);
-  TS_PRINTF("[TIME] Current date (UTC+offset): %04d/%02d/%02d %02d:%02d:%02d - %ld\n",
-                plocal->tm_year + 1900, plocal->tm_mon + 1, plocal->tm_mday,
-                plocal->tm_hour, plocal->tm_min, plocal->tm_sec, (long)tlocal);
-
-  // Initialize schedule caches using validated UTC defaults
+  // Initialize schedule caches using validated UTC defaults (time-independent)
   updateResolvedScheduleFromUtc(DEFAULT_READING_HOUR_UTC, DEFAULT_READING_MINUTE_UTC);
 
   TS_PRINTLN("[OTA] Configure Arduino OTA flash.");
@@ -1474,6 +1514,16 @@ void onConnectionEstablished()
     EVB_PRINTLN("Deep frequency scan command received via MQTT");
     performDeepFrequencyScan(); });
 
+  char scanTopic[MQTT_TOPIC_BUFFER_SIZE];
+  snprintf(scanTopic, sizeof(scanTopic), "%s/scan", mqttBaseTopic);
+  mqtt.subscribe(scanTopic, [](const String &message) {
+    if (message == "scan" && _retry == 0) startRecoveryScan(false);
+  });
+  snprintf(scanTopic, sizeof(scanTopic), "%s/stop_scan", mqttBaseTopic);
+  mqtt.subscribe(scanTopic, [](const String &message) {
+    if (message == "stop") FrequencyManager::requestScanCancel();
+  });
+
   char resetFrequencyTopic[MQTT_TOPIC_BUFFER_SIZE];
   snprintf(resetFrequencyTopic, sizeof(resetFrequencyTopic), "%s/reset_frequency", mqttBaseTopic);
   mqtt.subscribe(resetFrequencyTopic, [](const String &message)
@@ -1572,7 +1622,11 @@ void onConnectionEstablished()
   TS_PRINTLN("[STATUS] Setup done");
   EVB_PRINTLN("================================\n");
 
+#if DISABLE_SCHEDULED_READINGS
+  TS_PRINTLN("[SCHEDULE] Scheduled readings disabled (DISABLE_SCHEDULED_READINGS); manual reads only.");
+#else
   onScheduled();
+#endif
 }
 
 // ============================================================================
@@ -1620,34 +1674,42 @@ static void publishFrequencyOffsetToMqtt()
 //              status + resulting offset topic).
 void performDeepFrequencyScan(float scanRangeMHz, float scanStepMHz)
 {
-  TS_PRINTLN("[FREQ] [NOTE] Wi-Fi/MQTT connections may temporarily drop and reconnect while the scan is running. This is expected.");
+  if (FrequencyManager::isScanInProgress() || _retry > 0) return;
+  g_scanRetryRead = false;
+  FrequencyManager::beginDeepFrequencyScan(scanRangeMHz, scanStepMHz, mqttFrequencyStatus);
+  g_scanActive = FrequencyManager::isScanInProgress();
+}
 
-  // FrequencyManager reports the final radio state via mqttFrequencyStatus
-  // ("Idle" on success/failure, "Error" if the radio did not respond), so we do
-  // NOT re-publish cc1101_state here. Doing so used the boot-time
-  // cc1101RadioConnected flag, which is still false during an early auto-scan and
-  // would wrongly overwrite the callback's "Idle" with "Not Connected".
-  FrequencyManager::performDeepFrequencyScan(scanRangeMHz, scanStepMHz, mqttFrequencyStatus);
-
-  publishFrequencyOffsetToMqtt();
+static void startRecoveryScan(bool retryRead)
+{
+  if (FrequencyManager::isScanInProgress()) return;
+  g_scanRetryRead = retryRead;
+  FrequencyManager::beginRecoveryScan(mqttFrequencyStatus);
+  g_scanActive = FrequencyManager::isScanInProgress();
 }
 
 // Function: resetFrequencyOffset
-// Description: Clears the persisted CC1101 frequency offset back to 0, re-tunes
-//              the radio to the configured base frequency and mirrors the reset
+// Description: Erases the persisted CC1101 frequency calibration, re-tunes the
+//              radio to the configured base frequency and mirrors the reset
 //              values to MQTT. This is the MQTT-build equivalent of the ESPHome
 //              "Reset Frequency Offset" button and shares FrequencyManager so the
 //              storage/re-tune logic stays single-sourced across both targets.
 void resetFrequencyOffset()
 {
+  if (FrequencyManager::isScanInProgress() || _retry > 0) return;
   TS_PRINTLN("[FREQ] Resetting frequency offset to 0");
 
-  // Reset the stored offset to 0 and persist it.
-  FrequencyManager::saveFrequencyOffset(0.0);
-
-  // Reset adaptive tracking so a stale correction history cannot immediately
-  // re-apply an offset after the reset.
-  FrequencyManager::resetAdaptiveTracking();
+  // Erase rather than store a zero, so the meter counts as uncalibrated again and
+  // auto-scan and the stored-calibration quality guard both re-arm. A refused erase
+  // leaves the offset in place, so report it instead of retuning and publishing a
+  // reset that did not happen.
+  if (!FrequencyManager::clearCalibration())
+  {
+    TS_PRINTF("[FREQ] Could not erase stored calibration - offset left at %.3f kHz\n",
+              FrequencyManager::getOffset() * 1000.0f);
+    publishSub("last_error", "Frequency offset reset failed - storage write error", true);
+    return;
+  }
 
   // Re-initialize the radio at the base frequency.
   const float baseFrequency = FrequencyManager::getBaseFrequency();
@@ -1678,6 +1740,7 @@ void resetFrequencyOffset()
 //              know about, and the output matches the ESPHome "Diagnostic Report" button.
 void printDiagnosticReport()
 {
+  if (FrequencyManager::isScanInProgress()) return;
   cc1101_report_context_t ctx;
   ctx.meter_code = METER_CODE;
   ctx.meter_year = g_meterYear;
@@ -1968,18 +2031,16 @@ void setup()
   FrequencyManager::setMeterReadCallback(get_meter_data);
   FrequencyManager::setAutoScanEnabled(autoScanEnabled);
   FrequencyManager::setAdaptiveThreshold(ADAPT_THRESHOLD);
-  const float loadedOffset = FrequencyManager::begin(FREQUENCY);
-
-  const bool noStoredOffset = (loadedOffset == 0.0f);
+  FrequencyManager::begin(FREQUENCY);
 
   // If no valid frequency offset found and auto-scan is enabled, perform Deep scan.
   // FrequencyManager updates its own stored offset during the scan, so no reload.
-  if (noStoredOffset && autoScanEnabled)
+  if (FrequencyManager::shouldPerformAutoScan())
   {
     TS_PRINTLN("[FREQ] No stored frequency offset found. Performing Deep frequency scan...");
     performDeepFrequencyScan();
   }
-  else if (noStoredOffset)
+  else if (!autoScanEnabled)
   {
     TS_PRINTLN("[FREQ] AUTO_SCAN_ENABLED=0; skipping automatic frequency scan (offset remains 0.0 MHz).");
   }
@@ -2013,6 +2074,12 @@ void setup()
   TS_PRINTF("[SCHEDULE] Reading schedule (configured): %s\n", readingSchedule);
   validateReadingSchedule();
   TS_PRINTF("[SCHEDULE] Reading schedule (effective): %s\n", readingSchedule);
+
+  // Wire the effective schedule into ScheduleManager. Without this, onScheduled()
+  // calls ScheduleManager::isReadingDay(), which reads the static default
+  // ("Monday-Friday") - so a configured DEFAULT_READING_SCHEDULE was honoured in
+  // the logs and HA discovery but silently ignored when deciding the reading day.
+  ScheduleManager::setSchedule(readingSchedule);
 
   // Log effective frequency and warn if default is used
   TS_PRINTF("[FREQ] Frequency (effective): %.6f MHz\n", (double)FREQUENCY);
@@ -2074,6 +2141,50 @@ void setup()
 // ============================================================================
 
 /**
+ * @brief Non-blocking NTP sync poll
+ *
+ * Counterpart to the NTP kick-off in onConnectionEstablished(). Called from
+ * loop(); logs the sync result (and the current UTC / local time) exactly once,
+ * either when the clock becomes valid or when NTP_SYNC_TIMEOUT_MS elapses
+ * without a sync. Schedule caches are time-independent and are set on connect.
+ */
+void pollNtpSync()
+{
+  if (!g_awaitingNtpSync)
+    return;
+
+  const time_t tnow = time(nullptr);
+  const bool synced = tnow >= NTP_MIN_VALID_EPOCH;
+  const unsigned long elapsed = millis() - g_ntpSyncStartMs;
+
+  if (!synced && elapsed < NTP_SYNC_TIMEOUT_MS)
+    return; // still waiting for the clock to be set
+
+  g_awaitingNtpSync = false;
+
+  if (synced)
+  {
+    TS_PRINTF("[TIME] ✓ NTP sync successful after %lu ms\n", elapsed);
+  }
+  else
+  {
+    TS_PRINTF("[WARNING] NTP sync failed within %lu ms. Clock may be unset (epoch=%ld).\n",
+                  elapsed, (long)tnow);
+  }
+
+  struct tm *ptm = gmtime(&tnow);
+  TS_PRINTF("[TIME] current date (UTC) : %04d/%02d/%02d %02d:%02d:%02d - %ld\n", ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, (long)tnow);
+  // Print simple offset and derived local time for debugging
+  int offsetMin = TIMEZONE_OFFSET_MINUTES;
+  time_t tlocal = tnow + (time_t)offsetMin * 60;
+  struct tm *plocal = gmtime(&tlocal);
+  TS_PRINTF("[TIME] Configured UTC offset: %+d minutes\n", offsetMin);
+  TS_PRINTF("[TIME] Current date (UTC+offset): %04d/%02d/%02d %02d:%02d:%02d - %ld\n",
+                plocal->tm_year + 1900, plocal->tm_mon + 1, plocal->tm_mday,
+                plocal->tm_hour, plocal->tm_min, plocal->tm_sec, (long)tlocal);
+}
+
+/**
  * @brief Main loop function
  *
  * Handles MQTT communication, OTA updates, state machine execution,
@@ -2086,6 +2197,32 @@ void loop()
 #if WIFI_SERIAL_MONITOR_ENABLED
   wifiSerialLoop();
 #endif
+
+  pollNtpSync();
+
+  if (g_scanActive)
+  {
+    FrequencyManager::loopScan();
+    if (!FrequencyManager::isScanInProgress())
+    {
+      g_scanActive = false;
+      publishFrequencyOffsetToMqtt();
+      // A scan started by a failed read still owes that reading once it has verified a
+      // tuning, even when that tuning is the one already stored: a meter that went quiet
+      // and came back on the same frequency would otherwise wait out the whole cooldown.
+      if (g_scanRetryRead && !g_postScanReadAttempted &&
+          FrequencyManager::lastScanOutcome() == FrequencyManager::ScanOutcome::Found)
+      {
+        g_postScanReadAttempted = true;
+        g_inCooldown = false;
+        lastFailedAttempt = 0;
+        _retry = max_retries - 1;
+        mqtt.executeDelayed(2000, onUpdateData);
+      }
+      g_scanRetryRead = false;
+    }
+    return;
+  }
 
   // Update diagnostics and Wi-Fi details every 5 minutes
   if (millis() - lastWifiUpdate > 300000)

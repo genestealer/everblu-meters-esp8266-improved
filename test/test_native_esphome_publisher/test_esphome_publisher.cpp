@@ -10,11 +10,13 @@
 
 #include <unity.h>
 
+#include <algorithm>
 #include <string>
 
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
+#include "esphome/core/log.h"
 
 #include "esphome_data_publisher.h"
 #include "utils.h"
@@ -304,25 +306,33 @@ void test_pub_history_publishes_json_payload(void)
     publisher().publishMeterReading(data, "t"); // caches the current volume
     publisher().publishHistory(history, true);
 
+    // The ESPHome text-sensor state uses the compact usage-only form (no
+    // cumulative "history" array) to stay within HA's 255-char state limit (#67).
     TEST_ASSERT_EQUAL_STRING(
-        "{\"history\":[100,150,220],\"monthly_usage\":[50,70],"
+        "{\"monthly_usage\":[50,70],"
         "\"current_month_usage\":40,\"months_available\":3}",
         g_sensors.history.last());
 }
 
-void test_pub_history_reports_unavailable_when_not_decoded(void)
+void test_pub_history_publishes_empty_json_when_not_decoded(void)
 {
     uint32_t history[13] = {0};
     publisher().publishHistory(history, false);
 
-    TEST_ASSERT_EQUAL_STRING("unavailable", g_sensors.history.last());
+    // A valid empty document rather than "unavailable", so HA never shows the
+    // sensor as unknown and template parsing does not throw (#67).
+    TEST_ASSERT_EQUAL_STRING(
+        "{\"monthly_usage\":[],\"current_month_usage\":0,\"months_available\":0}",
+        g_sensors.history.last());
 }
 
-void test_pub_history_reports_unavailable_for_a_null_array(void)
+void test_pub_history_publishes_empty_json_for_a_null_array(void)
 {
     publisher().publishHistory(nullptr, true);
 
-    TEST_ASSERT_EQUAL_STRING("unavailable", g_sensors.history.last());
+    TEST_ASSERT_EQUAL_STRING(
+        "{\"monthly_usage\":[],\"current_month_usage\":0,\"months_available\":0}",
+        g_sensors.history.last());
 }
 
 void test_pub_history_without_a_sensor_is_safe(void)
@@ -483,25 +493,27 @@ void test_pub_wifi_details_and_discovery_are_no_ops(void)
 
 void test_pub_shared_sensors_keep_their_first_registration(void)
 {
-    // Calibration and radio entities describe the one shared CC1101, so a
-    // second meter instance in the same YAML must not steal them.
     Sensor secondOffset;
+    Sensor secondTuned;
     TextSensor secondRadioState;
     BinarySensor secondConnected;
 
     ESPHomeDataPublisher second;
     second.set_frequency_offset_sensor(&secondOffset);
+    second.set_tuned_frequency_sensor(&secondTuned);
     second.set_radio_state_sensor(&secondRadioState);
     second.set_radio_connected_sensor(&secondConnected);
 
     second.publishFrequencyOffset(0.010f);
+    second.publishTunedFrequency(433.83f);
     second.publishRadioState("Idle");
 
-    TEST_ASSERT_FALSE(secondOffset.published());
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 10.0f, secondOffset.last());
+    TEST_ASSERT_FLOAT_WITHIN(0.0001f, 433.83f, secondTuned.last());
     TEST_ASSERT_FALSE(secondRadioState.published());
     TEST_ASSERT_FALSE(secondConnected.published());
 
-    TEST_ASSERT_FLOAT_WITHIN(0.001f, 10.0f, g_sensors.frequencyOffset.last());
+    TEST_ASSERT_FALSE(g_sensors.frequencyOffset.published());
     TEST_ASSERT_EQUAL_STRING("Idle", g_sensors.radioState.last());
 }
 
@@ -522,4 +534,25 @@ void test_pub_per_meter_sensors_are_not_shared(void)
     TEST_ASSERT_EQUAL_STRING("Ready", secondStatus.last());
     TEST_ASSERT_FALSE(g_sensors.volume.published());
     TEST_ASSERT_FALSE(g_sensors.status.published());
+}
+
+// ---------------------------------------------------------------------------
+// Shared logging, built the ESPHome way
+// ---------------------------------------------------------------------------
+
+void test_echo_debug_routes_through_the_esphome_logger(void)
+{
+    // In ESPHome builds echo_debug() must reach ESP_LOGI so the line appears in
+    // the API/WiFi log, not just on the UART, and the trailing newline the
+    // MQTT formatting relies on has to be stripped because ESP_LOG adds its own.
+    std::string captured;
+    esphome::native_log_capture() = &captured;
+    echo_debug(true, "[METER] esphome routed line\n");
+    echo_debug(false, "[METER] suppressed line\n");
+    esphome::native_log_capture() = nullptr;
+
+    TEST_ASSERT_TRUE(captured.find("[METER] esphome routed line") != std::string::npos);
+    TEST_ASSERT_TRUE(captured.find("suppressed") == std::string::npos);
+    // One log record, so the newline inside the message was removed.
+    TEST_ASSERT_EQUAL(1, (int)std::count(captured.begin(), captured.end(), '\n'));
 }

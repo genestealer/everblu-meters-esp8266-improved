@@ -15,7 +15,7 @@ esphome:
   friendly_name: ${friendly_name}
   # Sub-devices: each meter appears as its own device in Home Assistant.
   # Entities below reference these via `device_id:`. Shared-radio entities
-  # (CC1101 state/connected, firmware, frequency calibration) are left without
+  # (CC1101 state/connected and firmware) are left without
   # a device_id so they stay on the main ${friendly_name} node.
   devices:
     - id: water_meter_device_1
@@ -78,7 +78,7 @@ spi:
 
 everblu_meter:
   - id: water_meter_1
-    meter_code: "20-0257750-000"  # year=20, serial=257750 (dashed form, suffix 000 ignored)
+    meter_code: "XX-XXXXXXX-XXX"  # Replace with the first meter's code
     meter_type: water
     debug_cc1101: true
     spi_id: main_bus
@@ -102,30 +102,16 @@ everblu_meter:
     request_reading_button:
       name: "${meter_1_prefix} Read Meter Now"
       device_id: water_meter_device_1
-    # Frequency calibration is a property of the shared CC1101 radio, not the
-    # meter. Declare these buttons/sensors on METER 1 ONLY - there is one base
-    # frequency, one offset and one tuned frequency for the whole device.
-    #
-    # Every entry must use the SAME `frequency:` value (all entries here use the
-    # default). FrequencyManager::begin() is called per entry and overwrites a
-    # single global, so only the LAST entry's value takes effect and any others
-    # are silently ignored.
-    #
-    # A scan has two properties that can disagree:
-    #   - which METER answers: the entry that triggered the scan. For this button
-    #     that is meter 1; for the automatic auto_scan_on_failure scan it is
-    #     whichever meter just exhausted its own retries.
-    #   - which FREQUENCIES are swept: always centred on the single global base
-    #     frequency, never on the triggering entry's `frequency:`.
-    # Both are logged at scan start, e.g.
-    #   Starting frequency scan using meter 20-0257750 (water)...
-    #   Scan centred on 433.820007 MHz (this meter is configured for 433.820007 MHz)
-    #
-    # For genuinely independent calibration, use one CC1101 (and one ESP) per meter.
+    frequency: 433.82
+    scan_button:
+      name: "${meter_1_prefix} Frequency Scan"
+      device_id: water_meter_device_1
     deep_scan_button:
-      name: "Radio Deep Frequency Scan"
+      name: "${meter_1_prefix} Deep Frequency Scan"
+      device_id: water_meter_device_1
     reset_frequency_button:
-      name: "Radio Reset Frequency Offset"
+      name: "${meter_1_prefix} Reset Frequency Offset"
+      device_id: water_meter_device_1
     stop_reading_button:
       name: "${meter_1_prefix} Stop Reading"
       device_id: water_meter_device_1
@@ -161,13 +147,15 @@ everblu_meter:
     failed_reads:
       name: "${meter_1_prefix} Failed Reads"
       device_id: water_meter_device_1
-    # Global (per-radio) calibration sensors - declared on this meter only.
     frequency_offset:
-      name: "Radio Frequency Offset"
+      name: "${meter_1_prefix} Frequency Offset"
+      device_id: water_meter_device_1
     tuned_frequency:
-      name: "Radio Tuned Frequency (MHz)"
+      name: "${meter_1_prefix} Tuned Frequency (MHz)"
+      device_id: water_meter_device_1
     frequency_estimate:
-      name: "Radio Frequency Estimate"
+      name: "${meter_1_prefix} Frequency Estimate"
+      device_id: water_meter_device_1
 
     meter_serial_sensor:
       name: "${meter_1_prefix} Meter Serial"
@@ -219,7 +207,7 @@ everblu_meter:
       name: "CC1101 Connected"        # device-level (shared radio) - stays on main node
 
   - id: water_meter_2
-    meter_code: "20-0257751-000"  # year=20, serial=257751 (dashed form, suffix 000 ignored)
+    meter_code: "XX-XXXXXXX-XXX"  # Replace with the second meter's code
     meter_type: water
     debug_cc1101: true
     spi_id: main_bus
@@ -244,13 +232,16 @@ everblu_meter:
     stop_reading_button:
       name: "${meter_2_prefix} Stop Reading"
       device_id: water_meter_device_2
-    # No frequency calibration entities here. deep_scan_button,
-    # reset_frequency_button and the offset/tuned-frequency sensors are
-    # radio-global and are declared on meter 1 only (see water_meter_1 above).
-    #
-    # Do NOT set `frequency:` here to a different value from water_meter_1 -
-    # there is a single global base frequency and the last entry to initialise
-    # silently wins.
+    frequency: 433.82
+    scan_button:
+      name: "${meter_2_prefix} Frequency Scan"
+      device_id: water_meter_device_2
+    deep_scan_button:
+      name: "${meter_2_prefix} Deep Frequency Scan"
+      device_id: water_meter_device_2
+    reset_frequency_button:
+      name: "${meter_2_prefix} Reset Frequency Offset"
+      device_id: water_meter_device_2
 
     volume:
       name: "${meter_2_prefix} Water Volume"
@@ -282,6 +273,15 @@ everblu_meter:
       device_id: water_meter_device_2
     failed_reads:
       name: "${meter_2_prefix} Failed Reads"
+      device_id: water_meter_device_2
+    frequency_offset:
+      name: "${meter_2_prefix} Frequency Offset"
+      device_id: water_meter_device_2
+    tuned_frequency:
+      name: "${meter_2_prefix} Tuned Frequency (MHz)"
+      device_id: water_meter_device_2
+    frequency_estimate:
+      name: "${meter_2_prefix} Frequency Estimate"
       device_id: water_meter_device_2
 
     meter_serial_sensor:

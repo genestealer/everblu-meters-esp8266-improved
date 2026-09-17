@@ -32,7 +32,7 @@ Two independent deployment targets share the same core radio/protocol logic:
 **Supports both water meters (readings in litres) and gas meters (readings in cubic metres)**.
 
 > [!NOTE]
-> **This project runs on both ESP8266 and ESP32.** Despite the `esp8266` in the repository name (kept for historical continuity), the firmware fully supports ESP32 and ESP32-C3 as well. Both deployment targets — the standalone MQTT firmware and the ESPHome component — are built and CI-tested on ESP8266 **and** ESP32 (see the ESP32 Build badge above). Ready-to-use PlatformIO environments ship for both families: `huzzah`, `d1_mini`, `d1_mini_pro`, `nodemcuv2` (ESP8266) and `esp32dev`, `esp32-c3-ard` (ESP32/ESP32-C3). There is also a [Nano ESP32 ESPHome example](ESPHOME/example-nano-esp32.yaml).
+> **This project runs on both ESP8266 and ESP32.** Despite the `esp8266` in the repository name (kept for historical continuity), the firmware fully supports ESP32 and ESP32-C3 as well. Both deployment targets, the standalone MQTT firmware and the ESPHome component, are built and CI-tested on ESP8266 **and** ESP32 (see the ESP32 Build badge above). Ready-to-use PlatformIO environments ship for both families: `huzzah`, `d1_mini`, `d1_mini_pro`, `nodemcuv2` (ESP8266) and `esp32dev`, `esp32-c3-ard` (ESP32/ESP32-C3). There is also a [Nano ESP32 ESPHome example](ESPHOME/example-nano-esp32.yaml).
 
 ---
 
@@ -150,7 +150,7 @@ A quick overview of what the firmware does:
 
 The firmware implements multiple layers of validation to ensure data integrity:
 
-1. **Custom Serial Decoding**: RADIAN protocol uses a proprietary serial encoding with 1 start bit + 8 data bits (LSB first) + 3 stop bits per byte. Each bit is oversampled 4x for noise immunity (logical '1' = 0xF0, logical '0' = 0x0F). The decoder verifies bit-level transitions, counts consecutive samples, validates start/stop bits, and extracts clean data bytes. This is NOT standard Manchester encoding-it's custom serial framing that must be decoded in software.
+1. **Custom Serial Decoding**: RADIAN protocol uses a proprietary serial encoding with 1 start bit + 8 data bits (LSB first) + 3 stop bits per byte. Each bit is oversampled 4x for noise immunity (logical '1' = 0xF0, logical '0' = 0x0F). The decoder verifies bit-level transitions, counts consecutive samples, validates start/stop bits, and extracts clean data bytes. This is custom serial framing, not standard Manchester encoding, and it must be decoded in software.
 
 2. **CRC-16/KERMIT Checksum**: Each RADIAN frame includes a 16-bit checksum (polynomial 0x8408, init 0x0000). Technically this is a Frame Check Sequence (FCS), not a true CRC, but it's highly effective at catching transmission errors and corrupted frames. The checksum is computed over the full 124-byte frame (bytes [0..121], including the length byte) and compared against the trailer in the last two bytes [122-123]. The firmware rejects any frame that fails this check.
 
@@ -575,7 +575,9 @@ Each of these appears in Home Assistant as a button on the device. `<serial>` is
 | **Button**               | **MQTT Topic**                             | **Payload** | **Description**                                                   |
 | ------------------------ | ------------------------------------------ | ----------- | ----------------------------------------------------------------- |
 | `Request Reading Now`    | `everblu/cyble/<serial>/trigger_force`     | `update`    | Read the meter immediately, bypassing the cooldown.               |
-| `Deep Frequency Scan`    | `everblu/cyble/<serial>/deep_scan`         | `scan`      | Sweep ±150 kHz in 2.5 kHz steps and store the best offset.        |
+| `Frequency Scan`         | `everblu/cyble/<serial>/scan`              | `scan`      | Search near saved tuning, then widen if empty. |
+| `Deep Frequency Scan`    | `everblu/cyble/<serial>/deep_scan`         | `scan`      | Coarse/fine acquisition across ±150 kHz, then refine and verify. |
+| `Stop Frequency Scan`    | `everblu/cyble/<serial>/stop_scan`         | `stop`      | Cancel between transactions and restore previous tuning. |
 | `Reset Frequency Offset` | `everblu/cyble/<serial>/reset_frequency`   | `reset`     | Clear the stored calibration and re-tune from the base frequency. |
 | `Diagnostic Report`      | `everblu/cyble/<serial>/diagnostic_report` | `report`    | Log and publish the wiring / SPI link / radio report. See below.  |
 | `Restart Device`         | `everblu/cyble/<serial>/restart`           | `restart`   | Reboot the ESP.                                                   |
@@ -604,7 +606,7 @@ When several ESP devices share one MQTT broker, the firmware appends the meter s
 
 **Recommended:** Create a Home Assistant Utility Meter helper to preserve historical data across platform or meter changes.
 
-**Why?** If you switch between MQTT and ESPHome, change meter serial numbers, or replace hardware, a utility meter helper acts as a stable interface. You simply update the source sensor in the helper configuration, and all your historical data, dashboards, and automations remain intact.
+**Why?** If you switch between MQTT and ESPHome, change meter serial numbers, or replace hardware, a utility meter helper acts as a stable interface. You update the source sensor in the helper configuration, and all your historical data, dashboards, and automations remain intact.
 
 **Setup:**
 
@@ -632,7 +634,7 @@ utility_meter:
     name: Master Water Meter
 ```
 
-When you change platforms or meters, simply update the `source` to point to the new sensor - your history remains unbroken.
+When you change platforms or meters, update the `source` to point to the new sensor. Your history remains unbroken.
 
 ### Migrating Sensor History Between Platforms
 
@@ -741,9 +743,9 @@ Both MQTT and ESPHome modes expose a **history sensor** containing up to 13 mont
    - If you need to skip the scan during development (for example, when you already know the meter's frequency), add `#define AUTO_SCAN_ENABLED 0` to your `include/private.h`.
    - Compile and upload the code to your ESP device using PlatformIO. Use **PlatformIO > Upload and Monitor**.
    - **Keep the device connected to your computer during this process.** The serial monitor will display debug output as the device scans frequencies in the 433 MHz range.
-   - **Important**: During the initial scan (first boot with no stored frequency offset), the device performs a wide frequency scan that takes approximately 2 minutes **before** connecting to MQTT. You will see no MQTT/Home Assistant activity during this time - this is normal. Monitor the serial output to see the scan progress. Once the scan completes and the optimal frequency is found, the device will connect to MQTT and publish telemetry data.
+  - Scans advance between complete radio transactions while the main loop services MQTT. Each transaction takes several seconds, and refinement can add minutes. Follow the phase messages in the logs or status entity.
    - Once the correct frequency is identified, update the `FREQUENCY` value in `private.h` if needed (the automatic scan stores the offset, so manual adjustment is usually not required).
-   - To re-run the deep scan later, either set `CLEAR_EEPROM_ON_BOOT` to `1` for a single boot cycle, re-enable `AUTO_SCAN_ENABLED`, or press the **Deep Frequency Scan** button (`mdi:radar`) exposed in Home Assistant to trigger a full ±150 kHz fine-step sweep on demand. A faster **Fast Frequency Scan** button (`mdi:magnify-scan`) is also available for a quicker ±150 kHz coarse-step recalibration. **Note**: Both on-demand scan buttons can block for 1–2 minutes during which Wi-Fi/MQTT may temporarily disconnect and reconnect. This is expected, and Home Assistant will reconnect automatically once the scan completes.
+  - Use **Frequency Scan** for a local search around saved tuning with automatic wide fallback, or **Deep Frequency Scan** to start across ±150 kHz. **Stop Frequency Scan** cancels at the next transaction boundary. Both modes bracket and refine a discovered response window, then verify before saving. Enabling `AUTO_SCAN_ENABLED` does not replace an existing calibration; use the button to recalibrate.
    - **Automatic recovery on failure**: Separately from the first-boot scan, when a full streak of read attempts fails (`MAX_RETRIES` reached) and the firmware enters its cooldown period, it can run a frequency scan once to check for meter carrier-frequency (crystal) drift. This is controlled by `AUTO_SCAN_ON_FAILURE_ENABLED` (default `0`, opt-in). Set `#define AUTO_SCAN_ON_FAILURE_ENABLED 1` in `include/private.h` to enable it; it runs at most once per failure streak (reset after the next successful read).
    - For best results, perform this step during local business hours when the meter is most likely to transmit. Refer to the "Frequency Adjustment" section below for additional guidance.
 
@@ -755,7 +757,7 @@ Both MQTT and ESPHome modes expose a **history sensor** containing up to 13 mont
 6. **Verify Meter Data**
    - After WiFi and MQTT connection is established (or after the initial frequency scan completes), the meter data should appear in the terminal (bottom panel) and be pushed to MQTT.
    - If Frequency Discovery is still enabled, its output will also be displayed during this step.
-   - **Note**: On first boot with no stored frequency offset, there will be a ~2 minute delay before any MQTT activity while the wide frequency scan runs. This is normal - monitor the serial output to see progress.
+   - **Note**: On first boot with no stored frequency offset, there will be a ~2 minute delay before any MQTT activity while the wide frequency scan runs. This is normal; monitor the serial output to see progress.
 
 7. **Automatic Meter Query**
    - The device will automatically query the meter once every 24 hours.
@@ -764,8 +766,7 @@ Both MQTT and ESPHome modes expose a **history sensor** containing up to 13 mont
 <details>
 <summary>Continuous Integration (for contributors)</summary>
 
-This project uses GitHub Actions for automated building, testing, and code quality checks.
-Every push and pull request triggers builds and quality checks to ensure code quality and compatibility.
+This project uses GitHub Actions to build, test, and run quality checks on every push and pull request, so both platforms stay compatible.
 
 The CI workflows include:
 
@@ -1045,7 +1046,7 @@ A CC1101 433 MHz module with an external wire-coil antenna typically reaches 300
 ## Important: Utility Read Counter Compatibility
 
 > [!IMPORTANT]
-> The meter includes a built-in **read counter** that increments each time it's queried. When your water/gas company performs wireless readings, they expect this counter to match their scheduled read count. **This is not an MQTT or ESP issue** - it's how the RADIAN protocol and meter hardware work.
+> The meter includes a built-in **read counter** that increments each time it's queried. When your water/gas company performs wireless readings, they expect this counter to match their scheduled read count. **This behaviour comes from the RADIAN protocol and meter hardware, not from MQTT or the ESP.**
 
 If you regularly read your meter yourself:
 

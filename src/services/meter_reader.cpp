@@ -5,6 +5,7 @@
 
 #include "meter_reader.h"
 #include "meter_history.h"
+#include "schedule_manager.h"
 
 // Conditional includes based on build environment
 #ifdef USE_ESPHOME
@@ -49,7 +50,7 @@ static void logReadableSummary(const tmeter_data &data, const IConfigProvider *c
 }
 
 MeterReader::MeterReader(IConfigProvider *config, ITimeProvider *timeProvider, IDataPublisher *publisher)
-    : m_config(config), m_timeProvider(timeProvider), m_publisher(publisher), m_initialized(false), m_readingInProgress(false), m_isScheduledRead(false), m_haConnected(false), m_radioConnected(false), m_scanInProgress(false), m_retryCount(0), m_inCooldown(false), m_lastFailedAttempt(0), m_nextRetryTime(0), m_autoScanAfterFailureDone(false), m_retryFailureReason(ReadFailure::None), m_totalReadAttempts(0), m_successfulReads(0), m_failedReads(0), m_lastErrorMessage("None"), m_lastScheduleCheck(0), m_lastStatsPublish(0), m_readHourLocal(10), m_readMinuteLocal(0), m_lastReadDayMatch(false), m_lastReadTimeMatch(false)
+    : m_config(config), m_timeProvider(timeProvider), m_publisher(publisher), m_initialized(false), m_readingInProgress(false), m_isScheduledRead(false), m_haConnected(false), m_radioConnected(false), m_scanInProgress(false), m_retryCount(0), m_inCooldown(false), m_lastFailedAttempt(0), m_nextRetryTime(0), m_autoScanAfterFailureDone(false), m_retryFailureReason(ReadFailure::None), m_totalReadAttempts(0), m_successfulReads(0), m_failedReads(0), m_lastErrorMessage("None"), m_lastScheduleCheck(0), m_lastStatsPublish(0), m_readHourLocal(10), m_readMinuteLocal(0), m_lastScheduledReadDateKey(-1), m_pendingScheduledReadDateKey(-1)
 {
 }
 
@@ -77,28 +78,32 @@ tmeter_data MeterReader::meterReadCallback()
         s_active_reader->m_config->getMeterSerial());
 }
 
-void MeterReader::activateCallbackContext()
+bool MeterReader::activateCallbackContext()
 {
+    if (!FrequencyManager::activateCalibration(m_calibration)) return false;
     s_active_reader = this;
+    return true;
 }
 
 void MeterReader::begin()
 {
     LOG_I("everblu_meter", "Initializing...");
 
-    activateCallbackContext();
+    if (!activateCallbackContext()) return;
 
     // Register FrequencyManager callbacks
     FrequencyManager::setRadioInitCallback(MeterReader::radioInitCallback);
     FrequencyManager::setMeterReadCallback(MeterReader::meterReadCallback);
 
-    // Initialize FrequencyManager with configured frequency.
-    // NOTE: The frequency offset is a property of the RADIO, not the meter. It is held in
-    // FrequencyManager's static state and persisted under a single storage key, so it is shared
-    // by every meter that uses the same CC1101. In multi-meter setups all meters on one radio must
-    // therefore be configured with the same base `frequency` for the shared offset to be valid.
     float frequency = m_config->getFrequency();
-    FrequencyManager::begin(frequency);
+    char storageKey[24];
+#ifdef USE_ESPHOME
+    snprintf(storageKey, sizeof(storageKey), "freq_%02u_%07lu", m_config->getMeterYear(),
+             (unsigned long)m_config->getMeterSerial());
+#else
+    snprintf(storageKey, sizeof(storageKey), "freq_offset");
+#endif
+    FrequencyManager::initialiseCalibration(m_calibration, frequency, storageKey);
     FrequencyManager::setAutoScanEnabled(m_config->isAutoScanEnabled());
 
     // Note: Adaptive threshold is set by the platform (ESPHome/MQTT) after this method
@@ -110,18 +115,17 @@ void MeterReader::begin()
     bool radio_ok = cc1101_init(effectiveFrequency);
     m_radioConnected = radio_ok; // Store radio initialization status for republish checks
 
-    // Calculate local reading time from UTC and timezone offset
-    int utcHour = m_config->getReadHourUTC();
-    int utcMinute = m_config->getReadMinuteUTC();
+    // Calculate local reading time from UTC and timezone offset. Clamp the
+    // configured hour/minute to valid ranges first: a bad config (e.g.
+    // read_hour=27) would otherwise compute a local time that never matches the
+    // clock, so the read would never fire. Shared with ScheduleManager so the
+    // clamping and conversion rules live in exactly one place.
+    int utcHour = constrain(m_config->getReadHourUTC(), 0, 23);
+    int utcMinute = constrain(m_config->getReadMinuteUTC(), 0, 59);
     int offsetMinutes = m_config->getTimezoneOffsetMinutes();
 
-    int totalUtcMin = utcHour * 60 + utcMinute;
-    int localMin = (totalUtcMin + offsetMinutes) % (24 * 60);
-    if (localMin < 0)
-        localMin += 24 * 60;
-
-    m_readHourLocal = localMin / 60;
-    m_readMinuteLocal = localMin % 60;
+    ScheduleManager::localReadingTime(utcHour, utcMinute, offsetMinutes,
+                                      m_readHourLocal, m_readMinuteLocal);
 
     LOG_I("everblu_meter", "Scheduled reading time: %02d:%02d UTC (%02d:%02d local)",
           utcHour, utcMinute, m_readHourLocal, m_readMinuteLocal);
@@ -203,26 +207,51 @@ void MeterReader::loop()
     // it finishes rather than retuning the radio mid-sweep.
     if (FrequencyManager::isScanInProgress())
     {
+        // Keep sampling the schedule. A staged scan can run for several minutes,
+        // and shouldPerformScheduledRead() can only record an occurrence it sees
+        // while the scheduled minute is still current; it defers rather than
+        // triggering for as long as the scan holds the radio.
+        if (now - m_lastScheduleCheck >= SCHEDULE_CHECK_INTERVAL_MS)
+        {
+            m_lastScheduleCheck = now;
+            (void)shouldPerformScheduledRead();
+        }
+
         if (m_scanInProgress)
         {
             activateCallbackContext();
             FrequencyManager::loopScan();
+            if (!FrequencyManager::isScanInProgress()) finishFrequencyScan();
         }
         return;
     }
 
     if (m_scanInProgress)
     {
-        // The scan finished or was cancelled on the previous iteration: report the
-        // resulting tuning once, rather than polling it every loop.
-        m_scanInProgress = false;
-        LOG_I("everblu_meter", "Frequency scan complete");
+        finishFrequencyScan();
+    }
 
-        if (m_publisher)
+    // The scan just decoded verified frames at the new tuning, so the meter is awake
+    // right now. Read it instead of sitting out the cooldown on a calibration that has
+    // only just been proven to work. Cleared before the read so it cannot re-arm itself.
+    if (m_postScanReadPending && !m_readingInProgress && m_publisher != nullptr && m_publisher->isReady())
+    {
+        m_postScanReadPending = false;
+        m_postScanConfirmRead = true;
+        m_readingInProgress = true;
+        m_publisher->publishStatusMessage("Confirming new calibration");
+        performReading();
+        return;
+    }
+
+    if (!m_bootScanAttempted && !m_readingInProgress && m_timeProvider->isTimeSynced() &&
+        m_publisher != nullptr && m_publisher->isReady())
+    {
+        m_bootScanAttempted = true;
+        if (shouldPerformAutoScan())
         {
-            m_publisher->publishFrequencyOffset(FrequencyManager::getOffset());
-            m_publisher->publishTunedFrequency(FrequencyManager::getTunedFrequency());
-            m_publisher->publishRadioState("Idle");
+            performFrequencyScan();
+            return;
         }
     }
 
@@ -254,8 +283,8 @@ void MeterReader::loop()
         if (m_publisher->isReady())
         {
             m_publisher->publishStatistics(m_totalReadAttempts, m_successfulReads, m_failedReads);
-            m_publisher->publishFrequencyOffset(FrequencyManager::getOffset());
-            m_publisher->publishTunedFrequency(FrequencyManager::getTunedFrequency());
+            m_publisher->publishFrequencyOffset(getFrequencyOffset());
+            m_publisher->publishTunedFrequency(getTunedFrequency());
         }
     }
 }
@@ -264,6 +293,11 @@ bool MeterReader::shouldPerformScheduledRead()
 {
     // Don't trigger if already reading
     if (m_readingInProgress)
+        return false;
+
+    // Honour the opt-out. Manual / on-demand reads bypass this method entirely,
+    // so they remain available when scheduled readings are disabled.
+    if (m_config->areScheduledReadingsDisabled())
         return false;
 
 #ifdef USE_ESPHOME
@@ -284,16 +318,20 @@ bool MeterReader::shouldPerformScheduledRead()
     // The flag, rather than a non-zero timestamp, is what marks the cooldown as
     // running: millis() legitimately returns 0 for the first millisecond after
     // boot, and a failure landing there must not skip the cooldown entirely.
+    bool inCooldown = false;
     if (m_inCooldown)
     {
         unsigned long cooldown = m_config->getRetryCooldownMs();
         if (millis() - m_lastFailedAttempt < cooldown)
         {
-            return false;
+            inCooldown = true;
         }
-        // Cooldown expired, reset
-        m_inCooldown = false;
-        m_lastFailedAttempt = 0;
+        else
+        {
+            // Cooldown expired, reset
+            m_inCooldown = false;
+            m_lastFailedAttempt = 0;
+        }
     }
 
     // Get current local time
@@ -307,20 +345,48 @@ bool MeterReader::shouldPerformScheduledRead()
     // Check if today is a valid reading day
     bool isDayMatch = isReadingDayForConfiguredSchedule(ptm);
     bool isTimeMatch = (ptm->tm_hour == m_readHourLocal && ptm->tm_min == m_readMinuteLocal);
-    bool isSecondMatch = (ptm->tm_sec == 0);
 
-    // Trigger only on the first match (edge detection)
-    bool shouldTrigger = isDayMatch && isTimeMatch && isSecondMatch &&
-                         (!m_lastReadDayMatch || !m_lastReadTimeMatch);
+    // Fire once anywhere inside the scheduled minute, guarded to one read per day.
+    // The schedule check only runs every SCHEDULE_CHECK_INTERVAL_MS, so keying the
+    // trigger on tm_sec == 0 meant a blocking read or frequency scan that spanned
+    // the exact :00 second made the reader miss the one-second window and skip the
+    // whole day's read. Servicing the entire scheduled minute widens that window
+    // 60x; the date-key guard keeps it to a single read per occurrence. (A loop
+    // stall longer than the full scheduled minute can still miss it.)
+    const int today = ScheduleManager::dateKey(ptm);
 
-    m_lastReadDayMatch = isDayMatch && isTimeMatch;
-    m_lastReadTimeMatch = isTimeMatch;
+    // An occurrence owed by an earlier day is stale: that day is over.
+    if (m_pendingScheduledReadDateKey != today)
+        m_pendingScheduledReadDateKey = -1;
 
-    return shouldTrigger;
+    const bool dueNow = isDayMatch && isTimeMatch;
+    if ((!dueNow && m_pendingScheduledReadDateKey != today) || today == m_lastScheduledReadDateKey)
+        return false;
+
+    // A running scan owns the radio and triggerReading() would drop the read; a
+    // cooldown after failures has to run out first. Neither latches the day, and
+    // the occurrence is remembered so it is still serviced when the blocker clears
+    // even if that happens after the scheduled minute has passed: a staged scan
+    // easily outlasts a minute, and re-sampling the clock would then find no match.
+    if (FrequencyManager::isScanInProgress() || inCooldown)
+    {
+        m_pendingScheduledReadDateKey = today;
+        return false;
+    }
+
+    m_pendingScheduledReadDateKey = -1;
+    m_lastScheduledReadDateKey = today;
+    // A scan that swept while the meter happened to be silent must not disable
+    // recovery for good: only a successful read cleared this guard, so the drift
+    // it exists to correct went unscanned from then on. Each scheduled occurrence
+    // arms one fresh attempt, which keeps the per-cooldown scanning it prevents.
+    m_autoScanAfterFailureDone = false;
+    return true;
 }
 
 void MeterReader::triggerReading(bool isScheduled)
 {
+    if (!m_initialized) return;
     if (m_readingInProgress)
     {
         LOG_W("everblu_meter", "Reading already in progress, skipping trigger");
@@ -345,7 +411,7 @@ void MeterReader::triggerReading(bool isScheduled)
 
 void MeterReader::performReading()
 {
-    activateCallbackContext();
+    if (!activateCallbackContext()) return;
 
     if (!m_publisher->isReady())
     {
@@ -370,6 +436,13 @@ void MeterReader::performReading()
           currentFreq, currentOffset * 1000.0);
 
     // Perform actual meter read
+    if (!radioInitCallback(getTunedFrequency()))
+    {
+        m_radioConnected = false;
+        handleFailedRead(ReadFailure::NotAttempted);
+        return;
+    }
+    m_radioConnected = true;
     struct tmeter_data meter_data = meterReadCallback();
 
     // Validate data
@@ -389,6 +462,7 @@ void MeterReader::handleSuccessfulRead(const tmeter_data &data)
 
     // Reset retry state
     resetRetryState();
+    m_inCooldown = false;
 
     // Allow a fresh failure-recovery frequency scan on the next failure streak
     m_autoScanAfterFailureDone = false;
@@ -411,11 +485,9 @@ void MeterReader::handleSuccessfulRead(const tmeter_data &data)
     // Publish meter data
     m_publisher->publishMeterReading(data, iso8601);
 
-    // Publish historical data if available
-    if (data.history_available)
-    {
-        m_publisher->publishHistory(data.history, true);
-    }
+    // Published unconditionally: a reading that decoded no history must clear the
+    // sensor rather than leave the previous reading's JSON in place.
+    m_publisher->publishHistory(data.history, data.history_available);
 
     // Publish updated statistics
     m_publisher->publishStatistics(m_totalReadAttempts, m_successfulReads, m_failedReads);
@@ -434,6 +506,12 @@ void MeterReader::handleSuccessfulRead(const tmeter_data &data)
 
 void MeterReader::handleFailedRead(ReadFailure reason)
 {
+    // The confirmation read after a scan is a single attempt: the retry sequence that
+    // triggered the scan has already run, so a miss here ends the streak rather than
+    // starting a fresh one against tuning that was just swept.
+    const bool finalAttempt = m_postScanConfirmRead;
+    m_postScanConfirmRead = false;
+
     LOG_W("everblu_meter", "Read failed (attempt %d/%d)%s",
           m_retryCount + 1, m_config->getMaxRetries(),
           read_failure_log_suffix(reason));
@@ -446,7 +524,7 @@ void MeterReader::handleFailedRead(ReadFailure reason)
         m_retryFailureReason = reason;
     }
 
-    if (m_retryCount < m_config->getMaxRetries() - 1)
+    if (!finalAttempt && m_retryCount < m_config->getMaxRetries() - 1)
     {
         // Schedule retry after delay.
         // The "Active Reading" sensor and the radio state are re-asserted on
@@ -503,20 +581,20 @@ void MeterReader::handleFailedRead(ReadFailure reason)
         // that just exhausted its retries) - activateCallbackContext() was set
         // for it at the start of performReading(), so the scan's RF responses
         // come from the same meter, not whichever meter last pressed a button.
-        if (m_config->isAutoScanOnFailureEnabled() && !m_autoScanAfterFailureDone)
+        // finalAttempt means a scan has just finished, so sweeping again immediately
+        // would only repeat what was measured seconds ago.
+        if (!finalAttempt && m_config->isAutoScanOnFailureEnabled() && !m_autoScanAfterFailureDone)
         {
             m_autoScanAfterFailureDone = true;
+            m_scanIsRecovery = true;
             LOG_W("everblu_meter",
                   "Running automatic frequency scan for meter %02u-%06lu after failed reads... "
                   "(disable with auto_scan_on_failure / AUTO_SCAN_ON_FAILURE_ENABLED)",
                   m_config->getMeterYear(), (unsigned long) m_config->getMeterSerial());
             m_publisher->publishStatusMessage("Auto frequency scan after failed reads");
-            // Narrow ±20 kHz / 1 kHz scan: fast re-tune after drift failure.
-            // The full ±150 kHz deep scan is reserved for manual commands and
-            // first-boot with no stored offset (both called via performFrequencyScan).
-            // Started rather than run inline so loop() keeps stepping it (issue #133).
-            FrequencyManager::beginDeepFrequencyScan(0.020f, 0.001f);
-            m_scanInProgress = true;
+            m_offsetBeforeScan = FrequencyManager::getOffset();
+            FrequencyManager::beginRecoveryScan(scanStatusCallback);
+            m_scanInProgress = FrequencyManager::isScanInProgress();
         }
     }
 }
@@ -526,22 +604,39 @@ void MeterReader::resetRetryState()
     m_retryCount = 0;
     m_nextRetryTime = 0;
     m_retryFailureReason = ReadFailure::None;
+    m_postScanConfirmRead = false;
 }
 
 void MeterReader::stopReading()
 {
+    // One CC1101 is shared, but each meter has its own Stop button. Only the meter
+    // that started a scan can cancel it, so tell the user which button to press
+    // instead of appearing to do nothing.
+    if (FrequencyManager::isScanInProgress() && !m_scanInProgress)
+    {
+        char message[96];
+        if (s_active_reader && s_active_reader->m_config)
+            snprintf(message, sizeof(message), "Scan belongs to meter %02u-%06lu - use that meter's Stop button",
+                     s_active_reader->m_config->getMeterYear(),
+                     (unsigned long) s_active_reader->m_config->getMeterSerial());
+        else
+            snprintf(message, sizeof(message), "Scan belongs to another meter - use that meter's Stop button");
+        LOG_W("everblu_meter", "%s", message);
+        if (m_publisher) m_publisher->publishError(message);
+        return;
+    }
+
     // A blocking RF transfer already in flight cannot be aborted mid-transaction;
     // this cancels any pending retry sequence and returns the reader to idle so
     // it stops retrying and won't start the next queued read.
-    const bool wasActive = m_readingInProgress || m_retryCount > 0 || m_nextRetryTime > 0 ||
-                           FrequencyManager::isScanInProgress();
+    const bool wasActive = m_readingInProgress || m_retryCount > 0 || m_nextRetryTime > 0 || m_scanInProgress;
 
     resetRetryState();
     m_readingInProgress = false;
 
     // Also ask any in-progress deep frequency scan to bail at its next step
     // boundary (it cannot be interrupted within a single blocking step).
-    FrequencyManager::requestScanCancel();
+    if (m_scanInProgress) FrequencyManager::requestScanCancel();
 
     if (wasActive)
     {
@@ -556,25 +651,15 @@ void MeterReader::stopReading()
     }
 }
 
-void MeterReader::performFrequencyScan()
+void MeterReader::performFrequencyScan(bool deep)
 {
-    activateCallbackContext();
-
-    if (FrequencyManager::isScanInProgress())
+    if (FrequencyManager::isScanInProgress() || m_readingInProgress || !m_initialized)
     {
         LOG_W("everblu_meter", "Frequency scan already running - ignoring request");
         return;
     }
 
-    // Two DIFFERENT things are being reported here, and in a multi-meter setup
-    // they can disagree:
-    //   - the meter INTERROGATED is this instance's meter (activateCallbackContext
-    //     above points the shared FrequencyManager callbacks at this reader);
-    //   - the frequency SWEPT is centred on FrequencyManager's single global
-    //     s_baseFrequency, which is whichever meter entry ran begin() LAST.
-    // If the two lines below show a centre that isn't this meter's configured
-    // frequency, the entries disagree on `frequency` and the scan window (and
-    // the narrow auto-scan-on-failure window especially) may be centred wrongly.
+    if (!activateCallbackContext()) return;
     LOG_I("everblu_meter", "Starting frequency scan using meter %02u-%06lu (%s)...",
           m_config->getMeterYear(), (unsigned long) m_config->getMeterSerial(),
           m_config->isMeterGas() ? "gas" : "water");
@@ -582,24 +667,35 @@ void MeterReader::performFrequencyScan()
           FrequencyManager::getBaseFrequency(), m_config->getFrequency());
 
     // Non-blocking: loop() steps the scan and publishes the result when it ends.
-    FrequencyManager::beginDeepFrequencyScan();
-    m_scanInProgress = true;
+    m_offsetBeforeScan = FrequencyManager::getOffset();
+    m_scanIsRecovery = false; // Asked for by the user, not owed a reading
+    if (deep) FrequencyManager::beginDeepFrequencyScan(0.150f, 0.010f, scanStatusCallback);
+    else FrequencyManager::beginRecoveryScan(scanStatusCallback);
+    m_scanInProgress = FrequencyManager::isScanInProgress();
 
     if (m_publisher)
     {
         m_publisher->publishRadioState("Frequency Scanning");
-        m_publisher->publishStatusMessage("Deep frequency scan running");
+        m_publisher->publishStatusMessage(deep ? "Deep frequency scan running" : "Frequency scan running");
     }
 }
 
 void MeterReader::resetFrequencyOffset()
 {
-    activateCallbackContext();
+    if (FrequencyManager::isScanInProgress() || m_readingInProgress || !m_initialized) return;
+    if (!activateCallbackContext()) return;
 
     LOG_I("everblu_meter", "Resetting frequency offset to 0");
 
-    // Reset offset to 0 and save
-    FrequencyManager::saveFrequencyOffset(0.0);
+    // Erase rather than store a zero, so the meter counts as uncalibrated again and
+    // auto-scan and the stored-calibration quality guard both re-arm.
+    if (!FrequencyManager::clearCalibration())
+    {
+        LOG_W("everblu_meter", "Could not erase stored calibration - offset left at %.3f kHz",
+              FrequencyManager::getOffset() * 1000.0f);
+        if (m_publisher) m_publisher->publishError("Frequency offset reset failed - storage write error");
+        return;
+    }
 
     // Reinitialize radio with base frequency
     float baseFrequency = FrequencyManager::getBaseFrequency();
@@ -623,6 +719,37 @@ void MeterReader::resetFrequencyOffset()
     }
 }
 
+void MeterReader::scanStatusCallback(const char *state, const char *message)
+{
+    if (!s_active_reader || !s_active_reader->m_publisher) return;
+    s_active_reader->m_publisher->publishStatusMessage(message);
+    s_active_reader->m_publisher->publishRadioState(state);
+}
+
+void MeterReader::finishFrequencyScan()
+{
+    m_scanInProgress = false;
+    const bool recovery = m_scanIsRecovery;
+    m_scanIsRecovery = false;
+    if (!m_publisher) return;
+    const float offset = getFrequencyOffset();
+    m_publisher->publishFrequencyOffset(offset);
+    m_publisher->publishTunedFrequency(getTunedFrequency());
+
+    // Found means a candidate was verified against repeat decodes, so the meter answered.
+    // A recovery scan still owes the read that provoked it, even when the tuning it
+    // confirmed is the one already stored: a meter that went quiet and came back on the
+    // same frequency would otherwise sit out the cooldown despite having just answered.
+    // A scan the user asked for owes nothing, so there an unchanged offset queues nothing.
+    if (FrequencyManager::lastScanOutcome() == FrequencyManager::ScanOutcome::Found &&
+        (recovery || offset != m_offsetBeforeScan))
+    {
+        m_postScanReadPending = true;
+        LOG_I("everblu_meter", "Scan verified %.6f MHz (offset %.3f kHz) - taking one confirmation read",
+              getTunedFrequency(), offset * 1000.0);
+    }
+}
+
 void MeterReader::getStatistics(unsigned long &totalAttempts, unsigned long &successfulReads,
                                 unsigned long &failedReads) const
 {
@@ -638,50 +765,8 @@ void MeterReader::setHAConnected(bool connected)
 
 bool MeterReader::isReadingDayForConfiguredSchedule(const struct tm *ptm) const
 {
-    if (ptm == nullptr)
-    {
-        return false;
-    }
-
-    const char *schedule = m_config->getReadingSchedule();
-    if (schedule == nullptr)
-    {
-        schedule = "Monday-Friday";
-    }
-
-    const int dayOfWeek = ptm->tm_wday; // 0=Sunday, 1=Monday, ... 6=Saturday
-    if (strcmp(schedule, "Monday-Friday") == 0)
-    {
-        return dayOfWeek >= 1 && dayOfWeek <= 5;
-    }
-    if (strcmp(schedule, "Monday-Saturday") == 0)
-    {
-        return dayOfWeek >= 1 && dayOfWeek <= 6;
-    }
-    if (strcmp(schedule, "Monday-Sunday") == 0)
-    {
-        return true;
-    }
-    // check for single day reading schedule
-    switch(dayOfWeek)
-    {
-        case 0:
-            return strcmp(schedule, "Sunday") == 0;
-        case 1:
-            return strcmp(schedule, "Monday") == 0;
-        case 2:
-            return strcmp(schedule, "Tuesday") == 0;
-        case 3:
-            return strcmp(schedule, "Wednesday") == 0;
-        case 4:
-            return strcmp(schedule, "Thursday") == 0;
-        case 5:
-            return strcmp(schedule, "Friday") == 0;
-        case 6:
-            return strcmp(schedule, "Saturday") == 0;
-    }
-
-    // Unknown schedule: log warning and skip read to avoid misconfiguration
-    LOG_W("everblu_meter", "Unknown reading_schedule '%s'; skipping scheduled read.", schedule);
-    return false;
+    // Read the schedule live from this instance's config (multi-meter setups run
+    // independent schedules) but defer the matching rules to the shared,
+    // stateless helper so there is only one implementation of them.
+    return ScheduleManager::matchesReadingDay(m_config->getReadingSchedule(), ptm);
 }

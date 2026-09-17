@@ -132,7 +132,7 @@ typedef struct
   uint8_t mdmcfg3;
   uint8_t mdmcfg2;
   uint8_t pktctrl0;
-  int8_t rssi_dbm; /**< Current RSSI, converted to dBm */
+  int rssi_dbm; /**< Current RSSI, converted to dBm (can be below -128, so not int8_t) */
   uint8_t lqi;
   /**
    * GDO0 line level: 0 = LOW, 1 = HIGH, -1 = unknown.
@@ -394,5 +394,17 @@ struct tmeter_data get_meter_data(void);
  * @return tmeter_data structure containing all extracted meter data
  */
 struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_serial);
+
+/**
+ * @brief Convert a raw CC1101 RSSI register byte to dBm (datasheet §17.3)
+ *
+ * Returns int, not int8_t: for weak signals the raw byte maps to values below
+ * -128 dBm (Rssi_dec 128 -> -138 dBm), which would wrap to a positive value in
+ * an int8_t and, for example, falsely trip the near-field-saturation heuristic.
+ *
+ * @param Rssi_dec Raw RSSI register value (0-255)
+ * @return Signal strength in dBm
+ */
+int cc1100_rssi_convert2dbm(uint8_t Rssi_dec);
 
 #endif // __CC1101_H__

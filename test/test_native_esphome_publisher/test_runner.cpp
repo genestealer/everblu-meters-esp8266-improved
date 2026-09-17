@@ -20,8 +20,8 @@ void test_pub_lqi_percentage_masks_the_crc_ok_bit(void);
 void test_pub_rssi_percentage_matches_the_shared_helper(void);
 void test_pub_rssi_percentage_is_clamped_to_0_100(void);
 void test_pub_history_publishes_json_payload(void);
-void test_pub_history_reports_unavailable_when_not_decoded(void);
-void test_pub_history_reports_unavailable_for_a_null_array(void);
+void test_pub_history_publishes_empty_json_when_not_decoded(void);
+void test_pub_history_publishes_empty_json_for_a_null_array(void);
 void test_pub_history_without_a_sensor_is_safe(void);
 void test_pub_radio_state_drives_the_connected_binary_sensor(void);
 void test_pub_radio_state_null_is_ignored(void);
@@ -40,6 +40,7 @@ void test_pub_is_always_ready(void);
 void test_pub_wifi_details_and_discovery_are_no_ops(void);
 void test_pub_shared_sensors_keep_their_first_registration(void);
 void test_pub_per_meter_sensors_are_not_shared(void);
+void test_echo_debug_routes_through_the_esphome_logger(void);
 
 void setUp(void) { esphomePublisherSetUp(); }
 void tearDown(void) { esphomePublisherTearDown(); }
@@ -62,8 +63,8 @@ int main(int, char **)
     RUN_TEST(test_pub_rssi_percentage_is_clamped_to_0_100);
 
     RUN_TEST(test_pub_history_publishes_json_payload);
-    RUN_TEST(test_pub_history_reports_unavailable_when_not_decoded);
-    RUN_TEST(test_pub_history_reports_unavailable_for_a_null_array);
+    RUN_TEST(test_pub_history_publishes_empty_json_when_not_decoded);
+    RUN_TEST(test_pub_history_publishes_empty_json_for_a_null_array);
     RUN_TEST(test_pub_history_without_a_sensor_is_safe);
 
     RUN_TEST(test_pub_radio_state_drives_the_connected_binary_sensor);
@@ -85,6 +86,7 @@ int main(int, char **)
 
     RUN_TEST(test_pub_shared_sensors_keep_their_first_registration);
     RUN_TEST(test_pub_per_meter_sensors_are_not_shared);
+    RUN_TEST(test_echo_debug_routes_through_the_esphome_logger);
 
     return UNITY_END();
 }

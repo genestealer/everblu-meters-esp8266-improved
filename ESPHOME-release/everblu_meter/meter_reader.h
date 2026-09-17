@@ -98,7 +98,11 @@ public:
      * Returns immediately: the scan is then stepped from loop(), so the host stays
      * responsive and stopReading() can abort it mid-scan.
      */
-    void performFrequencyScan();
+    void performFrequencyScan(bool deep = true);
+    float getFrequencyOffset() const { return m_calibration.offset; }
+    float getTunedFrequency() const { return m_calibration.baseFrequency + m_calibration.offset; }
+    void setAdaptiveThreshold(int threshold) { m_calibration.adaptiveThreshold = threshold > 0 ? threshold : 1; }
+    bool shouldPerformAutoScan() const { return m_calibration.autoScan && !m_calibration.hasStored; }
 
     /**
      * @brief Check whether a deep frequency scan is currently running
@@ -160,7 +164,9 @@ private:
     static bool radioInitCallback(float freq);
     static tmeter_data meterReadCallback();
 
-    void activateCallbackContext();
+    bool activateCallbackContext();
+    static void scanStatusCallback(const char *state, const char *message);
+    void finishFrequencyScan();
     bool isReadingDayForConfiguredSchedule(const struct tm *ptm) const;
 
     /**
@@ -201,6 +207,8 @@ private:
     IConfigProvider *m_config;
     ITimeProvider *m_timeProvider;
     IDataPublisher *m_publisher;
+    FrequencyManager::Calibration m_calibration;
+    bool m_bootScanAttempted = false;
 
     // State tracking
     bool m_initialized;
@@ -216,6 +224,10 @@ private:
     unsigned long m_lastFailedAttempt;
     unsigned long m_nextRetryTime;
     bool m_autoScanAfterFailureDone;  // Guards the failure-recovery frequency scan to once per failure streak
+    bool m_postScanReadPending = false;   // A scan stored new tuning; loop() owes one confirmation read
+    bool m_postScanConfirmRead = false;   // The read in flight is that confirmation, so a miss is final
+    bool m_scanIsRecovery = false;        // The running scan follows a failed read, so it owes that reading
+    float m_offsetBeforeScan = 0.0f;      // Offset when the running scan started, to spot a real change
     ReadFailure m_retryFailureReason; // Most informative failure seen so far in the current retry sequence
 
     // Statistics
@@ -233,8 +245,8 @@ private:
     // Schedule state cache
     int m_readHourLocal;
     int m_readMinuteLocal;
-    bool m_lastReadDayMatch;
-    bool m_lastReadTimeMatch;
+    int m_lastScheduledReadDateKey;  // ScheduleManager::dateKey() of the last serviced scheduled read; -1 = none yet
+    int m_pendingScheduledReadDateKey; // Occurrence owed but deferred by a scan or cooldown; -1 = none owed
 };
 
 #endif // METER_READER_H

@@ -1,5 +1,13 @@
 # Quick Reference Guide - New Features
 
+> **⚠️ Historical document.** Some figures here no longer match the code. The
+> frequency scan is not "±30 kHz, 5 kHz step, best RSSI": it sweeps ±150/±20 kHz
+> and ranks candidates by decode success then |FREQEST| (RSSI was abandoned, see
+> issue #104). `frequency_offset` is expressed in **kHz**, not MHz, and the offset
+> limit is ±0.15 MHz (not ±0.1). For current behaviour see
+> [ESPHOME_INTEGRATION_GUIDE.md](../ESPHOME/docs/ESPHOME_INTEGRATION_GUIDE.md) and
+> the source in `src/services/frequency_manager.*`. Kept for history.
+
 ## New MQTT Topics
 
 ### Diagnostics & Metrics

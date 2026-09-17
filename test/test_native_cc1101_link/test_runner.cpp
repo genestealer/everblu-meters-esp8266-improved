@@ -41,6 +41,22 @@ void test_report_works_without_any_context(void);
 void test_report_says_the_register_values_are_meaningless_on_a_stuck_bus(void);
 void test_report_calls_out_a_gdo0_line_that_is_not_wired(void);
 void test_report_is_truncated_rather_than_overrunning_its_buffer(void);
+void test_rssi_convert2dbm_matches_the_datasheet(void);
+void test_rssi_convert2dbm_does_not_wrap_below_int8_min(void);
+
+// test_cc1101_read.cpp
+void test_read_decodes_a_captured_reply_into_a_reading(void);
+void test_read_reports_the_link_quality_it_measured(void);
+void test_read_transmits_the_wake_up_burst_then_the_interrogation(void);
+void test_read_reports_no_reply_when_the_meter_stays_silent(void);
+void test_read_reports_a_corrupted_frame_rather_than_a_reading(void);
+void test_read_blames_near_field_saturation_when_the_signal_is_too_strong(void);
+void test_read_gives_up_when_the_reply_stops_part_way_through(void);
+void test_read_times_out_when_the_frame_start_never_arrives(void);
+void test_get_meter_data_resolves_the_configured_meter_code(void);
+void test_every_recorded_capture_replays_through_the_radio(void);
+void test_receive_recovers_a_radio_that_ignores_the_first_rx_strobe(void);
+void test_receive_gives_up_on_a_radio_that_never_enters_rx(void);
 
 void setUp(void)
 {
@@ -90,6 +106,21 @@ int main(int, char **)
     RUN_TEST(test_report_says_the_register_values_are_meaningless_on_a_stuck_bus);
     RUN_TEST(test_report_calls_out_a_gdo0_line_that_is_not_wired);
     RUN_TEST(test_report_is_truncated_rather_than_overrunning_its_buffer);
+    RUN_TEST(test_rssi_convert2dbm_matches_the_datasheet);
+    RUN_TEST(test_rssi_convert2dbm_does_not_wrap_below_int8_min);
+
+    RUN_TEST(test_read_decodes_a_captured_reply_into_a_reading);
+    RUN_TEST(test_read_reports_the_link_quality_it_measured);
+    RUN_TEST(test_read_transmits_the_wake_up_burst_then_the_interrogation);
+    RUN_TEST(test_read_reports_no_reply_when_the_meter_stays_silent);
+    RUN_TEST(test_read_reports_a_corrupted_frame_rather_than_a_reading);
+    RUN_TEST(test_read_blames_near_field_saturation_when_the_signal_is_too_strong);
+    RUN_TEST(test_read_gives_up_when_the_reply_stops_part_way_through);
+    RUN_TEST(test_read_times_out_when_the_frame_start_never_arrives);
+    RUN_TEST(test_get_meter_data_resolves_the_configured_meter_code);
+    RUN_TEST(test_every_recorded_capture_replays_through_the_radio);
+    RUN_TEST(test_receive_recovers_a_radio_that_ignores_the_first_rx_strobe);
+    RUN_TEST(test_receive_gives_up_on_a_radio_that_never_enters_rx);
 
     return UNITY_END();
 }

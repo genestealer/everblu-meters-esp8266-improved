@@ -84,7 +84,6 @@ HistoryStats MeterHistory::calculateStats(const uint32_t history[13], uint32_t c
     }
 
     stats.totalUsage = totalUsage + stats.currentMonthUsage;
-    stats.averageMonthlyUsage = (stats.monthCount > 0) ? (stats.totalUsage / (stats.monthCount + 1)) : 0;
 
     return stats;
 }
@@ -132,6 +131,50 @@ int MeterHistory::generateHistoryJson(const uint32_t history[13], uint32_t curre
     if (ok)
     {
         const uint32_t currentMonthUsage = calculateUsage(currentVolume, history[monthCount - 1]);
+        ok = appendFormatted(outputBuffer, bufferSize, pos,
+                             "],\"current_month_usage\":%u,\"months_available\":%d}",
+                             currentMonthUsage, monthCount);
+    }
+
+    if (!ok)
+    {
+        // Report failure rather than publishing a truncated, unparseable payload.
+        outputBuffer[0] = '\0';
+        return 0;
+    }
+
+    return pos;
+}
+
+int MeterHistory::generateHistoryJsonCompact(const uint32_t history[13], uint32_t currentVolume,
+                                             char *outputBuffer, int bufferSize)
+{
+    if (!outputBuffer || bufferSize <= 1)
+    {
+        return 0;
+    }
+
+    outputBuffer[0] = '\0';
+
+    // Unlike generateHistoryJson(), an empty history is not an error here: emit a
+    // valid empty document so Home Assistant always receives a parseable state.
+    const int monthCount = countValidMonths(history);
+
+    int pos = 0;
+    bool ok = appendFormatted(outputBuffer, bufferSize, pos, "{\"monthly_usage\":[");
+
+    // Month-over-month deltas, omitting the oldest month (no earlier baseline),
+    // aligned so monthly_usage[k] pairs with history[k+1] - same as the full form.
+    for (int i = 1; ok && i < monthCount; i++)
+    {
+        const uint32_t usage = calculateUsage(history[i], history[i - 1]);
+        ok = appendFormatted(outputBuffer, bufferSize, pos, "%s%u", (i > 1 ? "," : ""), usage);
+    }
+
+    if (ok)
+    {
+        const uint32_t currentMonthUsage =
+            (monthCount > 0) ? calculateUsage(currentVolume, history[monthCount - 1]) : 0;
         ok = appendFormatted(outputBuffer, bufferSize, pos,
                              "],\"current_month_usage\":%u,\"months_available\":%d}",
                              currentMonthUsage, monthCount);

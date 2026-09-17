@@ -554,9 +554,7 @@ void CC1101_CMD(uint8_t spi_instr)
   CC1101_status_state = (tbuf[0] >> 4) & 0x0F;
 }
 
-void echo_cc1101_version(void);
-void show_cc1101_registers_settings(void);
-int8_t cc1100_rssi_convert2dbm(uint8_t Rssi_dec);
+// cc1100_rssi_convert2dbm() is declared in cc1101.h
 
 //---------------[CC1100 reset function]-----------------------
 // Reset CC1101 via software reset strobe command (per datasheet §19.1)
@@ -570,49 +568,10 @@ void cc1101_reset(void)
 
 void setMHZ(float mhz)
 {
-  byte freq2 = 0;
-  byte freq1 = 0;
-  byte freq0 = 0;
-
-  // Serial.printf("%.4f Mhz : ", mhz);
-
-  for (bool i = 0; i == 0;)
-  {
-    if (mhz >= 26)
-    {
-      mhz -= 26;
-      freq2 += 1;
-    }
-    else if (mhz >= 0.1015625)
-    {
-      mhz -= 0.1015625;
-      freq1 += 1;
-    }
-    else if (mhz >= 0.00039675)
-    {
-      mhz -= 0.00039675;
-      freq0 += 1;
-    }
-    else
-    {
-      i = 1;
-    }
-  }
-  // No carry handling is needed here. The loop subtracts a whole FREQ1 step
-  // (0.1015625 MHz == 256 FREQ0 LSBs) before freq0 can reach 256, so freq0
-  // always fits in one byte. The former `if (freq0 > 255)` check was dead: freq0
-  // is a byte and can never exceed 255.
-
-  /*
-  Serial.printf("FREQ2=0x%02X ", freq2);
-  Serial.printf("FREQ1=0x%02X ", freq1);
-  Serial.printf("FREQ0=0x%02X ", freq0);
-  Serial.printf("\n");
-  */
-
-  halRfWriteReg(FREQ2, freq2);
-  halRfWriteReg(FREQ1, freq1);
-  halRfWriteReg(FREQ0, freq0);
+  const uint32_t frequency_word = (uint32_t)(mhz * (65536.0f / 26.0f) + 0.5f);
+  halRfWriteReg(FREQ2, (uint8_t)(frequency_word >> 16));
+  halRfWriteReg(FREQ1, (uint8_t)(frequency_word >> 8));
+  halRfWriteReg(FREQ0, (uint8_t)frequency_word);
 }
 
 void cc1101_configureRF_0(float freq)
@@ -1181,9 +1140,11 @@ bool cc1101_init(float freq)
   return true;
 }
 
-int8_t cc1100_rssi_convert2dbm(uint8_t Rssi_dec)
+int cc1100_rssi_convert2dbm(uint8_t Rssi_dec)
 {
-  int8_t rssi_dbm;
+  // int, not int8_t: weak signals map below -128 dBm (Rssi_dec 128 -> -138),
+  // which would wrap to a positive value in an int8_t.
+  int rssi_dbm;
   if (Rssi_dec >= 128)
   {
     rssi_dbm = ((Rssi_dec - 256) / 2) - 74; // rssi_offset via datasheet
@@ -1234,45 +1195,6 @@ void cc1101_rec_mode(void)
       return;
     }
   }
-}
-
-void echo_cc1101_version(void)
-{
-  echo_debug(debug_out, "CC1101 Partnumber: 0x%02X\n", halRfReadReg(PARTNUM_ADDR));
-  echo_debug(debug_out, "CC1101 Version != 00 or 0xFF  : 0x%02X\n", halRfReadReg(VERSION_ADDR)); // != 00 or 0xFF
-}
-
-#define CFG_REGISTER 0x2F // 47 registers
-void show_cc1101_registers_settings(void)
-{
-  uint8_t config_reg_verify[CFG_REGISTER], Patable_verify[8];
-  uint8_t i;
-
-  memset(config_reg_verify, 0, CFG_REGISTER);
-  memset(Patable_verify, 0, 8);
-
-  SPIReadBurstReg(0, config_reg_verify, CFG_REGISTER); // reads all 47 config register from cc1100	"359.63us"
-  SPIReadBurstReg(PATABLE_ADDR, Patable_verify, 8);    // reads output power settings from cc1100	"104us"
-
-  echo_debug(debug_out, "Config Register in hex:\n");
-  echo_debug(debug_out, " 0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F\n");
-  for (i = 0; i < CFG_REGISTER; i++) // showes rx_buffer for debug
-  {
-    echo_debug(debug_out, "%02X ", config_reg_verify[i]);
-
-    if (i == 15 || i == 31 || i == 47 || i == 63) // just for beautiful output style
-    {
-      echo_debug(debug_out, "\n");
-    }
-  }
-  echo_debug(debug_out, "\n");
-  echo_debug(debug_out, "PaTable:\n");
-
-  for (i = 0; i < 8; i++) // showes rx_buffer for debug
-  {
-    echo_debug(debug_out, "%02X ", Patable_verify[i]);
-  }
-  echo_debug(debug_out, "\n");
 }
 
 // Diagnostic: the RADIAN frame length is not assumed. Scan every candidate
@@ -1718,7 +1640,7 @@ uint8_t decode_4bitpbit_serial(uint8_t *rxBuffer, int l_total_byte, uint8_t *dec
    Note: The received data is 4x larger than the decoded size due to oversampling
    and needs to be processed by decode_4bitpbit_serial() to extract actual data.
 */
-int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rxBuffer_size)
+int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rxBuffer_size, int8_t *frequency_estimate = nullptr)
 {
   uint8_t l_byte_in_rx = 0;
   uint16_t l_total_byte = 0;
@@ -1729,7 +1651,7 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
   // lost. (8 + 4) = 12 bits sizes the capture to cover the whole frame.
   uint16_t l_radian_frame_size_byte = ((size_byte * (8 + 4)) / 8) + 1;
   int l_tmo = 0;
-  int8_t l_Rssi_dbm;
+  int l_Rssi_dbm;
   uint8_t l_lqi, l_freq_est;
 
   echo_debug(debug_out, "[RX] size_byte=%d  l_radian_frame_size_byte=%d\n", size_byte, l_radian_frame_size_byte);
@@ -1796,6 +1718,7 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
 
   l_lqi = halRfReadReg(LQI_ADDR);
   l_freq_est = halRfReadReg(FREQEST_ADDR);
+  if (frequency_estimate != nullptr) *frequency_estimate = (int8_t)l_freq_est;
   l_Rssi_dbm = cc1100_rssi_convert2dbm(halRfReadReg(RSSI_ADDR));
   echo_debug(debug_out, "[CC1101] rssi=%d lqi=%u F_est=%d\n", l_Rssi_dbm, l_lqi & 0x7F, (int8_t)l_freq_est);
 
@@ -2269,7 +2192,8 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
   // delay(30); //50ms de 111111  , mais on a 7+3ms de printf et xxms calculs
   /*34ms 0101...01  14.25ms 000...000  14ms 1111...11111  582ms de data avec l'index */
   echo_debug(1, "[METER] Waiting for data frame (124-byte frame, 1000ms timeout)...\n");
-  rxBuffer_size = receive_radian_frame(0x7C, 1000, rxBuffer, sizeof(rxBuffer));
+  int8_t data_frequency_estimate = 0;
+  rxBuffer_size = receive_radian_frame(0x7C, 1000, rxBuffer, sizeof(rxBuffer), &data_frequency_estimate);
   if (rxBuffer_size)
   {
     echo_debug(1, "[METER] Data frame received - decoding %d raw bytes...\n", rxBuffer_size);
@@ -2321,7 +2245,7 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
     echo_debug(1, "[METER] Validating CRC...\n");
     // Read RSSI now while the channel is still active so we can use it to
     // diagnose the cause of a CRC failure (saturation vs. weak signal).
-    int8_t frame_rssi_dbm = cc1100_rssi_convert2dbm(halRfReadReg(RSSI_ADDR));
+    int frame_rssi_dbm = cc1100_rssi_convert2dbm(halRfReadReg(RSSI_ADDR));
     if (validate_radian_crc(meter_data, meter_data_size))
     {
       echo_debug(1, "[METER] CRC valid - parsing meter data\n");
@@ -2363,7 +2287,7 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
   sdata.rssi = halRfReadReg(RSSI_ADDR);                              // Read RSSI value from CC1101
   sdata.rssi_dbm = cc1100_rssi_convert2dbm(halRfReadReg(RSSI_ADDR)); // Read RSSI value from CC1101 and convert to dBm
   sdata.lqi = halRfReadReg(LQI_ADDR) & 0x7F;                         // Read LQI value from CC1101 (mask bit 7 = CRC_OK; bits 6:0 are the LQI)
-  sdata.freqest = (int8_t)halRfReadReg(FREQEST_ADDR);                // Read frequency offset estimate for adaptive tracking
+  sdata.freqest = data_frequency_estimate;
   return sdata;
 }
 

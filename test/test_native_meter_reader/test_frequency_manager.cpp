@@ -46,18 +46,18 @@ namespace
      * the only point a test can hook without reaching into the scan's private
      * state.
      */
-    bool isFirstZoomRetune(float freq)
+    bool isFirstRefineRetune(float freq)
     {
         const FakeRadio &radio = fakeRadio();
         return !radio.initFrequencies.empty() && freq < radio.lastInitFrequency();
     }
 
-    /// Model the meter dropping out (falling asleep) as the zoom pass starts.
-    void silenceMeterWhenZoomStarts()
+    /// Model the meter dropping out (falling asleep) as the refinement starts.
+    void silenceMeterWhenRefinementStarts()
     {
         fakeRadio().onInit = [](float freq)
         {
-            if (isFirstZoomRetune(freq))
+            if (isFirstRefineRetune(freq))
             {
                 fakeRadio().carrierFrequency = 0.0f;
                 fakeRadio().onInit = nullptr;
@@ -65,12 +65,12 @@ namespace
         };
     }
 
-    /// Model the radio failing to retune from the zoom pass onwards.
-    void failRadioInitWhenZoomStarts()
+    /// Model the radio failing to retune from the refinement onwards.
+    void failRadioInitWhenRefinementStarts()
     {
         fakeRadio().onInit = [](float freq)
         {
-            if (isFirstZoomRetune(freq))
+            if (isFirstRefineRetune(freq))
             {
                 fakeRadio().initSucceeds = false;
                 fakeRadio().onInit = nullptr;
@@ -183,6 +183,61 @@ void test_freq_auto_scan_is_requested_only_while_uncalibrated(void)
     TEST_ASSERT_FALSE(FrequencyManager::shouldPerformAutoScan());
 }
 
+void test_freq_stored_offset_is_readable_without_reloading_the_manager(void)
+{
+    // loadFrequencyOffset() reports what is on the device, which is not always
+    // the live offset: adaptive tracking moves the in-memory value between saves.
+    beginManager();
+    FrequencyManager::saveFrequencyOffset(0.0225f);
+    FrequencyManager::setOffset(-0.0400f);
+
+    TEST_ASSERT_FLOAT_WITHIN(0.000001f, 0.0225f, FrequencyManager::loadFrequencyOffset());
+    TEST_ASSERT_FLOAT_WITHIN(0.000001f, -0.0400f, FrequencyManager::getOffset());
+}
+
+void test_freq_releasing_the_active_calibration_ends_its_scan(void)
+{
+    // A calibration outlives the scan it started only if the meter that owns it
+    // stays alive. Tearing it down mid-sweep must stop the state machine too,
+    // or the next loopScan() would step against a destroyed profile.
+    beginManager();
+    {
+        FrequencyManager::Calibration calibration;
+        FrequencyManager::initialiseCalibration(calibration, BASE_FREQ, "freq_transient");
+        TEST_ASSERT_TRUE(FrequencyManager::activateCalibration(calibration));
+
+        placeCarrier(30.0f, 6.0f);
+        FrequencyManager::beginDeepFrequencyScan();
+        FrequencyManager::loopScan();
+        TEST_ASSERT_TRUE(FrequencyManager::isScanInProgress());
+    }
+
+    TEST_ASSERT_FALSE(FrequencyManager::isScanInProgress());
+    TEST_ASSERT_TRUE(FrequencyManager::lastScanOutcome() == FrequencyManager::ScanOutcome::Aborted);
+    TEST_ASSERT_EQUAL(0, fakeStorage().saveCalls);
+
+    // The default calibration is active again, so the manager is usable.
+    const size_t before = fakeRadio().calls.size();
+    FrequencyManager::loopScan();
+    TEST_ASSERT_EQUAL(before, fakeRadio().calls.size());
+}
+
+void test_freq_scan_that_cannot_persist_its_result_is_abandoned(void)
+{
+    // Storage that refuses the write leaves the radio tuned to a calibration no
+    // reboot would restore, so the scan has to report the failure rather than
+    // pretend it succeeded.
+    beginManager();
+    placeCarrier(30.0f, 6.0f);
+    fakeStorage().failSaves = true;
+
+    FrequencyManager::performDeepFrequencyScan(0.050f, 0.0025f);
+
+    TEST_ASSERT_TRUE(FrequencyManager::lastScanOutcome() == FrequencyManager::ScanOutcome::Aborted);
+    TEST_ASSERT_NULL(fakeStorage().find("freq_offset"));
+    TEST_ASSERT_FLOAT_WITHIN(0.000001f, 0.0f, FrequencyManager::getOffset());
+}
+
 // ---------------------------------------------------------------------------
 // Deep scan
 // ---------------------------------------------------------------------------
@@ -241,6 +296,12 @@ void test_freq_scan_without_a_carrier_keeps_the_base_frequency(void)
     TEST_ASSERT_FLOAT_WITHIN(0.000001f, 0.0f, FrequencyManager::getOffset());
     TEST_ASSERT_FLOAT_WITHIN(0.000001f, BASE_FREQ, fakeRadio().lastInitFrequency());
     TEST_ASSERT_EQUAL(0, fakeStorage().saveCalls);
+
+    FrequencyManager::saveFrequencyOffset(0.060760f);
+    FrequencyManager::performDeepFrequencyScan(0.020f, 0.0025f);
+    TEST_ASSERT_FLOAT_WITHIN(0.000001f, BASE_FREQ + 0.060760f, fakeRadio().lastInitFrequency());
+    TEST_ASSERT_FLOAT_WITHIN(0.000001f, 0.060760f, FrequencyManager::getOffset());
+    TEST_ASSERT_EQUAL(1, fakeStorage().saveCalls);
 }
 
 void test_freq_scan_aborts_when_the_radio_stops_responding(void)
@@ -387,10 +448,10 @@ void test_freq_scan_reports_its_result_through_the_status_callback(void)
 
     FrequencyManager::performDeepFrequencyScan(0.050f, 0.0025f, recordScanStatus);
 
-    TEST_ASSERT_EQUAL(2, (int)g_scanStates.size());
+    TEST_ASSERT_GREATER_OR_EQUAL(2, (int)g_scanStates.size());
     TEST_ASSERT_EQUAL_STRING("Frequency Scanning", g_scanStates.front().c_str());
     TEST_ASSERT_EQUAL_STRING("Idle", g_scanStates.back().c_str());
-    TEST_ASSERT_EQUAL(0, (int)g_scanMessages.back().rfind("Deep scan complete: offset"));
+    TEST_ASSERT_EQUAL_STRING("Deep scan complete - verified calibration", g_scanMessages.back().c_str());
 }
 
 void test_freq_scan_reports_a_failed_sweep_through_the_status_callback(void)
@@ -402,18 +463,18 @@ void test_freq_scan_reports_a_failed_sweep_through_the_status_callback(void)
 
     TEST_ASSERT_EQUAL(2, (int)g_scanStates.size());
     TEST_ASSERT_EQUAL_STRING("Idle", g_scanStates.back().c_str());
-    TEST_ASSERT_EQUAL_STRING("Deep scan failed - check setup", g_scanMessages.back().c_str());
+    TEST_ASSERT_EQUAL_STRING("Deep scan failed - no meter response", g_scanMessages.back().c_str());
 }
 
 void test_freq_scan_keeps_the_stored_offset_when_the_candidate_stops_answering(void)
 {
-    // The meter drops out between the coarse sweep and the zoom, so neither the
-    // zoom nor the post-lock verification decodes anything. A calibration that
+    // The meter drops out between the coarse sweep and the refinement, so neither the
+    // refinement nor the post-lock verification decodes anything. A calibration that
     // is already known good must survive that (issue #104).
     beginManager();
     FrequencyManager::saveFrequencyOffset(0.012f);
     placeCarrier(20.0f, 6.0f);
-    silenceMeterWhenZoomStarts();
+    silenceMeterWhenRefinementStarts();
 
     FrequencyManager::performDeepFrequencyScan(0.050f, 0.0025f);
 
@@ -421,18 +482,17 @@ void test_freq_scan_keeps_the_stored_offset_when_the_candidate_stops_answering(v
     TEST_ASSERT_FLOAT_WITHIN(0.000001f, BASE_FREQ + 0.012f, fakeRadio().lastInitFrequency());
 }
 
-void test_freq_scan_falls_back_to_the_window_midpoint_when_the_zoom_cannot_retune(void)
+void test_freq_scan_saves_nothing_when_the_refinement_cannot_retune(void)
 {
-    // The radio stops accepting new frequencies once the zoom starts. Rather
-    // than lose the sweep, the scan keeps the midpoint of the window it mapped.
     beginManager();
     placeCarrier(20.0f, 6.0f);
-    failRadioInitWhenZoomStarts();
+    failRadioInitWhenRefinementStarts();
 
     FrequencyManager::performDeepFrequencyScan(0.050f, 0.0025f);
 
-    TEST_ASSERT_TRUE(FrequencyManager::getOffset() > 0.0f);
-    assertLockedInsideWindow(20.0f, 6.0f, 2.5f);
+    TEST_ASSERT_FLOAT_WITHIN(0.000001f, 0.0f, FrequencyManager::getOffset());
+    TEST_ASSERT_EQUAL(0, fakeStorage().saveCalls);
+    TEST_ASSERT_TRUE(FrequencyManager::lastScanOutcome() == FrequencyManager::ScanOutcome::Aborted);
 }
 
 // ---------------------------------------------------------------------------

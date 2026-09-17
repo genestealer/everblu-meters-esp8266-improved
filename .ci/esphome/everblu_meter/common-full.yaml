@@ -120,6 +120,8 @@ everblu_meter:
     name: "CI Read Now"
   deep_scan_button:
     name: "CI Deep Scan"
+  scan_button:
+    name: "CI Scan"
   reset_frequency_button:
     name: "CI Reset Freq"
   stop_reading_button:

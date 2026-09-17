@@ -484,7 +484,6 @@ The ESPHome component exposes a **history text sensor** containing up to 13 mont
 
 ```json
 {
-  "history": [667441, 684214, 700917, 712720, 721549, 728836, 736957, 744959, 752026, 759559, 770165, 779789, 792364],
   "monthly_usage": [16773, 16703, 11803, 8829, 7287, 8121, 8002, 7067, 7533, 10606, 9624, 12575],
   "current_month_usage": 7276,
   "months_available": 13
@@ -493,10 +492,23 @@ The ESPHome component exposes a **history text sensor** containing up to 13 mont
 
 **Data Structure:**
 
-- `history`: up to 13 monthly readings (oldest to newest) in L or m³
-- `monthly_usage`: monthly consumption values (differences between successive history snapshots)
+- `monthly_usage`: monthly consumption values (differences between successive monthly snapshots), oldest to newest
 - `current_month_usage`: Current month consumption
 - `months_available`: Months of data (typically 13)
+
+> [!IMPORTANT]
+> **Changed in this release: the cumulative `history` array was removed from this
+> sensor.** Home Assistant rejects entity states longer than 255 characters and
+> shows the entity as `unknown`, and 13 seven-digit cumulative readings pushed the
+> document well past that limit ([#67](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/67)).
+> The deltas in `monthly_usage` are small enough to always fit.
+>
+> If you had a template reading `history.history[-1]` (the newest cumulative
+> snapshot), derive it instead from the `volume` sensor:
+> `volume - current_month_usage`. See
+> [ESPHOME_HOME_ASSISTANT_INTEGRATION.md](docs/ESPHOME_HOME_ASSISTANT_INTEGRATION.md)
+> for the updated templates. The full cumulative series is still published in the
+> MQTT (standalone) build, where history is an attribute and has no length limit.
 
 **Use Cases:**
 
@@ -566,7 +578,7 @@ EverbluMeterComponent (ESPHome)
 - **time_start** / **time_end** - Reading timing
 - **frequency_offset** - Current frequency offset (kHz)
 - **tuned_frequency** - Actual tuned frequency (MHz)
-- **frequency_estimate** - CC1101 frequency estimate from last reading (kHz) - helps monitor frequency drift
+- **frequency_estimate** - CC1101 FREQEST reading from this meter's last frame (kHz) - helps monitor frequency drift. Like `frequency_offset` and `tuned_frequency`, it is **per-meter**: declare it on every `everblu_meter:` entry to compare how far apart your meters actually transmit
 - **total_attempts** / **successful_reads** / **failed_reads** - Statistics
 - **gdo2_timeouts** - GDO2 wiring faults since boot (failed boot self-test plus runtime FIFO-threshold timeouts). A non-zero, growing value points at a miswired or wrong-GPIO GDO2 rather than an RF problem
 
@@ -594,53 +606,67 @@ EverbluMeterComponent (ESPHome)
 
 - **request_reading_button** - Trigger a manual reading
 - **stop_reading_button** - Cancel the current read/retry sequence. Also requests best-effort cancellation of an in-progress deep frequency scan (it bails at the next step; see [#133](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/133))
-- **deep_scan_button** - Trigger a Deep frequency scan (±150 kHz, fine 2.5 kHz steps, maps the response window then zooms to the carrier centre)
+- **scan_button** - Search within ±20 kHz of this meter's saved tuning, then run a full Deep Scan if no response is found.
+- **deep_scan_button** - Search ±150 kHz around this meter's configured frequency, then bracket and refine the response window.
 - **reset_frequency_button** - Reset the frequency offset
 - **diagnostic_report_button** - Print a single copy-pasteable block covering the configured pins, the live SPI link self-test, the key CC1101 registers and the current GDO0/GDO2 levels. Press this first when raising an issue; it captures in one place everything needed to tell a wiring fault from an RF problem, and it works even when the radio never came up. The standalone MQTT build prints the same block from its own **Diagnostic Report** button
 
 ### Frequency scans in multi-meter setups
 
-Frequency calibration is **radio-global, not per-meter**. There is one base
-frequency, one stored offset and one tuned frequency for the whole device, no
-matter how many `everblu_meter:` entries you declare. A scan therefore has two
-separate properties that can disagree:
+Each `everblu_meter:` entry has its own base `frequency`, saved offset and
+adaptive-tracking history. Entries can use different base frequencies. Before
+each read, the reader applies that meter's tuning to the shared CC1101.
 
-| Property | Scope |
-| --- | --- |
-| Which meter answers the scan | Per-entry: the meter on the `everblu_meter:` entry that triggered it |
-| Which frequency range is swept | Global: centred on the single base frequency |
-| Where the resulting offset is stored | Global: one value, applied to every meter |
+Declare `scan_button`, `deep_scan_button`, `reset_frequency_button`,
+`stop_reading_button`, `frequency_offset`, `tuned_frequency` and
+`frequency_estimate` on each meter, as shown in
+[example-multi-meter.yaml](example-multi-meter.yaml). Use the meter's `device_id`
+to put these entities on its Home Assistant sub-device. `tuned_frequency`
+reports that meter's saved setting, not an instantaneous read of radio registers.
+CC1101 connectivity, radio state and firmware version remain device-level entities.
 
-The meter that answers is whichever entry triggered the scan. For a manual
-`deep_scan_button` press that is the entry declaring the button. For the
-automatic scan run by `auto_scan_on_failure` (enabled by default) it is the
-meter that just exhausted its own `max_retries`, which need not be the entry
-the button was declared on. Both cases are named in the log:
+One scan owns the radio until it finishes. Other reads pause, and another scan
+or reset request is rejected while it is busy. A meter's Stop button cancels
+only its own scan or retries. A cancelled or unsuccessful scan restores the
+previous setting; a hardware fault may prevent the restore and is reported.
 
-```text
-Starting frequency scan using meter 20-0257750 (water)...
-Scan centred on 433.820007 MHz (this meter is configured for 433.782712 MHz)
-Running automatic frequency scan for meter 20-0259301 after failed reads...
-```
+Deep Scan follows the same policy in ESPHome and standalone MQTT:
 
-The swept range, however, is **not** per-meter. It is centred on the base
-frequency held in the shared `FrequencyManager`, which is set by whichever
-entry initialised **last** during boot. Because of this:
+1. Search ±150 kHz at nominal 10 kHz intervals.
+2. If the complete pass finds nothing, repeat once at nominal 2.5 kHz intervals.
+3. From a successful hit, sample nine settings spanning ±9.5 kHz around it at
+  approximately 2.380 kHz intervals, twice each.
+4. Rank by successful decodes, then average absolute FREQEST. Break ties towards the
+  first response. Require at least two of three confirmation reads before saving;
+  compare against three reads at an existing calibration before replacing it.
 
-> [!IMPORTANT]
-> Every `everblu_meter:` entry sharing one CC1101 must be given the **same**
-> `frequency:` value. If they differ, only the last entry's value takes effect
-> and the others are silently ignored, so scans (and normal reads) run at a
-> frequency that no longer matches those meters' configuration. The wide
-> ±150 kHz manual deep scan will usually still find the carrier, but the narrow
-> ±20 kHz `auto_scan_on_failure` window can end up centred well away from it.
+The scan deliberately does not map the edges of the band the meter answers over. Field
+logs show the meter decoding across a span far wider than the tuning resolution, and a
+missed reply usually means the meter was not transmitting rather than that the setting
+is wrong. Refinement only has to escape a marginal corner of that band. A response that
+cannot be reproduced is treated as a false start and the search carries on, up to twice
+per scan.
 
-If you need genuinely independent calibration per meter, use one CC1101 (and
-one ESP) per meter. Declare `deep_scan_button`, `reset_frequency_button` and
-the offset/tuned-frequency sensors on the **first** meter entry only, as in
-[example-multi-meter.yaml](example-multi-meter.yaml); adding extra scan buttons
-on other entries only changes which meter answers, not the swept range or the
-shared offset.
+The scanner uses integer CC1101 register steps: approximately 9.918 kHz for
+coarse acquisition and 2.380 kHz for the fallback pass and refinement.
+These are tuning resolutions, not guarantees of carrier-estimation accuracy.
+Each read takes several seconds, so a scan that has to search the full range still
+takes minutes, but the cost after the first response is fixed. Stop is handled
+between complete radio transactions. The phase and meter identity appear in the log.
+
+`auto_scan_on_failure` uses the Scan policy once per failure streak. `auto_scan`
+starts a Deep Scan once after time synchronises when that meter has no saved
+calibration. A stored zero offset is a valid calibration, not a request to scan again.
+
+**Upgrade:** older versions saved a single `freq_offset` without a meter identity.
+The per-meter implementation does not import that ambiguous value. Run Deep Scan
+once per meter after upgrading, or enable `auto_scan`. Offsets use keys based on
+meter year and serial and survive reboot. Reset/recalibrate after changing a
+meter's base `frequency`. Standalone MQTT retains its existing storage key.
+
+FREQEST comes from the data-frame sync measurement. Compare each meter's tuned
+frequency and residual estimate; do not assume that nearby meters require the
+same tuning or that RSSI alone identifies a usable setting.
 
 ## Common Configuration Patterns
 
