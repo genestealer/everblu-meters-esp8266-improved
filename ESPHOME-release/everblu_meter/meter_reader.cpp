@@ -656,9 +656,15 @@ void MeterReader::resetFrequencyOffset()
 
     LOG_I("everblu_meter", "Resetting frequency offset to 0");
 
-    // Reset offset to 0 and save
-    FrequencyManager::saveFrequencyOffset(0.0);
-    FrequencyManager::resetAdaptiveTracking();
+    // Erase rather than store a zero, so the meter counts as uncalibrated again and
+    // auto-scan and the stored-calibration quality guard both re-arm.
+    if (!FrequencyManager::clearCalibration())
+    {
+        LOG_W("everblu_meter", "Could not erase stored calibration - offset left at %.3f kHz",
+              FrequencyManager::getOffset() * 1000.0f);
+        if (m_publisher) m_publisher->publishError("Frequency offset reset failed - storage write error");
+        return;
+    }
 
     // Reinitialize radio with base frequency
     float baseFrequency = FrequencyManager::getBaseFrequency();

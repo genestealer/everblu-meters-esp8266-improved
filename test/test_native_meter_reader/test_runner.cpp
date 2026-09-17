@@ -66,6 +66,8 @@ void test_a_scan_is_only_stepped_by_the_reader_that_started_it(void);
 void test_a_running_scan_blocks_reads_and_further_scan_requests(void);
 void test_a_gas_meter_scans_the_same_as_a_water_meter(void);
 void test_reset_frequency_offset_clears_storage_and_retunes(void);
+void test_reset_frequency_offset_rearms_auto_scan(void);
+void test_reset_frequency_offset_reports_storage_failure(void);
 void test_successful_reads_feed_adaptive_frequency_tracking(void);
 void test_small_frequency_errors_do_not_move_the_offset(void);
 void test_reset_frequency_offset_reports_radio_failure(void);
@@ -173,6 +175,8 @@ int main(int, char **)
     RUN_TEST(test_a_running_scan_blocks_reads_and_further_scan_requests);
     RUN_TEST(test_a_gas_meter_scans_the_same_as_a_water_meter);
     RUN_TEST(test_reset_frequency_offset_clears_storage_and_retunes);
+    RUN_TEST(test_reset_frequency_offset_rearms_auto_scan);
+    RUN_TEST(test_reset_frequency_offset_reports_storage_failure);
     RUN_TEST(test_successful_reads_feed_adaptive_frequency_tracking);
     RUN_TEST(test_small_frequency_errors_do_not_move_the_offset);
     RUN_TEST(test_reset_frequency_offset_reports_radio_failure);

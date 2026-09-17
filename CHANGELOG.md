@@ -12,6 +12,12 @@ Releases are created manually by tagging commits with version tags matching `v*.
 - Keep PR coverage explicit per release so branch-only work is auditable against merge history.
 - Add new versions below, not above this section.
 
+## [Unreleased]
+
+### Fixed
+
+- **Reset Frequency Offset now returns the meter to uncalibrated instead of storing a zero.** The button used to persist an offset of 0.0, which still counts as a saved calibration. That left a reset meter unable to start a first-boot automatic scan, and made any frequency a later scan found compete against the zero offset in the stored-calibration quality guard, so a good candidate could be rejected in favour of a tuning the user had asked the firmware to forget. The stored value is now erased, so `Calibration ...: not stored` is reported on the next boot and both behaviours re-arm. If the erase is refused by flash, the offset is left alone and the reason is published to the Last Error sensor rather than silently reporting success. Affects both the ESPHome and MQTT builds ([#104](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/104)).
+
 ## [v3.6.0] - 2026-09-16
 
 ### AI Metadata

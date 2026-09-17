@@ -117,6 +117,9 @@ struct FakeStorage
     // Model a backend that rejects the write (worn flash, failed verify read-back).
     bool failSaves = false;
 
+    // Model a backend that rejects the erase, so the reset path can be tested.
+    bool failClears = false;
+
     void clear();
     const Entry *find(const char *key) const;
 };

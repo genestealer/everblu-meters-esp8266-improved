@@ -109,6 +109,20 @@ void FrequencyManager::saveFrequencyOffset(float offset)
     }
 }
 
+bool FrequencyManager::clearCalibration()
+{
+    StorageAbstraction::begin();
+    // An absent key is already the wanted state; ESP32 Preferences::remove() and the
+    // host fake both report false for one, so only a refused erase counts as failure.
+    if (StorageAbstraction::hasKey(s_calibration->storageKey) &&
+        !StorageAbstraction::clearKey(s_calibration->storageKey))
+        return false;
+    s_calibration->offset = 0.0f;
+    s_calibration->hasStored = false;
+    resetAdaptiveTracking();
+    return true;
+}
+
 float FrequencyManager::loadFrequencyOffset()
 {
     return StorageAbstraction::loadFloat(s_calibration->storageKey, 0.0f, STORAGE_MAGIC, MIN_OFFSET, MAX_OFFSET);

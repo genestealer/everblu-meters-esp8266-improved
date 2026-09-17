@@ -968,9 +968,43 @@ void test_reset_frequency_offset_clears_storage_and_retunes(void)
     reader.resetFrequencyOffset();
 
     TEST_ASSERT_FLOAT_WITHIN(0.0001f, 433.82f, fakeRadio().lastInitFrequency());
-    TEST_ASSERT_FLOAT_WITHIN(0.0001f, 0.0f, StorageAbstraction::loadFloat("freq_offset", 99.0f, 0xABCD));
+    // Erased, not overwritten with a zero: loadFloat must fall back to the default.
+    TEST_ASSERT_FALSE(StorageAbstraction::hasKey("freq_offset"));
+    TEST_ASSERT_FLOAT_WITHIN(0.0001f, 99.0f, StorageAbstraction::loadFloat("freq_offset", 99.0f, 0xABCD));
     TEST_ASSERT_FALSE(g_publisher.frequencyOffsets.empty());
     TEST_ASSERT_FLOAT_WITHIN(0.0001f, 0.0f, g_publisher.frequencyOffsets.back());
+}
+
+void test_reset_frequency_offset_rearms_auto_scan(void)
+{
+    // A stored zero still satisfies hasStored, which suppressed the first-boot
+    // auto scan and made a scan candidate compete against a forgotten tuning.
+    StorageAbstraction::saveFloat("freq_offset", 0.030f, 0xABCD);
+    g_config.frequency = 433.82f;
+    g_config.autoScan = true;
+
+    MeterReader reader = makeReader();
+    TEST_ASSERT_FALSE(FrequencyManager::shouldPerformAutoScan());
+
+    reader.resetFrequencyOffset();
+
+    TEST_ASSERT_TRUE(FrequencyManager::shouldPerformAutoScan());
+    TEST_ASSERT_FLOAT_WITHIN(0.0001f, 0.0f, FrequencyManager::getOffset());
+}
+
+void test_reset_frequency_offset_reports_storage_failure(void)
+{
+    // A refused erase must not silently leave the user believing the meter was reset.
+    StorageAbstraction::saveFloat("freq_offset", 0.030f, 0xABCD);
+    g_config.frequency = 433.82f;
+
+    MeterReader reader = makeReader();
+    fakeStorage().failClears = true;
+
+    reader.resetFrequencyOffset();
+
+    TEST_ASSERT_FLOAT_WITHIN(0.0001f, 0.030f, FrequencyManager::getOffset());
+    TEST_ASSERT_TRUE(g_publisher.lastError().find("reset failed") != std::string::npos);
 }
 
 void test_successful_reads_feed_adaptive_frequency_tracking(void)

@@ -169,6 +169,7 @@ void FakeStorage::clear()
     beginCalls = 0;
     saveCalls = 0;
     failSaves = false;
+    failClears = false;
 }
 
 const FakeStorage::Entry *FakeStorage::find(const char *key) const
@@ -233,6 +234,10 @@ bool StorageAbstraction::hasKey(const char *key)
 bool StorageAbstraction::clearKey(const char *key)
 {
     FakeStorage &storage = fakeStorage();
+    if (storage.failClears)
+    {
+        return false;
+    }
     for (size_t i = 0; i < storage.entries.size(); i++)
     {
         if (storage.entries[i].key == key)

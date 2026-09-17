@@ -148,6 +148,17 @@ public:
     /** @brief Persist an offset for the active calibration (range-checked). */
     static void saveFrequencyOffset(float offset);
 
+    /**
+     * @brief Erase the active calibration's stored offset and return it to uncalibrated
+     *
+     * Persisting a zero offset is not the same as having no calibration: a stored zero
+     * still satisfies hasStored, which suppresses the first-boot auto scan and makes a
+     * newly found candidate compete against a tuning the user asked to forget.
+     *
+     * @return false when the storage backend refused the erase (offset left untouched)
+     */
+    static bool clearCalibration();
+
     /** @brief Read the active calibration's stored offset straight from storage. */
     static float loadFrequencyOffset();
 
