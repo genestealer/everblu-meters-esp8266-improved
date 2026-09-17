@@ -12,7 +12,28 @@ Releases are created manually by tagging commits with version tags matching `v*.
 - Keep PR coverage explicit per release so branch-only work is auditable against merge history.
 - Add new versions below, not above this section.
 
-## [Unreleased]
+## [v3.6.0] - 2026-09-16
+
+### AI Metadata
+
+```yaml
+release_type: minor
+base_branch: main
+release_branch: develop
+includes_prs: [161, 162, 163]
+notable_superseded_work:
+  - "the once-per-day scheduler latch was first keyed on tm_yday, which restarts at 0 every January and suppressed the next year's occurrence of the same day; it was re-keyed on ScheduleManager::dateKey() before release"
+  - "the MQTT day-of-week fix was committed twice while the two review branches were stacked (ffce31c and da258a4) and lands once"
+scope_summary:
+  - "The cumulative history array is removed from the ESPHome history JSON, which had pushed the entity state past Home Assistant's 255-character limit and rendered it unknown"
+  - "Frequency calibration is per meter: each entry has its own base frequency, saved offset, adaptive tracking, sensors and scan controls"
+  - "Scans are staged (coarse acquisition, fine fallback, edge bracketing, ranked refinement, verification) and step from the main loop on both targets"
+  - "A scan stands down when the meter goes quiet instead of mapping a sleeping meter as hundreds of dead frequencies, and leaves the stored calibration untouched"
+  - "New opt-in to disable automatic scheduled readings on both targets, plus Scan and Stop Scan buttons on the standalone MQTT build"
+  - "Scheduler correctness: the configured day of week is honoured on MQTT, reads fire anywhere in the scheduled minute, the schedule waits for a valid clock and defers during a scan"
+  - "NTP sync no longer blocks the MQTT connect callback on the standalone build"
+  - "The host CC1101 simulation gained the FIFOs, so the whole radio read now runs on a desktop against real captured frames"
+```
 
 > **⚠️ BREAKING CHANGE** - The ESPHome `history` text sensor no longer carries the cumulative `history` array. Home Assistant templates that read `history.history[...]` require migration (see below). The MQTT / standalone build is unaffected.
 
@@ -31,11 +52,18 @@ Releases are created manually by tagging commits with version tags matching `v*.
 - **If you have a template reading `history.history[-1]`** (the newest cumulative snapshot), derive it from the volume sensor instead: `volume - current_month_usage`. The two are equal by definition, since `current_month_usage` is that difference. Updated templates are in `ESPHOME/docs/ESPHOME_HOME_ASSISTANT_INTEGRATION.md`.
 - **If you only use `monthly_usage`, `current_month_usage` or `months_available`**, no action is needed.
 
+### Added
+
+- **Opt-in to disable automatic scheduled readings** ([#159](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/159)): `DISABLE_SCHEDULED_READINGS` in `include/private.h` (default `0`) and `disable_scheduled_readings` in the ESPHome YAML (default `false`), threaded through `IConfigProvider::areScheduledReadingsDisabled()`. The daily read is skipped; manual and on-demand reads still work, so a meter can be read only when you ask for it. Useful where the utility's own read counter matters, or for a meter you only want to sample occasionally.
+- **`Frequency Scan` and `Stop Frequency Scan` buttons on the standalone MQTT build**, on the `everblu/cyble/<serial>/scan` and `.../stop_scan` topics. Scan searches around the saved tuning and widens automatically if nothing answers, which is the cheap first move when a working meter goes quiet; the existing `Deep Frequency Scan` still starts across the full ±150 kHz. Stop cancels at the next transaction boundary and restores the previous tuning, so a scan started by mistake no longer has to be waited out or the device rebooted.
+- **A per-meter `scan_button` in ESPHome**, alongside the existing deep scan, reset and stop buttons, and `frequency_estimate` is now a per-meter sensor rather than one shared value.
+- **The host CC1101 simulation now models the FIFOs**, so `get_meter_data_for_meter()` runs end to end on a desktop against the captures in `test/fixtures/meter_frames/raw_frames.lst`: wake-up burst, both receive stages, the oversampled decode, the CRC check and the parser, plus the failure modes. Two more host environments, `env:native_cc1101_debug` and `env:native_cc1101_legacy`, build the same suite with `debug_cc1101` and with `DISABLE_GDO2_FIFO_MANAGEMENT`. Adds the `home_003` / `raw_259301_c` fixtures and tests for the calibration, scheduling and reporting paths this release touched.
+
 ### Changed
 
 - **ESPHome history sensor always publishes a parseable document** ([#67](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/67)): a reading that decoded no history, and the state published at boot, are now a valid empty document rather than `unavailable`, so templates parsing the JSON never see `unknown`. History is published on every successful read, so a read without history clears the sensor rather than leaving the previous reading's payload in place.
 - **Per-meter ESPHome calibration:** each meter has independent base frequency, saved offset, adaptive tracking and frequency sensors. Add Scan, Deep Scan, Reset and Stop buttons to each entry. Reads reapply that meter's tuning; another meter cannot reset or cancel an active scan. Run a scan for each meter after upgrading: the old shared offset has no meter identity and is not imported.
-- **Staged scans in both targets:** wide acquisition uses nominal 10 kHz jumps, with one nominal 2.5 kHz fallback pass if empty. The scanner brackets both response edges, samples the complete window at 793 Hz intervals, ranks decode reliability before FREQEST, and confirms the candidate before saving. Local recovery starts around the saved tuning and widens if empty. MQTT scans now run from the main loop and support Scan and Stop Scan commands.
+- **Staged scans in both targets:** wide acquisition uses nominal 10 kHz jumps, with one nominal 2.5 kHz fallback pass if empty. The scanner brackets both response edges, samples the complete window at 793 Hz intervals, ranks decode reliability before FREQEST, and confirms the candidate before saving. Local recovery starts around the saved tuning and widens if empty. MQTT scans now step from the main loop rather than blocking it, so Wi-Fi and MQTT stay serviced for the duration.
 - **Calibration safeguards:** cancelled or unsuccessful scans restore previous tuning, radio faults abort, first-time calibration requires verification, and stored offsets support the full ±150 kHz scan range. Frequency-word conversion now rounds to the nearest register value. FREQEST is captured at data-frame sync rather than after decoding and logging.
 - **Confirmation read after a scan stores new tuning:** a scan only reaches its verified outcome by decoding frames, so the meter is awake at that moment. Previously the reader published the new offset and went idle, leaving a recovery scan to sit out the full `retry_cooldown` on a calibration that had just been proven to work. It now takes one read on the new tuning, reported as `Confirming new calibration`. It is a single attempt: a miss ends the failure streak rather than starting a fresh retry cycle, and does not trigger another scan. A scan that re-confirms the existing offset queues nothing.
 
@@ -45,6 +73,19 @@ Releases are created manually by tagging commits with version tags matching `v*.
 - **Pressing Stop on the wrong meter no longer appears to do nothing.** One CC1101 is shared, but each meter has its own Stop button and only the meter that started a scan can cancel it. The other meters now log and publish `Scan belongs to meter NN-NNNNNN - use that meter's Stop button` to their Last Error sensor instead of silently ignoring the press. ESPHome multi-meter setups only.
 - **Frame hex dumps are suppressed during a frequency scan.** `debug_cc1101: true` made every scan step dump the raw and decoded frames, which is what the scan's own log suppression was meant to prevent; the hex dumper wrote to the log directly and escaped it. One reported scan log was 35% frame dumps. High-level scan progress is unchanged.
 - **The fine sweep window in the log now matches the window actually swept.** It reported the bracket edges rather than the sweep bounds, understating each end by one bracketing step (~2.4 kHz).
+- **The standalone build ignored the configured reading schedule's day of week.** `main.cpp` never called `ScheduleManager::setSchedule()`, so a `DEFAULT_READING_SCHEDULE` of, for example, weekdays only was printed in the logs and published in Home Assistant discovery while the reading day was still picked from the default. ESPHome was unaffected.
+- **A scheduled read could be lost for the whole day.** Both schedulers fired only when a poll happened to observe `tm_sec == 0`, a one-second window per day, so a blocking read, a frequency scan or a Wi-Fi reconnect spanning that second silently skipped the day's reading. The read now fires anywhere inside the scheduled minute, latched to one occurrence per day.
+- **The schedule no longer latches on an unset clock or while a scan owns the radio.** `onScheduled()` waits for a plausible epoch before matching, so the 1970 clock at boot cannot satisfy a 00:00 schedule and consume that day's read. Both schedulers now defer instead of latching during a frequency scan, where the read would previously have been dropped and lost until the next day. The once-per-day latch is keyed on the full date rather than `tm_yday`, which restarts at 0 every January and suppressed the next year's occurrence of the same day.
+- **NTP sync no longer stalls the MQTT connect callback** on the standalone build. It spun in a `delay()` loop for up to 10 seconds waiting for the clock on every reconnect, holding up `mqtt.loop()` and `ArduinoOTA.handle()` with it. `configTzTime()` is now kicked off and the callback returns; a non-blocking poll in `loop()` watches the clock and logs the outcome once.
+- **A very weak signal was reported as "too strong".** The dBm conversion returned `int8_t`, but the weakest readings map below -128 dBm (register value 128 converts to -138), which wrapped to a positive number and satisfied the `> -50 dBm` near-field saturation heuristic. The conversion, the diagnostic struct field and the local variables are now `int`, and the function is declared in `cc1101.h` so the boundary tests can cover the whole 0-255 register range.
+- **The ESPHome manual-read and deep-scan buttons are guarded like the others.** They only null-checked the meter reader, unlike the scan and reset buttons, which also require an initialised radio and reject a press while a scan or read is already running. A deep scan could therefore be launched on an unconfigured or busy radio.
+- **The `Status` text sensor in `example-advanced.yaml` was missing the `id` its own `on_value` automation refers to**, so the example failed to compile as published.
+- **The release workflow no longer interpolates its `workflow_dispatch` tag input into a shell command.** The tag and version are passed through the environment and the input is validated against the `v*.*.*` shape, closing a script-injection path open to anyone able to trigger the workflow.
+
+### Removed
+
+- **`averageMonthlyUsage`** from `HistoryStats` and `calculateStats()`. It divided the total usage by `monthCount + 1`, counting the phantom oldest month (whose usage is always 0) as a period, so the figure was wrong. Nothing read it: it was never published over MQTT or the ESPHome API, and the only consumer was a unit test that asserted the buggy result and so locked the defect in. Rather than invent a definition for an undocumented metric, the field is gone.
+- **`echo_cc1101_version()` and `show_cc1101_registers_settings()`** from the CC1101 driver. Both dumped register state to the serial log, and neither had a caller anywhere in the firmware. Being non-`static` with no declaration in `cc1101.h`, they raised no unused-function warning and were compiled into every build of both targets. `cc1101_print_diagnostic_report()` already reports the part number, version and key registers in a form meant for pasting into a bug report.
 
 ## [v3.5.0] - 2026-07-31
 

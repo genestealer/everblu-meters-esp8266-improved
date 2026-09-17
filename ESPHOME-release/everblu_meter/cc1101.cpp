@@ -554,8 +554,6 @@ void CC1101_CMD(uint8_t spi_instr)
   CC1101_status_state = (tbuf[0] >> 4) & 0x0F;
 }
 
-void echo_cc1101_version(void);
-void show_cc1101_registers_settings(void);
 // cc1100_rssi_convert2dbm() is declared in cc1101.h
 
 //---------------[CC1100 reset function]-----------------------
@@ -1197,45 +1195,6 @@ void cc1101_rec_mode(void)
       return;
     }
   }
-}
-
-void echo_cc1101_version(void)
-{
-  echo_debug(debug_out, "CC1101 Partnumber: 0x%02X\n", halRfReadReg(PARTNUM_ADDR));
-  echo_debug(debug_out, "CC1101 Version != 00 or 0xFF  : 0x%02X\n", halRfReadReg(VERSION_ADDR)); // != 00 or 0xFF
-}
-
-#define CFG_REGISTER 0x2F // 47 registers
-void show_cc1101_registers_settings(void)
-{
-  uint8_t config_reg_verify[CFG_REGISTER], Patable_verify[8];
-  uint8_t i;
-
-  memset(config_reg_verify, 0, CFG_REGISTER);
-  memset(Patable_verify, 0, 8);
-
-  SPIReadBurstReg(0, config_reg_verify, CFG_REGISTER); // reads all 47 config register from cc1100	"359.63us"
-  SPIReadBurstReg(PATABLE_ADDR, Patable_verify, 8);    // reads output power settings from cc1100	"104us"
-
-  echo_debug(debug_out, "Config Register in hex:\n");
-  echo_debug(debug_out, " 0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F\n");
-  for (i = 0; i < CFG_REGISTER; i++) // showes rx_buffer for debug
-  {
-    echo_debug(debug_out, "%02X ", config_reg_verify[i]);
-
-    if (i == 15 || i == 31 || i == 47 || i == 63) // just for beautiful output style
-    {
-      echo_debug(debug_out, "\n");
-    }
-  }
-  echo_debug(debug_out, "\n");
-  echo_debug(debug_out, "PaTable:\n");
-
-  for (i = 0; i < 8; i++) // showes rx_buffer for debug
-  {
-    echo_debug(debug_out, "%02X ", Patable_verify[i]);
-  }
-  echo_debug(debug_out, "\n");
 }
 
 // Diagnostic: the RADIAN frame length is not assumed. Scan every candidate
