@@ -634,17 +634,23 @@ Deep Scan follows the same policy in ESPHome and standalone MQTT:
 
 1. Search ±150 kHz at nominal 10 kHz intervals.
 2. If the complete pass finds nothing, repeat once at nominal 2.5 kHz intervals.
-3. From a successful hit, probe downwards and upwards at the smaller interval.
-  Five consecutive misses close each edge, with the scan range as a hard limit.
-4. Sample the entire bracket twice per frequency at approximately 793 Hz intervals.
-5. Rank by successful decodes, then average absolute FREQEST. Break ties towards
-  the window midpoint. Require at least two of three confirmation reads before
-  saving; compare against three reads at an existing calibration before replacing it.
+3. From a successful hit, sample nine settings spanning ±9.5 kHz around it at
+  approximately 2.380 kHz intervals, twice each.
+4. Rank by successful decodes, then average absolute FREQEST. Break ties towards the
+  first response. Require at least two of three confirmation reads before saving;
+  compare against three reads at an existing calibration before replacing it.
+
+The scan deliberately does not map the edges of the band the meter answers over. The
+CC1101 runs a 270 kHz receive filter with offset compensation across ±67.7 kHz, so the
+meter decodes over a span far wider than the tuning resolution, and a missed reply
+usually means the meter was not transmitting rather than that the setting is wrong.
+Refinement only has to escape a marginal corner of that band.
 
 The scanner uses integer CC1101 register steps: approximately 9.918 kHz for
-coarse acquisition, 2.380 kHz for fallback/bracketing, and 793 Hz for fine scanning.
+coarse acquisition and 2.380 kHz for the fallback pass and refinement.
 These are tuning resolutions, not guarantees of carrier-estimation accuracy.
-Each read takes several seconds, so refinement can add minutes. Stop is handled
+Each read takes several seconds, so a scan that has to search the full range still
+takes minutes, but the cost after the first response is fixed. Stop is handled
 between complete radio transactions. The phase and meter identity appear in the log.
 
 `auto_scan_on_failure` uses the Scan policy once per failure streak. `auto_scan`

@@ -4,7 +4,7 @@
  *
  * Provides comprehensive frequency management features for accurate meter communication:
  * - Persistent storage of frequency offsets, one calibration per meter
- * - Staged frequency scanning (coarse acquisition, bracketing, fine sweep, verification)
+ * - Staged frequency scanning (coarse acquisition, local refinement, verification)
  * - Adaptive frequency tracking using FREQEST
  *
  * This module is designed to be reusable across different projects (Arduino, ESPHome, etc.)
@@ -213,8 +213,8 @@ public:
      * host loop responsive so an incoming Stop can still be delivered mid-scan (#133).
      *
      * Stages: coarse acquisition across the range; one finer acquisition pass if that
-     * came back empty; bracketing of both response edges; a full fine sweep of the
-     * bracket; then verification before anything is saved.
+     * came back empty; a short refinement window around the first response; then
+     * verification before anything is saved.
      */
     static void beginDeepFrequencyScan(float scanRangeMHz = 0.150f, float scanStepMHz = 0.010f,
                                        StatusCallback statusCallback = nullptr);
@@ -253,17 +253,14 @@ private:
     /**
      * @brief Stages of the non-blocking scan state machine
      *
-     * Acquire finds any response; Lower/Upper map the edges of the response window;
-     * Zoom samples the whole window finely; the Verify stages confirm a candidate
-     * against repeat reads before Finalise persists it.
+     * Acquire finds any response; Refine samples a short window around it; the Verify
+     * stages confirm a candidate against repeat reads before Finalise persists it.
      */
     enum class ScanPhase : uint8_t
     {
         Idle,
         Acquire,
-        Lower,
-        Upper,
-        Zoom,
+        Refine,
         VerifyCandidate,
         VerifyStored,
         Finalise
@@ -298,12 +295,8 @@ private:
         int32_t current = 0;        // Frequency word being tested
         int32_t step = 0;           // Acquisition stride in frequency words
         int32_t seed = 0;           // Word where acquisition first got a response
-        int32_t firstHit = 0;       // Lowest word that answered
-        int32_t lastHit = 0;        // Highest word that answered
-        int32_t zoomStart = 0;      // First word of the fine sweep
-        int32_t zoomEnd = 0;        // Last word of the fine sweep
-        int32_t best = 0;           // Best candidate word found by the fine sweep
-        int misses = 0;             // Consecutive misses while bracketing an edge
+        int32_t refineEnd = 0;      // Last word of the refinement window
+        int32_t best = 0;           // Best candidate word found by the refinement
         bool expandOnMiss = false;  // Recovery scan: widen to full range if local is empty
         bool finerFallback = false; // One finer acquisition pass is still available
         bool quietPrevious = false; // Saved g_echo_debug_quiet (RAII cannot span loops)
@@ -335,11 +328,13 @@ private:
     static constexpr float MIN_OFFSET = -0.150f;
     static constexpr float MAX_OFFSET = 0.150f;
     static constexpr uint16_t STORAGE_MAGIC = 0xABCD;
-    // A single missed reply is not an edge: the meter does not answer every attempt,
-    // so an edge is only closed after this many consecutive misses.
-    static constexpr int MISS_TOLERANCE = 5;
-    static constexpr int MAP_STEP = 6;  // Bracketing/fallback stride, ~2.380 kHz
-    static constexpr int ZOOM_STEP = 2; // Fine sweep stride, ~793 Hz
+    static constexpr int MAP_STEP = 6; // Finer acquisition fallback and refinement stride, ~2.380 kHz
+    // The CC1101 runs a 270 kHz RX filter with offset compensation over +-67.7 kHz
+    // (see MDMCFG4/FOCCFG in cc1101.cpp), so the meter decodes over a band far wider
+    // than the tuning resolution. Refinement only has to escape a marginal corner of
+    // that band, not locate the carrier, so a short window either side is enough.
+    static constexpr int REFINE_SPAN = 4; // Steps each side of the first response, ~+-9.5 kHz
+    static constexpr int REFINE_READS = 2; // Reads per refinement frequency
 
     static void feedWatchdog();
     static bool validateCallbacks(); // Validate that required callbacks are set
@@ -352,9 +347,7 @@ private:
     static bool better(const Quality &candidate, const Quality &previous);
     static void finishScan(ScanOutcome outcome, const char *message);
     static void stepAcquire();
-    static void stepBracket();
-    static void closeEdge(bool lower);
-    static void stepZoom();
+    static void stepRefine();
     static void stepVerify();
 
     // Private constructor - static-only class

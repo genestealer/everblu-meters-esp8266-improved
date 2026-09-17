@@ -105,62 +105,63 @@ half the error when it exceeds 2 kHz. It does not guarantee sub-kilohertz accura
 
 ## 5. Deep frequency scan (fallback)
 
-Both targets use staged acquisition, two-sided bracketing, full-window refinement
-and repeated verification. ESPHome calibration profiles are independent per meter.
+Both targets use staged acquisition, a bounded local refinement and repeated
+verification. ESPHome calibration profiles are independent per meter.
 
 ### Entry points
 
 | Trigger | Range | Step | Duration |
 |---|---|---|---|
-| Deep Scan or startup | ±150 kHz around meter base | Nominal 10 kHz, then 2.5 kHz if empty | Variable; refinement adds minutes |
+| Deep Scan or startup | ±150 kHz around meter base | Nominal 10 kHz, then 2.5 kHz if empty | Variable; fixed cost once a response is found |
 | Scan or failed-read recovery | ±20 kHz around saved tuning, then Deep Scan if empty | Nominal 1 kHz locally | Variable |
 
 The scanner uses integer frequency words and a bounded finer acquisition fallback.
 See the [current scan policy](../ESPHOME/README.md#frequency-scans-in-multi-meter-setups).
 
-### Phase 1 — Window mapping (coarse pass)
+### Phase 1 — Acquisition (coarse pass)
 
 ```
 search the full range in coarse steps until a valid reading is found
 if empty: repeat once with smaller steps
 if still empty: restore previous tuning and finish
-from a hit: probe downwards and upwards in smaller steps
-record lowest and highest successful settings
-stop each direction at five consecutive misses or the range limit
 ```
-
-This maps the full response band (`firstHitFreq` to `lastHitFreq`) without scanning to the end of the range unnecessarily.
 
 `reads_counter` is the meter's counter, not a byte count or quality score.
 
 Each attempt actively sends a wake-up burst and interrogation. No fixed
 probability of an on-frequency timing miss has been established.
 
-### Phase 2 — Zoom (fine pass)
+### Phase 2 — Refinement
 
 ```
-expand the observed window by one bracketing step, within range limits
-sample the complete fine window twice at each setting
+sample four steps either side of the first response, within range limits
+read each setting twice
 rank successful decodes, then average absolute FREQEST
-break ties towards the window midpoint
+break ties towards the first response
 require at least two successes in three candidate verification reads
 compare with three reads at an existing calibration before replacing it
 ```
 
-An empty fine sweep or failed verification restores previous tuning. No midpoint
-or unverified candidate is saved, including on first boot.
+An empty refinement or failed verification restores previous tuning. No unverified
+candidate is saved, including on first boot.
 
-The fine sweep does not stop on the first successful decode. FREQEST comes from
-data-frame sync, before decoding/logging delays. Fine tuning resolution does not
-guarantee equal measurement accuracy.
+The refinement does not stop at the first successful decode, and it does not try to
+map where the meter stops answering. The CC1101 runs a 270 kHz receive filter with
+offset compensation across ±67.7 kHz (see `MDMCFG4` and `FOCCFG` in `cc1101.cpp`), so
+the meter decodes over a band far wider than the tuning resolution and a missed reply
+usually means the meter was not transmitting. A scan that walked outwards until the
+replies stopped therefore measured the meter's duty cycle, not its carrier.
+
+FREQEST comes from data-frame sync, before decoding/logging delays. Tuning resolution
+does not guarantee equal measurement accuracy.
 
 ### CC1101 minimum frequency step (hardware limit)
 
 $$\Delta f_\text{min} = \frac{F_{xosc}}{2^{16}} = \frac{26{,}000{,}000}{65{,}536} \approx 396.7 \text{ Hz}$$
 
 The correct MHz expression is `26.0 / 65536.0`, without division by 1,000.
-Coarse acquisition uses 25 register steps (9.918 kHz), fallback/bracketing
-6 (2.380 kHz), and fine scanning 2 (793 Hz).
+Coarse acquisition uses 25 register steps (9.918 kHz); the fallback pass and
+refinement use 6 (2.380 kHz).
 
 ### Save and reinit
 

@@ -294,11 +294,16 @@ void FrequencyManager::stepAcquire()
     if (!readAt(s_scan.current * CC1101_MIN_STEP_MHZ, data)) return;
     if (data.reads_counter > 0 && data.volume > 0)
     {
-        s_scan.seed = s_scan.firstHit = s_scan.lastHit = s_scan.current;
-        s_scan.current -= MAP_STEP;
-        s_scan.phase = ScanPhase::Lower;
-        reportPhase("Bracketing lower edge");
-        LOG_I("everblu_meter", "Response found - bracketing both edges");
+        s_scan.seed = s_scan.current;
+        s_scan.current = s_scan.seed - REFINE_SPAN * MAP_STEP;
+        if (s_scan.current < s_scan.start) s_scan.current = s_scan.start;
+        s_scan.refineEnd = s_scan.seed + REFINE_SPAN * MAP_STEP;
+        if (s_scan.refineEnd > s_scan.end) s_scan.refineEnd = s_scan.end;
+        s_scan.phase = ScanPhase::Refine;
+        reportPhase("Refining around first response");
+        LOG_I("everblu_meter", "Response found - refining %.6f - %.6f MHz at %.3f kHz",
+              s_scan.current * CC1101_MIN_STEP_MHZ, s_scan.refineEnd * CC1101_MIN_STEP_MHZ,
+              MAP_STEP * CC1101_MIN_STEP_MHZ * 1000.0f);
     }
     else if (s_scan.current == s_scan.end) s_scan.current++;
     else
@@ -308,61 +313,20 @@ void FrequencyManager::stepAcquire()
     }
 }
 
-// Stage 2: walk out from the first response in both directions to find where the
-// meter stops answering. MISS_TOLERANCE consecutive misses close an edge, so a single
-// unanswered attempt is not mistaken for the boundary.
-void FrequencyManager::stepBracket()
+// Stage 2: sample a short window either side of the first response and keep the best.
+//
+// Mapping the edges of the response band was tried and does not work. The radio is
+// deliberately configured with a 270 kHz RX filter and +-67.7 kHz offset compensation,
+// so the meter decodes over a band far wider than a scan can usefully resolve, and a
+// missed reply means the meter was not transmitting rather than that the tuning is
+// wrong: the meter answers on a duty cycle. A field scan therefore mapped a 171 kHz
+// "window" whose edges were where the meter happened to fall silent, spent 25 minutes
+// sweeping it, and excluded the frequency that was known to work.
+void FrequencyManager::stepRefine()
 {
-    bool lower = s_scan.phase == ScanPhase::Lower;
-    if (s_scan.misses >= MISS_TOLERANCE || s_scan.current < s_scan.start || s_scan.current > s_scan.end)
+    if (s_scan.current > s_scan.refineEnd)
     {
-        closeEdge(lower);
-        return;
-    }
-    tmeter_data data{};
-    if (!readAt(s_scan.current * CC1101_MIN_STEP_MHZ, data)) return;
-    if (data.reads_counter > 0 && data.volume > 0)
-    {
-        if (lower) s_scan.firstHit = s_scan.current;
-        else s_scan.lastHit = s_scan.current;
-        s_scan.misses = 0;
-    }
-    else s_scan.misses++;
-    s_scan.current += lower ? -MAP_STEP : MAP_STEP;
-}
-
-// Declare one bracket edge found and move on: lower hands over to the upper walk,
-// upper opens the fine sweep.
-void FrequencyManager::closeEdge(bool lower)
-{
-    s_scan.misses = 0;
-    if (lower)
-    {
-        s_scan.current = s_scan.seed + MAP_STEP;
-        s_scan.phase = ScanPhase::Upper;
-        reportPhase("Bracketing upper edge");
-        return;
-    }
-    s_scan.zoomStart = s_scan.firstHit - MAP_STEP;
-    if (s_scan.zoomStart < s_scan.start) s_scan.zoomStart = s_scan.start;
-    s_scan.zoomEnd = s_scan.lastHit + MAP_STEP;
-    if (s_scan.zoomEnd > s_scan.end) s_scan.zoomEnd = s_scan.end;
-    s_scan.current = s_scan.zoomStart;
-    s_scan.phase = ScanPhase::Zoom;
-    reportPhase("Fine window scan");
-    LOG_I("everblu_meter", "Window %.6f - %.6f MHz; full fine sweep at %.3f kHz",
-          s_scan.zoomStart * CC1101_MIN_STEP_MHZ, s_scan.zoomEnd * CC1101_MIN_STEP_MHZ,
-          ZOOM_STEP * CC1101_MIN_STEP_MHZ * 1000.0f);
-}
-
-// Stage 3: sample the WHOLE bracket, twice per frequency, and keep the best. Stopping
-// at the first decode would lock onto the lower edge of the response window rather
-// than its centre, which is what the earlier implementation did.
-void FrequencyManager::stepZoom()
-{
-    if (s_scan.current > s_scan.zoomEnd)
-    {
-        if (s_scan.bestQuality.successes == 0) finishScan(ScanOutcome::NotFound, "Fine scan failed - restoring tuning");
+        if (s_scan.bestQuality.successes == 0) finishScan(ScanOutcome::NotFound, "Refinement failed - restoring tuning");
         else
         {
             s_scan.phase = ScanPhase::VerifyCandidate;
@@ -373,17 +337,16 @@ void FrequencyManager::stepZoom()
     tmeter_data data{};
     if (!readAt(s_scan.current * CC1101_MIN_STEP_MHZ, data)) return;
     record(s_scan.sample, data);
-    if (s_scan.sample.attempts < 2) return;
+    if (s_scan.sample.attempts < REFINE_READS) return;
     bool tied = s_scan.sample.successes == s_scan.bestQuality.successes && s_scan.sample.error == s_scan.bestQuality.error;
-    int32_t midpointTwice = s_scan.firstHit + s_scan.lastHit;
     if (better(s_scan.sample, s_scan.bestQuality) ||
-        (s_scan.sample.successes > 0 && tied && abs(2 * s_scan.current - midpointTwice) < abs(2 * s_scan.best - midpointTwice)))
+        (s_scan.sample.successes > 0 && tied && abs(s_scan.current - s_scan.seed) < abs(s_scan.best - s_scan.seed)))
     {
         s_scan.best = s_scan.current;
         s_scan.bestQuality = s_scan.sample;
     }
     s_scan.sample = Quality{};
-    s_scan.current += ZOOM_STEP;
+    s_scan.current += MAP_STEP;
 }
 
 // Stage 4: confirm before persisting. The candidate must decode at least twice out of
@@ -433,9 +396,7 @@ void FrequencyManager::loopScan()
     switch (s_scan.phase)
     {
     case ScanPhase::Acquire: stepAcquire(); break;
-    case ScanPhase::Lower:
-    case ScanPhase::Upper: stepBracket(); break;
-    case ScanPhase::Zoom: stepZoom(); break;
+    case ScanPhase::Refine: stepRefine(); break;
     case ScanPhase::VerifyCandidate:
     case ScanPhase::VerifyStored: stepVerify(); break;
     case ScanPhase::Finalise:

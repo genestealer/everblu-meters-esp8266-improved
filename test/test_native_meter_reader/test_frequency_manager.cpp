@@ -46,18 +46,18 @@ namespace
      * the only point a test can hook without reaching into the scan's private
      * state.
      */
-    bool isFirstZoomRetune(float freq)
+    bool isFirstRefineRetune(float freq)
     {
         const FakeRadio &radio = fakeRadio();
         return !radio.initFrequencies.empty() && freq < radio.lastInitFrequency();
     }
 
-    /// Model the meter dropping out (falling asleep) as the zoom pass starts.
-    void silenceMeterWhenZoomStarts()
+    /// Model the meter dropping out (falling asleep) as the refinement starts.
+    void silenceMeterWhenRefinementStarts()
     {
         fakeRadio().onInit = [](float freq)
         {
-            if (isFirstZoomRetune(freq))
+            if (isFirstRefineRetune(freq))
             {
                 fakeRadio().carrierFrequency = 0.0f;
                 fakeRadio().onInit = nullptr;
@@ -65,12 +65,12 @@ namespace
         };
     }
 
-    /// Model the radio failing to retune from the zoom pass onwards.
-    void failRadioInitWhenZoomStarts()
+    /// Model the radio failing to retune from the refinement onwards.
+    void failRadioInitWhenRefinementStarts()
     {
         fakeRadio().onInit = [](float freq)
         {
-            if (isFirstZoomRetune(freq))
+            if (isFirstRefineRetune(freq))
             {
                 fakeRadio().initSucceeds = false;
                 fakeRadio().onInit = nullptr;
@@ -468,13 +468,13 @@ void test_freq_scan_reports_a_failed_sweep_through_the_status_callback(void)
 
 void test_freq_scan_keeps_the_stored_offset_when_the_candidate_stops_answering(void)
 {
-    // The meter drops out between the coarse sweep and the zoom, so neither the
-    // zoom nor the post-lock verification decodes anything. A calibration that
+    // The meter drops out between the coarse sweep and the refinement, so neither the
+    // refinement nor the post-lock verification decodes anything. A calibration that
     // is already known good must survive that (issue #104).
     beginManager();
     FrequencyManager::saveFrequencyOffset(0.012f);
     placeCarrier(20.0f, 6.0f);
-    silenceMeterWhenZoomStarts();
+    silenceMeterWhenRefinementStarts();
 
     FrequencyManager::performDeepFrequencyScan(0.050f, 0.0025f);
 
@@ -482,11 +482,11 @@ void test_freq_scan_keeps_the_stored_offset_when_the_candidate_stops_answering(v
     TEST_ASSERT_FLOAT_WITHIN(0.000001f, BASE_FREQ + 0.012f, fakeRadio().lastInitFrequency());
 }
 
-void test_freq_scan_falls_back_to_the_window_midpoint_when_the_zoom_cannot_retune(void)
+void test_freq_scan_saves_nothing_when_the_refinement_cannot_retune(void)
 {
     beginManager();
     placeCarrier(20.0f, 6.0f);
-    failRadioInitWhenZoomStarts();
+    failRadioInitWhenRefinementStarts();
 
     FrequencyManager::performDeepFrequencyScan(0.050f, 0.0025f);
 

@@ -51,7 +51,8 @@ void test_statistics_are_republished_periodically(void);
 void test_auto_scan_on_failure_runs_once_per_failure_streak(void);
 void test_auto_scan_on_failure_is_rearmed_by_a_success(void);
 void test_staged_scan_falls_back_and_finds_a_narrow_carrier();
-void test_staged_scan_sweeps_both_sides_and_selects_the_centre();
+void test_staged_scan_refines_on_both_sides_of_the_first_response();
+void test_staged_scan_cost_does_not_scale_with_the_response_band();
 void test_calibration_profiles_keep_independent_storage_and_tracking();
 void test_staged_scan_cancels_every_phase_without_saving();
 void test_staged_scan_radio_faults_never_save_candidates();
@@ -110,7 +111,7 @@ void test_freq_loop_scan_does_nothing_when_no_scan_is_running(void);
 void test_freq_scan_reports_its_result_through_the_status_callback(void);
 void test_freq_scan_reports_a_failed_sweep_through_the_status_callback(void);
 void test_freq_scan_keeps_the_stored_offset_when_the_candidate_stops_answering(void);
-void test_freq_scan_falls_back_to_the_window_midpoint_when_the_zoom_cannot_retune(void);
+void test_freq_scan_saves_nothing_when_the_refinement_cannot_retune(void);
 void test_freq_adaptive_tracking_waits_for_the_threshold(void);
 void test_freq_adaptive_tracking_applies_half_the_average_error(void);
 void test_freq_adaptive_tracking_cancels_symmetric_noise(void);
@@ -222,7 +223,7 @@ int main(int, char **)
     RUN_TEST(test_freq_scan_reports_its_result_through_the_status_callback);
     RUN_TEST(test_freq_scan_reports_a_failed_sweep_through_the_status_callback);
     RUN_TEST(test_freq_scan_keeps_the_stored_offset_when_the_candidate_stops_answering);
-    RUN_TEST(test_freq_scan_falls_back_to_the_window_midpoint_when_the_zoom_cannot_retune);
+    RUN_TEST(test_freq_scan_saves_nothing_when_the_refinement_cannot_retune);
     RUN_TEST(test_freq_adaptive_tracking_waits_for_the_threshold);
     RUN_TEST(test_freq_adaptive_tracking_applies_half_the_average_error);
     RUN_TEST(test_freq_adaptive_tracking_cancels_symmetric_noise);
@@ -232,7 +233,8 @@ int main(int, char **)
     RUN_TEST(test_freq_scan_result_is_a_plain_tmeter_data_by_value);
 
     RUN_TEST(test_staged_scan_falls_back_and_finds_a_narrow_carrier);
-    RUN_TEST(test_staged_scan_sweeps_both_sides_and_selects_the_centre);
+    RUN_TEST(test_staged_scan_refines_on_both_sides_of_the_first_response);
+    RUN_TEST(test_staged_scan_cost_does_not_scale_with_the_response_band);
     RUN_TEST(test_calibration_profiles_keep_independent_storage_and_tracking);
     RUN_TEST(test_staged_scan_cancels_every_phase_without_saving);
     RUN_TEST(test_staged_scan_radio_faults_never_save_candidates);

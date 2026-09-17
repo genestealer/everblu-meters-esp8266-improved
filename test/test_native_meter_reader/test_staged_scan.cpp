@@ -8,51 +8,46 @@ namespace
 {
     constexpr float BASE = 433.82f;
     constexpr float STEP = 26.0f / 65536.0f;
+    constexpr const char *REFINE_PHASE = "Refining around first response";
     const char *targetPhase = nullptr;
     int phaseAction = 0;
     bool targetVisited = false;
-    bool fineSampling = false;
-    bool upperEdgeVisited = false;
-    int sampleCount = 0;
+    bool refining = false;
+    int carrierReads = 0;
     void scanProgress(const char *, const char *message)
     {
-        fineSampling = strcmp(message, "Fine window scan") == 0;
-        upperEdgeVisited |= strcmp(message, "Bracketing upper edge") == 0;
+        refining |= strcmp(message, REFINE_PHASE) == 0;
         if (targetPhase == nullptr || strcmp(message, targetPhase) != 0) return;
         targetVisited = true;
         if (phaseAction == 1) FrequencyManager::requestScanCancel();
         if (phaseAction == 2) fakeRadio().initSucceeds = false;
         if (phaseAction == 3) fakeRadio().carrierFrequency = 0;
     }
-    tmeter_data readWithDropouts()
-    {
-        tmeter_data data = get_meter_data_for_meter(20, 257750);
-        float frequency = fakeRadio().lastInitFrequency();
-        if (fineSampling)
-        {
-            if (fabsf(frequency - fakeRadio().carrierFrequency) < 0.0015f && ++sampleCount % 2 == 1)
-                return FakeRadio::failure(ReadFailure::NoReply);
-        }
-        else if (!upperEdgeVisited && fakeRadio().calls.size() % 3 == 0)
-            return FakeRadio::failure(ReadFailure::NoReply);
-        return data;
-    }
     tmeter_data readScanMeter() { return get_meter_data_for_meter(20, 257750); }
 
-    // Model a meter that stops answering for a stretch of the fine sweep and comes
-    // back. The silence runs longer than MISS_TOLERANCE frequencies.
-    int fineReads = 0;
+    // Answer only once in two at the exact carrier, and both times everywhere else, so
+    // the frequency with the lowest |FREQEST| is not the one that decodes reliably.
+    tmeter_data readWithDropouts()
+    {
+        if (refining && fabsf(fakeRadio().lastInitFrequency() - fakeRadio().carrierFrequency) < 0.0015f &&
+            ++carrierReads % 2 == 1)
+            return FakeRadio::failure(ReadFailure::NoReply);
+        return readScanMeter();
+    }
+
+    // Model a meter that stops answering for a stretch of the refinement and comes back.
+    int refineReads = 0;
     int quietUntil = 0;
     bool quietSpellUsed = false;
     void quietSpellScanProgress(const char *, const char *message)
     {
-        if (quietSpellUsed || strcmp(message, "Fine window scan") != 0) return;
+        if (quietSpellUsed || strcmp(message, REFINE_PHASE) != 0) return;
         quietSpellUsed = true;
-        quietUntil = fineReads + 14; // seven frequencies at two reads each
+        quietUntil = refineReads + 6; // three frequencies at two reads each
     }
     tmeter_data readWithQuietSpell()
     {
-        if (++fineReads <= quietUntil) return FakeRadio::failure(ReadFailure::NoReply);
+        if (++refineReads <= quietUntil) return FakeRadio::failure(ReadFailure::NoReply);
         return readScanMeter();
     }
 
@@ -62,9 +57,9 @@ namespace
         FrequencyManager::setMeterReadCallback(readScanMeter);
         FrequencyManager::begin(BASE);
         targetPhase = nullptr;
-        targetVisited = fineSampling = upperEdgeVisited = false;
-        sampleCount = 0;
-        fineReads = quietUntil = 0;
+        targetVisited = refining = false;
+        carrierReads = 0;
+        refineReads = quietUntil = 0;
         quietSpellUsed = false;
     }
 }
@@ -86,26 +81,45 @@ void test_staged_scan_falls_back_and_finds_a_narrow_carrier()
     TEST_ASSERT_FLOAT_WITHIN(STEP, fakeRadio().carrierFrequency, FrequencyManager::getTunedFrequency());
 }
 
-void test_staged_scan_sweeps_both_sides_and_selects_the_centre()
+// The response band is far wider than the tuning resolution, so the first frequency
+// that answers may sit at a marginal corner of it. Refinement samples a short window
+// either side rather than accepting the acquisition hit outright.
+void test_staged_scan_refines_on_both_sides_of_the_first_response()
 {
     startManager();
     fakeRadio().carrierFrequency = BASE + 0.060f;
     fakeRadio().carrierWidthMHz = 0.0075f;
     FrequencyManager::performDeepFrequencyScan();
-    TEST_ASSERT_FLOAT_WITHIN(0.001f, fakeRadio().carrierFrequency, FrequencyManager::getTunedFrequency());
-    bool lowerFine = false;
-    bool upperFine = false;
+    TEST_ASSERT_TRUE(FrequencyManager::lastScanOutcome() == FrequencyManager::ScanOutcome::Found);
+    TEST_ASSERT_FLOAT_WITHIN(0.0075f, fakeRadio().carrierFrequency, FrequencyManager::getTunedFrequency());
+    // Refinement reads each frequency twice, so a repeated frequency marks a sample.
+    float lowest = 0.0f;
+    float highest = 0.0f;
     for (size_t index = 1; index < fakeRadio().calls.size(); index++)
     {
         float frequency = fakeRadio().calls[index].frequency;
-        if (frequency == fakeRadio().calls[index - 1].frequency)
-        {
-            lowerFine |= frequency < fakeRadio().carrierFrequency - 0.005f;
-            upperFine |= frequency > fakeRadio().carrierFrequency + 0.005f;
-        }
+        if (frequency != fakeRadio().calls[index - 1].frequency) continue;
+        if (lowest == 0.0f || frequency < lowest) lowest = frequency;
+        if (frequency > highest) highest = frequency;
     }
-    TEST_ASSERT_TRUE(lowerFine);
-    TEST_ASSERT_TRUE(upperFine);
+    // Four steps of six frequency words each side of the first response.
+    TEST_ASSERT_FLOAT_WITHIN(0.001f, 8 * 6 * STEP, highest - lowest);
+}
+
+// The real radio decodes over a band far wider than the tuning resolution, so a scan
+// that tried to map that band's edges swept 171 kHz at 793 Hz: over 400 reads, around
+// 25 minutes, far longer than the meter stays awake. Cost must not scale with the band.
+void test_staged_scan_cost_does_not_scale_with_the_response_band()
+{
+    startManager();
+    fakeRadio().carrierFrequency = BASE + 0.020f;
+    fakeRadio().carrierWidthMHz = 0.090f;
+
+    FrequencyManager::performDeepFrequencyScan(0.150f, 0.010f);
+
+    TEST_ASSERT_TRUE(FrequencyManager::lastScanOutcome() == FrequencyManager::ScanOutcome::Found);
+    // Acquisition walks up to the band, then a fixed nine frequencies and verification.
+    TEST_ASSERT_LESS_THAN(60, (int)fakeRadio().calls.size());
 }
 
 void test_calibration_profiles_keep_independent_storage_and_tracking()
@@ -142,8 +156,8 @@ void test_calibration_profiles_keep_independent_storage_and_tracking()
 
 void test_staged_scan_cancels_every_phase_without_saving()
 {
-    const char *phases[] = {"Wide acquisition", "Finer acquisition fallback", "Bracketing lower edge",
-        "Bracketing upper edge", "Fine window scan", "Verifying candidate", "Verifying stored calibration", "Saving calibration"};
+    const char *phases[] = {"Wide acquisition", "Finer acquisition fallback", REFINE_PHASE,
+        "Verifying candidate", "Verifying stored calibration", "Saving calibration"};
     for (const char *phase : phases)
     {
         resetAllFakes();
@@ -164,8 +178,8 @@ void test_staged_scan_cancels_every_phase_without_saving()
 
 void test_staged_scan_radio_faults_never_save_candidates()
 {
-    const char *phases[] = {"Wide acquisition", "Bracketing lower edge", "Bracketing upper edge",
-        "Fine window scan", "Verifying candidate", "Verifying stored calibration", "Saving calibration"};
+    const char *phases[] = {"Wide acquisition", REFINE_PHASE, "Verifying candidate",
+        "Verifying stored calibration", "Saving calibration"};
     for (const char *phase : phases)
     {
         resetAllFakes();
@@ -202,15 +216,14 @@ void test_staged_scan_prefers_reliable_decodes_over_lower_error()
     fakeRadio().carrierWidthMHz = 0.0075f;
     FrequencyManager::setMeterReadCallback(readWithDropouts);
     FrequencyManager::performDeepFrequencyScan(0.150f, 0.010f, scanProgress);
-    TEST_ASSERT_TRUE(upperEdgeVisited);
+    TEST_ASSERT_TRUE(refining);
     TEST_ASSERT_TRUE(FrequencyManager::lastScanOutcome() == FrequencyManager::ScanOutcome::Found);
     TEST_ASSERT_GREATER_OR_EQUAL(0.0015f, fabsf(FrequencyManager::getTunedFrequency() - fakeRadio().carrierFrequency));
-    TEST_ASSERT_FLOAT_WITHIN(0.004f, fakeRadio().carrierFrequency, FrequencyManager::getTunedFrequency());
+    TEST_ASSERT_FLOAT_WITHIN(0.0075f, fakeRadio().carrierFrequency, FrequencyManager::getTunedFrequency());
 }
 
-// Meters duty-cycle, and a long sweep is itself enough to outlast a wake window, so a
-// run of misses is not proof the meter has gone for good. The sweep has to map the
-// whole bracket rather than stand down part way through it.
+// Meters duty-cycle, so a run of misses is not proof the tuning is wrong. Refinement
+// samples its whole window rather than standing down part way through it.
 void test_staged_scan_carries_on_through_a_quiet_spell()
 {
     startManager();
@@ -222,5 +235,5 @@ void test_staged_scan_carries_on_through_a_quiet_spell()
 
     TEST_ASSERT_TRUE(quietSpellUsed);
     TEST_ASSERT_TRUE(FrequencyManager::lastScanOutcome() == FrequencyManager::ScanOutcome::Found);
-    TEST_ASSERT_FLOAT_WITHIN(0.004f, fakeRadio().carrierFrequency, FrequencyManager::getTunedFrequency());
+    TEST_ASSERT_FLOAT_WITHIN(0.0075f, fakeRadio().carrierFrequency, FrequencyManager::getTunedFrequency());
 }
