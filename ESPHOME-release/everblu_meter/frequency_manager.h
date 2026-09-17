@@ -301,6 +301,7 @@ private:
         int32_t current = 0;        // Frequency word being tested
         int32_t step = 0;           // Acquisition stride in frequency words
         int32_t seed = 0;           // Word where acquisition first got a response
+        int32_t lastGood = 0;       // Most recent word that decoded, in any stage
         int32_t firstHit = 0;       // Lowest word that answered
         int32_t lastHit = 0;        // Highest word that answered
         int32_t zoomStart = 0;      // First word of the fine sweep

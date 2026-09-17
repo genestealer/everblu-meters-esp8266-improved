@@ -294,7 +294,7 @@ void FrequencyManager::stepAcquire()
     if (!readAt(s_scan.current * CC1101_MIN_STEP_MHZ, data)) return;
     if (data.reads_counter > 0 && data.volume > 0)
     {
-        s_scan.seed = s_scan.firstHit = s_scan.lastHit = s_scan.current;
+        s_scan.seed = s_scan.firstHit = s_scan.lastHit = s_scan.lastGood = s_scan.current;
         s_scan.current -= MAP_STEP;
         s_scan.phase = ScanPhase::Lower;
         reportPhase("Bracketing lower edge");
@@ -310,8 +310,9 @@ void FrequencyManager::stepAcquire()
 
 // Stage 2: walk out from the first response in both directions to find where the
 // meter stops answering. MISS_TOLERANCE consecutive misses close an edge, so a single
-// unanswered attempt is not mistaken for the boundary. Silence is checked against the
-// seed first, because a meter that has gone to sleep looks exactly like an edge.
+// unanswered attempt is not mistaken for the boundary. Silence is checked against a
+// known-good frequency first, because a meter that has gone to sleep looks exactly
+// like an edge.
 void FrequencyManager::stepBracket()
 {
     bool lower = s_scan.phase == ScanPhase::Lower;
@@ -331,6 +332,7 @@ void FrequencyManager::stepBracket()
     {
         if (lower) s_scan.firstHit = s_scan.current;
         else s_scan.lastHit = s_scan.current;
+        s_scan.lastGood = s_scan.current;
         s_scan.misses = 0;
     }
     else s_scan.misses++;
@@ -364,8 +366,10 @@ void FrequencyManager::closeEdge(bool lower)
 
 // A run of misses means either the wrong frequency or a meter that has stopped
 // answering (they duty-cycle, and a long sweep is itself enough to quieten one).
-// Re-reading the seed, which is known to answer, tells the two apart; without it a
-// sleeping meter is mapped as hundreds of dead frequencies.
+// Re-reading a frequency known to answer tells the two apart; without it a sleeping
+// meter is mapped as hundreds of dead frequencies. The MOST RECENT such frequency is
+// used, not the first: the response band drifts, so by the end of a long sweep the
+// seed can be silent while the meter is still answering where it was last heard.
 void FrequencyManager::beginProbe()
 {
     s_scan.resumePhase = s_scan.phase;
@@ -376,7 +380,7 @@ void FrequencyManager::beginProbe()
 void FrequencyManager::stepProbe()
 {
     tmeter_data data{};
-    if (!readAt(s_scan.seed * CC1101_MIN_STEP_MHZ, data)) return;
+    if (!readAt(s_scan.lastGood * CC1101_MIN_STEP_MHZ, data)) return;
     if (!(data.reads_counter > 0 && data.volume > 0))
     {
         finishScan(ScanOutcome::Aborted, "Meter stopped answering - scan stopped, try again later");
@@ -410,6 +414,7 @@ void FrequencyManager::stepZoom()
     tmeter_data data{};
     if (!readAt(s_scan.current * CC1101_MIN_STEP_MHZ, data)) return;
     record(s_scan.sample, data);
+    if (data.reads_counter > 0 && data.volume > 0) s_scan.lastGood = s_scan.current;
     if (s_scan.sample.attempts < 2) return;
     bool tied = s_scan.sample.successes == s_scan.bestQuality.successes && s_scan.sample.error == s_scan.bestQuality.error;
     int32_t midpointTwice = s_scan.firstHit + s_scan.lastHit;
