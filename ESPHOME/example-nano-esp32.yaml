@@ -109,6 +109,8 @@ everblu_meter:
   # Control buttons
   request_reading_button:
     name: "Read Meter Now"
+  scan_button:
+    name: "Frequency Scan"
   deep_scan_button:
     name: "Deep Frequency Scan"
   reset_frequency_button:
