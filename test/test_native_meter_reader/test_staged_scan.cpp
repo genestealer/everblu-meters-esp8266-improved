@@ -39,50 +39,23 @@ namespace
     }
     tmeter_data readScanMeter() { return get_meter_data_for_meter(20, 257750); }
 
-    // Model a response band that drifts upward while the sweep runs, so that by the
-    // time the upper edge is bracketed the frequency which first answered is silent
-    // while the meter still answers where it was last heard.
-    float driftLow = 0.0f;
-    float driftHigh = 0.0f;
-    int awakeChecks = 0;
-    void driftingScanProgress(const char *, const char *message)
+    // Model a meter that stops answering for a stretch of the fine sweep and comes
+    // back. The silence runs longer than MISS_TOLERANCE frequencies.
+    int fineReads = 0;
+    int quietUntil = 0;
+    bool quietSpellUsed = false;
+    void quietSpellScanProgress(const char *, const char *message)
     {
-        if (strcmp(message, "Checking meter is awake") != 0) return;
-        // The second check is the upper-edge one; retire the bottom of the band,
-        // which is where acquisition first got a response.
-        if (++awakeChecks == 2) driftLow = BASE + 0.070f;
+        if (quietSpellUsed || strcmp(message, "Fine window scan") != 0) return;
+        quietSpellUsed = true;
+        quietUntil = fineReads + 14; // seven frequencies at two reads each
     }
-    tmeter_data readDriftingBand()
+    tmeter_data readWithQuietSpell()
     {
-        const float frequency = fakeRadio().lastInitFrequency();
-        if (frequency < driftLow || frequency > driftHigh) return FakeRadio::failure(ReadFailure::NoReply);
-        return FakeRadio::success();
+        if (++fineReads <= quietUntil) return FakeRadio::failure(ReadFailure::NoReply);
+        return readScanMeter();
     }
 
-    // Model a meter that dozes off for one stretch of the fine sweep and answers
-    // again by the time the probe re-reads the seed. The probe also runs at each
-    // bracket edge, so the carrier is only silenced on the first fine-sweep report.
-    float dozingCarrier = 0.0f;
-    bool dozeUsed = false;
-    bool probeRan = false;
-    int fineSweepReports = 0;
-    void dozingScanProgress(const char *, const char *message)
-    {
-        if (strcmp(message, "Fine window scan") == 0)
-        {
-            fineSweepReports++;
-            if (!dozeUsed)
-            {
-                dozeUsed = true;
-                fakeRadio().carrierFrequency = 0.0f;
-            }
-        }
-        else if (strcmp(message, "Checking meter is awake") == 0)
-        {
-            probeRan = true;
-            fakeRadio().carrierFrequency = dozingCarrier;
-        }
-    }
     void startManager()
     {
         FrequencyManager::setRadioInitCallback(cc1101_init);
@@ -91,9 +64,8 @@ namespace
         targetPhase = nullptr;
         targetVisited = fineSampling = upperEdgeVisited = false;
         sampleCount = 0;
-        dozingCarrier = 0.0f;
-        dozeUsed = probeRan = false;
-        fineSweepReports = 0;
+        fineReads = quietUntil = 0;
+        quietSpellUsed = false;
     }
 }
 
@@ -236,66 +208,19 @@ void test_staged_scan_prefers_reliable_decodes_over_lower_error()
     TEST_ASSERT_FLOAT_WITHIN(0.004f, fakeRadio().carrierFrequency, FrequencyManager::getTunedFrequency());
 }
 
-// A meter that stops answering part way through looks identical to a long run of
-// wrong frequencies. Without the awake probe the sweep maps the whole window as dead
-// and burns tens of minutes doing it, so the scan must notice and stand down.
-void test_staged_scan_stops_when_the_meter_goes_quiet_mid_sweep()
-{
-    startManager();
-    FrequencyManager::saveFrequencyOffset(-0.020f);
-    fakeRadio().carrierFrequency = BASE + 0.060f;
-    fakeRadio().carrierWidthMHz = 0.0075f;
-    // Silence the meter for good the moment the fine sweep starts.
-    targetPhase = "Fine window scan";
-    phaseAction = 3;
-    FrequencyManager::performDeepFrequencyScan(0.150f, 0.010f, scanProgress);
-    TEST_ASSERT_TRUE(targetVisited);
-    TEST_ASSERT_TRUE(FrequencyManager::lastScanOutcome() == FrequencyManager::ScanOutcome::Aborted);
-    // The known-good offset survives, and nothing new was written.
-    TEST_ASSERT_EQUAL(1, fakeStorage().saveCalls);
-    TEST_ASSERT_FLOAT_WITHIN(0.0001f, -0.020f, FrequencyManager::getOffset());
-    // MISS_TOLERANCE frequencies at two reads each, plus the probe, is the budget;
-    // sweeping the whole window instead would be an order of magnitude more.
-    int zoomCalls = 0;
-    for (const auto &call : fakeRadio().calls)
-        if (call.frequency > BASE + 0.040f) zoomCalls++;
-    TEST_ASSERT_LESS_THAN(40, zoomCalls);
-}
-
-// The counterpart to the test above: meters duty-cycle, so a quiet stretch is not
-// proof the calibration is wrong. Once the probe shows the meter is still awake the
-// fine sweep has to carry on from where it stopped rather than abandon the window.
-void test_staged_scan_resumes_the_fine_sweep_after_a_quiet_spell()
+// Meters duty-cycle, and a long sweep is itself enough to outlast a wake window, so a
+// run of misses is not proof the meter has gone for good. The sweep has to map the
+// whole bracket rather than stand down part way through it.
+void test_staged_scan_carries_on_through_a_quiet_spell()
 {
     startManager();
     fakeRadio().carrierFrequency = BASE + 0.060f;
     fakeRadio().carrierWidthMHz = 0.0075f;
-    dozingCarrier = fakeRadio().carrierFrequency;
-    FrequencyManager::performDeepFrequencyScan(0.150f, 0.010f, dozingScanProgress);
+    FrequencyManager::setMeterReadCallback(readWithQuietSpell);
 
-    TEST_ASSERT_TRUE(probeRan);
-    // Two "Fine window scan" reports: the original one and the resume after the probe.
-    TEST_ASSERT_GREATER_OR_EQUAL(2, fineSweepReports);
+    FrequencyManager::performDeepFrequencyScan(0.150f, 0.010f, quietSpellScanProgress);
+
+    TEST_ASSERT_TRUE(quietSpellUsed);
     TEST_ASSERT_TRUE(FrequencyManager::lastScanOutcome() == FrequencyManager::ScanOutcome::Found);
     TEST_ASSERT_FLOAT_WITHIN(0.004f, fakeRadio().carrierFrequency, FrequencyManager::getTunedFrequency());
-}
-
-// The response band moves while a long sweep runs, so the frequency that first
-// answered is not proof the meter is still awake. Probing it rather than the last
-// frequency that decoded threw away a scan that was still getting live responses.
-void test_staged_scan_probes_where_the_meter_last_answered()
-{
-    startManager();
-    FrequencyManager::setMeterReadCallback(readDriftingBand);
-    driftLow = BASE + 0.040f;
-    driftHigh = BASE + 0.100f;
-    awakeChecks = 0;
-
-    FrequencyManager::performDeepFrequencyScan(0.150f, 0.010f, driftingScanProgress);
-
-    TEST_ASSERT_GREATER_OR_EQUAL(2, awakeChecks);
-    TEST_ASSERT_TRUE(FrequencyManager::lastScanOutcome() == FrequencyManager::ScanOutcome::Found);
-    // The saved tuning has to land in the part of the band that is still alive.
-    TEST_ASSERT_TRUE(FrequencyManager::getTunedFrequency() >= driftLow);
-    TEST_ASSERT_TRUE(FrequencyManager::getTunedFrequency() <= driftHigh);
 }

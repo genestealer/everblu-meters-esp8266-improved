@@ -57,9 +57,7 @@ void test_staged_scan_cancels_every_phase_without_saving();
 void test_staged_scan_radio_faults_never_save_candidates();
 void test_staged_scan_requires_verification_without_prior_calibration();
 void test_staged_scan_prefers_reliable_decodes_over_lower_error();
-void test_staged_scan_stops_when_the_meter_goes_quiet_mid_sweep();
-void test_staged_scan_resumes_the_fine_sweep_after_a_quiet_spell();
-void test_staged_scan_probes_where_the_meter_last_answered();
+void test_staged_scan_carries_on_through_a_quiet_spell();
 void test_auto_scan_on_failure_escalates_to_a_full_sweep(void);
 void test_auto_scan_on_failure_does_not_escalate_after_a_cancel(void);
 void test_auto_scan_on_failure_stays_off_when_disabled(void);
@@ -240,9 +238,7 @@ int main(int, char **)
     RUN_TEST(test_staged_scan_radio_faults_never_save_candidates);
     RUN_TEST(test_staged_scan_requires_verification_without_prior_calibration);
     RUN_TEST(test_staged_scan_prefers_reliable_decodes_over_lower_error);
-    RUN_TEST(test_staged_scan_stops_when_the_meter_goes_quiet_mid_sweep);
-    RUN_TEST(test_staged_scan_resumes_the_fine_sweep_after_a_quiet_spell);
-    RUN_TEST(test_staged_scan_probes_where_the_meter_last_answered);
+    RUN_TEST(test_staged_scan_carries_on_through_a_quiet_spell);
 
     return UNITY_END();
 }
