@@ -1,6 +1,7 @@
 #include <unity.h>
 #include <cmath>
 #include <cstring>
+#include <set>
 #include "native_fakes.h"
 #include "services/frequency_manager.h"
 
@@ -51,6 +52,26 @@ namespace
         return readScanMeter();
     }
 
+    // Answer once at the very first frequency tried, wherever that is, and thereafter
+    // only where the carrier really is.
+    tmeter_data readOneOffThenCarrier()
+    {
+        tmeter_data data = readScanMeter();
+        if (fakeRadio().calls.size() == 1) return FakeRadio::success();
+        return data;
+    }
+
+    // Answer the first read at every frequency and never on a repeat, so no frequency
+    // can ever be confirmed and every acquisition step looks like a response.
+    std::set<int> frequenciesTried;
+    tmeter_data readNeverTwice()
+    {
+        readScanMeter();
+        const int word = (int)lroundf(fakeRadio().lastInitFrequency() / STEP);
+        if (frequenciesTried.insert(word).second) return FakeRadio::success();
+        return FakeRadio::failure(ReadFailure::NoReply);
+    }
+
     void startManager()
     {
         FrequencyManager::setRadioInitCallback(cc1101_init);
@@ -61,6 +82,7 @@ namespace
         carrierReads = 0;
         refineReads = quietUntil = 0;
         quietSpellUsed = false;
+        frequenciesTried.clear();
     }
 }
 
@@ -120,6 +142,54 @@ void test_staged_scan_cost_does_not_scale_with_the_response_band()
     TEST_ASSERT_TRUE(FrequencyManager::lastScanOutcome() == FrequencyManager::ScanOutcome::Found);
     // Acquisition walks up to the band, then a fixed nine frequencies and verification.
     TEST_ASSERT_LESS_THAN(60, (int)fakeRadio().calls.size());
+}
+
+// A response near the end of the range leaves no room for a full window either side.
+// Clipping the window to the range bound used to shift the whole grid off the seed, so
+// the one frequency known to answer was never sampled again and the scan gave up.
+void test_staged_scan_samples_the_seed_when_the_window_is_clipped()
+{
+    startManager();
+    const int32_t localStart = (int32_t)ceilf((BASE - 0.020f) / STEP);
+    fakeRadio().carrierFrequency = (localStart + 3) * STEP;
+    fakeRadio().carrierWidthMHz = STEP * 0.4f;
+
+    FrequencyManager::beginRecoveryScan();
+    while (FrequencyManager::isScanInProgress()) FrequencyManager::loopScan();
+
+    TEST_ASSERT_TRUE(FrequencyManager::lastScanOutcome() == FrequencyManager::ScanOutcome::Found);
+    TEST_ASSERT_FLOAT_WITHIN(STEP, fakeRadio().carrierFrequency, FrequencyManager::getTunedFrequency());
+}
+
+// One decode proves very little when the meter answers on its own schedule. A response
+// that refinement cannot reproduce must not end a scan that still has most of its
+// range untested: the real carrier here sits well above the frequency that answered.
+void test_staged_scan_resumes_after_a_response_it_cannot_reproduce()
+{
+    startManager();
+    fakeRadio().carrierFrequency = BASE + 0.060f;
+    fakeRadio().carrierWidthMHz = 0.0075f;
+    FrequencyManager::setMeterReadCallback(readOneOffThenCarrier);
+
+    FrequencyManager::performDeepFrequencyScan();
+
+    TEST_ASSERT_TRUE(FrequencyManager::lastScanOutcome() == FrequencyManager::ScanOutcome::Found);
+    TEST_ASSERT_FLOAT_WITHIN(0.0075f, fakeRadio().carrierFrequency, FrequencyManager::getTunedFrequency());
+}
+
+// The counterpart bound: resuming must not let a meter that answers once and sleeps
+// restart the sweep over and over, which would cost a refinement window every time.
+void test_staged_scan_gives_up_after_repeated_false_starts()
+{
+    startManager();
+    FrequencyManager::setMeterReadCallback(readNeverTwice);
+
+    FrequencyManager::performDeepFrequencyScan(0.150f, 0.010f);
+
+    TEST_ASSERT_TRUE(FrequencyManager::lastScanOutcome() == FrequencyManager::ScanOutcome::NotFound);
+    TEST_ASSERT_EQUAL(0, fakeStorage().saveCalls);
+    // Three refinement windows at most: around 22 reads each, plus acquisition.
+    TEST_ASSERT_LESS_THAN(120, (int)fakeRadio().calls.size());
 }
 
 void test_calibration_profiles_keep_independent_storage_and_tracking()

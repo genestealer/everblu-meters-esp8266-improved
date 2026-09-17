@@ -134,23 +134,25 @@ probability of an on-frequency timing miss has been established.
 ### Phase 2 — Refinement
 
 ```
-sample four steps either side of the first response, within range limits
+sample four steps either side of the first response, clipped in whole steps
 read each setting twice
 rank successful decodes, then average absolute FREQEST
 break ties towards the first response
 require at least two successes in three candidate verification reads
 compare with three reads at an existing calibration before replacing it
+resume the sweep if nothing here can be reproduced, at most twice per scan
 ```
 
 An empty refinement or failed verification restores previous tuning. No unverified
 candidate is saved, including on first boot.
 
 The refinement does not stop at the first successful decode, and it does not try to
-map where the meter stops answering. The CC1101 runs a 270 kHz receive filter with
-offset compensation across ±67.7 kHz (see `MDMCFG4` and `FOCCFG` in `cc1101.cpp`), so
-the meter decodes over a band far wider than the tuning resolution and a missed reply
-usually means the meter was not transmitting. A scan that walked outwards until the
-replies stopped therefore measured the meter's duty cycle, not its carrier.
+map where the meter stops answering. Field logs show the meter decoding over a band far
+wider than the tuning resolution, and a missed reply usually means the meter was not
+transmitting. A scan that walked outwards until the replies stopped therefore measured
+when the meter was answering, not where. A response that refinement cannot reproduce is
+treated as a false start: the sweep resumes from where it left off, at most twice per
+scan so a meter that answers once cannot restart the search indefinitely.
 
 FREQEST comes from data-frame sync, before decoding/logging delays. Tuning resolution
 does not guarantee equal measurement accuracy.

@@ -297,6 +297,7 @@ private:
         int32_t seed = 0;           // Word where acquisition first got a response
         int32_t refineEnd = 0;      // Last word of the refinement window
         int32_t best = 0;           // Best candidate word found by the refinement
+        int falseStarts = 0;        // Responses that refinement could not reproduce
         bool expandOnMiss = false;  // Recovery scan: widen to full range if local is empty
         bool finerFallback = false; // One finer acquisition pass is still available
         bool quietPrevious = false; // Saved g_echo_debug_quiet (RAII cannot span loops)
@@ -329,12 +330,14 @@ private:
     static constexpr float MAX_OFFSET = 0.150f;
     static constexpr uint16_t STORAGE_MAGIC = 0xABCD;
     static constexpr int MAP_STEP = 6; // Finer acquisition fallback and refinement stride, ~2.380 kHz
-    // The CC1101 runs a 270 kHz RX filter with offset compensation over +-67.7 kHz
-    // (see MDMCFG4/FOCCFG in cc1101.cpp), so the meter decodes over a band far wider
-    // than the tuning resolution. Refinement only has to escape a marginal corner of
-    // that band, not locate the carrier, so a short window either side is enough.
+    // Field logs show the meter decoding across a band far wider than the tuning
+    // resolution, so refinement only has to escape a marginal corner of that band
+    // rather than locate the carrier. A short window either side is enough.
     static constexpr int REFINE_SPAN = 4; // Steps each side of the first response, ~+-9.5 kHz
     static constexpr int REFINE_READS = 2; // Reads per refinement frequency
+    // Each false start costs another refinement window, so the budget is what stops a
+    // meter that answers once and sleeps from restarting the sweep indefinitely.
+    static constexpr int MAX_FALSE_STARTS = 2;
 
     static void feedWatchdog();
     static bool validateCallbacks(); // Validate that required callbacks are set
@@ -348,6 +351,7 @@ private:
     static void finishScan(ScanOutcome outcome, const char *message);
     static void stepAcquire();
     static void stepRefine();
+    static bool resumeAcquisition();
     static void stepVerify();
 
     // Private constructor - static-only class

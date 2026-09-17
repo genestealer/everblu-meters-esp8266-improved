@@ -295,10 +295,14 @@ void FrequencyManager::stepAcquire()
     if (data.reads_counter > 0 && data.volume > 0)
     {
         s_scan.seed = s_scan.current;
-        s_scan.current = s_scan.seed - REFINE_SPAN * MAP_STEP;
-        if (s_scan.current < s_scan.start) s_scan.current = s_scan.start;
-        s_scan.refineEnd = s_scan.seed + REFINE_SPAN * MAP_STEP;
-        if (s_scan.refineEnd > s_scan.end) s_scan.refineEnd = s_scan.end;
+        // Clip by whole steps rather than to the range bounds, so the frequency that
+        // just answered stays on the grid when the window runs into an edge.
+        int32_t below = (s_scan.seed - s_scan.start) / MAP_STEP;
+        if (below > REFINE_SPAN) below = REFINE_SPAN;
+        int32_t above = (s_scan.end - s_scan.seed) / MAP_STEP;
+        if (above > REFINE_SPAN) above = REFINE_SPAN;
+        s_scan.current = s_scan.seed - below * MAP_STEP;
+        s_scan.refineEnd = s_scan.seed + above * MAP_STEP;
         s_scan.phase = ScanPhase::Refine;
         reportPhase("Refining around first response");
         LOG_I("everblu_meter", "Response found - refining %.6f - %.6f MHz at %.3f kHz",
@@ -315,19 +319,19 @@ void FrequencyManager::stepAcquire()
 
 // Stage 2: sample a short window either side of the first response and keep the best.
 //
-// Mapping the edges of the response band was tried and does not work. The radio is
-// deliberately configured with a 270 kHz RX filter and +-67.7 kHz offset compensation,
-// so the meter decodes over a band far wider than a scan can usefully resolve, and a
-// missed reply means the meter was not transmitting rather than that the tuning is
-// wrong: the meter answers on a duty cycle. A field scan therefore mapped a 171 kHz
-// "window" whose edges were where the meter happened to fall silent, spent 25 minutes
-// sweeping it, and excluded the frequency that was known to work.
+// Mapping the edges of the response band was tried and does not work. The meter decodes
+// over a band far wider than a scan can usefully resolve, and a missed reply usually
+// means the meter was not transmitting rather than that the tuning is wrong: it answers
+// on its own schedule. A field scan therefore mapped a 171 kHz "window" whose edges were
+// where the meter happened to fall silent, spent 25 minutes sweeping it, and excluded
+// the frequency that was known to work.
 void FrequencyManager::stepRefine()
 {
     if (s_scan.current > s_scan.refineEnd)
     {
-        if (s_scan.bestQuality.successes == 0) finishScan(ScanOutcome::NotFound, "Refinement failed - restoring tuning");
-        else
+        if (s_scan.bestQuality.successes == 0 && !resumeAcquisition())
+            finishScan(ScanOutcome::NotFound, "Refinement failed - restoring tuning");
+        else if (s_scan.bestQuality.successes > 0)
         {
             s_scan.phase = ScanPhase::VerifyCandidate;
             reportPhase("Verifying candidate");
@@ -349,6 +353,22 @@ void FrequencyManager::stepRefine()
     s_scan.current += MAP_STEP;
 }
 
+// A response that refinement cannot reproduce was a false start: one decode says very
+// little when the meter answers on its own schedule. Carry on sweeping from where
+// acquisition left off instead of abandoning a scan that has most of its range left.
+bool FrequencyManager::resumeAcquisition()
+{
+    if (++s_scan.falseStarts > MAX_FALSE_STARTS) return false;
+    s_scan.current = s_scan.seed + s_scan.step;
+    s_scan.best = 0;
+    s_scan.sample = Quality{};
+    s_scan.bestQuality = Quality{};
+    s_scan.candidateQuality = Quality{};
+    s_scan.phase = ScanPhase::Acquire;
+    reportPhase("Resuming acquisition");
+    return true;
+}
+
 // Stage 4: confirm before persisting. The candidate must decode at least twice out of
 // three, and an existing calibration is re-measured over the same number of reads so a
 // known-good offset is only replaced by something demonstrably better (issue #104).
@@ -367,7 +387,8 @@ void FrequencyManager::stepVerify()
     {
         if (quality.successes < 2)
         {
-            finishScan(ScanOutcome::NotFound, "Candidate verification failed - restoring tuning");
+            if (!resumeAcquisition())
+                finishScan(ScanOutcome::NotFound, "Candidate verification failed - restoring tuning");
             return;
         }
         s_scan.phase = s_calibration->hasStored ? ScanPhase::VerifyStored : ScanPhase::Finalise;

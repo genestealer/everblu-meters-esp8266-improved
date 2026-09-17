@@ -640,11 +640,12 @@ Deep Scan follows the same policy in ESPHome and standalone MQTT:
   first response. Require at least two of three confirmation reads before saving;
   compare against three reads at an existing calibration before replacing it.
 
-The scan deliberately does not map the edges of the band the meter answers over. The
-CC1101 runs a 270 kHz receive filter with offset compensation across ±67.7 kHz, so the
-meter decodes over a span far wider than the tuning resolution, and a missed reply
-usually means the meter was not transmitting rather than that the setting is wrong.
-Refinement only has to escape a marginal corner of that band.
+The scan deliberately does not map the edges of the band the meter answers over. Field
+logs show the meter decoding across a span far wider than the tuning resolution, and a
+missed reply usually means the meter was not transmitting rather than that the setting
+is wrong. Refinement only has to escape a marginal corner of that band. A response that
+cannot be reproduced is treated as a false start and the search carries on, up to twice
+per scan.
 
 The scanner uses integer CC1101 register steps: approximately 9.918 kHz for
 coarse acquisition and 2.380 kHz for the fallback pass and refinement.
