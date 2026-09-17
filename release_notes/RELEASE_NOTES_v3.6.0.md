@@ -65,7 +65,7 @@ Four separate ways a day's reading could disappear:
 - **The configured day of week was ignored on the MQTT build.** `main.cpp` never applied `DEFAULT_READING_SCHEDULE` to the schedule manager, so a weekdays-only setting appeared in the logs and in Home Assistant discovery while the reading day came from the default. ESPHome was unaffected.
 - **The read fired only on the exact `:00` second.** A blocking read, a scan or a reconnect spanning that one-second window lost the day's reading. It now fires anywhere inside the scheduled minute, latched to one occurrence per day.
 - **The 1970 clock at boot could satisfy a 00:00 schedule** and consume the day's read before NTP had synced. The scheduler now waits for a plausible epoch.
-- **A scheduled read during a frequency scan was dropped**, not deferred, and lost until the next day.
+- **A scheduled read during a frequency scan was dropped**, not deferred, and lost until the next day. The occurrence is now remembered and taken once the radio is free, which matters because a staged scan, or the cooldown after a failed read, can easily run past the scheduled minute.
 
 The once-per-day latch is also keyed on the full date rather than the day of year, which restarted at 0 each January and would have suppressed the next year's occurrence of the same day.
 

@@ -155,6 +155,13 @@ static bool g_isScheduledRead = false;
 // single read per occurrence.
 static int g_lastScheduledReadDateKey = -1;
 
+// Date key of an occurrence that was due but deferred by a cooldown or a running
+// scan, or -1 if none is owed. A staged scan can outlast the scheduled minute, so
+// re-sampling the clock once it finishes would no longer match and the day would
+// be skipped; the occurrence is remembered instead and serviced when the blocker
+// clears. Cleared on the day rolling over, since that occurrence is then gone.
+static int g_pendingScheduledReadDateKey = -1;
+
 // Define a default meter frequency if missing from private.h.
 // RADIAN protocol nominal center frequency for EverBlu is 433.82 MHz.
 #ifndef FREQUENCY
@@ -219,7 +226,7 @@ void performDeepFrequencyScan(float scanRangeMHz = 0.150f, float scanStepMHz = 0
 static void startRecoveryScan(bool retryRead);
 
 /**
- * @brief Reset the persisted frequency offset to zero and re-tune the radio.
+ * @brief Erase the persisted frequency calibration and re-tune the radio.
  */
 void resetFrequencyOffset();
 
@@ -886,11 +893,16 @@ void onScheduled()
   // nothing logged. Servicing the entire scheduled minute widens the window 60x.
   // (A loop stall longer than the full scheduled minute can still miss it.)
   const int today = ScheduleManager::dateKey(ptm);
-  if (ScheduleManager::isReadingDay(ptm) && timeMatch && today != g_lastScheduledReadDateKey)
+
+  // An occurrence owed by an earlier day is stale: that day is over.
+  if (g_pendingScheduledReadDateKey != today) g_pendingScheduledReadDateKey = -1;
+
+  const bool dueNow = ScheduleManager::isReadingDay(ptm) && timeMatch;
+  if ((dueNow || g_pendingScheduledReadDateKey == today) && today != g_lastScheduledReadDateKey)
   {
     // Check if we're still in cooldown period after failed attempts.
-    // Defer without latching the day so the read can still fire later once the
-    // cooldown clears (while the scheduled minute is still current).
+    // Defer without latching the day, remembering the occurrence so the read can
+    // still fire once the cooldown clears, even past the scheduled minute.
     if (g_inCooldown && (millis() - lastFailedAttempt) < RETRY_COOLDOWN)
     {
       unsigned long remainingCooldown = (RETRY_COOLDOWN - (millis() - lastFailedAttempt)) / 1000;
@@ -901,6 +913,7 @@ void onScheduled()
       char topicBuffer[MQTT_TOPIC_BUFFER_SIZE];
       snprintf(topicBuffer, sizeof(topicBuffer), "%s/status_message", mqttBaseTopic);
       mqtt.publish(topicBuffer, cooldownMsg, true);
+      g_pendingScheduledReadDateKey = today;
       mqtt.executeDelayed(500, onScheduled);
       return;
     }
@@ -911,15 +924,17 @@ void onScheduled()
 
     // A running scan owns the radio and onUpdateData() would return immediately.
     // Defer without latching the day, as for cooldown, so the read still fires
-    // once the scan finishes (while the scheduled minute is still current).
+    // once the scan finishes however long that takes.
     if (FrequencyManager::isScanInProgress())
     {
+      g_pendingScheduledReadDateKey = today;
       mqtt.executeDelayed(500, onScheduled);
       return;
     }
 
     // Mark today serviced so this occurrence reads exactly once, even if another
     // poll (or a second poll chain) observes the same minute.
+    g_pendingScheduledReadDateKey = -1;
     g_lastScheduledReadDateKey = today;
 
     // Call back in 23 hours
@@ -1670,8 +1685,8 @@ static void startRecoveryScan(bool retryRead)
 }
 
 // Function: resetFrequencyOffset
-// Description: Clears the persisted CC1101 frequency offset back to 0, re-tunes
-//              the radio to the configured base frequency and mirrors the reset
+// Description: Erases the persisted CC1101 frequency calibration, re-tunes the
+//              radio to the configured base frequency and mirrors the reset
 //              values to MQTT. This is the MQTT-build equivalent of the ESPHome
 //              "Reset Frequency Offset" button and shares FrequencyManager so the
 //              storage/re-tune logic stays single-sourced across both targets.
@@ -1680,12 +1695,17 @@ void resetFrequencyOffset()
   if (FrequencyManager::isScanInProgress() || _retry > 0) return;
   TS_PRINTLN("[FREQ] Resetting frequency offset to 0");
 
-  // Reset the stored offset to 0 and persist it.
-  FrequencyManager::saveFrequencyOffset(0.0);
-
-  // Reset adaptive tracking so a stale correction history cannot immediately
-  // re-apply an offset after the reset.
-  FrequencyManager::resetAdaptiveTracking();
+  // Erase rather than store a zero, so the meter counts as uncalibrated again and
+  // auto-scan and the stored-calibration quality guard both re-arm. A refused erase
+  // leaves the offset in place, so report it instead of retuning and publishing a
+  // reset that did not happen.
+  if (!FrequencyManager::clearCalibration())
+  {
+    TS_PRINTF("[FREQ] Could not erase stored calibration - offset left at %.3f kHz\n",
+              FrequencyManager::getOffset() * 1000.0f);
+    publishSub("last_error", "Frequency offset reset failed - storage write error", true);
+    return;
+  }
 
   // Re-initialize the radio at the base frequency.
   const float baseFrequency = FrequencyManager::getBaseFrequency();

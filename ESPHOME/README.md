@@ -578,7 +578,7 @@ EverbluMeterComponent (ESPHome)
 - **time_start** / **time_end** - Reading timing
 - **frequency_offset** - Current frequency offset (kHz)
 - **tuned_frequency** - Actual tuned frequency (MHz)
-- **frequency_estimate** - CC1101 FREQEST reading from this meter's last frame (kHz) - helps monitor frequency drift. Unlike `frequency_offset` and `tuned_frequency`, this one is **per-meter**: declare it on every `everblu_meter:` entry to compare how far apart your meters actually transmit
+- **frequency_estimate** - CC1101 FREQEST reading from this meter's last frame (kHz) - helps monitor frequency drift. Like `frequency_offset` and `tuned_frequency`, it is **per-meter**: declare it on every `everblu_meter:` entry to compare how far apart your meters actually transmit
 - **total_attempts** / **successful_reads** / **failed_reads** - Statistics
 - **gdo2_timeouts** - GDO2 wiring faults since boot (failed boot self-test plus runtime FIFO-threshold timeouts). A non-zero, growing value points at a miswired or wrong-GPIO GDO2 rather than an RF problem
 

@@ -245,6 +245,7 @@ private:
     int m_readHourLocal;
     int m_readMinuteLocal;
     int m_lastScheduledReadDateKey;  // ScheduleManager::dateKey() of the last serviced scheduled read; -1 = none yet
+    int m_pendingScheduledReadDateKey; // Occurrence owed but deferred by a scan or cooldown; -1 = none owed
 };
 
 #endif // METER_READER_H

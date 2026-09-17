@@ -50,7 +50,7 @@ static void logReadableSummary(const tmeter_data &data, const IConfigProvider *c
 }
 
 MeterReader::MeterReader(IConfigProvider *config, ITimeProvider *timeProvider, IDataPublisher *publisher)
-    : m_config(config), m_timeProvider(timeProvider), m_publisher(publisher), m_initialized(false), m_readingInProgress(false), m_isScheduledRead(false), m_haConnected(false), m_radioConnected(false), m_scanInProgress(false), m_retryCount(0), m_inCooldown(false), m_lastFailedAttempt(0), m_nextRetryTime(0), m_autoScanAfterFailureDone(false), m_retryFailureReason(ReadFailure::None), m_totalReadAttempts(0), m_successfulReads(0), m_failedReads(0), m_lastErrorMessage("None"), m_lastScheduleCheck(0), m_lastStatsPublish(0), m_readHourLocal(10), m_readMinuteLocal(0), m_lastScheduledReadDateKey(-1)
+    : m_config(config), m_timeProvider(timeProvider), m_publisher(publisher), m_initialized(false), m_readingInProgress(false), m_isScheduledRead(false), m_haConnected(false), m_radioConnected(false), m_scanInProgress(false), m_retryCount(0), m_inCooldown(false), m_lastFailedAttempt(0), m_nextRetryTime(0), m_autoScanAfterFailureDone(false), m_retryFailureReason(ReadFailure::None), m_totalReadAttempts(0), m_successfulReads(0), m_failedReads(0), m_lastErrorMessage("None"), m_lastScheduleCheck(0), m_lastStatsPublish(0), m_readHourLocal(10), m_readMinuteLocal(0), m_lastScheduledReadDateKey(-1), m_pendingScheduledReadDateKey(-1)
 {
 }
 
@@ -207,6 +207,16 @@ void MeterReader::loop()
     // it finishes rather than retuning the radio mid-sweep.
     if (FrequencyManager::isScanInProgress())
     {
+        // Keep sampling the schedule. A staged scan can run for several minutes,
+        // and shouldPerformScheduledRead() can only record an occurrence it sees
+        // while the scheduled minute is still current; it defers rather than
+        // triggering for as long as the scan holds the radio.
+        if (now - m_lastScheduleCheck >= SCHEDULE_CHECK_INTERVAL_MS)
+        {
+            m_lastScheduleCheck = now;
+            (void)shouldPerformScheduledRead();
+        }
+
         if (m_scanInProgress)
         {
             activateCallbackContext();
@@ -290,12 +300,6 @@ bool MeterReader::shouldPerformScheduledRead()
     if (m_config->areScheduledReadingsDisabled())
         return false;
 
-    // A running scan owns the radio, so triggerReading() would drop this read.
-    // Return false without latching the day, so the read still fires once the
-    // scan finishes and the scheduled minute is re-sampled.
-    if (FrequencyManager::isScanInProgress())
-        return false;
-
 #ifdef USE_ESPHOME
     // In ESPHome builds, avoid scheduled reads until HA API is connected
     if (!m_haConnected)
@@ -314,16 +318,20 @@ bool MeterReader::shouldPerformScheduledRead()
     // The flag, rather than a non-zero timestamp, is what marks the cooldown as
     // running: millis() legitimately returns 0 for the first millisecond after
     // boot, and a failure landing there must not skip the cooldown entirely.
+    bool inCooldown = false;
     if (m_inCooldown)
     {
         unsigned long cooldown = m_config->getRetryCooldownMs();
         if (millis() - m_lastFailedAttempt < cooldown)
         {
-            return false;
+            inCooldown = true;
         }
-        // Cooldown expired, reset
-        m_inCooldown = false;
-        m_lastFailedAttempt = 0;
+        else
+        {
+            // Cooldown expired, reset
+            m_inCooldown = false;
+            m_lastFailedAttempt = 0;
+        }
     }
 
     // Get current local time
@@ -346,13 +354,29 @@ bool MeterReader::shouldPerformScheduledRead()
     // 60x; the date-key guard keeps it to a single read per occurrence. (A loop
     // stall longer than the full scheduled minute can still miss it.)
     const int today = ScheduleManager::dateKey(ptm);
-    if (isDayMatch && isTimeMatch && today != m_lastScheduledReadDateKey)
+
+    // An occurrence owed by an earlier day is stale: that day is over.
+    if (m_pendingScheduledReadDateKey != today)
+        m_pendingScheduledReadDateKey = -1;
+
+    const bool dueNow = isDayMatch && isTimeMatch;
+    if ((!dueNow && m_pendingScheduledReadDateKey != today) || today == m_lastScheduledReadDateKey)
+        return false;
+
+    // A running scan owns the radio and triggerReading() would drop the read; a
+    // cooldown after failures has to run out first. Neither latches the day, and
+    // the occurrence is remembered so it is still serviced when the blocker clears
+    // even if that happens after the scheduled minute has passed: a staged scan
+    // easily outlasts a minute, and re-sampling the clock would then find no match.
+    if (FrequencyManager::isScanInProgress() || inCooldown)
     {
-        m_lastScheduledReadDateKey = today;
-        return true;
+        m_pendingScheduledReadDateKey = today;
+        return false;
     }
 
-    return false;
+    m_pendingScheduledReadDateKey = -1;
+    m_lastScheduledReadDateKey = today;
+    return true;
 }
 
 void MeterReader::triggerReading(bool isScheduled)

@@ -608,6 +608,113 @@ void test_scheduled_read_survives_a_scan_holding_the_radio(void)
     TEST_ASSERT_EQUAL(before + 1, (int)fakeRadio().calls.size());
 }
 
+void test_scheduled_read_survives_a_scan_that_outlasts_the_minute(void)
+{
+    // A staged scan easily runs for several minutes. Deferring only while the
+    // clock is still inside the scheduled minute meant the occurrence was dropped
+    // whenever the scan finished after it, so the day was skipped anyway. The
+    // reader must remember the occurrence and service it when the radio is free.
+    g_config.schedule = "Monday-Friday";
+    g_config.readHourUTC = 10;
+    g_config.readMinuteUTC = 0;
+    g_config.frequency = 433.82f;
+
+    MeterReader reader = makeReader();
+    MeterReader scanOwner = makeReader();
+
+    scanOwner.performFrequencyScan();
+    TEST_ASSERT_TRUE(FrequencyManager::isScanInProgress());
+
+    // The whole scheduled minute passes while the scan holds the radio.
+    int before = (int)fakeRadio().calls.size();
+    g_time.setUtc(2025, 6, 10, 10, 0, 20);
+    nativeClockAdvance(1000);
+    reader.loop();
+    g_time.setUtc(2025, 6, 10, 10, 5, 0);
+    nativeClockAdvance(1000);
+    reader.loop();
+    TEST_ASSERT_EQUAL(before, (int)fakeRadio().calls.size());
+
+    FrequencyManager::requestScanCancel();
+    drainFrequencyScan(scanOwner);
+
+    // Long past the scheduled minute, and the owed read must still happen.
+    fakeRadio().responses.push_back(FakeRadio::success());
+    before = (int)fakeRadio().calls.size();
+    g_time.setUtc(2025, 6, 10, 10, 7, 0);
+    nativeClockAdvance(1000);
+    reader.loop();
+    TEST_ASSERT_EQUAL(before + 1, (int)fakeRadio().calls.size());
+
+    // Still one read per day: servicing the occurrence clears it.
+    before = (int)fakeRadio().calls.size();
+    g_time.setUtc(2025, 6, 10, 10, 8, 0);
+    nativeClockAdvance(1000);
+    reader.loop();
+    TEST_ASSERT_EQUAL(before, (int)fakeRadio().calls.size());
+}
+
+void test_scheduled_read_survives_a_cooldown_that_outlasts_the_minute(void)
+{
+    // The post-failure cooldown defers the occurrence for the same reason, and
+    // outlasts the scheduled minute by design (the default is an hour).
+    g_config.schedule = "Monday-Friday";
+    g_config.readHourUTC = 10;
+    g_config.readMinuteUTC = 0;
+    g_config.maxRetries = 1;
+    g_config.retryCooldownMs = 120000;
+    fakeRadio().responses.push_back(FakeRadio::failure(ReadFailure::NoReply));
+
+    MeterReader reader = makeReader();
+    reader.triggerReading(false);
+    TEST_ASSERT_EQUAL(1, (int)fakeRadio().calls.size());
+
+    // The scheduled minute arrives and passes while the cooldown is still running.
+    g_time.setUtc(2025, 6, 10, 10, 0, 30);
+    nativeClockAdvance(1000);
+    reader.loop();
+    TEST_ASSERT_EQUAL(1, (int)fakeRadio().calls.size());
+
+    // Cooldown expired, minute long gone: the owed read must still happen.
+    fakeRadio().responses.push_back(FakeRadio::success());
+    g_time.setUtc(2025, 6, 10, 10, 3, 0);
+    nativeClockAdvance(g_config.retryCooldownMs);
+    reader.loop();
+    TEST_ASSERT_EQUAL(2, (int)fakeRadio().calls.size());
+}
+
+void test_scheduled_read_is_not_owed_after_the_day_rolls_over(void)
+{
+    // An occurrence deferred by a scan belongs to the day it was due on. If the
+    // blocker clears the next day, that day's own schedule decides, not the
+    // stale occurrence: 2025-06-14 is a Saturday and not a reading day.
+    g_config.schedule = "Monday-Friday";
+    g_config.readHourUTC = 10;
+    g_config.readMinuteUTC = 0;
+    g_config.frequency = 433.82f;
+
+    MeterReader reader = makeReader();
+    MeterReader scanOwner = makeReader();
+
+    scanOwner.performFrequencyScan();
+    TEST_ASSERT_TRUE(FrequencyManager::isScanInProgress());
+
+    // 2025-06-13 is a Friday: the occurrence is due, and deferred by the scan.
+    g_time.setUtc(2025, 6, 13, 10, 0, 10);
+    nativeClockAdvance(1000);
+    reader.loop();
+
+    FrequencyManager::requestScanCancel();
+    drainFrequencyScan(scanOwner);
+
+    fakeRadio().responses.push_back(FakeRadio::success());
+    int before = (int)fakeRadio().calls.size();
+    g_time.setUtc(2025, 6, 14, 11, 0, 0);
+    nativeClockAdvance(1000);
+    reader.loop();
+    TEST_ASSERT_EQUAL(before, (int)fakeRadio().calls.size());
+}
+
 void test_scheduled_read_waits_for_time_sync(void)
 {
     fakeRadio().responses.push_back(FakeRadio::success());
