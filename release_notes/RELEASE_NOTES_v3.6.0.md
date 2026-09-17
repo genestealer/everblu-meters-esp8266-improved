@@ -4,7 +4,7 @@ A calibration and scheduling release. Frequency calibration is now per meter, sc
 
 ## Highlights
 
-- **Per-meter frequency calibration.** Each `everblu_meter:` entry keeps its own base frequency, saved offset, adaptive tracking, sensors and scan buttons.
+- **Per-meter frequency calibration.** Each `everblu_meter:` entry keeps its own base frequency, saved offset, adaptive tracking, sensors and scan buttons. Multi-meter YAML needs updating; see the upgrade notes.
 - **A scan stops when the meter goes to sleep** rather than recording hundreds of frequencies as dead, and leaves the working calibration alone.
 - **`Frequency Scan` and `Stop Frequency Scan` on the MQTT build**, and scans step from the main loop so Wi-Fi and MQTT stay up for the duration.
 - **Scheduled reads are no longer lost** to a one-second timing window, an unset clock at boot, an in-progress scan, or a configured day of week that was never applied.
@@ -35,7 +35,11 @@ The MQTT build publishes history as an attribute, which has no length limit, and
 
 Calibration was previously one offset shared by every meter on the device, which is wrong on two counts: the drift being corrected is in each meter's crystal, and a scan started for one meter could be reset or cancelled from another meter's buttons.
 
+It was worse than shared, in fact. `FrequencyManager::begin()` ran once per `everblu_meter:` entry against a single global base frequency, so whichever entry initialised last decided the frequency for all of them and a scan always swept around that value rather than the triggering meter's. That was documented as a limitation in v3.4.0 and carried a warning in `example-multi-meter.yaml`. Each meter now keeps its own base frequency, so a per-entry `frequency:` finally means what it says.
+
 Each entry now has its own base frequency, saved offset, adaptive tracking and `frequency_estimate` sensor, plus its own Scan, Deep Scan, Reset and Stop buttons. A read reapplies that meter's tuning before transmitting. Pressing Stop on a meter that did not start the running scan now reports `Scan belongs to meter NN-NNNNNN - use that meter's Stop button` to that meter's Last Error sensor, instead of appearing to do nothing.
+
+The practical consequence for multi-meter users is a YAML change: the calibration entities used to be radio-global and the example told you to declare them on the first meter only. They belong on every meter now. See the upgrade notes below.
 
 ## Scans
 
@@ -68,8 +72,10 @@ The once-per-day latch is also keyed on the full date rather than the day of yea
 ## Also in this release
 
 - **NTP sync no longer stalls the MQTT connect callback.** It spun in a `delay()` loop for up to 10 seconds on every reconnect, holding up `mqtt.loop()` and `ArduinoOTA.handle()`.
+- **The standalone build stopped re-scanning on every boot.** It inferred "no calibration stored" from an offset of exactly 0.0 kHz, so a device whose crystal is on spec never recognised its own saved calibration and spent about two minutes scanning before every MQTT connection.
 - **A very weak signal was reported as "too strong".** The dBm conversion returned `int8_t` and the weakest readings map below -128 dBm, which wrapped to a positive number and satisfied the near-field saturation heuristic.
-- **The ESPHome manual-read and deep-scan buttons are guarded like the others**, so a deep scan can no longer be launched on an unconfigured or busy radio.
+- **The ESPHome manual-read and deep-scan buttons are guarded like the others**, so a deep scan can no longer be launched on an unconfigured or busy radio. On the MQTT build, `Reset Frequency Offset`, `Deep Frequency Scan` and `Diagnostic Report` are likewise ignored during a scan or a retry sequence.
+- **An unrecognised reading schedule now says so.** It used to match no day at all, so the device simply never read and gave no reason.
 - **`example-advanced.yaml` compiles again**: the `Status` text sensor was missing the `id` its own automation refers to.
 - **The release workflow no longer interpolates its dispatch input into a shell command.**
 - **The radio read is now covered by host tests.** The simulated CC1101 models the FIFOs, so a full read - wake-up burst, both receive stages, decode, CRC and parse - replays real captured frames on every CI run, in the default, `debug_cc1101` and `DISABLE_GDO2_FIFO_MANAGEMENT` builds.
@@ -78,7 +84,8 @@ The once-per-day latch is also keyed on the full date rather than the day of yea
 ## Upgrade notes
 
 - **Run a frequency scan for each meter after upgrading.** The old shared offset has no meter identity and is not imported. Until you do, each meter starts from its configured base frequency.
-- **Add the per-meter scan buttons to your ESPHome YAML** if you want them; they are optional and additive.
+- **Multi-meter setups: move the calibration entities onto every meter.** `frequency_offset`, `tuned_frequency`, `frequency_estimate`, `deep_scan_button` and `reset_frequency_button` were radio-global, and `example-multi-meter.yaml` told you to declare them on the first meter only. A YAML carried forward unchanged leaves meters 2 and up calibrating with no entities to show for it. The updated example shows the new layout.
+- **The new per-meter `scan_button` is optional and additive**, as are the other per-meter buttons.
 - **If you have a Home Assistant template reading `history.history[-1]`**, the newest cumulative snapshot is `volume - current_month_usage`, which is equal by definition. Updated templates are in `ESPHOME/docs/ESPHOME_HOME_ASSISTANT_INTEGRATION.md`.
 - **If you only use `monthly_usage`, `current_month_usage` or `months_available`**, no action is needed.
 - **MQTT users are unaffected by the history change.** No topic, YAML key or wiring migration in this release; the new MQTT scan topics are additive.
