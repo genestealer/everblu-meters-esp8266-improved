@@ -34,11 +34,12 @@ wifi:
 
 substitutions:
   git_ref: main
+  git_url: https://github.com/genestealer/everblu-meters-esp8266-improved
 
 external_components:
   - source:
       type: git
-      url: https://github.com/genestealer/everblu-meters-esp8266-improved
+      url: ${git_url}
       ref: ${git_ref}
       path: ESPHOME-release
     components: [ everblu_meter ]

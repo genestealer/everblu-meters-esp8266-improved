@@ -60,7 +60,7 @@ config.h
 include/config.h
 include/private.h
 include/secrets.h
-__pycache__/
+__pycache__
 *.pyc
 **/.esphome/
 scripts/dev_notes.txt
