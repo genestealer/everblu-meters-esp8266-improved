@@ -1418,3 +1418,207 @@ void test_a_radio_fault_fails_the_read_before_the_meter_is_contacted(void)
     TEST_ASSERT_EQUAL(0, (int)g_publisher.readings.size());
     TEST_ASSERT_TRUE(g_publisher.sawStatus("Retry scheduled"));
 }
+
+
+// Full FDR shares standard-read accounting, but owns busy through publication.
+namespace
+{
+    MeterReader *fdrReader = nullptr;
+    void assertFdrBusy()
+    {
+        TEST_ASSERT_TRUE(MeterReader::isFullFdrInProgress());
+        TEST_ASSERT_TRUE(fdrReader->isReadingInProgress());
+        TEST_ASSERT_EQUAL(1, g_publisher.activeReadingFlags.size());
+        TEST_ASSERT_TRUE(g_publisher.activeReadingFlags.front());
+        TEST_ASSERT_FALSE(fdrReader->readFullFdr());
+    }
+
+    tmeter_data clockReading(const char *clock)
+    {
+        tmeter_data result = FakeRadio::success();
+        snprintf(result.meter_time, sizeof(result.meter_time), "%s", clock);
+        return result;
+    }
+}
+
+void test_fdr_keeps_busy_through_fresh_read_capture_and_publication()
+{
+    fakeRadio().responses.push_back(clockReading("2024-03-15 12:00:00"));
+    MeterReader reader = makeReader();
+    fdrReader = &reader;
+    fakeRadio().onFdrRead = assertFdrBusy;
+    g_publisher.onFdrPublish = assertFdrBusy;
+    TEST_ASSERT_TRUE(reader.readFullFdr());
+    TEST_ASSERT_EQUAL(1, fakeRadio().calls.size());
+    TEST_ASSERT_EQUAL(1, fakeRadio().fdrCalls.size());
+    TEST_ASSERT_EQUAL(1, g_publisher.readings.size());
+    TEST_ASSERT_EQUAL(1, g_publisher.historyPublishes);
+    TEST_ASSERT_EQUAL(1, g_publisher.fdrPublishes);
+    TEST_ASSERT_TRUE(g_publisher.fdrHasClock);
+    TEST_ASSERT_EQUAL(124, g_publisher.fdrClock.tm_year);
+    TEST_ASSERT_EQUAL(g_time.nowUtc, g_publisher.fdrCapturedAt);
+    TEST_ASSERT_EQUAL(2, g_publisher.activeReadingFlags.size());
+    TEST_ASSERT_FALSE(g_publisher.activeReadingFlags.back());
+    TEST_ASSERT_FALSE(reader.isReadingInProgress());
+    TEST_ASSERT_EQUAL_STRING("Full FDR captured", g_publisher.lastStatus().c_str());
+    unsigned long attempts, successes, failures;
+    reader.getStatistics(attempts, successes, failures);
+    TEST_ASSERT_EQUAL(1, attempts);
+    TEST_ASSERT_EQUAL(1, successes);
+    TEST_ASSERT_EQUAL(0, failures);
+}
+
+void test_fdr_failure_never_retries_scans_or_reads_archive_after_standard_failure()
+{
+    g_config.autoScanOnFailure = true;
+    fakeRadio().responses.push_back(FakeRadio::failure(ReadFailure::NoReply));
+    MeterReader reader = makeReader();
+    TEST_ASSERT_FALSE(reader.readFullFdr());
+    TEST_ASSERT_FALSE(reader.isReadingInProgress());
+    TEST_ASSERT_FALSE(FrequencyManager::isScanInProgress());
+    TEST_ASSERT_EQUAL(0, fakeRadio().fdrCalls.size());
+    advanceAndLoop(reader, RETRY_DELAY_MS + 1);
+    TEST_ASSERT_EQUAL(1, fakeRadio().calls.size());
+    unsigned long attempts, successes, failures;
+    reader.getStatistics(attempts, successes, failures);
+    TEST_ASSERT_EQUAL(1, attempts);
+    TEST_ASSERT_EQUAL(0, successes);
+    TEST_ASSERT_EQUAL(1, failures);
+}
+
+void test_fdr_preserves_pending_retry_and_refuses_unready_publisher()
+{
+    fakeRadio().responses = {FakeRadio::failure(ReadFailure::NoReply), FakeRadio::success()};
+    MeterReader reader = makeReader();
+    reader.triggerReading(false);
+    TEST_ASSERT_FALSE(reader.readFullFdr());
+    TEST_ASSERT_EQUAL(0, fakeRadio().fdrCalls.size());
+    advanceAndLoop(reader, RETRY_DELAY_MS + 1);
+    TEST_ASSERT_EQUAL(2, fakeRadio().calls.size());
+    TEST_ASSERT_EQUAL(1, g_publisher.readings.size());
+    g_publisher.ready = false;
+    TEST_ASSERT_FALSE(reader.readFullFdr());
+    TEST_ASSERT_EQUAL(2, fakeRadio().calls.size());
+}
+
+void test_fdr_uses_only_fresh_clock_and_reader_utc_is_optional()
+{
+    fakeRadio().responses = {clockReading("2024-03-15 12:00:00"), clockReading("2024-02-30 12:00:00")};
+    MeterReader reader = makeReader();
+    TEST_ASSERT_TRUE(reader.readFullFdr());
+    TEST_ASSERT_TRUE(g_publisher.fdrHasClock);
+    g_time.synced = false;
+    TEST_ASSERT_TRUE(reader.readFullFdr());
+    TEST_ASSERT_FALSE(g_publisher.fdrHasClock);
+    TEST_ASSERT_EQUAL(0, g_publisher.fdrCapturedAt);
+    TEST_ASSERT_EQUAL(2, g_publisher.fdrPublishes);
+}
+
+void test_fdr_rejects_interval_rollover_and_distinguishes_delivery_failures()
+{
+    fakeRadio().responses = {clockReading("2024-03-31 23:59:59"), clockReading("2024-03-15 12:00:00")};
+    fakeRadio().fdrDurationMs = 2000;
+    MeterReader reader = makeReader();
+    TEST_ASSERT_FALSE(reader.readFullFdr());
+    TEST_ASSERT_EQUAL(0, g_publisher.fdrPublishes);
+    TEST_ASSERT_EQUAL_STRING("Full FDR capture failed: meter interval changed during capture", reader.getLastError());
+    fakeRadio().fdrSucceeds = false;
+    TEST_ASSERT_FALSE(reader.readFullFdr());
+    TEST_ASSERT_EQUAL_STRING("Full FDR capture failed: frame acquisition failed", reader.getLastError());
+    fakeRadio().fdrSucceeds = true;
+    g_publisher.fdrResult = FdrPublishResult::FormattingFailed;
+    TEST_ASSERT_FALSE(reader.readFullFdr());
+    TEST_ASSERT_EQUAL_STRING("Full FDR formatting failed", reader.getLastError());
+    g_publisher.fdrResult = FdrPublishResult::DeliveryFailed;
+    TEST_ASSERT_FALSE(reader.readFullFdr());
+    TEST_ASSERT_EQUAL_STRING("Full FDR delivery failed", reader.getLastError());
+    TEST_ASSERT_FALSE(reader.isReadingInProgress());
+    TEST_ASSERT_FALSE(FrequencyManager::isScanInProgress());
+    unsigned long attempts, successes, failures;
+    reader.getStatistics(attempts, successes, failures);
+    TEST_ASSERT_EQUAL(4, attempts);
+    TEST_ASSERT_EQUAL(4, successes);
+    TEST_ASSERT_EQUAL(0, failures);
+}
+
+void test_fdr_uses_selected_meter_calibration_and_adaptive_tuning()
+{
+    FakeConfig otherConfig;
+    otherConfig.meterYear = 22;
+    otherConfig.frequency = 434.0f;
+    RecordingPublisher otherPublisher;
+    MeterReader reader = makeReader();
+    MeterReader other(&otherConfig, &g_time, &otherPublisher);
+    other.begin();
+    reader.setAdaptiveThreshold(1);
+    fakeRadio().responses.push_back(FakeRadio::success(12345, 10));
+    TEST_ASSERT_TRUE(reader.readFullFdr());
+    TEST_ASSERT_FLOAT_WITHIN(0.0001f, g_config.frequency, fakeRadio().calls.back().frequency);
+    TEST_ASSERT_FLOAT_WITHIN(0.0001f, reader.getTunedFrequency(), fakeRadio().fdrCalls.back().frequency);
+    TEST_ASSERT_TRUE(reader.getTunedFrequency() > g_config.frequency);
+    TEST_ASSERT_EQUAL(21, fakeRadio().fdrCalls.back().year);
+    TEST_ASSERT_TRUE(other.readFullFdr());
+    TEST_ASSERT_EQUAL(22, fakeRadio().fdrCalls.back().year);
+    TEST_ASSERT_FLOAT_WITHIN(0.0001f, otherConfig.frequency, fakeRadio().fdrCalls.back().frequency);
+}
+
+void test_fdr_radio_init_failure_releases_busy_without_retry()
+{
+    MeterReader reader = makeReader();
+    fakeRadio().initSucceeds = false;
+    TEST_ASSERT_FALSE(reader.readFullFdr());
+    TEST_ASSERT_FALSE(reader.isReadingInProgress());
+    TEST_ASSERT_EQUAL(0, fakeRadio().calls.size());
+    TEST_ASSERT_EQUAL(0, fakeRadio().fdrCalls.size());
+    TEST_ASSERT_EQUAL(2, g_publisher.activeReadingFlags.size());
+}
+
+
+void test_fdr_preserves_owed_scheduled_and_post_scan_reads()
+{
+    g_config.maxRetries = 1;
+    g_config.retryCooldownMs = 120000;
+    fakeRadio().responses = {FakeRadio::failure(ReadFailure::NoReply), FakeRadio::success()};
+    MeterReader reader = makeReader();
+    reader.triggerReading(false);
+    g_time.setUtc(2025, 6, 10, 10, 0, 30);
+    advanceAndLoop(reader, 1000); // Queue scheduled work during cooldown.
+    g_time.setUtc(2025, 6, 10, 10, 3, 0);
+    TEST_ASSERT_TRUE(reader.readFullFdr());
+    const size_t before = fakeRadio().calls.size();
+    advanceAndLoop(reader, 1000);
+    TEST_ASSERT_EQUAL(before + 1, fakeRadio().calls.size());
+
+    // A completed scan queues confirmation for the next loop pass.
+    fakeRadio().carrierFrequency = g_config.frequency + 0.008f;
+    reader.performFrequencyScan();
+    int guard = 0;
+    while (FrequencyManager::isScanInProgress() && guard++ < 5000) reader.loop();
+    TEST_ASSERT_FALSE(FrequencyManager::isScanInProgress());
+    TEST_ASSERT_TRUE(reader.readFullFdr());
+    const size_t afterFdr = fakeRadio().calls.size();
+    reader.loop();
+    TEST_ASSERT_EQUAL(afterFdr + 1, fakeRadio().calls.size());
+}
+
+void test_fdr_blocks_reentrant_other_meter_radio_actions()
+{
+    fakeRadio().responses = {FakeRadio::success()};
+    MeterReader reader = makeReader();
+    FakeConfig otherConfig;
+    otherConfig.meterYear = 22;
+    RecordingPublisher otherPublisher;
+    MeterReader other(&otherConfig, &g_time, &otherPublisher);
+    other.begin();
+    fdrReader = &other;
+    fakeRadio().onFdrRead = []() {
+        TEST_ASSERT_FALSE(fdrReader->readFullFdr());
+        fdrReader->triggerReading(false);
+        fdrReader->performFrequencyScan();
+        fdrReader->resetFrequencyOffset();
+        fdrReader->loop();
+        TEST_ASSERT_EQUAL(1, fakeRadio().calls.size());
+        TEST_ASSERT_FALSE(FrequencyManager::isScanInProgress());
+    };
+    TEST_ASSERT_TRUE(reader.readFullFdr());
+}

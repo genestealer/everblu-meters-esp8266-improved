@@ -204,3 +204,50 @@ gcovr --root . --object-directory .pio/build/ --print-summary \
   --filter src/services/meter_reader.cpp \
   --filter src/services/schedule_manager.cpp
 ```
+
+## Full FDR verification
+
+Run every native variant, including debug and legacy FIFO polling:
+
+```sh
+pio test -e native -e native_esphome -e native_cc1101 \
+  -e native_cc1101_debug -e native_cc1101_legacy
+pytest -q tests/esphome
+esphome compile .ci/esphome/everblu_meter/test.esp8266-fdr.yaml
+esphome compile ESPHOME/example-full-fdr-memory-probe.yaml
+```
+
+`tests/esphome/test_mqtt_full_fdr.py` compiles the actual standalone command body with a
+recording MQTT/radio harness. It covers busy/pending work, capture and formatter
+failures, allocation/publication failure, retained-publication intent and packet
+restoration, formatter release before publication and delayed callbacks consumed
+during scans. CI collects it with the existing ESPHome Python suite; it explicitly
+skips when no C++ compiler is installed. It does not simulate a broker's QoS 0 delivery acknowledgement.
+The publisher suites verify retention across failed refreshes and meter isolation.
+The formatter suite asserts the maximum raw JSON size including timestamps.
+
+`tests/esphome/test_fdr_delivery.py` validates the getter schema and the public
+native-client signatures. It executes the guide client against a narrow fake of
+public API methods: subscription alone, missing values and another meter's
+state must not permit a fetch before initialization. It covers cached/fresh
+retrieval, the response flag, nested JSON and the before-capture error. Run it
+with ESPHome 2026.1.0/current and aioesphomeapi 43.0.0/current. It does not claim
+TCP transport or firmware initialization integration coverage.
+
+Source-dependent upstream investigations are opt-in, outside default CI:
+
+```bash
+pytest tools/fdr_delivery_source_probe.py -q
+```
+
+This probe imports upstream client implementation and compiles extracted web
+routing methods; upstream internal changes can require updating it. Set
+`FDR_HA_MANAGER_SOURCE` to an independently downloaded Home Assistant 2026.1.0
+`homeassistant/components/esphome/manager.py` to include the HA source check.
+Otherwise only that optional check skips. No proprietary source is needed.
+
+The [hardware probe](../ESPHOME/example-full-fdr-memory-probe.yaml) requires only
+an ESP8266 and network connection, no meter or radio. Its actual synthetic payload
+lambda is also exercised on the host. Build size, host tests and ESP32 field tests
+do not establish ESP8266 runtime heap feasibility; follow the
+[measurement procedure](../docs/full-fdr.md#payload-memory-and-hardware-verification).

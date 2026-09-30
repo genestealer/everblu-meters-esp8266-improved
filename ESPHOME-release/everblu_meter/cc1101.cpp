@@ -1511,8 +1511,8 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
 // is decoded to:
 // 76543210 76543210 76543210 76543210
 // Note: this wrapper always passes MAX_DECODED_SIZE (200) as the output-buffer
-// limit, so decoded_buffer must be at least 200 bytes (see the static
-// meter_data[200] caller); the decode stops early if that limit is reached.
+// limit, so decoded_buffer must be at least 200 bytes. The shared 300-byte
+// meter_data buffer exceeds this limit; decoding stops early at 200 bytes.
 //
 // The core bit-recovery algorithm lives in radian_decode_4bitpbit()
 // (src/core/radian_decoder.cpp) so that a single, platform-neutral
@@ -1522,8 +1522,7 @@ struct tmeter_data parse_meter_report(uint8_t *decoded_buffer, uint8_t size)
 // around the pure decode.
 uint8_t decode_4bitpbit_serial(uint8_t *rxBuffer, int l_total_byte, uint8_t *decoded_buffer)
 {
-  // Maximum decoded buffer size (matches the static meter_data[200] caller
-  // buffer; a conservative estimate of input bytes / 4).
+  // Bound the decode to 200 bytes within the shared 300-byte caller buffer.
   const int MAX_DECODED_SIZE = 200;
 
   // Feed the watchdog before and after the decode. The decode itself is a
@@ -1649,7 +1648,8 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
   // raw capture length, so the hard cap l_expected_bytes stopped ~60 raw bytes
   // early and the last ~4 decoded bytes (13th history month + CRC trailer) were
   // lost. (8 + 4) = 12 bits sizes the capture to cover the whole frame.
-  uint16_t l_radian_frame_size_byte = ((size_byte * (8 + 4)) / 8) + 1;
+  // Round up the partial serial byte for odd-length FDR responses.
+  uint16_t l_radian_frame_size_byte = ((size_byte * (8 + 4) + 7) / 8) + 1;
   int l_tmo = 0;
   int l_Rssi_dbm;
   uint8_t l_lqi, l_freq_est;
@@ -1926,29 +1926,26 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
    but for read-only operation, this is not required.
 */
 
-struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_serial)
+// Radio operations are serialized by each platform. Reuse one decoded buffer
+// across standard and FDR exchanges instead of growing the ESP8266 stack.
+static uint8_t meter_data[300];
+
+// Shared wake-up / interrogation / ACK / data exchange. The caller supplies a
+// decoded buffer of at least 200 bytes (the decoder's existing bounded limit).
+static int exchange_radian_request(uint8_t *txbuffer, size_t tx_size, size_t response_size,
+                                   uint8_t *decoded_buffer, bool *frame_received = nullptr, int8_t *frequency_estimate = nullptr)
 {
-  // Avoid leading newline so ESPHome log doesn't emit an empty line first
-  echo_debug(1, "[METER] Starting meter read sequence...\n");
-  struct tmeter_data sdata;
+  if (frame_received) *frame_received = false;
+  if (!tx_size || tx_size > 64) return 0;
   uint8_t marcstate = 0xFF;
   uint8_t wupbuffer[] = {0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55};
   uint8_t wup2send = 77;
   uint16_t tmo = 0;
   static uint8_t rxBuffer[1500]; // Make static to avoid stack overflow
   int rxBuffer_size;
-  static uint8_t meter_data[300]; // Make static to avoid stack overflow
-  uint8_t meter_data_size = 0;
+  memset(rxBuffer, 0, sizeof(rxBuffer)); // Clear static buffer
 
-  memset(&sdata, 0, sizeof(sdata));
-  memset(rxBuffer, 0, sizeof(rxBuffer));     // Clear static buffer
-  memset(meter_data, 0, sizeof(meter_data)); // Clear static buffer
-
-  uint8_t txbuffer[100];
-  Make_Radian_Master_req(txbuffer, meter_year, meter_serial);
-
-  echo_debug(1, "[METER] Transmitting wake-up + interrogation (Year=%d, Serial=%lu)...\n",
-             meter_year, (unsigned long)meter_serial);
+  echo_debug(1, "[METER] Transmitting wake-up + interrogation (%u encoded bytes)...\n", (unsigned)tx_size);
 
   // === Critical: Reset radio state before TX ===
   // If the radio is stuck in RXFIFO_OVERFLOW (0x11) or any non-IDLE state from
@@ -2066,11 +2063,11 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
     }
     else
     {
-      // Wait for TX FIFO to drain enough to fit the 39-byte interrogation frame.
+      // Wait for TX FIFO space for the actual encoded interrogation length.
       // Only write when FIFO space is confirmed; skip and retry the outer TX loop if
       // the safety limit fires before the FIFO drains (avoids write with no headroom).
       bool fifo_ready = false;
-      if (GET_GDO2_PIN() >= 0)
+      if (GET_GDO2_PIN() >= 0 && tx_size <= 39)
       {
         // With FIFOTHR_FIFO_THR_25_40: GDO2 de-asserts (LOW) when FIFO < 25 bytes,
         // guaranteeing >= 40 free bytes - safely fits the 39-byte frame.
@@ -2105,7 +2102,8 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
       }
       else
       {
-        // Fallback: poll TXBYTES register until <= 25 bytes remain (39 free bytes).
+        // Longer FDR requests do not fit the GDO2 threshold guarantee.
+        // Poll actual FIFO occupancy; also used when GDO2 is absent.
         // See: https://github.com/genestealer/everblu-meters-esp8266-improved/issues/58
         uint8_t wait_count = 0;
         while (wait_count < 100) // Safety limit ~500ms
@@ -2114,9 +2112,9 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
           if (txbytes_reg & 0x80)
             break; // TXFIFO_UNDERFLOW - marcstate check at loop bottom will abort
           uint8_t num_txbytes = txbytes_reg & 0x7F;
-          if (num_txbytes <= 25)
+          if (num_txbytes <= 64 - tx_size)
           {
-            fifo_ready = true; // 64 - 25 = 39 free bytes confirmed
+            fifo_ready = true; // Enough room for the entire encoded request
             break;
           }
           delay(5);
@@ -2127,11 +2125,11 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
       }
       if (fifo_ready)
       {
-        SPIWriteBurstReg(TX_FIFO_ADDR, txbuffer, 39);
+        SPIWriteBurstReg(TX_FIFO_ADDR, txbuffer, tx_size);
         if (debug_out && 0)
         {
           echo_debug(debug_out, "txbuffer:\n");
-          show_in_hex_array(&txbuffer[0], 39);
+          show_in_hex_array(&txbuffer[0], tx_size);
         }
         wup2send = 0xFF;
       }
@@ -2191,23 +2189,41 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
   }
   // delay(30); //50ms de 111111  , mais on a 7+3ms de printf et xxms calculs
   /*34ms 0101...01  14.25ms 000...000  14ms 1111...11111  582ms de data avec l'index */
-  echo_debug(1, "[METER] Waiting for data frame (124-byte frame, 1000ms timeout)...\n");
-  int8_t data_frequency_estimate = 0;
-  rxBuffer_size = receive_radian_frame(0x7C, 1000, rxBuffer, sizeof(rxBuffer), &data_frequency_estimate);
+  echo_debug(1, "[METER] Waiting for data frame (%u-byte frame, 1000ms timeout)...\n", (unsigned)response_size);
+  rxBuffer_size = receive_radian_frame(response_size, 1000, rxBuffer, sizeof(rxBuffer), frequency_estimate);
   if (rxBuffer_size)
   {
     echo_debug(1, "[METER] Data frame received - decoding %d raw bytes...\n", rxBuffer_size);
     if (debug_out)
     {
-      // Raw pre-decode oversampled buffer, for offline analysis of the full
-      // frame (captured to end of transmission, not a fixed 124-byte window).
+      // Raw pre-decode oversampled buffer, for offline analysis of the
+      // receive window sized to the expected response frame.
       echo_debug(debug_out, "[CC1101] Raw pre-decode RX buffer (%d oversampled bytes):\n", rxBuffer_size);
       show_in_hex_array(rxBuffer, rxBuffer_size);
     }
 
-    meter_data_size = decode_4bitpbit_serial(rxBuffer, rxBuffer_size, meter_data);
+    if (frame_received) *frame_received = true;
+    return decode_4bitpbit_serial(rxBuffer, rxBuffer_size, decoded_buffer);
+  }
+  return 0;
+}
+
+struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_serial)
+{
+  // Avoid leading newline so ESPHome log doesn't emit an empty line first
+  echo_debug(1, "[METER] Starting meter read sequence (Year=%u, Serial=%lu)...\n",
+             meter_year, (unsigned long)meter_serial);
+  tmeter_data sdata{};
+  memset(meter_data, 0, sizeof(meter_data)); // Clear static buffer
+  uint8_t txbuffer[100];
+  const size_t tx_size = Make_Radian_Master_req(txbuffer, meter_year, meter_serial);
+  bool frame_received = false;
+  int8_t data_frequency_estimate = 0;
+  int meter_data_size = exchange_radian_request(txbuffer, tx_size, 124, meter_data, &frame_received, &data_frequency_estimate);
+  if (frame_received)
+  {
     // If debug enabled, print the decoded (post-serial-decoding) meter data so we can inspect fields (timestamp etc.)
-    echo_debug(1, "[METER] Decoded %d bytes from %d raw bytes\n", meter_data_size, rxBuffer_size);
+    echo_debug(1, "[METER] Decoded %d bytes\n", meter_data_size);
 
     // Always show hex dump when debug_cc1101 is enabled for field-level debugging
     if (debug_out)
@@ -2324,4 +2340,87 @@ struct tmeter_data get_meter_data(void)
   return get_meter_data_for_meter(meter_year, meter_serial);
 #endif
 #endif
+}
+
+static void log_fdr_bytes(const char *label, const uint8_t *bytes, size_t size)
+{
+  if (!debug_out) return;
+  // Short labelled chunks survive ESPHome's log message size limit.
+  for (size_t offset = 0; offset < size; offset += 16)
+  {
+    char hex[16 * 3 + 1] = {};
+    size_t count = size - offset < 16 ? size - offset : 16;
+    for (size_t i = 0; i < count; ++i)
+      snprintf(hex + i * 3, sizeof(hex) - i * 3, "%02X ", bytes[offset + i]);
+    echo_debug(1, "[FDR] %s [%03u]: %s\n", label, (unsigned)offset, hex);
+  }
+}
+
+static void log_fdr_configuration(const radian_fdr_data &result)
+{
+  const auto &config = result.configuration;
+  log_fdr_bytes("Configuration raw", config.raw, 3);
+  const char *periods[] = {"Monthly", "Weekly", "Daily", "Hourly"};
+  // Driver Service 3.1.9 enums; retain unknown codes without inventing a width.
+  const char *resolutions[] = {"SignedLong (32-bit)", "UnsignedInteger (16-bit)",
+                               "SignedInteger (16-bit)", "UnsignedShort (8-bit)",
+                               "SignedShort (8-bit)", "Irrigation (special)"};
+  const unsigned factors[] = {1, 10, 100, 1000, 10000};
+  echo_debug(1, "[FDR] Configuration: StartHour=%u StartDay=%u Period=%u (%s) TurnFactor=%u Resolution=%u (%s)\n",
+             config.start_hour, config.start_day, config.period, periods[config.period], config.turn_factor,
+             config.resolution, config.resolution < 6 ? resolutions[config.resolution] : "unknown");
+  if (config.turn_factor < 5)
+    echo_debug(1, "[FDR] TurnFactor multiplier=%u turns\n", factors[config.turn_factor]);
+  echo_debug(1, "[FDR] CurrentIndex=%lu FdrGlobalIndex=%lu (raw index units)\n",
+             (unsigned long)result.current_index, (unsigned long)result.global_index);
+}
+
+bool read_fdr_frame_for_meter(uint8_t year, uint32_t serial, uint8_t frame_number,
+                              radian_fdr_data *out)
+{
+  if (!out || (frame_number != 7 && frame_number != 8)) return false;
+  const uint8_t ats[7] = {}; // Official driver: ATS disabled, not a fixed date/time.
+  uint8_t raw[29], encoded[64];
+  const size_t size = radian_build_predefined_request(raw, sizeof(raw), year, serial, ats, 0, frame_number);
+  if (!size) return false;
+  const size_t encoded_size = encode_radian_request(raw, size, encoded, sizeof(encoded));
+  echo_debug(1, "[FDR] Request frame %u for %02u-%07lu\n", frame_number, year, (unsigned long)serial);
+  log_fdr_bytes("ATS", ats, 7);
+  log_fdr_bytes("Request raw", raw, size);
+  uint8_t *decoded = meter_data;
+  memset(decoded, 0, sizeof(meter_data));
+  const size_t expected = frame_number == 7 ? RADIAN_FDR_FRAME_7_SIZE : RADIAN_FDR_FRAME_8_SIZE;
+  const int received = exchange_radian_request(encoded, encoded_size, expected, decoded);
+  log_fdr_bytes(frame_number == 7 ? "Frame 7" : "Frame 8", decoded, received);
+  // The response reverses source/destination addresses from our request.
+  const bool address_ok = received >= 15 && memcmp(decoded + 3, raw + 9, 5) == 0 &&
+                          memcmp(decoded + 9, raw + 3, 5) == 0;
+  if (!address_ok || !radian_parse_fdr_frame(decoded, received, frame_number, out))
+  {
+    echo_debug(1, "[FDR] Frame %u rejected: decoded=%d expected=%u length=%u address=%s CRC=%s\n",
+               frame_number, received, (unsigned)expected, decoded[0], address_ok ? "OK" : "BAD",
+               radian_validate_crc(decoded, received) ? "OK" : "BAD");
+    return false;
+  }
+  echo_debug(1, "[FDR] Frame %u validated: length=%u CRC=OK status=0x%02X (raw)\n",
+             frame_number, decoded[0], out->communication_status[frame_number - 7]);
+  if (frame_number == 7) log_fdr_configuration(*out);
+  return true;
+}
+
+bool read_full_fdr_for_meter(uint8_t year, uint32_t serial, radian_fdr_data *out)
+{
+  if (!out) return false;
+  *out = {};
+  radian_fdr_data result{};
+  if (!read_fdr_frame_for_meter(year, serial, 7, &result) ||
+      !read_fdr_frame_for_meter(year, serial, 8, &result))
+  {
+    echo_debug(1, "[FDR] Full read failed; no combined result\n");
+    return false;
+  }
+  *out = result;
+  log_fdr_bytes("Consumptions raw", result.consumptions, sizeof(result.consumptions));
+  echo_debug(1, "[FDR] Full read complete: 180 interval-consumption bytes\n");
+  return true;
 }

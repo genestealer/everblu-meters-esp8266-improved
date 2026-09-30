@@ -1,3 +1,7 @@
+void test_read_preserves_receive_time_frequency_estimate();
+void test_fdr_complete_synthetic_pair_and_failures();
+void test_fdr_transmit_waits_for_fifo_space_and_disables_ats();
+void test_fdr_receive_capacity_rounds_up_partial_serial_bytes();
 /**
  * @file test_runner.cpp
  * @brief Unity entry point for the CC1101 SPI link host suite
@@ -122,5 +126,9 @@ int main(int, char **)
     RUN_TEST(test_receive_recovers_a_radio_that_ignores_the_first_rx_strobe);
     RUN_TEST(test_receive_gives_up_on_a_radio_that_never_enters_rx);
 
+    RUN_TEST(test_fdr_transmit_waits_for_fifo_space_and_disables_ats);
+    RUN_TEST(test_fdr_receive_capacity_rounds_up_partial_serial_bytes);
+    RUN_TEST(test_fdr_complete_synthetic_pair_and_failures);
+    RUN_TEST(test_read_preserves_receive_time_frequency_estimate);
     return UNITY_END();
 }

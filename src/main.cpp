@@ -26,6 +26,7 @@
 #include "core/version.h"              // Firmware version definition
 #include "core/logging.h"              // Timestamped serial logging macros
 #include "core/wifi_serial.h"          // WiFi serial monitor
+#include "core/radian_parser.h"
 #include "core/cc1101.h"               // CC1101 RF transceiver and meter data
 #include "core/meter_code_parser.h"    // Shared METER_CODE parser
 #include "core/utils.h"                 // Utility functions
@@ -45,6 +46,8 @@
 #include <Arduino.h>       // Core Arduino library
 #include <ArduinoOTA.h>    // OTA update library
 #include <EspMQTTClient.h> // MQTT client library
+#include <memory>
+#include <new>
 #include <math.h>          // For floor/ceil during scan alignment
 
 // Define the LED_BUILTIN pin if missing
@@ -324,6 +327,8 @@ bool g_inCooldown = false;
 const unsigned long RETRY_COOLDOWN = 3600000; // 1 hour cooldown in milliseconds
 bool g_autoScanAfterFailureDone = false;      // Guards the failure-recovery frequency scan to once per failure streak
 bool g_postScanReadAttempted = false;         // Guards the single post-scan re-read to once per failure streak
+bool g_readActive = false;
+bool g_readPending = false; // Includes a delayed post-scan attempt, even with MAX_RETRIES=1.
 bool g_scanActive = false;
 bool g_scanRetryRead = false;
 ReadFailure g_retryFailureReason = ReadFailure::None; // Most informative failure seen so far in the current retry sequence
@@ -573,121 +578,39 @@ static const char *wifiStatusToString(wl_status_t st)
   }
 }
 
-// Function: onUpdateData
-// Description: Fetches data from the water and gas meter and publishes it to MQTT topics.
-//              Retries up to 10 times if data retrieval fails.
-void onUpdateData()
+static void beginMeterRead()
 {
-  if (FrequencyManager::isScanInProgress()) return;
-  Serial.println("");
-  EVB_PRINTLN("========================================");
-  EVB_PRINTF("        METER READ - START (fw %s)\n", EVERBLU_FW_VERSION);
-  EVB_PRINTLN("========================================");
-  TS_PRINTF("[STATUS] Updating data from meter...\n");
-  TS_PRINTF("[STATUS] Retry count: %d\n", _retry);
-  TS_PRINTF("[STATUS] Reading schedule: %s\n", readingSchedule);
-  TS_PRINTF("[STATUS] Scheduled read time: %02d:%02d UTC (%02d:%02d local-offset)\n", g_readHourUtc, g_readMinuteUtc, g_readHourLocal, g_readMinuteLocal);
-
-  // Increment total attempts counter
-  totalReadAttempts++;
-
-  // Indicate activity with LED
-  digitalWrite(LED_BUILTIN, LOW); // Turn on LED to indicate activity
-
-  // Notify MQTT that active reading has started
+  g_readActive = true;
+  digitalWrite(LED_BUILTIN, LOW);
   publishSub("active_reading", "true", true);
   publishSub("cc1101_state", "Reading", true);
+}
 
-  struct tmeter_data meter_data = get_meter_data(); // Fetch meter data
+static void completeMeterRead()
+{
+  g_readActive = false;
+  publishSub("active_reading", "false", true);
+  publishSub("cc1101_state", cc1101RadioConnected ? "Idle" : "unavailable", true);
+  digitalWrite(LED_BUILTIN, HIGH);
+}
 
-  // Get current UTC time
-  time_t tnow = time(nullptr);
-  struct tm *ptm = gmtime(&tnow);
-  Serial.println();
-  TS_PRINTF("[TIME] Current date (UTC): %04d/%02d/%02d %02d:%02d:%02d - %ld\n", ptm->tm_year + 1900, ptm->tm_mon + 1, ptm->tm_mday, ptm->tm_hour, ptm->tm_min, ptm->tm_sec, (long)tnow);
+static tmeter_data readMeterOnce()
+{
+  ++totalReadAttempts;
+  const tmeter_data data = get_meter_data();
+  const time_t now = time(nullptr);
+  const tm *utc = gmtime(&now);
+  TS_PRINTF("[TIME] Current date (UTC): %04d/%02d/%02d %02d:%02d:%02d - %ld\n",
+            utc->tm_year + 1900, utc->tm_mon + 1, utc->tm_mday,
+            utc->tm_hour, utc->tm_min, utc->tm_sec, (long)now);
+  return data;
+}
 
-  char iso8601[128];
-  strftime(iso8601, sizeof iso8601, "%FT%TZ", gmtime(&tnow));
-
-  // Handle data retrieval failure (including first-layer protection rejecting
-  // corrupted frames and returning zeros).
-  if (meter_data.reads_counter == 0 || meter_data.volume == 0)
-  {
-    TS_PRINTF("[ERROR] Unable to retrieve data from meter (attempt %d/%d)\n", _retry + 1, max_retries);
-
-    // Remember the most informative symptom of the sequence: a run of corrupted
-    // frames ending in one silent timeout is still an RF quality problem, so the
-    // final message should not fall back to "no response".
-    if (meter_data.failure != ReadFailure::None && meter_data.failure != ReadFailure::NoReply)
-    {
-      g_retryFailureReason = meter_data.failure;
-    }
-
-    if (_retry < max_retries - 1)
-    {
-      // Schedule retry using callback instead of recursion to prevent stack overflow
-      _retry++;
-      static char errorMsg[128];
-      // Deliberately the symptom of THIS attempt, not the sticky
-      // g_retryFailureReason: while a sequence is still running the user wants
-      // to see what just happened. Only the final message below prefers the
-      // most informative symptom of the whole sequence.
-      snprintf(errorMsg, sizeof(errorMsg), "Retry %d/%d - %s", _retry, max_retries,
-               read_failure_message(meter_data.failure, true));
-      lastErrorMessage = errorMsg;
-      TS_PRINTF("[STATUS] Scheduling retry in 5 seconds... (next attempt %d/%d)\n", _retry + 1, max_retries);
-      // Keep the "Active Reading" sensor true and the radio state as "Reading"
-      // for the whole retry sequence so they don't flip to "Not running"/Idle
-      // between attempts. They are cleared only on final success or after max
-      // retries (see the else branch below).
-      publishSub("last_error", lastErrorMessage, true);
-      digitalWrite(LED_BUILTIN, HIGH); // Turn off LED
-      // Use non-blocking callback instead of recursive call
-      mqtt.executeDelayed(5000, onUpdateData);
-    }
-    else
-    {
-      // Max retries reached, enter cooldown period
-      g_inCooldown = true;
-      lastFailedAttempt = millis();
-      failedReads++;
-      lastErrorMessage = read_failure_message(
-          g_retryFailureReason != ReadFailure::None ? g_retryFailureReason : meter_data.failure, false);
-      TS_PRINTF("[ERROR] Max retries (%d) reached. Entering 1-hour cooldown period.\n", max_retries);
-      publishSub("active_reading", "false", true);
-      publishSub("cc1101_state", cc1101RadioConnected ? "Idle" : "unavailable", true);
-      publishSub("status_message", "Failed after max retries, cooling down for 1 hour", true);
-      publishSub("last_error", lastErrorMessage, true);
-
-      char buffer[16];
-      snprintf(buffer, sizeof(buffer), "%lu", failedReads);
-      publishSub("failed_reads", buffer, true);
-
-      snprintf(buffer, sizeof(buffer), "%lu", totalReadAttempts);
-      publishSub("total_attempts", buffer, true);
-      digitalWrite(LED_BUILTIN, HIGH); // Turn off LED
-      _retry = 0;                      // Reset retry counter for next scheduled attempt
-      g_retryFailureReason = ReadFailure::None;
-
-      // When the meter cannot be reached after all retries, a drifted carrier
-      // frequency (crystal offset) is a common cause. Automatically run a
-      // frequency scan once per failure streak so users who never trigger a
-      // manual scan still get recalibrated. The guard is reset on the next
-      // successful read so we don't burn power scanning on every cooldown when
-      // the meter is genuinely unreachable (e.g. dead battery).
-      if (autoScanOnFailureEnabled && !g_autoScanAfterFailureDone)
-      {
-        g_autoScanAfterFailureDone = true;
-        startRecoveryScan(true);
-      }
-    }
-    EVB_PRINTLN("========================================");
-    EVB_PRINTLN("        METER READ - FAILED");
-    EVB_PRINTLN("========================================");
-    Serial.println("");
-    return;
-  }
-
+static void publishSuccessfulRead(const tmeter_data &meter_data)
+{
+  const time_t now = time(nullptr);
+  char iso8601[32];
+  strftime(iso8601, sizeof(iso8601), "%FT%TZ", gmtime(&now));
   // Format int time_start and time_end as "HH:MM"
   char timeStartFormatted[6];
   char timeEndFormatted[6];
@@ -824,10 +747,6 @@ void onUpdateData()
   }
 #endif
 
-  // Notify MQTT that active reading has ended
-  publishSub("active_reading", "false", true);
-  publishSub("cc1101_state", cc1101RadioConnected ? "Idle" : "unavailable", true);
-  digitalWrite(LED_BUILTIN, HIGH); // Turn off LED to indicate completion
 
   // Reset retry counter and cooldown on successful read
   _retry = 0;
@@ -856,10 +775,199 @@ void onUpdateData()
   // Reset scheduled read flag for next invocation
   g_isScheduledRead = false;
 
+}
+
+// Function: onUpdateData
+// Description: Fetches data from the water and gas meter and publishes it to MQTT topics.
+//              Retries up to 10 times if data retrieval fails.
+void onUpdateData()
+{
+  g_readPending = false; // This callback is consumed even if a scan owns the radio.
+  if (FrequencyManager::isScanInProgress()) return;
+  Serial.println("");
+  EVB_PRINTLN("========================================");
+  EVB_PRINTF("        METER READ - START (fw %s)\n", EVERBLU_FW_VERSION);
+  EVB_PRINTLN("========================================");
+  TS_PRINTF("[STATUS] Updating data from meter...\n");
+  TS_PRINTF("[STATUS] Retry count: %d\n", _retry);
+  TS_PRINTF("[STATUS] Reading schedule: %s\n", readingSchedule);
+  TS_PRINTF("[STATUS] Scheduled read time: %02d:%02d UTC (%02d:%02d local-offset)\n", g_readHourUtc, g_readMinuteUtc, g_readHourLocal, g_readMinuteLocal);
+
+  beginMeterRead();
+  const tmeter_data meter_data = readMeterOnce();
+
+  // Handle data retrieval failure (including first-layer protection rejecting
+  // corrupted frames and returning zeros).
+  if (meter_data.reads_counter == 0 || meter_data.volume == 0)
+  {
+    TS_PRINTF("[ERROR] Unable to retrieve data from meter (attempt %d/%d)\n", _retry + 1, max_retries);
+
+    // Remember the most informative symptom of the sequence: a run of corrupted
+    // frames ending in one silent timeout is still an RF quality problem, so the
+    // final message should not fall back to "no response".
+    if (meter_data.failure != ReadFailure::None && meter_data.failure != ReadFailure::NoReply)
+    {
+      g_retryFailureReason = meter_data.failure;
+    }
+
+    if (_retry < max_retries - 1)
+    {
+      // Schedule retry using callback instead of recursion to prevent stack overflow
+      _retry++;
+      static char errorMsg[128];
+      // Deliberately the symptom of THIS attempt, not the sticky
+      // g_retryFailureReason: while a sequence is still running the user wants
+      // to see what just happened. Only the final message below prefers the
+      // most informative symptom of the whole sequence.
+      snprintf(errorMsg, sizeof(errorMsg), "Retry %d/%d - %s", _retry, max_retries,
+               read_failure_message(meter_data.failure, true));
+      lastErrorMessage = errorMsg;
+      TS_PRINTF("[STATUS] Scheduling retry in 5 seconds... (next attempt %d/%d)\n", _retry + 1, max_retries);
+      // Keep the "Active Reading" sensor true and the radio state as "Reading"
+      // for the whole retry sequence so they don't flip to "Not running"/Idle
+      // between attempts. They are cleared only on final success or after max
+      // retries (see the else branch below).
+      publishSub("last_error", lastErrorMessage, true);
+      digitalWrite(LED_BUILTIN, HIGH); // Turn off LED
+      // Use non-blocking callback instead of recursive call
+      g_readPending = true;
+      mqtt.executeDelayed(5000, onUpdateData);
+    }
+    else
+    {
+      // Max retries reached, enter cooldown period
+      g_inCooldown = true;
+      lastFailedAttempt = millis();
+      failedReads++;
+      lastErrorMessage = read_failure_message(
+          g_retryFailureReason != ReadFailure::None ? g_retryFailureReason : meter_data.failure, false);
+      TS_PRINTF("[ERROR] Max retries (%d) reached. Entering 1-hour cooldown period.\n", max_retries);
+      publishSub("active_reading", "false", true);
+      publishSub("cc1101_state", cc1101RadioConnected ? "Idle" : "unavailable", true);
+      publishSub("status_message", "Failed after max retries, cooling down for 1 hour", true);
+      publishSub("last_error", lastErrorMessage, true);
+
+      char buffer[16];
+      snprintf(buffer, sizeof(buffer), "%lu", failedReads);
+      publishSub("failed_reads", buffer, true);
+
+      snprintf(buffer, sizeof(buffer), "%lu", totalReadAttempts);
+      publishSub("total_attempts", buffer, true);
+      digitalWrite(LED_BUILTIN, HIGH); // Turn off LED
+      _retry = 0;                      // Reset retry counter for next scheduled attempt
+      g_retryFailureReason = ReadFailure::None;
+
+      // When the meter cannot be reached after all retries, a drifted carrier
+      // frequency (crystal offset) is a common cause. Automatically run a
+      // frequency scan once per failure streak so users who never trigger a
+      // manual scan still get recalibrated. The guard is reset on the next
+      // successful read so we don't burn power scanning on every cooldown when
+      // the meter is genuinely unreachable (e.g. dead battery).
+      if (autoScanOnFailureEnabled && !g_autoScanAfterFailureDone)
+      {
+        g_autoScanAfterFailureDone = true;
+        startRecoveryScan(true);
+      }
+    }
+    g_readActive = false;
+    EVB_PRINTLN("========================================");
+    EVB_PRINTLN("        METER READ - FAILED");
+    EVB_PRINTLN("========================================");
+    Serial.println("");
+    return;
+  }
+
+  publishSuccessfulRead(meter_data);
+  completeMeterRead();
   EVB_PRINTLN("========================================");
   EVB_PRINTLN("        METER READ - COMPLETE");
   EVB_PRINTLN("========================================");
   Serial.println("");
+
+}
+
+
+void onRequestFullFdr()
+{
+  if (g_readActive || g_readPending || _retry != 0 || g_scanActive || g_scanRetryRead ||
+      FrequencyManager::isScanInProgress())
+  {
+    publishSub("status_message", "Full FDR rejected: radio busy or retry pending", true);
+    return;
+  }
+
+  // EspMQTTClient copies incoming topic/payload before invoking subscribers, so
+  // resizing PubSubClient's packet buffer here does not invalidate the command.
+  char topic[MQTT_TOPIC_BUFFER_SIZE];
+  snprintf(topic, sizeof(topic), "%s/fdr_history", mqttBaseTopic);
+  const size_t packetSize = FULL_FDR_JSON_BUFFER_SIZE + strlen(topic) + 8;
+  std::unique_ptr<char[]> json(new (std::nothrow) char[FULL_FDR_JSON_BUFFER_SIZE]);
+  if (!json || !mqtt.setMaxPacketSize(packetSize))
+  {
+    lastErrorMessage = "Full FDR allocation failed before capture";
+    publishSub("last_error", lastErrorMessage, true);
+    publishSub("status_message", lastErrorMessage, true);
+    return;
+  }
+
+  beginMeterRead();
+  g_isScheduledRead = false;
+  const tmeter_data standard = readMeterOnce();
+  const unsigned long sampledAt = millis();
+  const char *error = nullptr;
+  if (standard.reads_counter == 0 || standard.volume == 0)
+  {
+    ++failedReads;
+    error = "Full FDR capture failed: fresh standard read";
+    char count[16];
+    snprintf(count, sizeof(count), "%lu", failedReads);
+    publishSub("failed_reads", count, true);
+    snprintf(count, sizeof(count), "%lu", totalReadAttempts);
+    publishSub("total_attempts", count, true);
+  }
+  else
+  {
+    // Same readings, accounting and adaptive tuning as an ordinary successful
+    // read, but completion is deferred until the archive operation has finished.
+    publishSuccessfulRead(standard);
+    tm meterTime{};
+    const bool clockValid = MeterHistory::parseMeterTime(standard.meter_time, meterTime);
+    radian_fdr_data archive{};
+    if (!read_full_fdr_for_meter(g_meterYear, g_meterSerial, &archive))
+      error = "Full FDR capture failed: frame pair";
+    else if (clockValid && !MeterHistory::captureWithinFdrInterval(archive, meterTime, millis() - sampledAt))
+      error = "Full FDR capture failed: interval boundary crossed";
+    else
+    {
+      const int length = MeterHistory::generateFullFdrJson(
+          archive, json.get(), FULL_FDR_JSON_BUFFER_SIZE, clockValid ? &meterTime : nullptr, time(nullptr));
+      if (length <= 0)
+        error = "Full FDR formatting failed";
+      else
+      {
+        // EspMQTTClient's public API takes String: verify its allocation before
+        // publishing so an allocation failure cannot replace the retained archive
+        // with an empty payload (which would delete it at the broker).
+        const String payload(json.get());
+        // String owns its copy now. This lowers live memory during publish;
+        // both buffers still coexist during String construction.
+        json.reset();
+        if (payload.length() != static_cast<size_t>(length))
+          error = "Full FDR delivery failed: payload allocation";
+        else if (!mqtt.publish(topic, payload, true))
+          error = "Full FDR delivery failed: MQTT publish";
+      }
+    }
+  }
+
+  // A failed shrink safely leaves the larger buffer in place. It must not turn
+  // an already sent archive into an apparent failed capture.
+  if (!mqtt.setMaxPacketSize(2048))
+    TS_PRINTLN("[FDR] MQTT buffer remains enlarged (shrink allocation failed)");
+  lastErrorMessage = error ? error : "None";
+  publishSub("last_error", lastErrorMessage, true);
+  publishSub("status_message", error ? error : "Full FDR sent (QoS 0, unacknowledged)", true);
+  completeMeterRead();
 }
 
 // Function: onScheduled
@@ -1235,6 +1343,17 @@ void publishHADiscovery()
   json += "}";
   publishDiscoveryMessage("button", "everblu_meter_request", json);
 
+  json = "{\"name\":\"Fetch Full FDR\",\"uniq_id\":\"" + getMeterPrefix() + "everblu_meter_full_fdr_request";
+  json += "\",\"cmd_t\":\"" + String(mqttBaseTopic) + "/request_full_fdr\",\"pl_prs\":\"fetch\",\"retain\":false";
+  json += ",\"avty_t\":\"" + String(mqttBaseTopic) + "/status\",\"dev\":{" + buildDeviceJson() + "}}";
+  publishDiscoveryMessage("button", "everblu_meter_full_fdr_request", json);
+
+  json = "{\"name\":\"Full FDR Archive\",\"uniq_id\":\"" + getMeterPrefix() + "everblu_meter_fdr_history";
+  json += "\",\"stat_t\":\"" + String(mqttBaseTopic) + "/fdr_history\",\"json_attr_t\":\"" + String(mqttBaseTopic) + "/fdr_history";
+  json += "\",\"val_tpl\":\"{{ value_json.captured_at or 'captured' }}\",\"ic\":\"mdi:history\"";
+  json += ",\"avty_t\":\"" + String(mqttBaseTopic) + "/status\",\"dev\":{" + buildDeviceJson() + "}}";
+  publishDiscoveryMessage("sensor", "everblu_meter_fdr_history", json);
+
   // Diagnostic sensors
   publishDiscoveryMessage("sensor", "everblu_meter_wifi_ip", buildDiscoveryJson("IP Address", "wifi_ip", "mdi:ip-network-outline", nullptr, nullptr, nullptr, "diagnostic"));
   publishDiscoveryMessage("sensor", "everblu_meter_wifi_rssi", buildDiscoveryJson("WiFi RSSI", "wifi_rssi", "mdi:signal-variant", "dBm", "signal_strength", "measurement", "diagnostic"));
@@ -1475,6 +1594,16 @@ void onConnectionEstablished()
     // Immediately attempt to update, ignoring any cooldown state
     _retry = 0;
     onUpdateData(); });
+
+  char fdrTopic[MQTT_TOPIC_BUFFER_SIZE];
+  snprintf(fdrTopic, sizeof(fdrTopic), "%s/request_full_fdr", mqttBaseTopic);
+  mqtt.subscribe(fdrTopic, [](const String &message) {
+    if (message != "fetch") {
+      publishSub("status_message", "Invalid Full FDR command (expected fetch)", true);
+      return;
+    }
+    onRequestFullFdr();
+  });
 
   char restartTopic[80];
   snprintf(restartTopic, sizeof(restartTopic), "%s/restart", mqttBaseTopic);
@@ -2217,6 +2346,7 @@ void loop()
         g_inCooldown = false;
         lastFailedAttempt = 0;
         _retry = max_retries - 1;
+        g_readPending = true;
         mqtt.executeDelayed(2000, onUpdateData);
       }
       g_scanRetryRead = false;

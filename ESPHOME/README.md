@@ -588,7 +588,12 @@ EverbluMeterComponent (ESPHome)
 - **error** - Last error message
 - **radio_state** - Radio state (Init/Scanning/Receiving/Idle)
 - **timestamp** - Last successful reading time
-- **history_json** - Meter history JSON payload
+- **history_json** - Existing compact monthly usage JSON (unchanged)
+- **fdr_history_json** - Optional internal text sensor retaining the latest successful
+  Full FDR archive; must remain `internal: true`, without filters. Configure it
+  alongside `request_full_fdr_button`. Retrieve the complete JSON using the cached
+  native API getter; debug text-sensor logs can truncate it. See the
+  [Full FDR guide](../docs/full-fdr.md) and [complete example](example-full-fdr.yaml).
 - **firmware_version** - Firmware version string
 - **meter_serial_sensor** - Parsed serial section from `meter_code`
 - **meter_year_sensor** - Parsed year (`YY`) from `meter_code`
@@ -605,6 +610,8 @@ EverbluMeterComponent (ESPHome)
 ### Control Buttons
 
 - **request_reading_button** - Trigger a manual reading
+- **request_full_fdr_button** - Fetch Full FDR manually (fresh standard read then
+  two archive frames); requires `fdr_history_json`. No automatic FDR scheduling.
 - **stop_reading_button** - Cancel the current read/retry sequence. Also requests best-effort cancellation of an in-progress deep frequency scan (it bails at the next step; see [#133](https://github.com/genestealer/everblu-meters-esp8266-improved/issues/133))
 - **scan_button** - Search within ±20 kHz of this meter's saved tuning, then run a full Deep Scan if no response is found.
 - **deep_scan_button** - Search ±150 kHz around this meter's configured frequency, then bracket and refine the response window.

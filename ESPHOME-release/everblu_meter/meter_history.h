@@ -14,6 +14,12 @@
 #define METER_HISTORY_H
 
 #include <Arduino.h>
+#include <time.h>
+
+struct radian_fdr_data;
+// Exhaustive supported resolution/pulse/factor extremes: 7898 bytes plus NUL.
+// Includes 180 dated signed intervals, maximum indexes and UTC captured_at.
+constexpr int FULL_FDR_JSON_BUFFER_SIZE = 7899;
 
 /**
  * @struct HistoryStats
@@ -38,6 +44,13 @@ struct HistoryStats
 class MeterHistory
 {
 public:
+    // Dedicated flat archive; civil interval dates and optional UTC capture time.
+    static int generateFullFdrJson(const radian_fdr_data &data, char *outputBuffer,
+                                   int bufferSize, const tm *meterTime = nullptr, time_t capturedAt = 0);
+    static bool parseMeterTime(const char *text, tm &out);
+    static bool advanceMeterTime(const tm &base, uint32_t elapsedSeconds, tm &out);
+    static bool captureWithinFdrInterval(const radian_fdr_data &data, const tm &sampledClock, uint32_t elapsedMs);
+
     /**
      * @brief Calculate statistics from historical data
      *

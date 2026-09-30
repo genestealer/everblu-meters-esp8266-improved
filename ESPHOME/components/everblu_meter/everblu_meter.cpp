@@ -4,6 +4,7 @@
  */
 
 #include "everblu_meter.h"
+#include "esphome/core/version.h"
 #ifndef __INTELLISENSE__
 #include "esphome/core/log.h"
 #endif
@@ -57,6 +58,8 @@ void EverbluMeterTriggerButton::press_action() {
 
   if (this->is_stop_) {
     this->parent_->request_stop_reading();
+  } else if (this->is_full_fdr_) {
+    this->parent_->request_full_fdr();
   } else if (this->is_deep_scan_) {
     this->parent_->request_deep_scan();
   } else if (this->is_scan_) {
@@ -129,6 +132,7 @@ void EverbluMeterComponent::setup() {
   this->data_publisher_->set_radio_state_sensor(this->radio_state_sensor_);
   this->data_publisher_->set_timestamp_sensor(this->timestamp_sensor_);
   this->data_publisher_->set_history_sensor(this->history_sensor_);
+  this->data_publisher_->set_fdr_history_sensor(this->fdr_history_sensor_);
   this->data_publisher_->set_version_sensor(this->version_sensor_);
   this->data_publisher_->set_meter_serial_sensor(this->meter_serial_sensor_);
   this->data_publisher_->set_meter_year_sensor(this->meter_year_sensor_);
@@ -161,6 +165,7 @@ void EverbluMeterComponent::setup() {
   texts += (this->radio_state_sensor_ != nullptr);
   texts += (this->timestamp_sensor_ != nullptr);
   texts += (this->history_sensor_ != nullptr);
+  texts += (this->fdr_history_sensor_ != nullptr);
   texts += (this->version_sensor_ != nullptr);
   texts += (this->meter_serial_sensor_ != nullptr);
   texts += (this->meter_year_sensor_ != nullptr);
@@ -283,8 +288,12 @@ void EverbluMeterComponent::loop() {
     // Initialize meter reader when Home Assistant connects (ensures safe boot sequence)
     // This is better than WiFi-only check because API connection is more stable
     if (esphome::api::global_api_server != nullptr) {
-      // Use is_connected_with_state_subscription() to check for state subscription (HA is actively monitoring)
+      // ESPHome 2026.3 split the state-subscription query into a dedicated method.
+#if ESPHOME_VERSION_CODE >= VERSION_CODE(2026, 3, 0)
       bool is_ha_connected = esphome::api::global_api_server->is_connected_with_state_subscription();
+#else
+      bool is_ha_connected = esphome::api::global_api_server->is_connected(true);
+#endif
 
       // Initialize meter reader if not already done
       if (!this->meter_initialized_ && is_ha_connected && !FrequencyManager::isScanInProgress()) {
@@ -367,6 +376,19 @@ void EverbluMeterComponent::request_manual_read() {
   this->meter_reader_->triggerReading(false);
 }
 
+void EverbluMeterComponent::request_full_fdr() {
+  if (this->meter_reader_ == nullptr || !this->meter_initialized_) {
+    ESP_LOGW(TAG, "Full FDR ignored: meter reader not ready");
+    return;
+  }
+  if (FrequencyManager::isScanInProgress() || this->meter_reader_->isReadingInProgress()) {
+    ESP_LOGW(TAG, "Full FDR ignored: radio operation in progress");
+    return;
+  }
+  this->apply_radio_context();
+  this->meter_reader_->readFullFdr();
+}
+
 void EverbluMeterComponent::request_deep_scan() {
   if (this->meter_reader_ == nullptr || !this->meter_initialized_) {
     ESP_LOGW(TAG, "Deep scan ignored: meter reader not ready");
@@ -417,8 +439,8 @@ void EverbluMeterComponent::request_stop_reading() {
 }
 
 void EverbluMeterComponent::request_diagnostic_report() {
-  if (FrequencyManager::isScanInProgress()) {
-    ESP_LOGW(TAG, "Diagnostic report ignored: frequency scan in progress");
+  if (FrequencyManager::isScanInProgress() || MeterReader::isFullFdrInProgress()) {
+    ESP_LOGW(TAG, "Diagnostic report ignored: radio operation in progress");
     return;
   }
   // Deliberately does not require meter_reader_: the most common reason to press this is
@@ -448,6 +470,10 @@ void EverbluMeterComponent::request_diagnostic_report() {
 }
 
 void EverbluMeterComponent::apply_radio_context() {
+  // on_value callbacks may synchronously request another meter. The reader
+  // rejects that work while FDR is active; keep its shared SPI/GDO context too.
+  if (MeterReader::isFullFdrInProgress())
+    return;
   auto *spi_device = static_cast<spi::SPIDevice<spi::BIT_ORDER_MSB_FIRST, spi::CLOCK_POLARITY_LOW,
                                                 spi::CLOCK_PHASE_LEADING, spi::DATA_RATE_1MHZ> *>(this);
   cc1101_set_spi_device(static_cast<void *>(spi_device));
@@ -565,6 +591,7 @@ void EverbluMeterComponent::dump_config() {
   LOG_TEXT_SENSOR("    ", "Radio State", this->radio_state_sensor_);
   LOG_TEXT_SENSOR("    ", "Timestamp", this->timestamp_sensor_);
   LOG_TEXT_SENSOR("    ", "History", this->history_sensor_);
+  LOG_TEXT_SENSOR("    ", "Full FDR History", this->fdr_history_sensor_);
   LOG_BINARY_SENSOR("    ", "Active Reading", this->active_reading_sensor_);
   LOG_BINARY_SENSOR("    ", "Radio Connected", this->radio_connected_sensor_);
 }

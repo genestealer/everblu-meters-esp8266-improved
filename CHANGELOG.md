@@ -12,6 +12,21 @@ Releases are created manually by tagging commits with version tags matching `v*.
 - Keep PR coverage explicit per release so branch-only work is auditable against merge history.
 - Add new versions below, not above this section.
 
+## [Unreleased]
+
+### Added
+
+- Manual, read-only Full FDR acquisition with a fresh meter clock: retained MQTT
+  archive and discovery button, or a separate internal ESPHome `fdr_history_json`
+  output with cached native API retrieval examples. Normal history is unchanged.
+  Includes synthetic protocol, transport and payload tests plus an ESP8266 memory
+  probe; runtime ESP8266 headroom remains to be verified on hardware.
+
+### Fixed
+
+- ESPHome 2026.1 and 2026.2 compile compatibility: preserve the HA state-subscription
+  check across the API method change introduced in ESPHome 2026.3.
+
 ## [v3.6.0] - 2026-09-16
 
 ### AI Metadata

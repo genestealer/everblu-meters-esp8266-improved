@@ -10,6 +10,7 @@
 
 #include <Arduino.h>
 #include "crc_kermit.h"
+#include "radian_parser.h"
 #include "cc1101.h"		 // For tmeter_data struct
 // private.h is pulled in ahead of wifi_serial.h so WIFI_SERIAL_MONITOR_ENABLED is
 // already known when the mirror decides whether to compile itself in. Not strictly
@@ -379,25 +380,22 @@ int encode2serial_1_3(uint8_t *inputBuffer, int inputBufferLen, uint8_t *outputB
 	return bytepos + 2;
 }
 
+int encode_radian_request(uint8_t *raw, size_t raw_size, uint8_t *out, size_t capacity)
+{
+    const uint8_t sync[] = {0x50, 0, 0, 0, 3, 0xFF, 0xFF, 0xFF, 0xFF};
+    // 12 bits per byte, rounded up, plus encoder's trailing idle byte.
+    if (!raw || !out || raw_size == 0 || raw_size > 255 ||
+        capacity < sizeof(sync) + (raw_size * 12 + 7) / 8 + 1) return 0;
+    memcpy(out, sync, sizeof(sync));
+    return sizeof(sync) + encode2serial_1_3(raw, raw_size, out + sizeof(sync));
+}
+
 int Make_Radian_Master_req(uint8_t *outputBuffer, uint8_t year, uint32_t serial)
 {
-	uint16_t crc;
-	uint8_t to_encode[] = {0x13, 0x10, 0x00, 0x45, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x45, 0x20, 0x0A, 0x50, 0x14, 0x00, 0x0A, 0x40, 0xFF, 0xFF}; // the last 2 bytes are reserved for the CRC as well as the serial number
-	uint8_t synch_pattern[] = {0x50, 0x00, 0x00, 0x00, 0x03, 0xFF, 0xFF, 0xFF, 0xFF};
-	uint8_t TS_len_u8;
-
-	to_encode[4] = year;
-	to_encode[5] = (uint8_t)((serial & 0x00FF0000) >> 16);
-	to_encode[6] = (uint8_t)((serial & 0x0000FF00) >> 8);
-	to_encode[7] = (uint8_t)(serial & 0x000000FF);
-	crc = crc_kermit(to_encode, sizeof(to_encode) - 2);
-	// printf("crc:%x\n",crc);
-	to_encode[sizeof(to_encode) - 2] = (uint8_t)((crc & 0xFF00) >> 8);
-	to_encode[sizeof(to_encode) - 1] = (uint8_t)(crc & 0x00FF);
-	// show_in_hex_one_line(to_encode,sizeof(to_encode));
-	memcpy(outputBuffer, synch_pattern, sizeof(synch_pattern));
-	TS_len_u8 = encode2serial_1_3(to_encode, sizeof(to_encode), &outputBuffer[sizeof(synch_pattern)]);
-	return TS_len_u8 + sizeof(synch_pattern);
+    uint8_t raw[19];
+    // Preserve the legacy API's 24-bit serial truncation.
+    const size_t size = radian_build_standard_request(raw, sizeof(raw), year, serial & 0xFFFFFF);
+    return encode_radian_request(raw, size, outputBuffer, 39);
 }
 
 // -----------------------------------------------------------------------------

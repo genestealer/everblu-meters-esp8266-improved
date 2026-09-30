@@ -92,6 +92,11 @@ public:
      */
     void triggerReading(bool isScheduled);
 
+    // Manual, blocking fresh standard read followed by read-only FDR frames 7/8.
+    // No retries or scans; pending scheduled and post-scan work stays queued.
+    bool readFullFdr();
+    static bool isFullFdrInProgress();
+
     /**
      * @brief Start a Deep frequency scan (window-map + zoom) to recalibrate the carrier offset
      *
@@ -191,6 +196,9 @@ private:
      * @param data Meter data
      */
     void handleSuccessfulRead(const tmeter_data &data);
+    tmeter_data readStandardAttempt();
+    void publishSuccessfulRead(const tmeter_data &data);
+    void completeReading(const char *status);
 
     /**
      * @brief Handle failed reading attempt

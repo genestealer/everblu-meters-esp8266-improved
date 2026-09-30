@@ -1,3 +1,8 @@
+void test_fdr_requests();
+void test_standard_request_unchanged();
+void test_fdr_parse_and_join();
+void test_fdr_rejects_bad_frames();
+void test_shared_synthetic_fdr_fixture();
 #include <unity.h>
 
 #include <cctype>
@@ -1229,6 +1234,12 @@ int main(int argc, char **argv)
     (void)argv;
 
     UNITY_BEGIN();
+    RUN_TEST(test_fdr_requests);
+    RUN_TEST(test_standard_request_unchanged);
+    RUN_TEST(test_fdr_parse_and_join);
+    RUN_TEST(test_fdr_rejects_bad_frames);
+    RUN_TEST(test_shared_synthetic_fdr_fixture);
+
     RUN_TEST(test_radian_parse_primary_volume_rejection);
     RUN_TEST(test_radian_parse_primary_time_rejection);
     RUN_TEST(test_radian_parse_primary_data_edge_cases);

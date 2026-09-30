@@ -22,6 +22,8 @@ void test_esphome_reset_frequency_offset_retunes_and_publishes(void);
 void test_esphome_frequency_scan_publishes_the_new_offset(void);
 void test_esphome_statistics_are_republished_periodically(void);
 
+void test_esphome_fdr_manual_read_without_ha_keeps_meter_outputs_isolated();
+
 void setUp(void) { esphomeReaderSetUp(); }
 
 void tearDown(void) {}
@@ -46,6 +48,8 @@ int main(int, char **)
     RUN_TEST(test_esphome_frequency_scan_publishes_the_new_offset);
     RUN_TEST(test_esphome_statistics_are_republished_periodically);
     RUN_TEST(test_esphome_calibration_is_per_meter_and_scan_is_exclusive);
+
+    RUN_TEST(test_esphome_fdr_manual_read_without_ha_keeps_meter_outputs_isolated);
 
     return UNITY_END();
 }

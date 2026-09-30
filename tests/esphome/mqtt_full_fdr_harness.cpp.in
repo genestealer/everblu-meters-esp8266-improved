@@ -1,0 +1,213 @@
+#include <cassert>
+#include <cstring>
+#include <cstdlib>
+#include <memory>
+#include <new>
+#include <string>
+#include <vector>
+#include <ctime>
+static int formatterAllocations = 0;
+static bool failString = false, failAllocation = false;
+struct String : std::string {
+  explicit String(const char *text) : std::string(failString ? "" : text) { assert(formatterAllocations == 1); }
+};
+void *operator new[](std::size_t size, const std::nothrow_t &) noexcept {
+  if (failAllocation)
+    return nullptr;
+  void *ptr = std::malloc(size);
+  if (ptr)
+    ++formatterAllocations;
+  return ptr;
+}
+void operator delete[](void *ptr) noexcept {
+  if (ptr)
+    --formatterAllocations;
+  std::free(ptr);
+}
+
+constexpr int FULL_FDR_JSON_BUFFER_SIZE = 10000, MQTT_TOPIC_BUFFER_SIZE = 128;
+constexpr int LED_BUILTIN = 1, HIGH = 1, LOW = 0;
+const char *mqttBaseTopic = "everblu/cyble/123456";
+bool g_readActive = false, g_scanActive = false, g_scanRetryRead = false, g_readPending = false,
+     g_isScheduledRead = false;
+bool cc1101RadioConnected = true;
+int _retry = 0;
+unsigned long totalReadAttempts = 0, successfulReads = 0, failedReads = 0;
+const char *lastErrorMessage = "None";
+enum class ReadFailure { None, NoReply };
+struct tmeter_data {
+  ReadFailure failure = ReadFailure::NoReply;
+  int reads_counter = 1, volume = 1;
+  char meter_time[32] = "2026-01-01 12:00:00";
+};
+struct radian_fdr_data {};
+static bool scan = false, standardOk = true, pairOk = true, clockOk = true, boundaryOk = true, formatOk = true;
+static unsigned long nowMs = 0;
+static int rfCalls = 0, publicationCalls = 0, completionCalls = 0;
+static std::vector<std::string> statuses;
+struct FrequencyManager {
+  static bool isScanInProgress() { return scan; }
+};
+struct MeterHistory {
+  static bool parseMeterTime(const char *, tm &) { return clockOk; }
+  static bool captureWithinFdrInterval(const radian_fdr_data &, const tm &, unsigned long) { return boundaryOk; }
+  static int generateFullFdrJson(const radian_fdr_data &, char *out, int, const tm *, time_t) {
+    if (!formatOk)
+      return 0;
+    strcpy(out, "{\"archive\":1}");
+    return strlen(out);
+  }
+};
+struct Mqtt {
+  bool resizeOk = true, publishOk = true;
+  int packetSize = 2048, published = 0;
+  bool setMaxPacketSize(int n) {
+    if (!resizeOk && n > 2048)
+      return false;
+    packetSize = n;
+    return true;
+  }
+  void executeDelayed(unsigned, void (*)()) {}
+  bool publish(const char *, const String &, bool retained) {
+    assert(formatterAllocations == 0);
+    assert(retained);
+    assert(g_readActive);
+    published++;
+    return publishOk;
+  }
+} mqtt;
+void publishSub(const char *topic, const char *value, bool) {
+  if (std::string(topic) == "status_message")
+    statuses.emplace_back(value);
+}
+void digitalWrite(int, int) {}
+unsigned long millis() { return nowMs; }
+tmeter_data readMeterOnce() {
+  assert(g_readActive);
+  ++rfCalls;
+  ++totalReadAttempts;
+  tmeter_data d;
+  if (!standardOk)
+    d.reads_counter = 0;
+  return d;
+}
+void beginMeterRead() { g_readActive = true; }
+void completeMeterRead() {
+  assert(g_readActive);
+  g_readActive = false;
+  ++completionCalls;
+}
+void publishSuccessfulRead(const tmeter_data &) {
+  assert(g_readActive);
+  ++publicationCalls;
+  ++successfulReads;
+}
+bool read_full_fdr_for_meter(unsigned, unsigned, radian_fdr_data *out) {
+  assert(g_readActive);
+  ++rfCalls;
+  nowMs += 5000;
+  return pairOk;
+}
+unsigned g_meterYear = 21, g_meterSerial = 123456;
+#define TS_PRINTLN(...) ((void) 0)
+#define TS_PRINTF(...) ((void) 0)
+struct {
+  void println(const char * = "") {}
+} Serial;
+const int max_retries = 5;
+bool g_inCooldown = false, autoScanOnFailureEnabled = false, g_autoScanAfterFailureDone = false;
+unsigned long lastFailedAttempt = 0;
+ReadFailure g_retryFailureReason = ReadFailure::None;
+const char *read_failure_message(ReadFailure, bool) { return "failed"; }
+void startRecoveryScan(bool) {}
+#define EVB_PRINTLN(...) ((void) 0)
+#define EVB_PRINTF(...) ((void) 0)
+// COMMAND_UNDER_TEST
+void reset() {
+  g_readActive = g_scanActive = g_scanRetryRead = g_readPending = scan = false;
+  _retry = 0;
+  standardOk = pairOk = clockOk = boundaryOk = formatOk = true;
+  mqtt = Mqtt{};
+  rfCalls = publicationCalls = completionCalls = 0;
+  totalReadAttempts = successfulReads = failedReads = 0;
+  statuses.clear();
+  failString = failAllocation = false;
+}
+int main() {
+  reset();
+  g_readPending = true;
+  scan = true;
+  onUpdateData();  // Actual delayed callback fires while a scan owns the radio.
+  assert(!g_readPending && rfCalls == 0);
+  scan = false;
+  onRequestFullFdr();
+  assert(mqtt.published == 1);  // Consumed callback must not permanently gate FDR.
+
+  reset();
+  onRequestFullFdr();
+  assert(rfCalls == 2 && publicationCalls == 1 && completionCalls == 1 && mqtt.published == 1 && !g_readActive &&
+         mqtt.packetSize == 2048);
+  for (int i = 0; i < 6; i++) {
+    reset();
+    switch (i) {
+      case 0:
+        scan = true;
+        break;
+      case 1:
+        g_scanActive = true;
+        break;
+      case 2:
+        g_readActive = true;
+        break;
+      case 3:
+        _retry = 1;
+        break;
+      case 4:
+        g_readPending = true;
+        break;
+      case 5:
+        g_scanRetryRead = true;
+        break;
+    }
+    onRequestFullFdr();
+    assert(rfCalls == 0 && mqtt.published == 0);
+  }
+  reset();
+  failAllocation = true;
+  onRequestFullFdr();
+  assert(rfCalls == 0 && !g_readActive);
+  reset();
+  failString = true;
+  onRequestFullFdr();
+  assert(mqtt.published == 0 && completionCalls == 1 &&
+         statuses.back().find("payload allocation") != std::string::npos);
+  reset();
+  mqtt.resizeOk = false;
+  onRequestFullFdr();
+  assert(rfCalls == 0 && !g_readActive);
+  reset();
+  standardOk = false;
+  onRequestFullFdr();
+  assert(rfCalls == 1 && publicationCalls == 0 && failedReads == 1 && completionCalls == 1 && mqtt.published == 0);
+  reset();
+  pairOk = false;
+  onRequestFullFdr();
+  assert(publicationCalls == 1 && successfulReads == 1 && completionCalls == 1 && mqtt.published == 0);
+  reset();
+  boundaryOk = false;
+  onRequestFullFdr();
+  assert(mqtt.published == 0 && completionCalls == 1);
+  reset();
+  clockOk = false;
+  boundaryOk = false;
+  onRequestFullFdr();
+  assert(mqtt.published == 1 && completionCalls == 1);
+  reset();
+  formatOk = false;
+  onRequestFullFdr();
+  assert(mqtt.published == 0 && completionCalls == 1 && mqtt.packetSize == 2048);
+  reset();
+  mqtt.publishOk = false;
+  onRequestFullFdr();
+  assert(mqtt.published == 1 && completionCalls == 1 && statuses.back().find("delivery failed") != std::string::npos);
+}

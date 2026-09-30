@@ -434,3 +434,28 @@ void test_receive_gives_up_on_a_radio_that_never_enters_rx(void)
 
     TEST_ASSERT_EQUAL_UINT8(0x11, nativeCC1101().marcstate);
 }
+
+namespace {
+unsigned narrowRxWrites;
+void retuneFrequencyEstimate(uint8_t *buffer, size_t length) {
+    // The CC1101 estimate may change when stage two reconfigures RX. Preserve
+    // the estimate sampled with the response's initial receive window.
+    if (length == 2 && buffer[0] == 0x10 && buffer[1] == 0xF6)
+        nativeCC1101().freqEst = ++narrowRxWrites % 2 ? uint8_t(-2) : 37;
+    nativeCC1101Transfer(buffer, length);
+}
+}
+
+void test_read_preserves_receive_time_frequency_estimate() {
+    RawCapture capture;
+    if (!armRadioWithCapture(capture))
+    {
+        TEST_IGNORE_MESSAGE("raw_frames.lst not found; skipping radio replay");
+    }
+    narrowRxWrites = 0;
+    nativeSpiSetHandler(retuneFrequencyEstimate);
+    const auto data = get_meter_data_for_meter(kFixtureMeterYear, kFixtureMeterSerial);
+    TEST_ASSERT_EQUAL(ReadFailure::None, data.failure);
+    TEST_ASSERT_EQUAL_INT8(-2, data.freqest);
+    TEST_ASSERT_EQUAL_UINT8(37, nativeCC1101().freqEst);
+}

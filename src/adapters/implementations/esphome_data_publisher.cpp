@@ -4,6 +4,8 @@
  */
 
 #include "esphome_data_publisher.h"
+#include <memory>
+#include <new>
 #include "../../services/meter_history.h"
 // Shared RSSI/LQI percentage conversions. Included unconditionally: utils.h has
 // no ESPHome dependency, and this translation unit is compiled by the MQTT build
@@ -108,6 +110,30 @@ void ESPHomeDataPublisher::publishMeterReading(const tmeter_data &data, const ch
     {
         publishFrequencyEstimate(data.freqest);
     }
+#endif
+}
+
+FdrPublishResult ESPHomeDataPublisher::publishFullFdr(const radian_fdr_data &data,
+                                                    const tm *meterTime, time_t capturedAt)
+{
+#ifdef USE_ESPHOME
+    if (!fdr_history_sensor_)
+        return FdrPublishResult::DeliveryFailed;
+
+    // Keep the large formatter buffer off the ESP8266 stack. The text sensor
+    // alone owns the successful result; ordinary history never contains FDR.
+    std::unique_ptr<char[]> json(new (std::nothrow) char[FULL_FDR_JSON_BUFFER_SIZE]);
+    if (!json)
+        return FdrPublishResult::FormattingFailed;
+    const int written = MeterHistory::generateFullFdrJson(data, json.get(), FULL_FDR_JSON_BUFFER_SIZE,
+                                                         meterTime, capturedAt);
+    if (written <= 0)
+        return FdrPublishResult::FormattingFailed;
+    ESP_LOGD(TAG_PUB, "Publishing Full FDR JSON (%d bytes)", written);
+    fdr_history_sensor_->publish_state(json.get());
+    return FdrPublishResult::Success;
+#else
+    return FdrPublishResult::DeliveryFailed;
 #endif
 }
 

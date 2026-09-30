@@ -1,0 +1,117 @@
+# Synthetic delivery stress probe: no meter, CC1101, SPI, or external component.
+# Flash on an ESP8266, connect an API client, and repeatedly press Refresh Probe.
+# Fetch both archives while automatic refresh runs; compare heap/block/fragmentation
+# logs before formatting, with each output retained, inside the getter, and later.
+# This intentionally exercises two retained outputs and getter/web copies together.
+esphome:
+  name: fdr-memory-probe
+  min_version: 2026.1.0
+
+esp8266:
+  board: d1_mini
+
+wifi:
+  ssid: EXAMPLE-WIFI
+  password: EXAMPLE-PASSWORD
+
+logger:
+  logs:
+    text_sensor: WARN
+
+ota:
+  - platform: esphome
+
+api:
+  actions:
+    - action: get_first_fdr
+      supports_response: only
+      then:
+        - api.respond:
+            success: !lambda return id(first_archive).has_state();
+            error_message: !lambda 'return id(first_archive).has_state() ? "" : "No successful capture since boot";'
+            data: |-
+              ESP_LOGI("fdr_heap", "getter before copy: heap=%u block=%u frag=%u",
+                       ESP.getFreeHeap(), ESP.getMaxFreeBlockSize(), ESP.getHeapFragmentation());
+              root["json"] = id(first_archive).state;
+              ESP_LOGI("fdr_heap", "getter after copy: heap=%u block=%u frag=%u",
+                       ESP.getFreeHeap(), ESP.getMaxFreeBlockSize(), ESP.getHeapFragmentation());
+    - action: get_second_fdr
+      supports_response: only
+      then:
+        - api.respond:
+            success: !lambda return id(second_archive).has_state();
+            error_message: !lambda 'return id(second_archive).has_state() ? "" : "No successful capture since boot";'
+            data: 'root["json"] = id(second_archive).state;'
+
+# Optional GET /text_sensor/First%20FDR and /text_sensor/Second%20FDR.
+# Each web response repeats the entire archive in state and value.
+# Add auth before using outside an isolated test network.
+web_server:
+  port: 80
+
+text_sensor:
+  - platform: template
+    id: first_archive
+    name: First FDR
+    internal: true
+    update_interval: never
+  - platform: template
+    id: second_archive
+    name: Second FDR
+    internal: true
+    update_interval: never
+
+button:
+  - platform: template
+    id: refresh_probe
+    name: Refresh Probe
+    on_press:
+      - lambda: |-
+          auto sample = [](const char *stage) {
+            ESP_LOGI("fdr_heap", "%s: heap=%u block=%u frag=%u", stage,
+                     ESP.getFreeHeap(), ESP.getMaxFreeBlockSize(), ESP.getHeapFragmentation());
+          };
+          sample("before formatting");
+          // Exact host-tested 7898-byte maximum: monthly, signed 8-bit -127,
+          // turn factor 10000, pulse code 18; no household data or radio.
+          std::string json = "{\"period\":\"monthly\",\"resolution\":4,\"start_day\":31,"
+            "\"start_hour\":23,\"turn_factor\":10000,\"pulse_value_code\":18,\"unit\":\"L\","
+            "\"current_index\":4294967295000,\"global_index\":4294960000000,"
+            "\"order\":\"newest_first\",\"interval_count\":180,\"consumptions\":[";
+          for (int i = 0; i < 180; ++i) {
+            if (i) json += ',';
+            json += "-1270000000";
+          }
+          json += "],\"validity\":[";
+          for (int i = 0; i < 180; ++i) {
+            if (i) json += ',';
+            json += "\"valid\"";
+          }
+          json += "],\"interval_end\":[";
+          for (int i = 0; i < 180; ++i) {
+            if (i) json += ',';
+            const int year = 2099 - i / 12;
+            const int month = 12 - i % 12;
+            const bool leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+            const int days[] = {31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+            char date[24];
+            snprintf(date, sizeof(date), "\"%04d-%02d-%02dT23:00:00\"", year, month, days[month - 1]);
+            json += date;
+          }
+          json += "],\"timestamp_basis\":\"meter_clock\",\"captured_at\":\"2099-12-31T23:59:59Z\"}";
+          ESP_LOGI("fdr_heap", "synthetic raw bytes=%u", (unsigned) json.size());
+          sample("formatted (temporary live)");
+          id(first_archive).publish_state(json);
+          sample("first retained (temporary live)");
+          id(second_archive).publish_state(json);
+          sample("both retained (temporary live)");
+
+interval:
+  - interval: 30s
+    then:
+      - button.press: refresh_probe
+  - interval: 5s
+    then:
+      - lambda: |-
+          ESP_LOGI("fdr_heap", "idle/transport: heap=%u block=%u frag=%u",
+                   ESP.getFreeHeap(), ESP.getMaxFreeBlockSize(), ESP.getHeapFragmentation());

@@ -335,3 +335,32 @@ void test_esphome_statistics_are_republished_periodically(void)
 
     TEST_ASSERT_EQUAL(baseline + 1, (int)g_publisher.statistics.size());
 }
+
+
+void test_esphome_fdr_manual_read_without_ha_keeps_meter_outputs_isolated()
+{
+    FakeConfig otherConfig = g_config;
+    otherConfig.meterYear = 22;
+    otherConfig.frequency = 434.0f;
+    RecordingPublisher otherPublisher;
+    StorageAbstraction::saveFloat("freq_21_0123456", 0.010f, 0xABCD);
+    StorageAbstraction::saveFloat("freq_22_0123456", -0.020f, 0xABCD);
+    MeterReader first(&g_config, &g_time, &g_publisher);
+    MeterReader second(&otherConfig, &g_time, &otherPublisher);
+    first.begin();
+    second.begin();
+    first.setHAConnected(false);
+    second.setHAConnected(false);
+    fakeRadio().responses = {FakeRadio::success()};
+    TEST_ASSERT_TRUE(first.readFullFdr());
+    TEST_ASSERT_EQUAL(1, g_publisher.fdrPublishes);
+    TEST_ASSERT_EQUAL(0, otherPublisher.fdrPublishes);
+    TEST_ASSERT_FLOAT_WITHIN(0.0001f, 433.83f, fakeRadio().fdrCalls.back().frequency);
+    TEST_ASSERT_TRUE(second.readFullFdr());
+    TEST_ASSERT_EQUAL(1, g_publisher.fdrPublishes);
+    TEST_ASSERT_EQUAL(1, otherPublisher.fdrPublishes);
+    TEST_ASSERT_FLOAT_WITHIN(0.0001f, 433.98f, fakeRadio().fdrCalls.back().frequency);
+    TEST_ASSERT_EQUAL(22, fakeRadio().fdrCalls.back().year);
+    TEST_ASSERT_FALSE(first.isReadingInProgress());
+    TEST_ASSERT_FALSE(second.isReadingInProgress());
+}
