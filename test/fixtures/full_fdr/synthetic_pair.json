@@ -1,7 +1,7 @@
 {
   "provenance": {
     "kind": "fully_synthetic",
-    "description": "Constructed from invented identities and values using the confirmed protocol layout. Not a recording or an anonymized capture."
+    "description": "Constructed from invented identities and values using the confirmed protocol layout. Not a recording or an anonymised capture."
   },
   "expected": {
     "meter_year": 21,

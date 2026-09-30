@@ -206,3 +206,24 @@ def test_fdr_public_output_rejected():
 def test_fdr_filters_rejected(filters):
     with pytest.raises(cv.Invalid, match="filters"):
         comp.validate_full_fdr({"fdr_history_json": {"filters": filters}})
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        {"request_full_fdr_button": {}},
+        {"fdr_history_json": {}},
+        {"request_full_fdr_button": {}, "fdr_history_json": {}},
+    ],
+)
+def test_gas_fdr_options_rejected(options):
+    with pytest.raises(cv.Invalid, match="water"):
+        comp.validate_full_fdr({"meter_type": "gas", **options})
+
+
+def test_gas_without_fdr_and_water_with_fdr_accepted():
+    for config in (
+        {"meter_type": "gas"},
+        {"meter_type": "water", "request_full_fdr_button": {}, "fdr_history_json": {}},
+    ):
+        assert comp.validate_full_fdr(config) is config

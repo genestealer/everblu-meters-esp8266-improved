@@ -64,7 +64,7 @@ The implementation calculates the length and CRC and reuses the standard
 read's addressing, encoding, wake-up and CC1101 exchange. Each frame request
 has its own wake-up, acknowledgement and response.
 
-**ATS means automatic time synchronization.** Sending a timestamp can set the
+**ATS means automatic time synchronisation.** Sending a timestamp can set the
 meter's clock. This implementation sends the driver's ATS-disabled encoding,
 seven zero bytes, and access code `00 00`. It exposes no clock-setting option.
 
@@ -159,7 +159,7 @@ The current implementation exports interval consumption and the reference
 index; it does not generate a cumulative historical series or write into
 Home Assistant's recorder. Interval dates use a fresh meter-clock sample from the same capture operation,
 never a cached clock. See the [guide](full-fdr.md#json-and-meter-clock-dates) for
-boundary-rollover rejection, missing-clock behavior and timezone interpretation.
+boundary-rollover rejection, missing-clock behaviour and timezone interpretation.
 
 ## Decoder reference
 
@@ -317,7 +317,7 @@ These notes do not add any new commands to the firmware. Configuration writes,
 clock setting, resets and probing unknown commands remain outside this work.
 
 The [Full FDR fixture](../test/fixtures/full_fdr/README.md) is fully synthetic,
-not an anonymized household capture. Tests cover frame sizes, CRCs, malformed
+not an anonymised household capture. Tests cover frame sizes, CRCs, malformed
 responses, fragment ordering, configured periods, encodings and preservation
 of the standard request. Real captures can contain identities, consumption,
 dates and access information; keep them out of repository fixtures.

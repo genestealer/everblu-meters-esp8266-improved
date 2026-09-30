@@ -537,6 +537,10 @@ def validate_pins(config):
 
 def validate_full_fdr(config):
     """Keep the complete structured archive retrievable and unmodified."""
+    if config.get(CONF_METER_TYPE) == METER_TYPE_GAS and (
+        CONF_REQUEST_FULL_FDR_BUTTON in config or CONF_FDR_HISTORY_JSON in config
+    ):
+        raise cv.Invalid("Full FDR is supported only for water meters")
     if CONF_REQUEST_FULL_FDR_BUTTON in config and CONF_FDR_HISTORY_JSON not in config:
         raise cv.Invalid("request_full_fdr_button requires fdr_history_json")
     output = config.get(CONF_FDR_HISTORY_JSON, {})

@@ -31,6 +31,7 @@ const char *mqttBaseTopic = "everblu/cyble/123456";
 bool g_readActive = false, g_scanActive = false, g_scanRetryRead = false, g_readPending = false,
      g_isScheduledRead = false;
 bool cc1101RadioConnected = true;
+bool meterIsGas = false;
 int _retry = 0;
 unsigned long totalReadAttempts = 0, successfulReads = 0, failedReads = 0;
 const char *lastErrorMessage = "None";
@@ -126,6 +127,7 @@ void startRecoveryScan(bool) {}
 void reset() {
   g_readActive = g_scanActive = g_scanRetryRead = g_readPending = scan = false;
   _retry = 0;
+  meterIsGas = false;
   standardOk = pairOk = clockOk = boundaryOk = formatOk = true;
   mqtt = Mqtt{};
   rfCalls = publicationCalls = completionCalls = 0;
@@ -134,6 +136,14 @@ void reset() {
   failString = failAllocation = false;
 }
 int main() {
+  reset();
+  meterIsGas = true;
+  onRequestFullFdr();
+  assert(rfCalls == 0 && mqtt.published == 0 && formatterAllocations == 0 && !g_readActive);
+  assert(mqtt.packetSize == 2048 && statuses.back().find("water") != std::string::npos);
+  onUpdateData();
+  assert(rfCalls == 1 && publicationCalls == 1);
+
   reset();
   g_readPending = true;
   scan = true;

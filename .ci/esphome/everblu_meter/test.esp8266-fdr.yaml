@@ -1,5 +1,5 @@
 # Validate the copyable example against this checkout before it is released.
-# Override only its Git source; keep getter, sensors and boot behavior identical.
+# Override only its Git source; keep getter, sensors and boot behaviour identical.
 <<: !include ../../../ESPHOME/example-full-fdr.yaml
 
 external_components:

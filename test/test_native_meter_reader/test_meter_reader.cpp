@@ -1622,3 +1622,24 @@ void test_fdr_blocks_reentrant_other_meter_radio_actions()
     };
     TEST_ASSERT_TRUE(reader.readFullFdr());
 }
+
+
+void test_fdr_rejects_gas_before_radio_and_preserves_standard_read()
+{
+    g_config.meterIsGas = true;
+    MeterReader reader = makeReader();
+    const size_t inits = fakeRadio().initFrequencies.size();
+    TEST_ASSERT_FALSE(reader.readFullFdr());
+    TEST_ASSERT_EQUAL(inits, fakeRadio().initFrequencies.size());
+    TEST_ASSERT_EQUAL(0, fakeRadio().calls.size());
+    TEST_ASSERT_EQUAL(0, fakeRadio().fdrCalls.size());
+    TEST_ASSERT_EQUAL(0, g_publisher.fdrPublishes);
+    TEST_ASSERT_FALSE(reader.isReadingInProgress());
+    TEST_ASSERT_FALSE(MeterReader::isFullFdrInProgress());
+    TEST_ASSERT_NOT_NULL(strstr(reader.getLastError(), "water"));
+
+    fakeRadio().responses.push_back(FakeRadio::success());
+    reader.triggerReading(false);
+    TEST_ASSERT_EQUAL(1, fakeRadio().calls.size());
+    TEST_ASSERT_EQUAL(1, g_publisher.readings.size());
+}

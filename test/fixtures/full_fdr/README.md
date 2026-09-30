@@ -1,7 +1,7 @@
 # Synthetic Full FDR pair
 
 `synthetic_pair.json` is **fully synthetic**, not a recording and not an
-anonymized capture. Every meter identity, reading, configuration value, counter,
+anonymised capture. Every meter identity, reading, configuration value, counter,
 and alarm value was invented. The protocol layout was checked against Android
 Driver Service 3.1.6 and 3.1.9 and physical monthly-meter responses. No driver
 binaries or source are included. The fixture contains no real household data

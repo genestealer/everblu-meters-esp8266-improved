@@ -13,6 +13,7 @@
 void meterReaderSetUp();
 void frequencyManagerSetUp();
 
+void test_fdr_rejects_gas_before_radio_and_preserves_standard_read();
 void test_fdr_keeps_busy_through_fresh_read_capture_and_publication();
 void test_fdr_failure_never_retries_scans_or_reads_archive_after_standard_failure();
 void test_fdr_preserves_pending_retry_and_refuses_unready_publisher();
@@ -216,6 +217,7 @@ int main(int, char **)
     RUN_TEST(test_a_recovery_scan_stays_local_and_reports_itself_as_such);
     RUN_TEST(test_a_radio_fault_fails_the_read_before_the_meter_is_contacted);
 
+    RUN_TEST(test_fdr_rejects_gas_before_radio_and_preserves_standard_read);
     RUN_TEST(test_fdr_keeps_busy_through_fresh_read_capture_and_publication);
     RUN_TEST(test_fdr_failure_never_retries_scans_or_reads_archive_after_standard_failure);
     RUN_TEST(test_fdr_preserves_pending_retry_and_refuses_unready_publisher);

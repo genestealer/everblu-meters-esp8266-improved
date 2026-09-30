@@ -789,6 +789,13 @@ bool MeterReader::readFullFdr()
     if (s_fdrInProgress || !m_initialized || m_readingInProgress || m_retryCount > 0 || m_nextRetryTime > 0 ||
         FrequencyManager::isScanInProgress() || !m_publisher || !m_publisher->isReady())
         return false;
+    if (m_config->isMeterGas())
+    {
+        m_lastErrorMessage = "Full FDR is supported only for water meters";
+        m_publisher->publishError(m_lastErrorMessage);
+        m_publisher->publishStatusMessage(m_lastErrorMessage);
+        return false;
+    }
     if (!activateCallbackContext()) return false;
 
     s_fdrInProgress = true;

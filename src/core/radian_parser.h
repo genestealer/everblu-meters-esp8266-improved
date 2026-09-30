@@ -51,7 +51,7 @@ bool radian_validate_crc(const uint8_t *decoded_buffer, size_t size);
 bool radian_parse_primary_data(const uint8_t *decoded_buffer, size_t size, struct radian_primary_data *out);
 
 // Raw request builders share addressing, length and CRC framing. ATS bytes are
-// supplied explicitly: a nonzero ATS can synchronize the meter's clock.
+// supplied explicitly: a nonzero ATS can synchronise the meter's clock.
 size_t radian_build_standard_request(uint8_t *out, size_t capacity, uint8_t year, uint32_t serial);
 size_t radian_build_predefined_request(uint8_t *out, size_t capacity, uint8_t year, uint32_t serial,
                                       const uint8_t ats[7], uint16_t access_code, uint8_t frame_number);

@@ -7,7 +7,7 @@ this reader does not change that configuration. Monthly operation has physical
 validation; the other periods have synthetic coverage and inferred date rules.
 
 Every fetch performs a fresh standard `0x40` read, then predefined frames 7 and 8
-(`0x70`), with three wake-ups. ATS is seven zero bytes: no clock synchronization
+(`0x70`), with three wake-ups. ATS is seven zero bytes: no clock synchronisation
 or meter writes. Allow roughly ten seconds normally; radio faults can take much
 longer. This blocks other radio work. There are no automatic FDR retries, scans,
 backfill, scheduling or flash persistence.

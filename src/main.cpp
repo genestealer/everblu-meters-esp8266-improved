@@ -889,6 +889,13 @@ void onUpdateData()
 
 void onRequestFullFdr()
 {
+  if (meterIsGas)
+  {
+    lastErrorMessage = "Full FDR is supported only for water meters";
+    publishSub("last_error", lastErrorMessage, true);
+    publishSub("status_message", lastErrorMessage, true);
+    return;
+  }
   if (g_readActive || g_readPending || _retry != 0 || g_scanActive || g_scanRetryRead ||
       FrequencyManager::isScanInProgress())
   {
@@ -1343,16 +1350,19 @@ void publishHADiscovery()
   json += "}";
   publishDiscoveryMessage("button", "everblu_meter_request", json);
 
-  json = "{\"name\":\"Fetch Full FDR\",\"uniq_id\":\"" + getMeterPrefix() + "everblu_meter_full_fdr_request";
-  json += "\",\"cmd_t\":\"" + String(mqttBaseTopic) + "/request_full_fdr\",\"pl_prs\":\"fetch\",\"retain\":false";
-  json += ",\"avty_t\":\"" + String(mqttBaseTopic) + "/status\",\"dev\":{" + buildDeviceJson() + "}}";
-  publishDiscoveryMessage("button", "everblu_meter_full_fdr_request", json);
+  if (!meterIsGas)
+  {
+    json = "{\"name\":\"Fetch Full FDR\",\"uniq_id\":\"" + getMeterPrefix() + "everblu_meter_full_fdr_request";
+    json += "\",\"cmd_t\":\"" + String(mqttBaseTopic) + "/request_full_fdr\",\"pl_prs\":\"fetch\",\"retain\":false";
+    json += ",\"avty_t\":\"" + String(mqttBaseTopic) + "/status\",\"dev\":{" + buildDeviceJson() + "}}";
+    publishDiscoveryMessage("button", "everblu_meter_full_fdr_request", json);
 
-  json = "{\"name\":\"Full FDR Archive\",\"uniq_id\":\"" + getMeterPrefix() + "everblu_meter_fdr_history";
-  json += "\",\"stat_t\":\"" + String(mqttBaseTopic) + "/fdr_history\",\"json_attr_t\":\"" + String(mqttBaseTopic) + "/fdr_history";
-  json += "\",\"val_tpl\":\"{{ value_json.captured_at or 'captured' }}\",\"ic\":\"mdi:history\"";
-  json += ",\"avty_t\":\"" + String(mqttBaseTopic) + "/status\",\"dev\":{" + buildDeviceJson() + "}}";
-  publishDiscoveryMessage("sensor", "everblu_meter_fdr_history", json);
+    json = "{\"name\":\"Full FDR Archive\",\"uniq_id\":\"" + getMeterPrefix() + "everblu_meter_fdr_history";
+    json += "\",\"stat_t\":\"" + String(mqttBaseTopic) + "/fdr_history\",\"json_attr_t\":\"" + String(mqttBaseTopic) + "/fdr_history";
+    json += "\",\"val_tpl\":\"{{ value_json.captured_at or 'captured' }}\",\"ic\":\"mdi:history\"";
+    json += ",\"avty_t\":\"" + String(mqttBaseTopic) + "/status\",\"dev\":{" + buildDeviceJson() + "}}";
+    publishDiscoveryMessage("sensor", "everblu_meter_fdr_history", json);
+  }
 
   // Diagnostic sensors
   publishDiscoveryMessage("sensor", "everblu_meter_wifi_ip", buildDiscoveryJson("IP Address", "wifi_ip", "mdi:ip-network-outline", nullptr, nullptr, nullptr, "diagnostic"));
