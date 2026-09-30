@@ -129,7 +129,7 @@ jobs:
           # - Gas meter path on ESP32 (different meter_type codegen)
           # - Legacy GDO2 opt-out on ESP8266 (disable_gdo2_fifo_management: true)
           # - RISC-V architecture on ESP32-C3
-          # - Git external_components smoke test (real-world install, main branch only)
+          # - Git external_components smoke test (real-world install, current repository and branch)
 
           # Xtensa / Arduino - water meter, minimal
           - id: esp8266-ard
@@ -152,8 +152,8 @@ jobs:
           - id: esp8266-git-local
             config: .ci/esphome/everblu_meter/test.esp8266-git-local.yaml
           # Git external_components smoke test - validates real-world install path.
-          # Branch-aware: ref follows the pushed branch (github.ref_name) so a
-          # push to develop validates develop's ESPHOME-release, not main.
+          # CI overrides both URL and ref to test the current repository and branch,
+          # including a fork's published ESPHOME-release.
           - id: esp8266-git
             config: .ci/esphome/everblu_meter/test.esp8266-git.yaml
 
@@ -189,14 +189,14 @@ jobs:
           pip install "esphome>=2025.0"
 
       - name: Validate configuration
-        # Only the Git fixture uses these substitutions. Keep them before the subcommand.
+        # Global -s options must precede the subcommand; only the git fixture consumes them.
         run: >-
-          esphome -s git_ref "$GITHUB_REF_NAME" -s git_url "https://github.com/$GITHUB_REPOSITORY"
+          esphome -s git_ref "$GITHUB_REF_NAME" -s git_url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
           config "${{ matrix.config }}"
 
       - name: Compile
         run: >-
-          esphome -s git_ref "$GITHUB_REF_NAME" -s git_url "https://github.com/$GITHUB_REPOSITORY"
+          esphome -s git_ref "$GITHUB_REF_NAME" -s git_url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
           compile "${{ matrix.config }}"
 
       - name: Summary

@@ -1,12 +1,12 @@
 # Git external_components smoke test.
 # Validates the component is consumable via the public GitHub URL (end-user path).
 #
-# Branch-aware: 'ref' defaults to main but the CI workflow overrides it with the
-# branch being pushed. Note that -s/--substitution is a GLOBAL ESPHome option, so
-# it must precede the subcommand:
-#   esphome -s git_ref "$GITHUB_REF_NAME" config <file>
-# Placed after the subcommand the override is silently ignored. A push to develop
-# therefore validates develop's published ESPHOME-release - not main.
+# Defaults to upstream main. CI overrides both git_url and git_ref with the
+# current repository and branch, so pushes to forks test the fork's release.
+# -s/--substitution is a GLOBAL ESPHome option and must precede the subcommand:
+#   esphome -s git_ref "$GITHUB_REF_NAME" \
+#     -s git_url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" config <file>
+# Placed after the subcommand the overrides are silently ignored.
 #
 # NOTE: this fetches over GitHub, so it tests the LAST PUSHED commit of the
 # branch (ESPHOME-release must be regenerated + committed). It is skipped on

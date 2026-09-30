@@ -48,7 +48,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Collect and Upload Coverage
     env:
-      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      CODECOV_ENABLED: ${{ secrets.CODECOV_TOKEN != '' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -112,7 +112,7 @@ jobs:
             --print-summary
 
       - name: Upload to Codecov
-        if: env.CODECOV_TOKEN != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        if: env.CODECOV_ENABLED == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         uses: codecov/codecov-action@v5
         with:
           files: coverage.xml
