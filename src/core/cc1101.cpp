@@ -1926,7 +1926,7 @@ int receive_radian_frame(int size_byte, int rx_tmo_ms, uint8_t *rxBuffer, int rx
    but for read-only operation, this is not required.
 */
 
-// Radio operations are serialized by each platform. Reuse one decoded buffer
+// Radio operations are serialised by each platform. Reuse one decoded buffer
 // across standard and FDR exchanges instead of growing the ESP8266 stack.
 static uint8_t meter_data[300];
 
@@ -1941,6 +1941,7 @@ static int exchange_radian_request(uint8_t *txbuffer, size_t tx_size, size_t res
   uint8_t wupbuffer[] = {0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55};
   uint8_t wup2send = 77;
   uint16_t tmo = 0;
+  size_t request_bytes_queued = 0;
   static uint8_t rxBuffer[1500]; // Make static to avoid stack overflow
   int rxBuffer_size;
   memset(rxBuffer, 0, sizeof(rxBuffer)); // Clear static buffer
@@ -2061,6 +2062,52 @@ static int exchange_radian_request(uint8_t *txbuffer, size_t tx_size, size_t res
         }
       }
     }
+    else if (tx_size > 39)
+    {
+      // Keep the LONG request contiguous with WUP: use available space immediately,
+      // rather than draining down to the small margin needed for all 54 bytes.
+      for (uint8_t poll = 0; poll < 100 && request_bytes_queued < tx_size; ++poll)
+      {
+        FEED_WDT();
+        // TI SWRZ020E: changing TXBYTES counts can contain mixed bits. Require
+        // consecutive equal reads; fail safely if four rapid reads cannot settle.
+        uint8_t txbytes = halRfReadReg(TXBYTES_ADDR);
+        bool stable = false;
+        for (uint8_t read = 1; read < 4 && !(txbytes & 0x80); ++read)
+        {
+          const uint8_t next = halRfReadReg(TXBYTES_ADDR);
+          if (next == txbytes)
+          {
+            stable = true;
+            break;
+          }
+          txbytes = next;
+        }
+        const uint8_t occupied = txbytes & 0x7F;
+        if (!stable || (txbytes & 0x80) || occupied > 64)
+          break;
+        const size_t free_bytes = 64 - occupied;
+        const size_t remaining = tx_size - request_bytes_queued;
+        const size_t chunk = remaining < free_bytes ? remaining : free_bytes;
+        if (chunk)
+        {
+          SPIWriteBurstReg(TX_FIFO_ADDR, txbuffer + request_bytes_queued, chunk);
+          // STATE can also glitch (SWRZ020E). Reject non-TX conservatively, then
+          // check the unaffected single underflow bit before counting this chunk.
+          if (CC1101_status_state != 0x02 || (halRfReadReg(TXBYTES_ADDR) & 0x80))
+            break;
+          request_bytes_queued += chunk;
+        }
+        else
+          delay(5); // Bounded to 500ms total; a stalled FIFO must fail, not resend.
+      }
+      if (request_bytes_queued != tx_size)
+      {
+        marcstate = halRfReadReg(MARCSTATE_ADDR);
+        break;
+      }
+      wup2send = 0xFF;
+    }
     else
     {
       // Wait for TX FIFO space for the actual encoded interrogation length.
@@ -2102,8 +2149,7 @@ static int exchange_radian_request(uint8_t *txbuffer, size_t tx_size, size_t res
       }
       else
       {
-        // Longer FDR requests do not fit the GDO2 threshold guarantee.
-        // Poll actual FIFO occupancy; also used when GDO2 is absent.
+        // Poll actual FIFO occupancy when GDO2 is absent.
         // See: https://github.com/genestealer/everblu-meters-esp8266-improved/issues/58
         uint8_t wait_count = 0;
         while (wait_count < 100) // Safety limit ~500ms
@@ -2148,19 +2194,26 @@ static int exchange_radian_request(uint8_t *txbuffer, size_t tx_size, size_t res
     // background load.)
     if ((marcstate & 0x1F) == 0x16) // TX FIFO drained - end of transmit burst
     {
-      echo_debug(1, "[CC1101] Wake-up burst sent; TX FIFO drained at tmo=%d (normal end of transmit)\n", tmo);
+      if (tx_size <= 39 || request_bytes_queued == tx_size)
+        echo_debug(1, "[CC1101] Wake-up burst sent; TX FIFO drained at tmo=%d (normal end of transmit)\n", tmo);
       break;
     }
   }
 
-  // A drained TX FIFO (MARCSTATE 0x16) is the normal end of transmit. The only
-  // abnormal case here is the loop hitting its timeout WITHOUT the FIFO ever
-  // draining, which points to an SPI/feeding problem rather than anything RF.
+  // A drained TX FIFO (MARCSTATE 0x16) is the normal end only after the request
+  // has been queued. LONG requests fail on incomplete writes or a drain timeout.
+  // Preserve the existing standard-read receive path after its TX loop.
   // Reaching this point says nothing about whether the meter replied - that is
   // determined below by the ACK/data frames, so any "meter asleep / out of
   // range / run a scan" guidance is deferred until a read actually fails.
   bool tx_fifo_drained = ((marcstate & 0x1F) == 0x16);
-  if (tx_fifo_drained)
+  const bool long_tx_failed = tx_size > 39 && (request_bytes_queued != tx_size || !tx_fifo_drained);
+  if (long_tx_failed)
+  {
+    echo_debug(1, "[METER] FDR transmission failed (%u/%u request bytes queued, MARCSTATE=0x%02X)\n",
+               (unsigned)request_bytes_queued, (unsigned)tx_size, marcstate & 0x1F);
+  }
+  else if (tx_fifo_drained)
   {
     echo_debug(1, "[METER] Wake-up/interrogation transmitted in %dms (MARCSTATE=0x%02X)\n", tmo * 10, marcstate & 0x1F);
   }
@@ -2174,6 +2227,8 @@ static int exchange_radian_request(uint8_t *txbuffer, size_t tx_size, size_t res
   // end of transition restore default register
   halRfWriteReg(MDMCFG2, MDMCFG2_2FSK_16_16_SYNC); // Restore: 2-FSK, 16/16 sync bits
   halRfWriteReg(PKTCTRL0, PKTCTRL0_FIXED_LENGTH);  // Restore: fixed packet length
+  if (long_tx_failed)
+    return 0;
 
   // delay(30); //43ms de bruit
   /*34ms 0101...01  14.25ms 000...000  14ms 1111...11111  83.5ms de data acquitement*/

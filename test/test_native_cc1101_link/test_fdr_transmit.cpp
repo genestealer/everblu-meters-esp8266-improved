@@ -6,66 +6,151 @@
 #include "core/utils.h"
 
 namespace {
-bool transmitting;
+enum class TxFault { None, StallBefore, StallBetween, StallDrain, UnderflowWake, UnderflowBefore, UnderflowBetween, UnderflowFinalWrite, UnderflowFinalWriteFalseStatus, InvalidOccupancy, TransientFalseLow, UnstableCount };
+TxFault tx_fault;
 size_t wake_bytes, request_size;
-uint8_t request[64], occupancy;
-unsigned request_space_polls;
+uint8_t request[64];
+unsigned request_space_polls, rx_strobes, tx_strobes;
+std::vector<size_t> request_chunks;
 
 void capture_transmit(uint8_t *buffer, size_t length) {
     const uint8_t header = buffer[0];
-    if (length == 1 && header == 0x35) transmitting = true; // STX
-    if (length == 1 && header == 0x36) transmitting = false; // SIDLE
-    if (header == 0x7F && length > 1) { // TX FIFO burst write
-        if (length == 9) {
-            wake_bytes += 8;
+    auto &radio = nativeCC1101();
+    if (length == 1 && header == 0x35) ++tx_strobes;
+    if (length == 1 && header == 0x34) ++rx_strobes;
+    if (header == 0xFA && length == 2 && wake_bytes == 77 * 8 && request_size < 54) {
+        ++request_space_polls;
+        radio.txTenthsPerMs = 0;
+        if (tx_fault == TxFault::UnderflowBefore ||
+            (tx_fault == TxFault::UnderflowBetween && request_size)) {
+            radio.txUnderflow = true;
+            radio.txActive = false;
+            radio.marcstate = 0x16;
+            radio.chipState = kChipStateTxUnderflow;
+        } else if (tx_fault == TxFault::InvalidOccupancy) {
+            radio.txBytes = 65;
+        } else if (tx_fault == TxFault::StallBefore ||
+                   (tx_fault == TxFault::StallBetween && request_size)) {
+            radio.txBytes = 64;
         } else {
-            TEST_ASSERT_LESS_OR_EQUAL_size_t(64, occupancy + length - 1);
-            request_size = length - 1;
-            memcpy(request, buffer + 1, request_size);
+            // Force 39 + 8 + 7 byte chunks; an eight-byte request write is not WUP.
+            radio.txBytes = request_size == 0 ? 25 : (request_size == 39 ? 56 : 57);
+        }
+    }
+    if (header == 0x7F && length > 1) {
+        if ((tx_fault == TxFault::UnderflowFinalWrite || tx_fault == TxFault::UnderflowFinalWriteFalseStatus) && request_size == 47) {
+            // FIFO drains after its occupancy was read, before the final burst.
+            radio.txBytes = 0;
+            radio.txActive = false;
+            radio.txUnderflow = true;
+            radio.marcstate = 0x16;
+            radio.chipState = kChipStateTxUnderflow;
+        }
+        TEST_ASSERT_LESS_OR_EQUAL_size_t(64, radio.txBytes + length - 1);
+        if (wake_bytes < 77 * 8) {
+            TEST_ASSERT_EQUAL_size_t(8, length - 1);
+            wake_bytes += length - 1;
+        } else {
+            TEST_ASSERT_LESS_OR_EQUAL_size_t(sizeof(request), request_size + length - 1);
+            memcpy(request + request_size, buffer + 1, length - 1);
+            request_size += length - 1;
+            request_chunks.push_back(length - 1);
+            if (request_size == 54 && tx_fault != TxFault::StallDrain) radio.txTenthsPerMs = 3;
         }
     }
     nativeCC1101Transfer(buffer, length);
-    if (transmitting) {
-        buffer[0] = 0x20; // Chip status: TX
-        if (header == 0xF5 && length == 2) { // MARCSTATE
-            buffer[1] = request_size ? 0x16 : 0x13;
-        }
-        if (header == 0xFA && length == 2) { // TXBYTES
-            if (wake_bytes == 77 * 8) {
-                ++request_space_polls;
-                if (occupancy > 0) --occupancy;
-                buffer[1] = occupancy;
-            } else {
-                buffer[1] = 8;
-            }
-        }
+    if (header == 0xFA && length == 2 && wake_bytes == 77 * 8 && request_size < 54) {
+        if (tx_fault == TxFault::TransientFalseLow && request_space_polls == 1) buffer[1] = 0;
+        if (tx_fault == TxFault::UnstableCount) buffer[1] = request_space_polls % 2 ? 25 : 26;
     }
+    if (tx_fault == TxFault::UnderflowFinalWriteFalseStatus && header == 0x7F && request_size == 54)
+        buffer[length - 1] = 0x20; // Erratum can also corrupt the SPI STATE field.
+    if (tx_fault == TxFault::UnderflowWake && header == 0x7F && wake_bytes == 77 * 8) {
+        radio.txBytes = 0;
+        radio.txActive = false;
+        radio.txUnderflow = true;
+        radio.marcstate = 0x16;
+        radio.chipState = kChipStateTxUnderflow;
+    }
+}
+void installTransmit(TxFault fault) {
+    nativeCC1101Install();
+    TEST_ASSERT_TRUE(cc1101_init(433.82f));
+    tx_fault = fault;
+    wake_bytes = request_size = request_space_polls = rx_strobes = tx_strobes = 0;
+    request_chunks.clear();
+    nativeSpiSetHandler(capture_transmit);
 }
 }
 
 void test_fdr_transmit_waits_for_fifo_space_and_disables_ats() {
-    for (uint8_t selector = 7; selector <= 8; ++selector) {
-        nativeCC1101Install();
-        TEST_ASSERT_TRUE(cc1101_init(433.82f));
-        transmitting = false; wake_bytes = request_size = request_space_polls = 0;
-        occupancy = 25; // Enough space for standard39, too little for FDR54.
-        digitalWrite(4, LOW); digitalWrite(5, LOW);
-        nativeSpiSetHandler(capture_transmit);
-        radian_fdr_data result{};
-        TEST_ASSERT_FALSE(read_fdr_frame_for_meter(21, 123456, selector, &result)); // no RX reply
-        TEST_ASSERT_EQUAL_size_t(77 * 8, wake_bytes);
-        TEST_ASSERT_EQUAL_size_t(54, request_size);
-        TEST_ASSERT_GREATER_THAN_UINT(1, request_space_polls);
-        const uint8_t disabled_ats[7] = {};
-        uint8_t raw[29], expected[64];
-        radian_build_predefined_request(raw, sizeof(raw), 21, 123456, disabled_ats, 0, selector);
-        const int size = encode_radian_request(raw, sizeof(raw), expected, sizeof(expected));
-        TEST_ASSERT_EQUAL_UINT8_ARRAY(expected, request, size);
+    for (TxFault fault : {TxFault::None, TxFault::TransientFalseLow}) {
+        for (uint8_t selector = 7; selector <= 8; ++selector) {
+            installTransmit(fault);
+            radian_fdr_data result{};
+            TEST_ASSERT_FALSE(read_fdr_frame_for_meter(21, 123456, selector, &result)); // no RX reply
+            TEST_ASSERT_EQUAL_size_t(77 * 8, wake_bytes);
+            TEST_ASSERT_EQUAL_size_t(54, request_size);
+            TEST_ASSERT_EQUAL_UINT(1, tx_strobes);
+            TEST_ASSERT_EQUAL_size_t(3, request_chunks.size());
+            TEST_ASSERT_EQUAL_size_t(39, request_chunks[0]);
+            TEST_ASSERT_EQUAL_size_t(8, request_chunks[1]);
+            TEST_ASSERT_EQUAL_size_t(7, request_chunks[2]);
+            const uint8_t disabled_ats[7] = {};
+            uint8_t raw[29], expected[64];
+            radian_build_predefined_request(raw, sizeof(raw), 21, 123456, disabled_ats, 0, selector);
+            const int size = encode_radian_request(raw, sizeof(raw), expected, sizeof(expected));
+            TEST_ASSERT_EQUAL_UINT8_ARRAY(expected, request, size);
+        }
     }
     const auto transfers = nativeCC1101().transfers;
     radian_fdr_data result{};
     TEST_ASSERT_FALSE(read_fdr_frame_for_meter(21, 123456, 0x69, &result));
     TEST_ASSERT_EQUAL_UINT32(transfers, nativeCC1101().transfers);
+}
+
+void test_fdr_transmit_failures_restore_radio_without_receiving() {
+    for (TxFault fault : {TxFault::StallBefore, TxFault::StallBetween, TxFault::StallDrain, TxFault::UnderflowWake, TxFault::UnderflowBefore,
+                         TxFault::UnderflowBetween, TxFault::UnderflowFinalWrite, TxFault::UnderflowFinalWriteFalseStatus,
+                         TxFault::InvalidOccupancy, TxFault::UnstableCount}) {
+        installTransmit(fault);
+        const auto start = millis();
+        radian_fdr_data result{};
+        std::string log;
+        NativeSerial::capture() = &log;
+        const bool ok = read_fdr_frame_for_meter(21, 123456, 7, &result);
+        NativeSerial::capture() = nullptr;
+        TEST_ASSERT_FALSE(ok);
+        TEST_ASSERT_TRUE(log.find("FDR transmission failed") != std::string::npos);
+        TEST_ASSERT_TRUE(log.find("normal end of transmit") == std::string::npos);
+        if (fault == TxFault::UnderflowFinalWrite || fault == TxFault::UnderflowFinalWriteFalseStatus)
+            TEST_ASSERT_TRUE(log.find("47/54 request bytes queued") != std::string::npos);
+        TEST_ASSERT_EQUAL_UINT(0, rx_strobes);
+        TEST_ASSERT_EQUAL_UINT(1, tx_strobes);
+        TEST_ASSERT_LESS_OR_EQUAL_UINT(fault == TxFault::UnstableCount ? 4 : 400, request_space_polls);
+        TEST_ASSERT_LESS_THAN_UINT32(4000, millis() - start);
+        const size_t expected_size = fault == TxFault::StallDrain || fault == TxFault::UnderflowFinalWrite || fault == TxFault::UnderflowFinalWriteFalseStatus ? 54 :
+            (fault == TxFault::StallBetween || fault == TxFault::UnderflowBetween ? 39 : 0);
+        TEST_ASSERT_EQUAL_size_t(expected_size, request_size);
+        TEST_ASSERT_EQUAL_UINT8(kChipStateIdle, nativeCC1101().chipState);
+        TEST_ASSERT_EQUAL_UINT8(0, nativeCC1101().txBytes);
+        TEST_ASSERT_FALSE(nativeCC1101().txUnderflow);
+        TEST_ASSERT_EQUAL_HEX8(0x02, nativeCC1101().config[0x12]); // MDMCFG2: sync restored
+        TEST_ASSERT_EQUAL_HEX8(0x00, nativeCC1101().config[0x08]); // PKTCTRL0: fixed length
+    }
+}
+
+void test_standard_request_remains_exactly_39_bytes() {
+    nativeCC1101Install();
+    TEST_ASSERT_TRUE(cc1101_init(433.82f));
+    nativeCC1101().txLog.clear();
+    get_meter_data_for_meter(21, 123456); // synthetic identity, no reply needed
+    const auto &sent = nativeCC1101().txLog;
+    TEST_ASSERT_EQUAL_size_t(77 * 8 + 39, sent.size());
+    for (size_t i = 0; i < 77 * 8; ++i) TEST_ASSERT_EQUAL_HEX8(0x55, sent[i]);
+    uint8_t expected[100]{};
+    TEST_ASSERT_EQUAL_INT(39, Make_Radian_Master_req(expected, 21, 123456));
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(expected, sent.data() + 77 * 8, 39);
 }
 
 // Exercise the actual receive guard: an odd-length response needs a rounded-up
@@ -88,6 +173,7 @@ void test_fdr_receive_capacity_rounds_up_partial_serial_bytes() {
 namespace {
 std::vector<std::vector<uint8_t>> replies;
 unsigned exchanges;
+size_t pair_wake_bytes;
 std::vector<std::vector<uint8_t>> requests;
 
 std::vector<uint8_t> response(uint8_t selector, uint8_t year = 21, uint32_t serial = 123456) {
@@ -124,20 +210,26 @@ std::vector<uint8_t> oversample(const std::vector<uint8_t> &frame) {
     return bytes;
 }
 void pairTransfer(uint8_t *buffer, size_t length) {
+    if (length == 1 && buffer[0] == 0x3B) pair_wake_bytes = 0; // SFTX starts a new phase
     if (length == 1 && buffer[0] == 0x35) {
         nativeCC1101ArmReply(exchanges < replies.size() ? replies[exchanges] : std::vector<uint8_t>{});
         ++exchanges;
+        requests.emplace_back();
     }
     if (length > 1 && buffer[0] == 0x7F) {
         TEST_ASSERT_LESS_OR_EQUAL_size_t(64, nativeCC1101().txBytes + length - 1);
-        if (length != 9) requests.emplace_back(buffer + 1, buffer + length);
+        if (pair_wake_bytes < 77 * 8) {
+            pair_wake_bytes += length - 1;
+        } else {
+            requests.back().insert(requests.back().end(), buffer + 1, buffer + length);
+        }
     }
     nativeCC1101Transfer(buffer, length);
 }
 void installPair() {
     nativeCC1101Install();
     TEST_ASSERT_TRUE(cc1101_init(433.82f));
-    exchanges = 0; requests.clear();
+    exchanges = 0; pair_wake_bytes = 0; requests.clear();
     nativeSpiSetHandler(pairTransfer);
 }
 }
@@ -170,6 +262,7 @@ void test_fdr_complete_synthetic_pair_and_failures() {
             uint8_t raw[29], encoded[64], ats[7]{};
             radian_build_predefined_request(raw, sizeof(raw), 21, 123456, ats, 0, 7 + i);
             const int size = encode_radian_request(raw, sizeof(raw), encoded, sizeof(encoded));
+            TEST_ASSERT_EQUAL_size_t(size, requests[i].size());
             TEST_ASSERT_EQUAL_UINT8_ARRAY(encoded, requests[i].data(), size);
         }
     }
