@@ -71,7 +71,10 @@ find "$RELEASE_DIR" -type f \( -name "*.h" -o -name "*.cpp" \) -print0 | while I
     # \s is a GNU-sed extension that BSD/macOS sed treats as a literal 's', so it
     # would silently no-op there and leave broken include paths. Use the portable
     # POSIX class [[:space:]] instead.
-    sed -i.bak -E 's|#include[[:space:]]+"(esphome/[^\"]+)"|#include "\1"|; t; s|#include[[:space:]]+"([^"]*/)+([^"/]+)"|#include "\2"|g' "$file" && rm -f "$file.bak"
+    # Keep branch expressions separate for BSD sed.
+    sed -i.bak -E -e '/#include[[:space:]]+"esphome\//b' \
+        -e 's|#include[[:space:]]+"([^"/]+/)+([^"/]+)"|#include "\2"|g' "$file"
+    rm -f "$file.bak"
 done
 
 # Add explicit WARNING and DO_NOT_EDIT markers, then mark files read-only
