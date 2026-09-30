@@ -175,6 +175,16 @@ void reset() {
 }
 int main() {
   reset();
+  if (!ENABLE_FULL_FDR) {
+    subscribeFullFdr();
+    assert(!mqtt.subscriber);
+    onRequestFullFdr();
+    assert(rfCalls == 0 && mqtt.published == 0 && formatterAllocations == 0 && !g_readActive);
+    assert(mqtt.packetSize == 2048 && statuses.back().find("disabled") != std::string::npos);
+    onUpdateData();
+    assert(rfCalls == 1 && publicationCalls == 1);
+    return 0;
+  }
   nowMs = 0;
   onRequestFullFdr();
   assert(rfCalls == 2); // First attempt starts immediately, including at boot.

@@ -77,6 +77,11 @@ static const unsigned long OFFLINE_LED_BLINK_MS = 500UL;
 #define ENABLE_MQTT_DEBUGGING 0 // Set to 1 to enable MQTT debugging messages
 #endif
 
+// Full FDR requires an explicit opt-in for supported Enhanced water meters.
+#ifndef ENABLE_FULL_FDR
+#define ENABLE_FULL_FDR 0
+#endif
+
 // Define gas volume divisor if missing from the private.h file
 // Converts internal liter count to cubic meters for gas meters
 // Default: 100 (equivalent to 0.01 m³ per unit)
@@ -908,6 +913,11 @@ void onRequestFullFdr()
     reject("Full FDR is supported only for water meters");
     return;
   }
+  if (!ENABLE_FULL_FDR)
+  {
+    reject("Full FDR disabled: set ENABLE_FULL_FDR to 1 for supported water meters");
+    return;
+  }
   if (!mqtt.isMqttConnected())
   {
     reject("Full FDR rejected: MQTT not connected");
@@ -1370,7 +1380,7 @@ void publishHADiscovery()
   json += "}";
   publishDiscoveryMessage("button", "everblu_meter_request", json);
 
-  if (!meterIsGas)
+  if (!meterIsGas && ENABLE_FULL_FDR)
   {
     json = "{\"name\":\"Fetch Full FDR\",\"uniq_id\":\"" + getMeterPrefix() + "everblu_meter_full_fdr_request";
     json += "\",\"cmd_t\":\"" + String(mqttBaseTopic) + "/request_full_fdr\",\"pl_prs\":\"fetch\",\"retain\":false";
@@ -1625,7 +1635,7 @@ void onConnectionEstablished()
     _retry = 0;
     onUpdateData(); });
 
-  if (!meterIsGas)
+  if (!meterIsGas && ENABLE_FULL_FDR)
   {
     char fdrTopic[MQTT_TOPIC_BUFFER_SIZE];
     snprintf(fdrTopic, sizeof(fdrTopic), "%s/request_full_fdr", mqttBaseTopic);

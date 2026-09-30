@@ -126,6 +126,11 @@
 //           and converted to cubic meters (m³) for display and MQTT, device class gas
 #define METER_TYPE "water"
 
+// Opt in to manual Full FDR archive capture for supported Cyble Enhanced water meters.
+// 0 (default): disabled; 1: enable MQTT commands and Home Assistant discovery.
+// Gas meters remain unsupported even when enabled.
+#define ENABLE_FULL_FDR 0
+
 // Gas meter volume divisor (only used when METER_TYPE is "gas")
 //
 // The RADIAN protocol transmits meter readings in liters (L). For gas meters,

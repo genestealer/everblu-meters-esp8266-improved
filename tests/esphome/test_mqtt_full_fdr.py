@@ -9,7 +9,15 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_mqtt_full_fdr(tmp_path):
+def fdr_settings(source, enabled):
+    start = source.index("// Define MQTT debugging")
+    end = source.index("// Define gas volume divisor", start)
+    override = "" if enabled is None else f"#define ENABLE_FULL_FDR {enabled}\n"
+    return override + source[start:end]
+
+
+@pytest.mark.parametrize("enabled", [None, 0, 1])
+def test_mqtt_full_fdr(tmp_path, enabled):
     compiler = shutil.which("c++")
     if compiler is None:
         pytest.skip("C++ compiler unavailable")
@@ -29,20 +37,21 @@ def test_mqtt_full_fdr(tmp_path):
         "// COMMAND_UNDER_TEST", interval + "\n" + source[start:end]
     )
     subscription_start = source.index(
-        "  if (!meterIsGas)", source.index("void onConnectionEstablished()\n{")
+        "  if (!meterIsGas", source.index("void onConnectionEstablished()\n{")
     )
     subscription_end = source.index("  char restartTopic[", subscription_start)
     harness = harness.replace(
         "// SUBSCRIPTION_UNDER_TEST", source[subscription_start:subscription_end]
     )
     cpp = tmp_path / "mqtt.cpp"
-    cpp.write_text(harness)
+    cpp.write_text(fdr_settings(source, enabled) + harness)
     binary = tmp_path / "mqtt"
     subprocess.run([compiler, "-std=c++17", str(cpp), "-o", str(binary)], check=True)
     subprocess.run([str(binary)], check=True)
 
 
-def test_mqtt_gas_discovery_omits_fdr_but_preserves_standard_button(tmp_path):
+@pytest.mark.parametrize("enabled", [None, 0, 1])
+def test_mqtt_fdr_discovery_requires_opt_in_and_water(tmp_path, enabled):
     compiler = shutil.which("c++")
     if compiler is None:
         pytest.skip("C++ compiler unavailable")
@@ -74,32 +83,38 @@ int main() {
   assert(entities == std::vector<std::string>{"everblu_meter_request"});
   entities.clear();
   discover(false);
+  if (!ENABLE_FULL_FDR) {
+    assert(entities == std::vector<std::string>{"everblu_meter_request"});
+    return 0;
+  }
   assert((entities == std::vector<std::string>{"everblu_meter_request",
     "everblu_meter_full_fdr_request", "everblu_meter_fdr_history"}));
 }
 """
     )
     cpp = tmp_path / "discovery.cpp"
-    cpp.write_text(harness)
+    cpp.write_text(fdr_settings(source, enabled) + harness)
     binary = tmp_path / "discovery"
     subprocess.run([compiler, "-std=c++17", str(cpp), "-o", str(binary)], check=True)
     subprocess.run([str(binary)], check=True)
 
 
-def test_mqtt_gas_subscription_and_deferred_fdr_dispatch(tmp_path):
+@pytest.mark.parametrize("enabled", [None, 0, 1])
+def test_mqtt_fdr_subscription_requires_opt_in_and_water(tmp_path, enabled):
     compiler = shutil.which("c++")
     if compiler is None:
         pytest.skip("C++ compiler unavailable")
     source = (ROOT / "src/main.cpp").read_text()
     start = source.index("  char fdrTopic[")
     # Include the guard around the subscription when present.
-    guard = source.rfind("  if (!meterIsGas)", 0, start)
+    guard = source.rfind("  if (!meterIsGas", 0, start)
     if guard > source.rfind("onUpdateData(); });", 0, start):
         start = guard
     end = source.index("  char restartTopic[", start)
     cpp = tmp_path / "subscriptions.cpp"
     cpp.write_text(
-        r"""
+        fdr_settings(source, enabled)
+        + r"""
 #include <cassert>
 #include <cstdio>
 #include <string>
@@ -129,7 +144,9 @@ void subscribe(bool meterIsGas) {
 }
 int main() {
   subscribe(true); assert(mqtt.count == 0);
-  subscribe(false); assert(mqtt.count == 1);
+  subscribe(false);
+  if (!ENABLE_FULL_FDR) { assert(mqtt.count == 0); return 0; }
+  assert(mqtt.count == 1);
   // The subscription dispatcher still owns its input buffer and matches later
   // subscribers after invoking ours. No publication or resize may happen here.
   dispatching = true;

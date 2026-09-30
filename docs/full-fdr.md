@@ -31,6 +31,18 @@ preserve the previous successful archive.
 
 ## Standalone MQTT
 
+For a supported Cyble Enhanced water meter, enable Full FDR in `private.h`
+and rebuild the firmware:
+
+```cpp
+#define ENABLE_FULL_FDR 1
+```
+
+It defaults to `0` when omitted. Disabled builds do not advertise FDR entities,
+subscribe to FDR commands or perform FDR captures. Normal reads are unaffected;
+gas meters remain excluded. ESPHome uses its YAML button configuration instead.
+Disabling FDR does not delete previously retained MQTT discovery or archive data.
+
 Publish a **non-retained** `fetch` command. Do not add `-r` to the request: a
 retained command would cause another meter capture when the reader reconnects.
 The discovered **Fetch Full FDR** button uses this command. Example synthetic
