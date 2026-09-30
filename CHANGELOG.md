@@ -12,6 +12,12 @@ Releases are created manually by tagging commits with version tags matching `v*.
 - Keep PR coverage explicit per release so branch-only work is auditable against merge history.
 - Add new versions below, not above this section.
 
+## [Unreleased]
+
+### Fixed
+
+- Restore ESPHome 2026.1/2026.2 compilation by using the API state-subscription query available before 2026.3. Home Assistant readiness still requires a state subscription, not just an API connection.
+
 ## [v3.6.0] - 2026-09-16
 
 ### AI Metadata
