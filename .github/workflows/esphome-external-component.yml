@@ -56,6 +56,10 @@ jobs:
           # Full coverage - every sensor, button, and non-default option on ESP8266
           - id: esp8266-full
             config: .ci/esphome/everblu_meter/test.esp8266-full.yaml
+          - id: esp8266-fdr
+            config: .ci/esphome/everblu_meter/test.esp8266-fdr.yaml
+          - id: esp32-full
+            config: .ci/esphome/everblu_meter/test.esp32-full.yaml
           - id: esp8266-multi
             config: .ci/esphome/everblu_meter/test.esp8266-multi.yaml
           # Legacy GDO2 opt-out path - disable_gdo2_fifo_management: true
@@ -137,6 +141,10 @@ jobs:
           # Xtensa / Arduino - all sensors, all options, all buttons
           - id: esp8266-full
             config: .ci/esphome/everblu_meter/test.esp8266-full.yaml
+          - id: esp8266-fdr
+            config: .ci/esphome/everblu_meter/test.esp8266-fdr.yaml
+          - id: esp32-full
+            config: .ci/esphome/everblu_meter/test.esp32-full.yaml
           - id: esp8266-multi
             config: .ci/esphome/everblu_meter/test.esp8266-multi.yaml
           # Xtensa / Arduino - legacy GDO2 polling (disable_gdo2_fifo_management: true)
@@ -224,6 +232,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - id: invalid-fdr-gas
+            config: .ci/esphome/everblu_meter/test.invalid-fdr-gas.yaml
+            expect: "Full FDR is supported only for water meters"
+          - id: invalid-fdr-public
+            config: .ci/esphome/everblu_meter/test.invalid-fdr-public.yaml
+            expect: "internal: true"
+          - id: invalid-fdr-filters
+            config: .ci/esphome/everblu_meter/test.invalid-fdr-filters.yaml
+            expect: "does not support filters"
+          - id: invalid-fdr-no-output
+            config: .ci/esphome/everblu_meter/test.invalid-fdr-no-output.yaml
+            expect: "requires fdr_history_json"
           - id: invalid-esp32-idf
             config: .ci/esphome/everblu_meter/test.invalid-esp32-idf.yaml
             expect: "requires ESP32 Arduino framework"

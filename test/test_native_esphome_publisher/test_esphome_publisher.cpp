@@ -12,6 +12,17 @@
 
 #include <algorithm>
 #include <string>
+#include <new>
+
+static bool failFdrAllocation = false;
+
+// Only the explicit nothrow formatting allocation is fault-injected.
+void *operator new[](std::size_t size, const std::nothrow_t &) noexcept
+{
+    if (failFdrAllocation) return nullptr;
+    try { return ::operator new[](size); }
+    catch (const std::bad_alloc &) { return nullptr; }
+}
 
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/sensor/sensor.h"
@@ -555,4 +566,71 @@ void test_echo_debug_routes_through_the_esphome_logger(void)
     TEST_ASSERT_TRUE(captured.find("suppressed") == std::string::npos);
     // One log record, so the newline inside the message was removed.
     TEST_ASSERT_EQUAL(1, (int)std::count(captured.begin(), captured.end(), '\n'));
+}
+
+// FDR uses a dedicated state; failed refreshes must preserve both outputs.
+void test_pub_full_fdr_is_separate_and_preserves_last_success(void)
+{
+    TextSensor archive;
+    publisher().set_fdr_history_sensor(&archive);
+    radian_fdr_data data{};
+    data.configuration.period = 3;
+    data.configuration.start_day = 1;
+    data.configuration.resolution = 1;
+    data.pulse_medium[0] = 6;
+    tm clock{};
+    clock.tm_year = 124;
+    clock.tm_mon = 5;
+    clock.tm_mday = 20;
+    publisher().publishHistory(nullptr, false);
+    const std::string history = g_sensors.history.last();
+    TEST_ASSERT_EQUAL(static_cast<int>(FdrPublishResult::Success),
+                      static_cast<int>(publisher().publishFullFdr(data, &clock, 0)));
+    TEST_ASSERT_NOT_NULL(strstr(archive.last(), "\"consumptions\":"));
+    TEST_ASSERT_NULL(strstr(archive.last(), "\"fdr\":"));
+    TEST_ASSERT_EQUAL_STRING(history.c_str(), g_sensors.history.last());
+    const std::string captured = archive.last();
+    data.configuration.period = 255;
+    TEST_ASSERT_EQUAL(static_cast<int>(FdrPublishResult::FormattingFailed),
+                      static_cast<int>(publisher().publishFullFdr(data, &clock, 0)));
+    TEST_ASSERT_EQUAL_STRING(captured.c_str(), archive.last());
+    TEST_ASSERT_EQUAL(1, archive.count());
+    publisher().publishHistory(nullptr, false);
+    TEST_ASSERT_EQUAL_STRING(captured.c_str(), archive.last());
+}
+
+void test_pub_full_fdr_requires_output_and_isolates_meters(void)
+{
+    ESPHomeDataPublisher other;
+    radian_fdr_data data{};
+    data.configuration.period = 3;
+    data.configuration.start_day = 1;
+    data.configuration.resolution = 1;
+    data.pulse_medium[0] = 6;
+    TEST_ASSERT_EQUAL(static_cast<int>(FdrPublishResult::DeliveryFailed),
+                      static_cast<int>(other.publishFullFdr(data, nullptr, 0)));
+    TextSensor first, second;
+    publisher().set_fdr_history_sensor(&first);
+    other.set_fdr_history_sensor(&second);
+    TEST_ASSERT_EQUAL(static_cast<int>(FdrPublishResult::Success),
+                      static_cast<int>(publisher().publishFullFdr(data, nullptr, 0)));
+    TEST_ASSERT_FALSE(second.published());
+    data.current_index = 123456;
+    TEST_ASSERT_EQUAL(static_cast<int>(FdrPublishResult::Success),
+                      static_cast<int>(other.publishFullFdr(data, nullptr, 0)));
+    TEST_ASSERT_NOT_EQUAL(0, strcmp(first.last(), second.last()));
+}
+
+void test_pub_full_fdr_allocation_failure_preserves_state(void)
+{
+    TextSensor archive;
+    archive.publish_state("previous successful archive");
+    publisher().set_fdr_history_sensor(&archive);
+    radian_fdr_data data{};
+    failFdrAllocation = true;
+    const auto result = publisher().publishFullFdr(data, nullptr, 0);
+    failFdrAllocation = false;
+    TEST_ASSERT_EQUAL(static_cast<int>(FdrPublishResult::FormattingFailed), static_cast<int>(result));
+    TEST_ASSERT_EQUAL_STRING("previous successful archive", archive.last());
+    TEST_ASSERT_EQUAL(1, archive.count());
 }

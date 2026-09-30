@@ -45,8 +45,16 @@ permissions:
 jobs:
   native-fixture-tests:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: ubuntu-latest
-    name: Replay Captured Meter Fixtures
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: Replay Captured Meter Fixtures
+          - os: windows-latest
+            name: Replay Captured Meter Fixtures (Windows)
+    runs-on: ${{ matrix.os }}
+    name: ${{ matrix.name }}
 
     steps:
       - uses: actions/checkout@v4
@@ -54,7 +62,7 @@ jobs:
       - name: Cache pip
         uses: actions/cache@v4
         with:
-          path: ~/.cache/pip
+          path: ${{ runner.os == 'Windows' && '~/AppData/Local/pip/Cache' || '~/.cache/pip' }}
           key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-

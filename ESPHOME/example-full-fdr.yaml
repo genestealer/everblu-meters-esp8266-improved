@@ -1,0 +1,92 @@
+# Synthetic meter identity. Replace Wi-Fi and meter settings before deploying.
+# Getter: ESPHome >=2026.1.0, HA >=2026.1.0, aioesphomeapi >=43.0.0.
+esphome:
+  name: everblu-fdr
+  min_version: 2026.1.0
+
+esp8266:
+  board: d1_mini
+
+logger:
+  logs:
+    text_sensor: WARN  # Large JSON log lines can be truncated; use the getter.
+
+wifi:
+  ssid: EXAMPLE-WIFI
+  password: EXAMPLE-PASSWORD
+
+ota:
+  - platform: esphome
+
+external_components:
+  - source:
+      type: git
+      url: https://github.com/genestealer/everblu-meters-esp8266-improved
+      ref: main
+      path: ESPHOME-release
+    components: [everblu_meter]
+    refresh: 1d
+
+api:
+  actions:
+    - action: get_full_fdr
+      supports_response: only
+      then:
+        - if:
+            condition:
+              lambda: return id(fdr_archive).has_state();
+            then:
+              - api.respond:
+                  data: |-
+                    root["json"] = id(fdr_archive).state;
+            else:
+              - api.respond:
+                  success: false
+                  error_message: No successful Full FDR capture since boot
+
+# Optional direct GET /text_sensor/Full%20FDR%20Archive (URL-encoded name).
+# Internal direct GET works without include_internal; keep it out of event streams.
+# Set web_server.auth credentials before exposing this endpoint on a shared network.
+# web_server:
+#   port: 80
+#   auth:
+#     username: !secret web_username
+#     password: !secret web_password
+
+spi:
+  clk_pin: GPIO14
+  miso_pin: GPIO12
+  mosi_pin: GPIO13
+
+time:
+  - platform: sntp
+    id: reader_time
+
+everblu_meter:
+  meter_code: "21-0123456"
+  cs_pin: GPIO15
+  gdo0_pin: GPIO5
+  gdo2_pin: GPIO4
+  time_id: reader_time
+  initial_read_on_boot: false
+  auto_scan: false  # Avoid a boot scan racing the first manual fetch.
+  # First published after reader initialisation; native clients wait for this.
+  tuned_frequency:
+    name: Tuned Frequency
+  request_full_fdr_button:
+    name: Fetch Full FDR
+  fdr_history_json:
+    id: fdr_archive
+    name: Full FDR Archive
+    internal: true
+    # Optional HA event forwarding: enable permission for this device to perform
+    # HA actions. Getter-only retrieval does not need that permission.
+    # on_value:
+    #   then:
+    #     - homeassistant.event:
+    #         event: esphome.everblu_full_fdr
+    #         data:
+    #           meter: synthetic_first
+    #           json: !lambda return x;
+  history_json:
+    name: Monthly History

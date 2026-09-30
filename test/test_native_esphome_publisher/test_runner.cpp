@@ -42,12 +42,20 @@ void test_pub_shared_sensors_keep_their_first_registration(void);
 void test_pub_per_meter_sensors_are_not_shared(void);
 void test_echo_debug_routes_through_the_esphome_logger(void);
 
+void test_pub_full_fdr_is_separate_and_preserves_last_success(void);
+void test_pub_full_fdr_requires_output_and_isolates_meters(void);
+
+void test_pub_full_fdr_allocation_failure_preserves_state(void);
+
 void setUp(void) { esphomePublisherSetUp(); }
 void tearDown(void) { esphomePublisherTearDown(); }
 
 int main(int, char **)
 {
     UNITY_BEGIN();
+    RUN_TEST(test_pub_full_fdr_allocation_failure_preserves_state);
+    RUN_TEST(test_pub_full_fdr_is_separate_and_preserves_last_success);
+    RUN_TEST(test_pub_full_fdr_requires_output_and_isolates_meters);
 
     RUN_TEST(test_pub_reading_populates_every_sensor);
     RUN_TEST(test_pub_reading_publishes_each_sensor_once);

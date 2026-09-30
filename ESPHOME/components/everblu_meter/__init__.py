@@ -24,8 +24,10 @@ from esphome.components import (
 )
 import esphome.config_validation as cv
 from esphome.const import (
+    CONF_FILTERS,
     CONF_FREQUENCY,
     CONF_ID,
+    CONF_INTERNAL,
     CONF_NUMBER,
     CONF_TIME_ID,
     DEVICE_CLASS_CONNECTIVITY,
@@ -89,6 +91,8 @@ CONF_ERROR = "error"
 CONF_RADIO_STATE = "radio_state"
 CONF_TIMESTAMP = "timestamp"
 CONF_HISTORY_JSON = "history_json"
+CONF_FDR_HISTORY_JSON = "fdr_history_json"
+CONF_REQUEST_FULL_FDR_BUTTON = "request_full_fdr_button"
 CONF_FIRMWARE_VERSION = "firmware_version"
 CONF_METER_SERIAL_SENSOR = "meter_serial_sensor"
 CONF_METER_YEAR_SENSOR = "meter_year_sensor"
@@ -375,6 +379,12 @@ CONFIG_SCHEMA = (
             cv.Optional(CONF_HISTORY_JSON): text_sensor.text_sensor_schema(
                 icon="mdi:history",
             ),
+            cv.Optional(CONF_FDR_HISTORY_JSON): text_sensor.text_sensor_schema(
+                icon="mdi:history",
+            ).extend({cv.Optional(CONF_INTERNAL, default=True): cv.boolean}),
+            cv.Optional(CONF_REQUEST_FULL_FDR_BUTTON): button.button_schema(
+                EverbluMeterTriggerButton, icon="mdi:database-arrow-down"
+            ),
             cv.Optional(CONF_FIRMWARE_VERSION): text_sensor.text_sensor_schema(
                 icon="mdi:tag",
                 entity_category="diagnostic",
@@ -525,8 +535,25 @@ def validate_pins(config):
     return config
 
 
+def validate_full_fdr(config):
+    """Keep the complete structured archive retrievable and unmodified."""
+    if config.get(CONF_METER_TYPE) == METER_TYPE_GAS and (
+        CONF_REQUEST_FULL_FDR_BUTTON in config or CONF_FDR_HISTORY_JSON in config
+    ):
+        raise cv.Invalid("Full FDR is supported only for water meters")
+    if CONF_REQUEST_FULL_FDR_BUTTON in config and CONF_FDR_HISTORY_JSON not in config:
+        raise cv.Invalid("request_full_fdr_button requires fdr_history_json")
+    output = config.get(CONF_FDR_HISTORY_JSON, {})
+    if not output.get(CONF_INTERNAL, True):
+        raise cv.Invalid("fdr_history_json must be internal: true")
+    if CONF_FILTERS in output:
+        raise cv.Invalid("fdr_history_json does not support filters")
+    return config
+
+
 CONFIG_SCHEMA = cv.All(
     CONFIG_SCHEMA,
+    validate_full_fdr,
     # dump_config() and the diagnostic report render pin summaries with the buffer-based
     # GPIOPin::dump_summary() and GPIO_SUMMARY_MAX_LEN, both of which first shipped in
     # ESPHome 2026.1.0. Without this guard an older install passes validation and then
@@ -704,6 +731,15 @@ async def to_code(config):
     if CONF_HISTORY_JSON in config:
         sens = await text_sensor.new_text_sensor(config[CONF_HISTORY_JSON])
         cg.add(var.set_history_sensor(sens))
+
+    if CONF_FDR_HISTORY_JSON in config:
+        sens = await text_sensor.new_text_sensor(config[CONF_FDR_HISTORY_JSON])
+        cg.add(var.set_fdr_history_sensor(sens))
+
+    if CONF_REQUEST_FULL_FDR_BUTTON in config:
+        btn = await button.new_button(config[CONF_REQUEST_FULL_FDR_BUTTON])
+        cg.add(btn.set_parent(var))
+        cg.add(btn.set_full_fdr(True))
 
     if CONF_FIRMWARE_VERSION in config:
         sens = await text_sensor.new_text_sensor(config[CONF_FIRMWARE_VERSION])

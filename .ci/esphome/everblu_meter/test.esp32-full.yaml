@@ -1,0 +1,31 @@
+# Full optional FDR output/button coverage on ESP32 Arduino.
+substitutions:
+  spi_clk_pin: GPIO18
+  spi_miso_pin: GPIO19
+  spi_mosi_pin: GPIO23
+  cs_pin: GPIO15
+  gdo0_pin: GPIO4
+  gdo2_pin: GPIO27
+  meter_type: water
+
+esphome:
+  name: ci-esp32-full
+  min_version: 2026.1.0
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+logger:
+
+api:
+
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: CI-WIFI
+  password: CI-PASSWORD
+
+<<: !include common-full.yaml

@@ -168,3 +168,5 @@ bool isValidReadingSchedule(const char *schedule);
  * @param volumeDivisor Gas volume divisor (ignored for water meters)
  */
 void printMeterDataSummary(const struct tmeter_data *meter_data, bool isMeterGas, int volumeDivisor);
+
+int encode_radian_request(uint8_t *raw, size_t raw_size, uint8_t *out, size_t capacity);

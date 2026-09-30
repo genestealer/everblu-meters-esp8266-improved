@@ -29,6 +29,10 @@ static const unsigned long STATS_PUBLISH_INTERVAL_MS = 300000;
 // Retry delay (milliseconds) - 5 seconds between retry attempts
 static const unsigned long RETRY_DELAY_MS = 5000;
 
+// Publishing can invoke user automations synchronously. Keep every reader off
+// the shared radio/archive until the FDR operation and its callbacks return.
+static bool s_fdrInProgress = false;
+
 // Produce a concise, MQTT-style summary of the latest reading for ESPHome logs
 static void logReadableSummary(const tmeter_data &data, const IConfigProvider *config)
 {
@@ -194,6 +198,7 @@ void MeterReader::begin()
 
 void MeterReader::loop()
 {
+    if (s_fdrInProgress) return;
     if (!m_initialized)
         return;
 
@@ -386,6 +391,7 @@ bool MeterReader::shouldPerformScheduledRead()
 
 void MeterReader::triggerReading(bool isScheduled)
 {
+    if (s_fdrInProgress) return;
     if (!m_initialized) return;
     if (m_readingInProgress)
     {
@@ -424,39 +430,39 @@ void MeterReader::performReading()
     m_publisher->publishActiveReading(true);
     m_publisher->publishRadioState("Reading");
 
-    // Increment attempt counter
-    m_totalReadAttempts++;
-
-    // Log current radio frequency for diagnostics
-    float currentFreq = FrequencyManager::getTunedFrequency();
-    float currentOffset = FrequencyManager::getOffset();
-
-    LOG_I("everblu_meter", "Reading attempt %lu (retry %d/%d) at %.6f MHz (offset: %.3f kHz)",
-          m_totalReadAttempts, m_retryCount, m_config->getMaxRetries(),
-          currentFreq, currentOffset * 1000.0);
-
-    // Perform actual meter read
-    if (!radioInitCallback(getTunedFrequency()))
-    {
-        m_radioConnected = false;
-        handleFailedRead(ReadFailure::NotAttempted);
-        return;
-    }
-    m_radioConnected = true;
-    struct tmeter_data meter_data = meterReadCallback();
-
-    // Validate data
+    const tmeter_data meter_data = readStandardAttempt();
     if (meter_data.reads_counter == 0 || meter_data.volume == 0)
     {
         handleFailedRead(meter_data.failure);
         return;
     }
-
-    // Success!
     handleSuccessfulRead(meter_data);
 }
 
+tmeter_data MeterReader::readStandardAttempt()
+{
+    m_totalReadAttempts++;
+    LOG_I("everblu_meter", "Reading attempt %lu (retry %d/%d) at %.6f MHz (offset: %.3f kHz)",
+          m_totalReadAttempts, m_retryCount, m_config->getMaxRetries(),
+          getTunedFrequency(), getFrequencyOffset() * 1000.0);
+    m_radioConnected = radioInitCallback(getTunedFrequency());
+    if (!m_radioConnected)
+    {
+        tmeter_data failed{};
+        failed.failure = ReadFailure::NotAttempted;
+        return failed;
+    }
+    return meterReadCallback();
+}
+
 void MeterReader::handleSuccessfulRead(const tmeter_data &data)
+{
+    publishSuccessfulRead(data);
+    completeReading("Reading successful");
+    LOG_I("everblu_meter", "Data published successfully");
+}
+
+void MeterReader::publishSuccessfulRead(const tmeter_data &data)
 {
     LOG_I("everblu_meter", "Read successful!");
 
@@ -493,15 +499,14 @@ void MeterReader::handleSuccessfulRead(const tmeter_data &data)
     m_publisher->publishStatistics(m_totalReadAttempts, m_successfulReads, m_failedReads);
     m_publisher->publishFrequencyOffset(FrequencyManager::getOffset());
     m_publisher->publishTunedFrequency(FrequencyManager::getTunedFrequency());
+}
 
-    // Update status
+void MeterReader::completeReading(const char *status)
+{
     m_publisher->publishActiveReading(false);
     m_publisher->publishRadioState("Idle");
-    m_publisher->publishStatusMessage("Reading successful");
-
+    m_publisher->publishStatusMessage(status);
     m_readingInProgress = false;
-
-    LOG_I("everblu_meter", "Data published successfully");
 }
 
 void MeterReader::handleFailedRead(ReadFailure reason)
@@ -609,6 +614,7 @@ void MeterReader::resetRetryState()
 
 void MeterReader::stopReading()
 {
+    if (s_fdrInProgress) return;
     // One CC1101 is shared, but each meter has its own Stop button. Only the meter
     // that started a scan can cancel it, so tell the user which button to press
     // instead of appearing to do nothing.
@@ -653,6 +659,7 @@ void MeterReader::stopReading()
 
 void MeterReader::performFrequencyScan(bool deep)
 {
+    if (s_fdrInProgress) return;
     if (FrequencyManager::isScanInProgress() || m_readingInProgress || !m_initialized)
     {
         LOG_W("everblu_meter", "Frequency scan already running - ignoring request");
@@ -682,6 +689,7 @@ void MeterReader::performFrequencyScan(bool deep)
 
 void MeterReader::resetFrequencyOffset()
 {
+    if (s_fdrInProgress) return;
     if (FrequencyManager::isScanInProgress() || m_readingInProgress || !m_initialized) return;
     if (!activateCallbackContext()) return;
 
@@ -769,4 +777,99 @@ bool MeterReader::isReadingDayForConfiguredSchedule(const struct tm *ptm) const
     // independent schedules) but defer the matching rules to the shared,
     // stateless helper so there is only one implementation of them.
     return ScheduleManager::matchesReadingDay(m_config->getReadingSchedule(), ptm);
+}
+
+bool MeterReader::isFullFdrInProgress()
+{
+    return s_fdrInProgress;
+}
+
+bool MeterReader::readFullFdr()
+{
+    static bool publishingRejection = false;
+    const auto reject = [this](const char *reason) {
+        m_lastErrorMessage = reason;
+        LOG_W("everblu_meter", "%s", reason);
+        if (!publishingRejection && m_publisher && m_publisher->isReady())
+        {
+            // Status automations may press the button again synchronously.
+            publishingRejection = true;
+            m_publisher->publishError(reason);
+            m_publisher->publishStatusMessage(reason);
+            publishingRejection = false;
+        }
+        return false;
+    };
+    if (!m_initialized)
+        return reject("Full FDR rejected: reader not initialised");
+    if (!m_publisher)
+        return reject("Full FDR rejected: publisher unavailable");
+    if (!m_publisher->isReady())
+        return reject("Full FDR rejected: publisher not ready");
+    if (s_fdrInProgress || m_readingInProgress || m_retryCount > 0 || m_nextRetryTime > 0 ||
+        FrequencyManager::isScanInProgress())
+        return reject("Full FDR rejected: radio busy or retry pending");
+    if (m_config->isMeterGas())
+        return reject("Full FDR is supported only for water meters");
+    if (m_fdrAttemptStarted && uint32_t(millis() - m_lastFdrAttemptAt) < FULL_FDR_MIN_INTERVAL_MS)
+        return reject("Full FDR rejected: wait 60 seconds between attempt starts");
+    if (!activateCallbackContext())
+        return reject("Full FDR rejected: radio callback context unavailable");
+
+    s_fdrInProgress = true;
+    m_readingInProgress = true;
+    m_publisher->publishActiveReading(true);
+    m_publisher->publishRadioState("Reading FDR");
+
+    m_lastFdrAttemptAt = millis();
+    m_fdrAttemptStarted = true;
+    const tmeter_data standard = readStandardAttempt();
+    const unsigned long sampledAt = millis();
+    if (standard.reads_counter == 0 || standard.volume == 0)
+    {
+        // These counters describe standard reads, not archive delivery. FDR never
+        // enters ordinary retry/recovery handling or consumes pending work.
+        m_failedReads++;
+        m_lastErrorMessage = "Full FDR capture failed: fresh standard read failed";
+        m_publisher->publishError(m_lastErrorMessage);
+        m_publisher->publishStatistics(m_totalReadAttempts, m_successfulReads, m_failedReads);
+        completeReading(m_lastErrorMessage);
+        s_fdrInProgress = false;
+        return false;
+    }
+
+    struct tm meterTime{};
+    const bool validClock = MeterHistory::parseMeterTime(standard.meter_time, meterTime);
+    publishSuccessfulRead(standard);
+
+    // Radio access is serialised. Avoid placing this decoded archive on the
+    // ESP8266 stack; each operation overwrites it before publication.
+    static radian_fdr_data archive;
+    const char *error = nullptr;
+    // Successful standard reads retain normal adaptive tracking. Reinitialise at
+    // this meter's updated tuning before FDR, including when tracking retuned it.
+    m_radioConnected = radioInitCallback(getTunedFrequency());
+    if (!m_radioConnected ||
+        !read_full_fdr_for_meter(m_config->getMeterYear(), m_config->getMeterSerial(), &archive))
+        error = "Full FDR capture failed: frame acquisition failed";
+    else if (validClock && !MeterHistory::captureWithinFdrInterval(archive, meterTime, millis() - sampledAt))
+        error = "Full FDR capture failed: meter interval changed during capture";
+    else
+    {
+        const time_t capturedAt = m_timeProvider->isTimeSynced() && m_timeProvider->isTimeValid()
+                                      ? m_timeProvider->getCurrentTime() : 0;
+        const FdrPublishResult result = m_publisher->publishFullFdr(archive, validClock ? &meterTime : nullptr, capturedAt);
+        if (result == FdrPublishResult::FormattingFailed)
+            error = "Full FDR formatting failed";
+        else if (result == FdrPublishResult::DeliveryFailed)
+            error = "Full FDR delivery failed";
+    }
+    if (error)
+    {
+        m_lastErrorMessage = error;
+        m_publisher->publishError(error);
+    }
+    completeReading(error ? error : "Full FDR captured");
+    s_fdrInProgress = false;
+    return error == nullptr;
 }

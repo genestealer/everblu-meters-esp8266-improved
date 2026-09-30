@@ -12,6 +12,18 @@ Releases are created manually by tagging commits with version tags matching `v*.
 - Keep PR coverage explicit per release so branch-only work is auditable against merge history.
 - Add new versions below, not above this section.
 
+## [Unreleased]
+
+### Added
+
+- Read-only Full FDR interval history for supported Cyble Enhanced water meters,
+  requested manually with a fresh meter clock. Standalone MQTT provides a retained
+  JSON archive and Home Assistant discovery with `ENABLE_FULL_FDR=1` (disabled by
+  default). ESPHome provides a separate `fdr_history_json` output and manual button.
+  History follows the meter's monthly, weekly, daily or hourly configuration;
+  monthly operation is hardware-tested, with synthetic tests for other periods.
+  Normal readings and history are unchanged. See [Full FDR setup](docs/full-fdr.md).
+
 ## [v3.6.0] - 2026-09-16
 
 ### AI Metadata

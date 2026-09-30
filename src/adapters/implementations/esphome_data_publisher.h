@@ -82,6 +82,7 @@ public:
             radio_state_sensor_ = sensor;
     }
     void set_timestamp_sensor(esphome::text_sensor::TextSensor *sensor) { timestamp_sensor_ = sensor; }
+    void set_fdr_history_sensor(esphome::text_sensor::TextSensor *sensor) { fdr_history_sensor_ = sensor; }
     void set_history_sensor(esphome::text_sensor::TextSensor *sensor) { history_sensor_ = sensor; }
     // Firmware Version is device-level - register once (first non-null wins).
     void set_version_sensor(esphome::text_sensor::TextSensor *sensor)
@@ -108,6 +109,7 @@ public:
 
     // IDataPublisher interface implementation
     void publishMeterReading(const tmeter_data &data, const char *timestamp) override;
+    FdrPublishResult publishFullFdr(const radian_fdr_data &data, const tm *meterTime, time_t capturedAt) override;
     void publishHistory(const uint32_t *history, bool historyAvailable) override;
     void publishWiFiDetails(const char *ip, int rssi, int signalPercent,
                             const char *mac, const char *ssid, const char *bssid) override;
@@ -159,6 +161,7 @@ private:
     static esphome::text_sensor::TextSensor *radio_state_sensor_;
     esphome::text_sensor::TextSensor *timestamp_sensor_{nullptr};
     esphome::text_sensor::TextSensor *history_sensor_{nullptr};
+    esphome::text_sensor::TextSensor *fdr_history_sensor_{nullptr};
     // Device-level (one firmware) - shared across all meter instances.
     static esphome::text_sensor::TextSensor *version_sensor_;
     esphome::text_sensor::TextSensor *meter_serial_sensor_{nullptr};

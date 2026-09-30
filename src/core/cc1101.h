@@ -407,4 +407,11 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
  */
 int cc1100_rssi_convert2dbm(uint8_t Rssi_dec);
 
+struct radian_fdr_data;
+// Only frame selectors 7 and 8 are allowed on the radio. ATS is always disabled
+// (seven zero bytes) so a read cannot request clock synchronisation.
+bool read_fdr_frame_for_meter(uint8_t year, uint32_t serial, uint8_t frame_number,
+                              radian_fdr_data *out);
+bool read_full_fdr_for_meter(uint8_t year, uint32_t serial, radian_fdr_data *out);
+
 #endif // __CC1101_H__

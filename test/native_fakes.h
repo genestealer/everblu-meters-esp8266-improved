@@ -50,6 +50,11 @@ struct FakeRadio
     // Scripted outcomes, consumed in order
     std::vector<tmeter_data> responses;
     std::vector<Call> calls;
+    std::vector<Call> fdrCalls;
+    radian_fdr_data fdrResponse{};
+    bool fdrSucceeds = true;
+    unsigned long fdrDurationMs = 0;
+    void (*onFdrRead)() = nullptr;
 
     // Frequency-selective mode: when carrierFrequency is non-zero the scripted
     // responses are ignored and the meter answers only while the radio is tuned
@@ -218,6 +223,12 @@ public:
     };
 
     bool ready = true;
+    FdrPublishResult fdrResult = FdrPublishResult::Success;
+    int fdrPublishes = 0;
+    bool fdrHasClock = false;
+    struct tm fdrClock{};
+    time_t fdrCapturedAt = 0;
+    void (*onFdrPublish)() = nullptr;
 
     std::vector<Reading> readings;
     std::vector<std::string> statuses;
@@ -254,6 +265,8 @@ public:
 
     void publishMeterReading(const tmeter_data &data, const char *timestamp) override;
     void publishHistory(const uint32_t *history, bool historyAvailable) override;
+    FdrPublishResult publishFullFdr(const radian_fdr_data &data, const struct tm *meterTime,
+                                  time_t capturedAt) override;
     void publishWiFiDetails(const char *ip, int rssi, int signalPercent,
                             const char *mac, const char *ssid, const char *bssid) override;
     void publishMeterSettings(int meterYear, unsigned long meterSerial,

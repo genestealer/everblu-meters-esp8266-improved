@@ -46,6 +46,7 @@ class EverbluMeterTriggerButton final : public button::Button {
  public:
   void set_parent(EverbluMeterComponent *parent) { this->parent_ = parent; }
   void set_deep_scan(bool is_deep_scan) { this->is_deep_scan_ = is_deep_scan; }
+  void set_full_fdr(bool full_fdr) { this->is_full_fdr_ = full_fdr; }
   void set_scan(bool is_scan) { this->is_scan_ = is_scan; }
   void set_reset_frequency(bool is_reset) { this->is_reset_frequency_ = is_reset; }
   void set_stop(bool is_stop) { this->is_stop_ = is_stop; }
@@ -58,6 +59,7 @@ class EverbluMeterTriggerButton final : public button::Button {
   EverbluMeterComponent *parent_{nullptr};
   bool is_deep_scan_{false};
   bool is_scan_{false};
+  bool is_full_fdr_{false};
   bool is_reset_frequency_{false};
   bool is_stop_{false};
   bool is_diagnostic_{false};
@@ -131,6 +133,7 @@ class EverbluMeterComponent final : public PollingComponent,
   void set_error_sensor(text_sensor::TextSensor *sensor) { this->error_sensor_ = sensor; }
   void set_radio_state_sensor(text_sensor::TextSensor *sensor) { this->radio_state_sensor_ = sensor; }
   void set_timestamp_sensor(text_sensor::TextSensor *sensor) { this->timestamp_sensor_ = sensor; }
+  void set_fdr_history_sensor(text_sensor::TextSensor *sensor) { this->fdr_history_sensor_ = sensor; }
   void set_history_sensor(text_sensor::TextSensor *sensor) { this->history_sensor_ = sensor; }
   void set_version_sensor(text_sensor::TextSensor *sensor) { this->version_sensor_ = sensor; }
   void set_meter_serial_sensor(text_sensor::TextSensor *sensor) { this->meter_serial_sensor_ = sensor; }
@@ -145,6 +148,7 @@ class EverbluMeterComponent final : public PollingComponent,
 
   // External actions
   void request_manual_read();
+  void request_full_fdr();
   void request_deep_scan();
   void request_scan();
   void request_reset_frequency();
@@ -218,6 +222,7 @@ class EverbluMeterComponent final : public PollingComponent,
   text_sensor::TextSensor *radio_state_sensor_{nullptr};
   text_sensor::TextSensor *timestamp_sensor_{nullptr};
   text_sensor::TextSensor *history_sensor_{nullptr};
+  text_sensor::TextSensor *fdr_history_sensor_{nullptr};
   text_sensor::TextSensor *version_sensor_{nullptr};
   text_sensor::TextSensor *meter_serial_sensor_{nullptr};
   text_sensor::TextSensor *meter_year_sensor_{nullptr};

@@ -178,3 +178,52 @@ def test_esp8266_arduino_ok():
     _set_target(PLATFORM_ESP8266, "arduino")
     config = {}
     assert comp.validate_esp32_framework(config) is config
+
+
+def test_fdr_button_requires_retrievable_output():
+    with pytest.raises(cv.Invalid, match="fdr_history_json"):
+        comp.validate_full_fdr({"request_full_fdr_button": {}})
+
+
+@pytest.mark.parametrize(
+    "config",
+    [
+        {},
+        {"fdr_history_json": {}},
+        {"request_full_fdr_button": {}, "fdr_history_json": {"internal": True}},
+    ],
+)
+def test_fdr_output_optional_and_internal(config):
+    assert comp.validate_full_fdr(config) is config
+
+
+def test_fdr_public_output_rejected():
+    with pytest.raises(cv.Invalid, match="internal"):
+        comp.validate_full_fdr({"fdr_history_json": {"internal": False}})
+
+
+@pytest.mark.parametrize("filters", [[], [{"prepend": "corrupt"}]])
+def test_fdr_filters_rejected(filters):
+    with pytest.raises(cv.Invalid, match="filters"):
+        comp.validate_full_fdr({"fdr_history_json": {"filters": filters}})
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        {"request_full_fdr_button": {}},
+        {"fdr_history_json": {}},
+        {"request_full_fdr_button": {}, "fdr_history_json": {}},
+    ],
+)
+def test_gas_fdr_options_rejected(options):
+    with pytest.raises(cv.Invalid, match="water"):
+        comp.validate_full_fdr({"meter_type": "gas", **options})
+
+
+def test_gas_without_fdr_and_water_with_fdr_accepted():
+    for config in (
+        {"meter_type": "gas"},
+        {"meter_type": "water", "request_full_fdr_button": {}, "fdr_history_json": {}},
+    ):
+        assert comp.validate_full_fdr(config) is config

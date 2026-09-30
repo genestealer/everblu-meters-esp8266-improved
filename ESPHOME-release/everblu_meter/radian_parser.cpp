@@ -206,3 +206,87 @@ bool radian_reading_within_history_bounds(uint32_t volume, const uint32_t *histo
 
     return true;
 }
+
+static size_t build_read_request(uint8_t *out, size_t capacity, uint8_t year, uint32_t serial,
+                                 const uint8_t *payload, size_t payload_size)
+{
+    const uint8_t header[] = {0, 0x10, 0, 0x45, year, (uint8_t)(serial >> 16),
+                              (uint8_t)(serial >> 8), (uint8_t)serial, 0,
+                              0x45, 0x20, 0x0A, 0x50, 0x14, 0, 0x0A};
+    const size_t size = sizeof(header) + payload_size + 2;
+    if (!out || capacity < size || serial > 0xFFFFFF) return 0;
+    memcpy(out, header, sizeof(header));
+    memcpy(out + sizeof(header), payload, payload_size);
+    out[0] = size;
+    const uint16_t crc = radian_crc_kermit(out, size - 2);
+    out[size - 2] = crc >> 8;
+    out[size - 1] = crc;
+    return size;
+}
+
+size_t radian_build_standard_request(uint8_t *out, size_t capacity, uint8_t year, uint32_t serial)
+{
+    const uint8_t payload[] = {0x40};
+    return build_read_request(out, capacity, year, serial, payload, sizeof(payload));
+}
+
+size_t radian_build_predefined_request(uint8_t *out, size_t capacity, uint8_t year, uint32_t serial,
+                                      const uint8_t ats[7], uint16_t access_code, uint8_t frame_number)
+{
+    if (!ats) return 0;
+    uint8_t payload[11] = {0x70};
+    memcpy(payload + 1, ats, 7);
+    payload[8] = access_code;
+    payload[9] = access_code >> 8;
+    payload[10] = frame_number;
+    return build_read_request(out, capacity, year, serial, payload, sizeof(payload));
+}
+
+static uint32_t fdr_uint32(const uint8_t *p)
+{
+    return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
+}
+
+bool radian_parse_fdr_frame(const uint8_t *frame, size_t size, uint8_t frame_number, radian_fdr_data *out)
+{
+    // A capture may include idle/noise after the declared frame; those bytes
+    // are not payload and are not part of its CRC (same as the standard reader).
+    const size_t expected = frame_number == 7 ? RADIAN_FDR_FRAME_7_SIZE :
+                            frame_number == 8 ? RADIAN_FDR_FRAME_8_SIZE : 0;
+    if (!frame || !out || !expected || size < expected || frame[0] != expected ||
+        frame[1] != 0x11 || !radian_validate_crc(frame, size)) return false;
+
+    // The schema starts after byte 15 (application envelope), not at it.
+    const uint8_t *payload = frame + 16;
+    if (frame_number == 7)
+    {
+        out->communication_status[0] = payload[0];
+        out->current_index = fdr_uint32(payload + 1);
+        memcpy(out->pulse_medium, payload + 5, 2);
+        auto &config = out->configuration;
+        memcpy(config.raw, payload + 7, 3);
+        // APK BitsDataBlock reads fields least-significant bit first.
+        config.start_hour = payload[7];
+        config.start_day = payload[8] & 0x1F;
+        config.period = (payload[8] >> 5) & 3;
+        config.turn_factor = payload[9] & 0x0F;
+        config.resolution = payload[9] >> 4;
+        memcpy(out->enhanced_alarms, payload + 10, 3);
+        memcpy(out->backflow, payload + 13, 6);
+        out->global_index = fdr_uint32(payload + 19);
+        memcpy(out->consumptions, payload + 23, 88);
+        memcpy(out->water_intelligence_alarms, payload + 111, 6);
+    }
+    else
+    {
+        out->communication_status[1] = payload[0];
+        out->miu_group = payload[1];
+        out->battery_lifetime = payload[2];
+        memcpy(out->leakage_threshold, payload + 3, 2);
+        memcpy(out->rf_counters, payload + 5, 2);
+        memcpy(out->leakage_history, payload + 7, 14);
+        memcpy(out->consumptions + 88, payload + 21, 92);
+        memcpy(out->billing_indexes, payload + 113, 8);
+    }
+    return true;
+}

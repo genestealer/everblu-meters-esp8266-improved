@@ -4,6 +4,23 @@ esp8266:
   board: d1_mini
 logger:
 api:
+  actions:
+    - action: get_first_fdr
+      supports_response: only
+      then:
+        - api.respond:
+            success: !lambda return id(first_archive).has_state();
+            error_message: !lambda 'return id(first_archive).has_state() ? "" : "No successful Full FDR capture since boot";'
+            data: 'root["json"] = id(first_archive).state;'
+    - action: get_second_fdr
+      supports_response: only
+      then:
+        - api.respond:
+            success: !lambda return id(second_archive).has_state();
+            error_message: !lambda 'return id(second_archive).has_state() ? "" : "No successful Full FDR capture since boot";'
+            data: 'root["json"] = id(second_archive).state;'
+web_server:
+  port: 80
 wifi:
   ssid: CI-WIFI
   password: CI-PASSWORD
@@ -29,6 +46,15 @@ everblu_meter:
     cs_pin: {number: GPIO15, allow_other_uses: true}
     gdo0_pin: {number: GPIO5, allow_other_uses: true}
     gdo2_pin: {number: GPIO4, allow_other_uses: true}
+    request_full_fdr_button: {name: First Fetch FDR}
+    fdr_history_json:
+      id: first_archive
+      name: First FDR Archive
+      on_value:
+        - homeassistant.event:
+            event: esphome.first_full_fdr
+            data:
+              json: !lambda return x;
     scan_button: {name: First Scan}
     deep_scan_button: {name: First Deep Scan}
     reset_frequency_button: {name: First Reset}
@@ -44,6 +70,15 @@ everblu_meter:
     cs_pin: {number: GPIO15, allow_other_uses: true}
     gdo0_pin: {number: GPIO5, allow_other_uses: true}
     gdo2_pin: {number: GPIO4, allow_other_uses: true}
+    request_full_fdr_button: {name: Second Fetch FDR}
+    fdr_history_json:
+      id: second_archive
+      name: Second FDR Archive
+      on_value:
+        - homeassistant.event:
+            event: esphome.second_full_fdr
+            data:
+              json: !lambda return x;
     scan_button: {name: Second Scan}
     deep_scan_button: {name: Second Deep Scan}
     reset_frequency_button: {name: Second Reset}

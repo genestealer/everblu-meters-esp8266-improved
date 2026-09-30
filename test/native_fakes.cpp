@@ -37,6 +37,13 @@ FakeRadio &fakeRadio()
 void FakeRadio::reset()
 {
     responses.clear();
+    fdrCalls.clear();
+    fdrResponse = {};
+    fdrResponse.configuration.period = 0;
+    fdrResponse.configuration.start_day = 1;
+    fdrSucceeds = true;
+    fdrDurationMs = 0;
+    onFdrRead = nullptr;
     calls.clear();
     initFrequencies.clear();
     initSucceeds = true;
@@ -144,6 +151,17 @@ struct tmeter_data get_meter_data_for_meter(uint8_t meter_year, uint32_t meter_s
         return radio.responses.back();
     }
     return radio.responses[index];
+}
+
+bool read_full_fdr_for_meter(uint8_t year, uint32_t serial, radian_fdr_data *out)
+{
+    FakeRadio &radio = fakeRadio();
+    radio.fdrCalls.push_back({year, serial, radio.lastInitFrequency()});
+    if (radio.onFdrRead) radio.onFdrRead();
+    nativeClockAdvance(radio.fdrDurationMs);
+    if (!radio.fdrSucceeds) return false;
+    *out = radio.fdrResponse;
+    return true;
 }
 
 struct tmeter_data get_meter_data(void)
@@ -356,6 +374,12 @@ void RecordingPublisher::reset()
     tunedFrequencies.clear();
     statistics.clear();
     historyPublishes = 0;
+    fdrPublishes = 0;
+    fdrResult = FdrPublishResult::Success;
+    fdrHasClock = false;
+    fdrClock = {};
+    fdrCapturedAt = 0;
+    onFdrPublish = nullptr;
     historyAvailableFlags.clear();
     settingsPublishes = 0;
     discoveryPublishes = 0;
@@ -389,6 +413,17 @@ void RecordingPublisher::publishHistory(const uint32_t *, bool historyAvailable)
 {
     historyPublishes++;
     historyAvailableFlags.push_back(historyAvailable);
+}
+
+FdrPublishResult RecordingPublisher::publishFullFdr(const radian_fdr_data &, const struct tm *meterTime,
+                                                        time_t capturedAt)
+{
+    fdrPublishes++;
+    fdrHasClock = meterTime != nullptr;
+    if (meterTime) fdrClock = *meterTime;
+    fdrCapturedAt = capturedAt;
+    if (onFdrPublish) onFdrPublish();
+    return fdrResult;
 }
 
 void RecordingPublisher::publishWiFiDetails(const char *, int, int, const char *, const char *, const char *) {}

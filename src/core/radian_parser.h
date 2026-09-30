@@ -50,6 +50,38 @@ uint16_t radian_crc_kermit(const uint8_t *input_ptr, size_t num_bytes);
 bool radian_validate_crc(const uint8_t *decoded_buffer, size_t size);
 bool radian_parse_primary_data(const uint8_t *decoded_buffer, size_t size, struct radian_primary_data *out);
 
+// Raw request builders share addressing, length and CRC framing. ATS bytes are
+// supplied explicitly: a nonzero ATS can synchronise the meter's clock.
+size_t radian_build_standard_request(uint8_t *out, size_t capacity, uint8_t year, uint32_t serial);
+size_t radian_build_predefined_request(uint8_t *out, size_t capacity, uint8_t year, uint32_t serial,
+                                      const uint8_t ats[7], uint16_t access_code, uint8_t frame_number);
+
+struct radian_fdr_configuration
+{
+    uint8_t raw[3];
+    uint8_t start_hour, start_day, period, turn_factor, resolution;
+};
+
+struct radian_fdr_data
+{
+    uint8_t communication_status[2]; // Retained raw; status semantics are not assumed.
+    uint32_t current_index, global_index;
+    uint8_t pulse_medium[2];
+    radian_fdr_configuration configuration;
+    uint8_t enhanced_alarms[3], backflow[6], water_intelligence_alarms[6];
+    uint8_t miu_group, battery_lifetime;
+    uint8_t leakage_threshold[2], rf_counters[2], leakage_history[14], billing_indexes[8];
+    uint8_t consumptions[180]; // Encoded deltas, not cumulative readings or timestamps.
+};
+
+// Captures confirm a 16-byte application envelope and a two-byte CRC.
+// Frame 7 also has two uninterpreted bytes after its schema; frame 8 does not.
+constexpr size_t RADIAN_FDR_FRAME_7_SIZE = 16 + 117 + 2 + 2;
+constexpr size_t RADIAN_FDR_FRAME_8_SIZE = 16 + 121 + 2;
+
+// Each successful parse updates only that frame's fields. Failure leaves out unchanged.
+bool radian_parse_fdr_frame(const uint8_t *frame, size_t size, uint8_t frame_number, radian_fdr_data *out);
+
 /**
  * @brief Plausibility check of a reading against its own monthly history.
  *

@@ -17,7 +17,11 @@
 #define DATA_PUBLISHER_H
 
 #include "../core/cc1101.h"
+#include "../core/radian_parser.h"
 #include <stdint.h>
+#include <time.h>
+
+enum class FdrPublishResult { Success, FormattingFailed, DeliveryFailed };
 
 /**
  * @class IDataPublisher
@@ -44,6 +48,10 @@ public:
      * @param historyAvailable Whether history was successfully decoded
      */
     virtual void publishHistory(const uint32_t *history, bool historyAvailable) = 0;
+
+    // The fresh meter-local clock is optional; capturedAt is reader UTC or zero.
+    virtual FdrPublishResult publishFullFdr(const radian_fdr_data &data,
+                                          const struct tm *meterTime, time_t capturedAt) = 0;
 
     /**
      * @brief Publish WiFi connection details

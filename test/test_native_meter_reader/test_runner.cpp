@@ -13,6 +13,18 @@
 void meterReaderSetUp();
 void frequencyManagerSetUp();
 
+void test_fdr_rejects_gas_before_radio_and_preserves_standard_read();
+void test_fdr_keeps_busy_through_fresh_read_capture_and_publication();
+void test_fdr_failure_never_retries_scans_or_reads_archive_after_standard_failure();
+void test_fdr_preserves_pending_retry_and_refuses_unready_publisher();
+void test_fdr_uses_only_fresh_clock_and_reader_utc_is_optional();
+void test_fdr_rejects_interval_rollover_and_distinguishes_delivery_failures();
+void test_fdr_uses_selected_meter_calibration_and_adaptive_tuning();
+void test_fdr_radio_init_failure_releases_busy_without_retry();
+
+void test_fdr_preserves_owed_scheduled_and_post_scan_reads();
+void test_fdr_blocks_reentrant_other_meter_radio_actions();
+
 // test_meter_reader.cpp
 void test_begin_reports_radio_failure(void);
 void test_begin_tunes_radio_to_base_plus_stored_offset(void);
@@ -204,6 +216,18 @@ int main(int, char **)
     RUN_TEST(test_boot_scan_is_skipped_when_a_calibration_is_already_stored);
     RUN_TEST(test_a_recovery_scan_stays_local_and_reports_itself_as_such);
     RUN_TEST(test_a_radio_fault_fails_the_read_before_the_meter_is_contacted);
+
+    RUN_TEST(test_fdr_rejects_gas_before_radio_and_preserves_standard_read);
+    RUN_TEST(test_fdr_keeps_busy_through_fresh_read_capture_and_publication);
+    RUN_TEST(test_fdr_failure_never_retries_scans_or_reads_archive_after_standard_failure);
+    RUN_TEST(test_fdr_preserves_pending_retry_and_refuses_unready_publisher);
+    RUN_TEST(test_fdr_uses_only_fresh_clock_and_reader_utc_is_optional);
+    RUN_TEST(test_fdr_rejects_interval_rollover_and_distinguishes_delivery_failures);
+    RUN_TEST(test_fdr_uses_selected_meter_calibration_and_adaptive_tuning);
+    RUN_TEST(test_fdr_radio_init_failure_releases_busy_without_retry);
+
+    RUN_TEST(test_fdr_preserves_owed_scheduled_and_post_scan_reads);
+    RUN_TEST(test_fdr_blocks_reentrant_other_meter_radio_actions);
 
     // FrequencyManager
     RUN_TEST(test_freq_begin_without_callbacks_is_refused);

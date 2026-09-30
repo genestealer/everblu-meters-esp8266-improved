@@ -1098,3 +1098,10 @@ Consider obtaining utility permission. Never use on meters you don't own. Procee
 - [ESP8266/ESP32 + CC1101 decoder](https://github.com/neutrinus/everblu-meters)
 
 ---
+
+### Full FDR archive
+
+Manual read-only Full FDR is available separately from normal monthly history in
+both MQTT and ESPHome firmware. See the [request/retrieval guide](docs/full-fdr.md)
+for retained MQTT results, the ESPHome cached API getter and optional HA archive
+entity, plus protocol and ESP8266 hardware-validation limitations.

@@ -98,6 +98,9 @@ everblu_meter:
     name: "CI Time End"
   history_json:
     name: "CI History"
+  fdr_history_json:
+    id: ci_fdr_archive
+    name: "CI Full FDR Archive"
   firmware_version:
     name: "CI FW Version"
   meter_serial_sensor:
@@ -118,6 +121,8 @@ everblu_meter:
   # --- Buttons (all of them) ---
   request_reading_button:
     name: "CI Read Now"
+  request_full_fdr_button:
+    name: "CI Fetch Full FDR"
   deep_scan_button:
     name: "CI Deep Scan"
   scan_button:

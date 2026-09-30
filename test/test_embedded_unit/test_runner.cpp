@@ -1,3 +1,10 @@
+void test_fdr_maximum_payload_bound_and_escaped_envelopes();
+void test_fdr_strict_clock_capture_rollovers_and_capture_time();
+void test_fdr_json_orders_fragments_and_scales_consumption();
+void test_fdr_json_widths_signs_sentinels_and_zero_validity();
+void test_fdr_json_rejects_unsupported_and_truncated_output();
+void test_fdr_meter_clock_rollover_and_monthly_dates();
+void test_fdr_json_calendar_boundaries_validity_and_fractional_units();
 /**
  * @file test_runner.cpp
  * @brief Single Unity entry point for the test_embedded_unit suite
@@ -108,6 +115,14 @@ int main(int argc, char **argv)
     (void)argv;
 
     UNITY_BEGIN();
+    RUN_TEST(test_fdr_maximum_payload_bound_and_escaped_envelopes);
+    RUN_TEST(test_fdr_strict_clock_capture_rollovers_and_capture_time);
+    RUN_TEST(test_fdr_json_orders_fragments_and_scales_consumption);
+    RUN_TEST(test_fdr_json_widths_signs_sentinels_and_zero_validity);
+    RUN_TEST(test_fdr_json_rejects_unsupported_and_truncated_output);
+    RUN_TEST(test_fdr_meter_clock_rollover_and_monthly_dates);
+    RUN_TEST(test_fdr_json_calendar_boundaries_validity_and_fractional_units);
+
 
     RUN_TEST(test_valid_reading_schedules);
     RUN_TEST(test_invalid_reading_schedules);
