@@ -229,10 +229,10 @@ The formatter suite asserts the maximum raw JSON size including timestamps.
 `tests/esphome/test_fdr_delivery.py` validates the getter schema and the public
 native-client signatures. It executes the guide client against a narrow fake of
 public API methods: subscription alone, missing values and another meter's
-state must not permit a fetch before initialization. It covers cached/fresh
+state must not permit a fetch before initialisation. It covers cached/fresh
 retrieval, the response flag, nested JSON and the before-capture error. Run it
 with ESPHome 2026.1.0/current and aioesphomeapi 43.0.0/current. It does not claim
-TCP transport or firmware initialization integration coverage.
+TCP transport or firmware initialisation integration coverage.
 
 Source-dependent upstream investigations are opt-in, outside default CI:
 

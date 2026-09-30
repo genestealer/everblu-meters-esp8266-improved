@@ -364,3 +364,78 @@ void test_esphome_fdr_manual_read_without_ha_keeps_meter_outputs_isolated()
     TEST_ASSERT_FALSE(first.isReadingInProgress());
     TEST_ASSERT_FALSE(second.isReadingInProgress());
 }
+
+void test_esphome_fdr_interval_starts_at_attempt_and_wraps()
+{
+    MeterReader reader(&g_config, &g_time, &g_publisher);
+    reader.begin();
+    fakeRadio().responses = {FakeRadio::success()};
+    nativeClockSet(0);
+    TEST_ASSERT_TRUE(reader.readFullFdr());
+    nativeClockSet(59999);
+    TEST_ASSERT_FALSE(reader.readFullFdr());
+    TEST_ASSERT_EQUAL(1, fakeRadio().calls.size());
+    TEST_ASSERT_NOT_NULL(strstr(reader.getLastError(), "60 seconds"));
+    TEST_ASSERT_FALSE(reader.isReadingInProgress());
+    // Standard reads do not share this interval.
+    reader.triggerReading(false);
+    TEST_ASSERT_EQUAL(2, fakeRadio().calls.size());
+    nativeClockSet(60000);
+    TEST_ASSERT_TRUE(reader.readFullFdr());
+
+    // A failed RF attempt consumes the interval too, including over millis wrap.
+    nativeClockSet(UINT32_MAX - 1000);
+    fakeRadio().fdrSucceeds = false;
+    TEST_ASSERT_FALSE(reader.readFullFdr());
+    TEST_ASSERT_NOT_NULL(strstr(reader.getLastError(), "acquisition failed"));
+    const size_t calls = fakeRadio().calls.size();
+    nativeClockSet(58998);
+    TEST_ASSERT_FALSE(reader.readFullFdr());
+    TEST_ASSERT_EQUAL(calls, fakeRadio().calls.size());
+    fakeRadio().fdrSucceeds = true;
+    nativeClockSet(58999);
+    TEST_ASSERT_TRUE(reader.readFullFdr());
+}
+
+void test_esphome_fdr_rejections_report_readiness_without_consuming_interval()
+{
+    MeterReader reader(&g_config, &g_time, &g_publisher);
+    TEST_ASSERT_FALSE(reader.readFullFdr());
+    TEST_ASSERT_NOT_NULL(strstr(reader.getLastError(), "not initialised"));
+    TEST_ASSERT_EQUAL_STRING(reader.getLastError(), g_publisher.lastStatus().c_str());
+    reader.begin();
+    g_publisher.reset();
+    g_publisher.ready = false;
+    TEST_ASSERT_FALSE(reader.readFullFdr());
+    TEST_ASSERT_NOT_NULL(strstr(reader.getLastError(), "publisher not ready"));
+    TEST_ASSERT_TRUE(g_publisher.statuses.empty());
+    TEST_ASSERT_TRUE(g_publisher.errors.empty());
+    TEST_ASSERT_FALSE(reader.isReadingInProgress());
+    TEST_ASSERT_EQUAL(0, fakeRadio().calls.size());
+    g_publisher.ready = true;
+    fakeRadio().responses = {FakeRadio::success()};
+    TEST_ASSERT_TRUE(reader.readFullFdr());
+    MeterReader missingPublisher(&g_config, &g_time, nullptr);
+    missingPublisher.begin();
+    TEST_ASSERT_FALSE(missingPublisher.readFullFdr());
+    TEST_ASSERT_NOT_NULL(strstr(missingPublisher.getLastError(), "publisher unavailable"));
+}
+
+void test_esphome_fdr_rejection_publication_cannot_recurse()
+{
+    struct ReentrantPublisher : RecordingPublisher
+    {
+        MeterReader *reader = nullptr;
+        void publishStatusMessage(const char *message) override
+        {
+            RecordingPublisher::publishStatusMessage(message);
+            if (statuses.size() == 1) reader->readFullFdr();
+        }
+    } publisher;
+    MeterReader reader(&g_config, &g_time, &publisher);
+    publisher.reader = &reader;
+    TEST_ASSERT_FALSE(reader.readFullFdr());
+    TEST_ASSERT_EQUAL(1, publisher.statuses.size());
+    TEST_ASSERT_EQUAL(0, fakeRadio().calls.size());
+    TEST_ASSERT_FALSE(reader.isReadingInProgress());
+}

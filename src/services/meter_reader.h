@@ -221,6 +221,8 @@ private:
     // State tracking
     bool m_initialized;
     bool m_readingInProgress;
+    bool m_fdrAttemptStarted = false;
+    uint32_t m_lastFdrAttemptAt = 0;
     bool m_isScheduledRead;
     bool m_haConnected;
     bool m_radioConnected;  // Tracks CC1101 radio initialization success

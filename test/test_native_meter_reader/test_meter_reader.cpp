@@ -1508,6 +1508,7 @@ void test_fdr_uses_only_fresh_clock_and_reader_utc_is_optional()
     TEST_ASSERT_TRUE(reader.readFullFdr());
     TEST_ASSERT_TRUE(g_publisher.fdrHasClock);
     g_time.synced = false;
+    nativeClockAdvance(60000);
     TEST_ASSERT_TRUE(reader.readFullFdr());
     TEST_ASSERT_FALSE(g_publisher.fdrHasClock);
     TEST_ASSERT_EQUAL(0, g_publisher.fdrCapturedAt);
@@ -1523,13 +1524,16 @@ void test_fdr_rejects_interval_rollover_and_distinguishes_delivery_failures()
     TEST_ASSERT_EQUAL(0, g_publisher.fdrPublishes);
     TEST_ASSERT_EQUAL_STRING("Full FDR capture failed: meter interval changed during capture", reader.getLastError());
     fakeRadio().fdrSucceeds = false;
+    nativeClockAdvance(60000);
     TEST_ASSERT_FALSE(reader.readFullFdr());
     TEST_ASSERT_EQUAL_STRING("Full FDR capture failed: frame acquisition failed", reader.getLastError());
     fakeRadio().fdrSucceeds = true;
     g_publisher.fdrResult = FdrPublishResult::FormattingFailed;
+    nativeClockAdvance(60000);
     TEST_ASSERT_FALSE(reader.readFullFdr());
     TEST_ASSERT_EQUAL_STRING("Full FDR formatting failed", reader.getLastError());
     g_publisher.fdrResult = FdrPublishResult::DeliveryFailed;
+    nativeClockAdvance(60000);
     TEST_ASSERT_FALSE(reader.readFullFdr());
     TEST_ASSERT_EQUAL_STRING("Full FDR delivery failed", reader.getLastError());
     TEST_ASSERT_FALSE(reader.isReadingInProgress());
@@ -1595,6 +1599,7 @@ void test_fdr_preserves_owed_scheduled_and_post_scan_reads()
     int guard = 0;
     while (FrequencyManager::isScanInProgress() && guard++ < 5000) reader.loop();
     TEST_ASSERT_FALSE(FrequencyManager::isScanInProgress());
+    nativeClockAdvance(60000);
     TEST_ASSERT_TRUE(reader.readFullFdr());
     const size_t afterFdr = fakeRadio().calls.size();
     reader.loop();

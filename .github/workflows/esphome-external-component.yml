@@ -232,6 +232,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - id: invalid-fdr-gas
+            config: .ci/esphome/everblu_meter/test.invalid-fdr-gas.yaml
+            expect: "Full FDR is supported only for water meters"
           - id: invalid-fdr-public
             config: .ci/esphome/everblu_meter/test.invalid-fdr-public.yaml
             expect: "internal: true"

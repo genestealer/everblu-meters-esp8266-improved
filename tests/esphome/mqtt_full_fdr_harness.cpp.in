@@ -6,10 +6,25 @@
 #include <string>
 #include <vector>
 #include <ctime>
+#include <cstdint>
+#include <functional>
 static int formatterAllocations = 0;
-static bool failString = false, failAllocation = false;
+static bool failString = false, failStringCopy = false, failAllocation = false;
+static size_t reservedStringCapacity = 0;
 struct String : std::string {
-  explicit String(const char *text) : std::string(failString ? "" : text) { assert(formatterAllocations == 1); }
+  using std::string::string;
+  String() = default;
+  bool reserve(size_t n) {
+    assert(formatterAllocations == 1);
+    if (failString) return false;
+    std::string::reserve(n);
+    reservedStringCapacity = n;
+    return true;
+  }
+  String &operator=(const char *text) {
+    std::string::operator=(failStringCopy ? "" : text);
+    return *this;
+  }
 };
 void *operator new[](std::size_t size, const std::nothrow_t &) noexcept {
   if (failAllocation)
@@ -43,7 +58,8 @@ struct tmeter_data {
 };
 struct radian_fdr_data {};
 static bool scan = false, standardOk = true, pairOk = true, clockOk = true, boundaryOk = true, formatOk = true;
-static unsigned long nowMs = 0;
+static uint32_t nowMs = 0;
+static bool dispatching = false;
 static int rfCalls = 0, publicationCalls = 0, completionCalls = 0;
 static std::vector<std::string> statuses;
 struct FrequencyManager {
@@ -60,16 +76,26 @@ struct MeterHistory {
   }
 };
 struct Mqtt {
-  bool resizeOk = true, publishOk = true;
+  bool resizeOk = true, publishOk = true, connected = true;
+  std::function<void(const String &)> subscriber;
+  std::vector<std::function<void()>> delayed;
+  template<class T> void subscribe(const char *, T callback) { subscriber = callback; }
+  bool isMqttConnected() { return connected; }
   int packetSize = 2048, published = 0;
   bool setMaxPacketSize(int n) {
+    assert(!dispatching);
+    if (n > 2048) assert(reservedStringCapacity >= FULL_FDR_JSON_BUFFER_SIZE - 1);
     if (!resizeOk && n > 2048)
       return false;
     packetSize = n;
     return true;
   }
-  void executeDelayed(unsigned, void (*)()) {}
-  bool publish(const char *, const String &, bool retained) {
+  void executeDelayed(unsigned, std::function<void()> callback) { delayed.push_back(callback); }
+  void drain() {
+    while (!delayed.empty()) { auto callback = delayed.front(); delayed.erase(delayed.begin()); callback(); }
+  }
+  bool publish(const char *, const String &payload, bool retained) {
+    assert(payload == "{\"archive\":1}");
     assert(formatterAllocations == 0);
     assert(retained);
     assert(g_readActive);
@@ -77,13 +103,20 @@ struct Mqtt {
     return publishOk;
   }
 } mqtt;
+void onRequestFullFdr();
+static bool rejectReentry = false;
 void publishSub(const char *topic, const char *value, bool) {
+  assert(!dispatching);
   if (std::string(topic) == "status_message")
+  {
     statuses.emplace_back(value);
+    if (rejectReentry && statuses.size() == 1) onRequestFullFdr();
+  }
 }
 void digitalWrite(int, int) {}
 unsigned long millis() { return nowMs; }
 tmeter_data readMeterOnce() {
+  assert(!dispatching);
   assert(g_readActive);
   ++rfCalls;
   ++totalReadAttempts;
@@ -124,7 +157,11 @@ void startRecoveryScan(bool) {}
 #define EVB_PRINTLN(...) ((void) 0)
 #define EVB_PRINTF(...) ((void) 0)
 // COMMAND_UNDER_TEST
+void subscribeFullFdr() {
+// SUBSCRIPTION_UNDER_TEST
+}
 void reset() {
+  nowMs += 60000;
   g_readActive = g_scanActive = g_scanRetryRead = g_readPending = scan = false;
   _retry = 0;
   meterIsGas = false;
@@ -133,14 +170,44 @@ void reset() {
   rfCalls = publicationCalls = completionCalls = 0;
   totalReadAttempts = successfulReads = failedReads = 0;
   statuses.clear();
-  failString = failAllocation = false;
+  failString = failStringCopy = failAllocation = false;
+  reservedStringCapacity = 0;
 }
 int main() {
   reset();
+  nowMs = 0;
+  onRequestFullFdr();
+  assert(rfCalls == 2); // First attempt starts immediately, including at boot.
+  nowMs = 59999;
+  onRequestFullFdr();
+  assert(rfCalls == 2 && statuses.back().find("60 seconds") != std::string::npos);
+  nowMs = 60000;
+  onRequestFullFdr();
+  assert(rfCalls == 4);
+  onUpdateData();
+  assert(rfCalls == 5); // Ordinary reads ignore the FDR interval.
+
+  reset();
+  nowMs = UINT32_MAX - 1000;
+  standardOk = false;
+  onRequestFullFdr();
+  assert(rfCalls == 1);
+  nowMs = 58998;
+  onRequestFullFdr();
+  assert(rfCalls == 1 && statuses.back().find("60 seconds") != std::string::npos);
+  standardOk = true;
+  nowMs = 58999;
+  onRequestFullFdr();
+  assert(rfCalls == 3 && mqtt.published == 1);
+
+  reset();
   meterIsGas = true;
+  rejectReentry = true;
   onRequestFullFdr();
   assert(rfCalls == 0 && mqtt.published == 0 && formatterAllocations == 0 && !g_readActive);
   assert(mqtt.packetSize == 2048 && statuses.back().find("water") != std::string::npos);
+  assert(statuses.size() == 1);
+  rejectReentry = false;
   onUpdateData();
   assert(rfCalls == 1 && publicationCalls == 1);
 
@@ -179,22 +246,45 @@ int main() {
         g_scanRetryRead = true;
         break;
     }
+    const bool pending = g_readPending, retryRead = g_scanRetryRead, active = g_readActive;
+    const int retry = _retry;
     onRequestFullFdr();
     assert(rfCalls == 0 && mqtt.published == 0);
+    assert(g_readPending == pending && g_scanRetryRead == retryRead && g_readActive == active && _retry == retry);
+    assert(statuses.back().find("radio busy or retry pending") != std::string::npos);
   }
+  reset();
+  mqtt.connected = false;
+  onRequestFullFdr();
+  assert(rfCalls == 0 && !g_readActive);
+  assert(std::string(lastErrorMessage).find("MQTT not connected") != std::string::npos);
+  assert(statuses.empty());
+  mqtt.connected = true;
+  onRequestFullFdr();
+  assert(rfCalls == 2);
+
   reset();
   failAllocation = true;
   onRequestFullFdr();
-  assert(rfCalls == 0 && !g_readActive);
+  assert(rfCalls == 0 && !g_readActive && mqtt.published == 0 && formatterAllocations == 0);
+  assert(statuses.back().find("allocation failed before capture") != std::string::npos);
   reset();
   failString = true;
   onRequestFullFdr();
-  assert(mqtt.published == 0 && completionCalls == 1 &&
-         statuses.back().find("payload allocation") != std::string::npos);
+  assert(rfCalls == 0 && !g_readActive && mqtt.published == 0 && completionCalls == 0 &&
+         statuses.back().find("allocation failed before capture") != std::string::npos);
+  assert(formatterAllocations == 0 && mqtt.packetSize == 2048);
+  failString = false;
+  onRequestFullFdr();
+  assert(rfCalls == 2); // Allocation rejection did not start the interval.
   reset();
   mqtt.resizeOk = false;
   onRequestFullFdr();
-  assert(rfCalls == 0 && !g_readActive);
+  assert(rfCalls == 0 && !g_readActive && mqtt.published == 0 && formatterAllocations == 0 && mqtt.packetSize == 2048);
+  assert(statuses.back().find("allocation failed before capture") != std::string::npos);
+  mqtt.resizeOk = true;
+  onRequestFullFdr();
+  assert(rfCalls == 2);
   reset();
   standardOk = false;
   onRequestFullFdr();
@@ -217,7 +307,31 @@ int main() {
   onRequestFullFdr();
   assert(mqtt.published == 0 && completionCalls == 1 && mqtt.packetSize == 2048);
   reset();
+  failStringCopy = true;
+  onRequestFullFdr();
+  assert(mqtt.published == 0 && completionCalls == 1 && !g_readActive && mqtt.packetSize == 2048);
+  assert(statuses.back().find("payload allocation") != std::string::npos);
+  reset();
   mqtt.publishOk = false;
   onRequestFullFdr();
   assert(mqtt.published == 1 && completionCalls == 1 && statuses.back().find("delivery failed") != std::string::npos);
+
+  reset();
+  subscribeFullFdr();
+  dispatching = true;
+  for (int i = 0; i < 100; ++i) mqtt.subscriber(String("fetch"));
+  assert(mqtt.delayed.size() == 1 && rfCalls == 0 && formatterAllocations == 0);
+  assert(mqtt.packetSize == 2048 && reservedStringCapacity == 0);
+  dispatching = false;
+  mqtt.drain(); // The real handler only resizes/publishes after dispatch returned.
+  assert(rfCalls == 2 && mqtt.published == 1 && mqtt.packetSize == 2048 && !g_readActive);
+
+  reset();
+  subscribeFullFdr();
+  dispatching = true;
+  mqtt.subscriber(String("fetch"));
+  dispatching = false;
+  g_readPending = true; // Recheck normal-read ownership when the delayed job runs.
+  mqtt.drain();
+  assert(g_readPending && rfCalls == 0 && mqtt.published == 0 && mqtt.packetSize == 2048);
 }

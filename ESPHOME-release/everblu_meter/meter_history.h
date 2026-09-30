@@ -20,6 +20,8 @@ struct radian_fdr_data;
 // Exhaustive supported resolution/pulse/factor extremes: 7898 bytes plus NUL.
 // Includes 180 dated signed intervals, maximum indexes and UTC captured_at.
 constexpr int FULL_FDR_JSON_BUFFER_SIZE = 7899;
+// Accidental-repeat guard between attempt starts, including failed captures.
+constexpr uint32_t FULL_FDR_MIN_INTERVAL_MS = 60000;
 
 /**
  * @struct HistoryStats

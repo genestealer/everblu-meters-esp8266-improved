@@ -70,7 +70,7 @@ everblu_meter:
   time_id: reader_time
   initial_read_on_boot: false
   auto_scan: false  # Avoid a boot scan racing the first manual fetch.
-  # First published after reader initialization; native clients wait for this.
+  # First published after reader initialisation; native clients wait for this.
   tuned_frequency:
     name: Tuned Frequency
   request_full_fdr_button:

@@ -1,6 +1,7 @@
 #include <unity.h>
 #include <algorithm>
 #include <cstring>
+#include <limits>
 #include <string>
 #include "services/meter_history.h"
 #include "core/radian_parser.h"
@@ -162,6 +163,35 @@ void test_fdr_json_calendar_boundaries_validity_and_fractional_units() {
     data = sample(); data.configuration.resolution = 3;
     memset(data.consumptions, 253, sizeof(data.consumptions));
     contains(json(data, &clock), "\"interval_count\":180");
+
+    // All-zero daily archive: current month unknown, alternating completed
+    // months valid/not_done. Compare every slot across six month boundaries.
+    data = sample(); data.configuration.resolution = 3; data.configuration.period = 2;
+    data.leakage_history[0] = data.leakage_history[13] = data.leakage_history[11] = data.leakage_history[9] = 0x80;
+    std::string expected = "{\"period\":\"daily\",\"resolution\":3,\"start_day\":1,\"start_hour\":0,"
+        "\"turn_factor\":1,\"pulse_value_code\":4,\"unit\":\"L\",\"order\":\"newest_first\","
+        "\"interval_count\":180,\"timestamp_basis\":\"meter_clock\",\"global_index\":12345,"
+        "\"current_index\":12456,\"consumptions\":[";
+    std::string validity, dates;
+    for (unsigned i = 0; i < 180; ++i) {
+        // 4 current-month days, then February 28, January 31, December 31,
+        // November 30, October 31, and the final 25 days in September.
+        const bool unknown = i < 4;
+        const bool valid = (i >= 4 && i < 32) || (i >= 63 && i < 94) || (i >= 124 && i < 155);
+        if (i) { expected += ','; validity += ','; dates += ','; }
+        expected += unknown || valid ? "0" : "null";
+        validity += unknown ? "\"unknown\"" : valid ? "\"valid\"" : "\"not_done\"";
+        const time_t utc = 1741132800 - time_t(i) * 86400; // 2025-03-05 00:00 UTC
+        const tm *date = gmtime(&utc);
+        TEST_ASSERT_NOT_NULL(date);
+        char text[24];
+        TEST_ASSERT_NOT_EQUAL(0, strftime(text, sizeof(text), "\"%Y-%m-%dT%H:%M:%S\"", date));
+        dates += text;
+    }
+    expected += "],\"validity\":[" + validity + "],\"interval_end\":[" + dates + "],\"captured_at\":null}";
+    char output[FULL_FDR_JSON_BUFFER_SIZE];
+    TEST_ASSERT_GREATER_THAN_INT(0, MeterHistory::generateFullFdrJson(data, output, sizeof(output), &clock));
+    TEST_ASSERT_EQUAL_STRING(expected.c_str(), output);
 }
 
 void test_fdr_strict_clock_capture_rollovers_and_capture_time() {
@@ -189,6 +219,26 @@ void test_fdr_strict_clock_capture_rollovers_and_capture_time() {
     TEST_ASSERT_GREATER_THAN_INT(0, MeterHistory::generateFullFdrJson(data, output, sizeof(output), &clock, 1740988800));
     contains(output, "\"captured_at\":\"2025-03-03T08:00:00Z\"");
     contains(json(data), "\"captured_at\":null");
+    for (time_t unavailable : {time_t(-1), time_t(0), time_t(946684799), time_t(4102444800LL)}) {
+        TEST_ASSERT_GREATER_THAN_INT(0, MeterHistory::generateFullFdrJson(data, output, sizeof(output), &clock, unavailable));
+        contains(output, "\"captured_at\":null");
+    }
+    TEST_ASSERT_GREATER_THAN_INT(0, MeterHistory::generateFullFdrJson(data, output, sizeof(output), &clock, 946684800));
+    contains(output, "\"captured_at\":\"2000-01-01T00:00:00Z\"");
+    if (sizeof(time_t) > 4) {
+        TEST_ASSERT_GREATER_THAN_INT(0, MeterHistory::generateFullFdrJson(data, output, sizeof(output), &clock, std::numeric_limits<time_t>::max()));
+        contains(output, "\"captured_at\":null");
+    }
+    TEST_ASSERT_TRUE(MeterHistory::parseMeterTime("2000-02-29 23:59:59", clock));
+    tm advanced{};
+    TEST_ASSERT_TRUE(MeterHistory::advanceMeterTime(clock, 1, advanced));
+    TEST_ASSERT_EQUAL_INT(2, advanced.tm_mon);
+    TEST_ASSERT_EQUAL_INT(1, advanced.tm_mday);
+    TEST_ASSERT_TRUE(MeterHistory::parseMeterTime("2099-12-31 23:59:59", clock));
+    TEST_ASSERT_FALSE(MeterHistory::advanceMeterTime(clock, 1, advanced));
+    clock.tm_year = 200;
+    contains(json(data, &clock), "\"timestamp_basis\":\"unavailable\"");
+    contains(json(data, &clock), "\"interval_end\":null");
 }
 
 void test_fdr_maximum_payload_bound_and_escaped_envelopes() {

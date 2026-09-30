@@ -786,23 +786,43 @@ bool MeterReader::isFullFdrInProgress()
 
 bool MeterReader::readFullFdr()
 {
-    if (s_fdrInProgress || !m_initialized || m_readingInProgress || m_retryCount > 0 || m_nextRetryTime > 0 ||
-        FrequencyManager::isScanInProgress() || !m_publisher || !m_publisher->isReady())
+    static bool publishingRejection = false;
+    const auto reject = [this](const char *reason) {
+        m_lastErrorMessage = reason;
+        LOG_W("everblu_meter", "%s", reason);
+        if (!publishingRejection && m_publisher && m_publisher->isReady())
+        {
+            // Status automations may press the button again synchronously.
+            publishingRejection = true;
+            m_publisher->publishError(reason);
+            m_publisher->publishStatusMessage(reason);
+            publishingRejection = false;
+        }
         return false;
+    };
+    if (!m_initialized)
+        return reject("Full FDR rejected: reader not initialised");
+    if (!m_publisher)
+        return reject("Full FDR rejected: publisher unavailable");
+    if (!m_publisher->isReady())
+        return reject("Full FDR rejected: publisher not ready");
+    if (s_fdrInProgress || m_readingInProgress || m_retryCount > 0 || m_nextRetryTime > 0 ||
+        FrequencyManager::isScanInProgress())
+        return reject("Full FDR rejected: radio busy or retry pending");
     if (m_config->isMeterGas())
-    {
-        m_lastErrorMessage = "Full FDR is supported only for water meters";
-        m_publisher->publishError(m_lastErrorMessage);
-        m_publisher->publishStatusMessage(m_lastErrorMessage);
-        return false;
-    }
-    if (!activateCallbackContext()) return false;
+        return reject("Full FDR is supported only for water meters");
+    if (m_fdrAttemptStarted && uint32_t(millis() - m_lastFdrAttemptAt) < FULL_FDR_MIN_INTERVAL_MS)
+        return reject("Full FDR rejected: wait 60 seconds between attempt starts");
+    if (!activateCallbackContext())
+        return reject("Full FDR rejected: radio callback context unavailable");
 
     s_fdrInProgress = true;
     m_readingInProgress = true;
     m_publisher->publishActiveReading(true);
     m_publisher->publishRadioState("Reading FDR");
 
+    m_lastFdrAttemptAt = millis();
+    m_fdrAttemptStarted = true;
     const tmeter_data standard = readStandardAttempt();
     const unsigned long sampledAt = millis();
     if (standard.reads_counter == 0 || standard.volume == 0)
@@ -822,11 +842,11 @@ bool MeterReader::readFullFdr()
     const bool validClock = MeterHistory::parseMeterTime(standard.meter_time, meterTime);
     publishSuccessfulRead(standard);
 
-    // Radio access is serialized. Avoid placing this decoded archive on the
+    // Radio access is serialised. Avoid placing this decoded archive on the
     // ESP8266 stack; each operation overwrites it before publication.
     static radian_fdr_data archive;
     const char *error = nullptr;
-    // Successful standard reads retain normal adaptive tracking. Reinitialize at
+    // Successful standard reads retain normal adaptive tracking. Reinitialise at
     // this meter's updated tuning before FDR, including when tracking retuned it.
     m_radioConnected = radioInitCallback(getTunedFrequency());
     if (!m_radioConnected ||

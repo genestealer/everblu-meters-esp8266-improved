@@ -12,6 +12,13 @@ or meter writes. Allow roughly ten seconds normally; radio faults can take much
 longer. This blocks other radio work. There are no automatic FDR retries, scans,
 backfill, scheduling or flash persistence.
 
+Each meter has a fixed 60-second minimum between FDR attempt starts on MQTT
+and ESPHome, including failed RF attempts. Requests rejected before RF work
+(including MQTT allocation failures) do not start the interval. Rejections report
+the reason; a rejected request does not cancel a pending normal read. The guard
+limits accidental repeat presses. Fetch archives only occasionally to conserve
+the meter's battery. Normal reads and cached archive retrieval remain available.
+
 The fresh standard reading publishes normal readings/history and updates normal
 statistics and adaptive frequency tracking. A successful standard stage also
 ends any cooldown and rearms failure-recovery bookkeeping, like a successful
@@ -47,9 +54,12 @@ by the local client, not acknowledged by the broker: disconnection can lose a
 result. Reconnect and subscribe to check what the broker retained. Reader reboot
 does not erase the broker's result; broker persistence depends on its settings.
 
-Commands are rejected during scans, reads and pending retries. The existing
+Commands are deferred until MQTT subscription dispatch has returned, with repeated
+commands coalesced into one pending job. Readiness and busy checks run when that
+job executes; commands are rejected during scans, reads and pending retries. The existing
 2048-byte MQTT packet buffer is enlarged before RF work to hold the measured
-maximum plus topic/header overhead; allocation failure prevents capture. It is
+maximum plus topic/header overhead. The JSON buffer and Arduino String are also
+reserved before RF work; allocation failure prevents capture. The packet buffer is
 shrunk after delivery when possible. MQTT keeps its upstream default keepalive
 (15 seconds). Normal FDR takes roughly ten seconds, with standard-reading
 publications during the operation. Pathological radio/FIFO waits can exceed the
@@ -109,13 +119,13 @@ The existing `on_value` automation is available for custom export. There is no
 second component cache or `on_full_fdr` trigger. Native getter retrieval requires
 neither a web server nor permission for the device to initiate HA actions.
 
-At boot, the component initializes after a native API client subscribes to
+At boot, the component initialises after a native API client subscribes to
 states. Connecting or listing entities alone is insufficient. The example adds
 `Tuned Frequency`, whose first real value is published during reader
-initialization. The client subscribes and waits for that value before pressing
+initialisation. The client subscribes and waits for that value before pressing
 the button; `Ready`/`Idle` text and radio connectivity are boot placeholders and
-are not initialization signals. This also applies to local/web button presses:
-keep a native state subscriber connected until initialization has completed.
+are not initialisation signals. This also applies to local/web button presses:
+keep a native state subscriber connected until initialisation has completed.
 
 ```python
 # Save as get_fdr.py; requires aioesphomeapi>=43.0.0.
@@ -315,7 +325,7 @@ headroom. Formatting needs a temporary buffer plus retained sensor state. ESPHom
 2026.1 also creates a temporary `std::string` for publication and retains both raw
 and filtered state; current ESPHome avoids these extra unfiltered copies.
 API retrieval additionally holds the
-ArduinoJson string copy, serialized envelope and transport buffers together.
+ArduinoJson string copy, serialised envelope and transport buffers together.
 MQTT holds formatter memory, a String copy and the enlarged packet buffer while
 constructing the String. It then frees the 7899-byte formatter before publication,
 reducing live memory during sending by that amount, not the allocation peak.

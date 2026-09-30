@@ -22,7 +22,20 @@ Releases are created manually by tagging commits with version tags matching `v*.
   Includes synthetic protocol, transport and payload tests plus an ESP8266 memory
   probe; runtime ESP8266 headroom remains to be verified on hardware.
 
+### Changed
+
+- Full FDR requests report rejection reasons and enforce a per-meter 60-second
+  minimum between attempt starts, including failed captures, on MQTT and ESPHome.
+  Normal reads are unaffected; fetch archives only occasionally.
+
 ### Fixed
+
+- Replace Full FDR's POSIX-only timestamp conversion with the portable C time
+  API for Windows/MinGW. Gas meters have no FDR MQTT subscription. Payload
+  allocation completes before RF work, and long FDR requests stream into the
+  FIFO with explicit transmit-failure handling. MQTT commands run after subscription
+  dispatch, with repeated requests coalesced, so packet resizing cannot invalidate
+  the callback's incoming topic.
 
 - ESPHome 2026.1 and 2026.2 compile compatibility: preserve the HA state-subscription
   check across the API method change introduced in ESPHome 2026.3.

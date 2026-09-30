@@ -98,7 +98,7 @@ def test_documented_client_waits_for_initialization_and_gets_archive(
 
         def subscribe_states(self, callback):
             events.append("subscribed")
-            # Missing/unrelated/non-finite state must not signal initialization.
+            # Missing/unrelated/non-finite state must not signal initialisation.
             callback(SensorState(key=2, device_id=1, state=433.82))
             callback(SensorState(key=2, device_id=2, missing_state=True))
             callback(SensorState(key=2, device_id=2, state=float("nan")))

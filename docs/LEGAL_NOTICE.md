@@ -31,6 +31,37 @@
 🧪 **Reverse-engineered protocols are available in the open source community**  
 🛠️ **Do not use on meters you don't own or have explicit access to**
 
+## Protocol research from vendor software
+
+Full FDR (`0x70` predefined frames 7 and 8) uses command layouts identified
+through interoperability research on Itron's Android Driver Service apps,
+versions 3.1.6 and 3.1.9. The implementation was written independently on this
+project's RADIAN transport. The FDR contribution contains no vendor source code,
+binaries, decompiled output, extracted app resources or real meter captures;
+its fixtures are synthetic.
+
+In the UK, [CDPA 1988 section 50B](https://www.legislation.gov.uk/ukpga/1988/48/section/50B)
+provides a conditional decompilation exception for lawful users obtaining
+information necessary for an independently created interoperable program.
+It requires that the information is not readily available, limits the work and
+use to that purpose, and restricts disclosure and substantially similar copying.
+[Section 296A](https://www.legislation.gov.uk/ukpga/1988/48/section/296A)
+voids contractual restrictions on decompilation where section 50B's conditions
+are met. In the EU, [Directive 2009/24/EC, Article 6](https://eur-lex.europa.eu/legal-content/EN/ALL/?uri=CELEX:32009L0024)
+sets a conditional interoperability exception; Article 8 separately addresses
+contrary contractual terms. These provisions do not establish that any specific
+research satisfies the conditions, or authorise radio access to a meter or its
+communications. Applicable access, privacy and radio rules remain separate.
+
+FDR sends read requests only, with the seven ATS clock-synchronisation bytes
+zero and no configuration writes, clock setting or resets. Each fetch wakes the
+meter three times and consumes battery power: fetch only occasionally. The
+60-second repeat guard is not a recommended polling interval.
+
+Contributors must not submit proprietary code/resources or private captures.
+Captures can expose meter identities, consumption and access codes. This is not
+legal advice; obtain advice for your jurisdiction when needed.
+
 ## Community Resources
 
 - [Maison Simon Wiki (FR) – RADIAN protocol explained](https://lamaisonsimon.fr/wiki/doku.php?id=eau:sonde_eau_radio)

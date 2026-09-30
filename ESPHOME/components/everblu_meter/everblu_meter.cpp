@@ -377,12 +377,21 @@ void EverbluMeterComponent::request_manual_read() {
 }
 
 void EverbluMeterComponent::request_full_fdr() {
+  const char *reason = nullptr;
   if (this->meter_reader_ == nullptr || !this->meter_initialized_) {
-    ESP_LOGW(TAG, "Full FDR ignored: meter reader not ready");
-    return;
+    reason = "Full FDR rejected: meter reader not ready";
+  } else if (FrequencyManager::isScanInProgress() || this->meter_reader_->isReadingInProgress()) {
+    reason = "Full FDR rejected: radio operation in progress";
   }
-  if (FrequencyManager::isScanInProgress() || this->meter_reader_->isReadingInProgress()) {
-    ESP_LOGW(TAG, "Full FDR ignored: radio operation in progress");
+  if (reason != nullptr) {
+    ESP_LOGW(TAG, "%s", reason);
+    static bool publishing_rejection = false;
+    if (!publishing_rejection && this->data_publisher_ != nullptr && this->data_publisher_->isReady()) {
+      publishing_rejection = true;
+      this->data_publisher_->publishError(reason);
+      this->data_publisher_->publishStatusMessage(reason);
+      publishing_rejection = false;
+    }
     return;
   }
   this->apply_radio_context();

@@ -24,6 +24,11 @@ void test_esphome_statistics_are_republished_periodically(void);
 
 void test_esphome_fdr_manual_read_without_ha_keeps_meter_outputs_isolated();
 
+void test_esphome_fdr_interval_starts_at_attempt_and_wraps();
+void test_esphome_fdr_rejections_report_readiness_without_consuming_interval();
+
+void test_esphome_fdr_rejection_publication_cannot_recurse();
+
 void setUp(void) { esphomeReaderSetUp(); }
 
 void tearDown(void) {}
@@ -50,6 +55,11 @@ int main(int, char **)
     RUN_TEST(test_esphome_calibration_is_per_meter_and_scan_is_exclusive);
 
     RUN_TEST(test_esphome_fdr_manual_read_without_ha_keeps_meter_outputs_isolated);
+
+    RUN_TEST(test_esphome_fdr_interval_starts_at_attempt_and_wraps);
+    RUN_TEST(test_esphome_fdr_rejections_report_readiness_without_consuming_interval);
+
+    RUN_TEST(test_esphome_fdr_rejection_publication_cannot_recurse);
 
     return UNITY_END();
 }

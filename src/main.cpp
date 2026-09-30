@@ -889,36 +889,58 @@ void onUpdateData()
 
 void onRequestFullFdr()
 {
+  static bool fdrAttemptStarted = false;
+  static bool publishingRejection = false;
+  static uint32_t lastFdrAttemptAt = 0;
+  const auto reject = [](const char *reason) {
+    lastErrorMessage = reason;
+    TS_PRINTF("[FDR] %s\n", reason);
+    if (!publishingRejection && mqtt.isMqttConnected())
+    {
+      publishingRejection = true;
+      publishSub("last_error", reason, true);
+      publishSub("status_message", reason, true);
+      publishingRejection = false;
+    }
+  };
   if (meterIsGas)
   {
-    lastErrorMessage = "Full FDR is supported only for water meters";
-    publishSub("last_error", lastErrorMessage, true);
-    publishSub("status_message", lastErrorMessage, true);
+    reject("Full FDR is supported only for water meters");
+    return;
+  }
+  if (!mqtt.isMqttConnected())
+  {
+    reject("Full FDR rejected: MQTT not connected");
     return;
   }
   if (g_readActive || g_readPending || _retry != 0 || g_scanActive || g_scanRetryRead ||
       FrequencyManager::isScanInProgress())
   {
-    publishSub("status_message", "Full FDR rejected: radio busy or retry pending", true);
+    reject("Full FDR rejected: radio busy or retry pending");
+    return;
+  }
+  if (fdrAttemptStarted && uint32_t(millis() - lastFdrAttemptAt) < FULL_FDR_MIN_INTERVAL_MS)
+  {
+    reject("Full FDR rejected: wait 60 seconds between attempt starts");
     return;
   }
 
-  // EspMQTTClient copies incoming topic/payload before invoking subscribers, so
-  // resizing PubSubClient's packet buffer here does not invalidate the command.
+  // Called after MQTT subscription dispatch has released its packet pointers.
   char topic[MQTT_TOPIC_BUFFER_SIZE];
   snprintf(topic, sizeof(topic), "%s/fdr_history", mqttBaseTopic);
   const size_t packetSize = FULL_FDR_JSON_BUFFER_SIZE + strlen(topic) + 8;
   std::unique_ptr<char[]> json(new (std::nothrow) char[FULL_FDR_JSON_BUFFER_SIZE]);
-  if (!json || !mqtt.setMaxPacketSize(packetSize))
+  String payload;
+  if (!json || !payload.reserve(FULL_FDR_JSON_BUFFER_SIZE - 1) || !mqtt.setMaxPacketSize(packetSize))
   {
-    lastErrorMessage = "Full FDR allocation failed before capture";
-    publishSub("last_error", lastErrorMessage, true);
-    publishSub("status_message", lastErrorMessage, true);
+    reject("Full FDR allocation failed before capture");
     return;
   }
 
   beginMeterRead();
   g_isScheduledRead = false;
+  lastFdrAttemptAt = millis();
+  fdrAttemptStarted = true;
   const tmeter_data standard = readMeterOnce();
   const unsigned long sampledAt = millis();
   const char *error = nullptr;
@@ -952,12 +974,10 @@ void onRequestFullFdr()
         error = "Full FDR formatting failed";
       else
       {
-        // EspMQTTClient's public API takes String: verify its allocation before
-        // publishing so an allocation failure cannot replace the retained archive
-        // with an empty payload (which would delete it at the broker).
-        const String payload(json.get());
-        // String owns its copy now. This lowers live memory during publish;
-        // both buffers still coexist during String construction.
+        // Assign into the preallocated String and check the complete payload so
+        // a failed copy cannot clear or truncate the retained archive.
+        payload = json.get();
+        // String owns its copy now; release the formatter buffer before publish.
         json.reset();
         if (payload.length() != static_cast<size_t>(length))
           error = "Full FDR delivery failed: payload allocation";
@@ -1605,15 +1625,27 @@ void onConnectionEstablished()
     _retry = 0;
     onUpdateData(); });
 
-  char fdrTopic[MQTT_TOPIC_BUFFER_SIZE];
-  snprintf(fdrTopic, sizeof(fdrTopic), "%s/request_full_fdr", mqttBaseTopic);
-  mqtt.subscribe(fdrTopic, [](const String &message) {
-    if (message != "fetch") {
-      publishSub("status_message", "Invalid Full FDR command (expected fetch)", true);
-      return;
-    }
-    onRequestFullFdr();
-  });
+  if (!meterIsGas)
+  {
+    char fdrTopic[MQTT_TOPIC_BUFFER_SIZE];
+    snprintf(fdrTopic, sizeof(fdrTopic), "%s/request_full_fdr", mqttBaseTopic);
+    mqtt.subscribe(fdrTopic, [](const String &message) {
+      // Dispatch still uses the original packet topic for later subscriptions.
+      // Defer publications/resizing and coalesce commands into one queued job.
+      static bool queued = false, fetchPending = false;
+      fetchPending = fetchPending || message == "fetch";
+      if (queued) return;
+      queued = true;
+      mqtt.executeDelayed(0, []() {
+        const bool fetch = fetchPending;
+        queued = fetchPending = false;
+        if (fetch)
+          onRequestFullFdr();
+        else
+          publishSub("status_message", "Invalid Full FDR command (expected fetch)", true);
+      });
+    });
+  }
 
   char restartTopic[80];
   snprintf(restartTopic, sizeof(restartTopic), "%s/restart", mqttBaseTopic);

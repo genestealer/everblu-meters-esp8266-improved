@@ -301,11 +301,15 @@ uint32_t MeterHistory::calculateUsage(uint32_t current, uint32_t previous)
 
 namespace
 {
+    bool isLeapYear(int year)
+    {
+        return year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    }
+
     int monthDays(const tm &date)
     {
         static const int days[] = {31,28,31,30,31,30,31,31,30,31,30,31};
-        const int year = date.tm_year + 1900;
-        return days[date.tm_mon] + (date.tm_mon == 1 && year % 4 == 0 && (year % 100 != 0 || year % 400 == 0));
+        return days[date.tm_mon] + (date.tm_mon == 1 && isLeapYear(date.tm_year + 1900));
     }
 
     // Civil arithmetic deliberately avoids mktime: the device timezone/DST
@@ -316,8 +320,7 @@ namespace
         tm cursor{};
         for (cursor.tm_year = 70; cursor.tm_year < date.tm_year; ++cursor.tm_year)
         {
-            cursor.tm_mon = 1;
-            days += 337 + monthDays(cursor);
+            days += isLeapYear(cursor.tm_year + 1900) ? 366 : 365;
         }
         for (cursor.tm_mon = 0; cursor.tm_mon < date.tm_mon; ++cursor.tm_mon)
             days += monthDays(cursor);
@@ -334,10 +337,9 @@ namespace
         result.tm_hour = seconds % 86400 / 3600;
         result.tm_min = seconds % 3600 / 60;
         result.tm_sec = seconds % 60;
-        result.tm_mon = 1;
-        while (days >= 337 + monthDays(result))
+        while (days >= (isLeapYear(result.tm_year + 1900) ? 366 : 365))
         {
-            days -= 337 + monthDays(result);
+            days -= isLeapYear(result.tm_year + 1900) ? 366 : 365;
             ++result.tm_year;
         }
         result.tm_mon = 0;
@@ -412,19 +414,15 @@ namespace
         return FdrValidity::Valid;
     }
 
-    FdrValidity zeroValidity(const tm &clock, const tm &end, const uint8_t leakage[14])
+    FdrValidity zeroValidity(const int64_t monthStarts[14], const tm &end, const uint8_t leakage[14])
     {
-        tm month = clock;
-        month.tm_mday = 1;
-        month.tm_hour = month.tm_min = month.tm_sec = 0;
         const int64_t last = civilSeconds(end) - 1; // APK intervals end inclusively
         // Byte zero's current-month leakage semantics are unverified; do not
         // certify a zero merely because it lies in the current month.
-        if (last >= civilSeconds(month)) return FdrValidity::Unknown;
+        if (last >= monthStarts[0]) return FdrValidity::Unknown;
         for (int ago = 1; ago <= 13; ++ago)
         {
-            if (last >= civilSeconds(shiftMonths(month, -ago)) &&
-                last <= civilSeconds(shiftMonths(month, 1 - ago)) - 1)
+            if (last >= monthStarts[ago] && last < monthStarts[ago - 1])
                 return leakage[14 - ago] & 0x80 ? FdrValidity::Valid : FdrValidity::NotDone;
         }
         return FdrValidity::Unknown;
@@ -478,7 +476,16 @@ int MeterHistory::generateFullFdrJson(const radian_fdr_data &data, char *output,
     for (unsigned i = 0; i < config.turn_factor; ++i) multiplier *= 10;
     tm clock{}, boundary{};
     const bool dated = meterTime && advanceMeterTime(*meterTime, 0, clock);
-    if (dated) boundary = fdrBoundary(clock, config);
+    int64_t monthStarts[14];
+    if (dated)
+    {
+        boundary = fdrBoundary(clock, config);
+        tm month = clock;
+        month.tm_mday = 1;
+        month.tm_hour = month.tm_min = month.tm_sec = 0;
+        for (int ago = 0; ago <= 13; ++ago)
+            monthStarts[ago] = civilSeconds(shiftMonths(month, -ago));
+    }
     FdrValidity validity[180];
     int pos = 0;
     bool ok = appendFormatted(output, size, pos,
@@ -502,7 +509,7 @@ int MeterHistory::generateFullFdrJson(const radian_fdr_data &data, char *output,
             value -= int64_t(1) << (width * 8);
         validity[i] = fdrValidity(value, config.resolution);
         if (validity[i] == FdrValidity::Unknown && dated)
-            validity[i] = zeroValidity(clock, intervalEnd(boundary, config, i), data.leakage_history);
+            validity[i] = zeroValidity(monthStarts, intervalEnd(boundary, config, i), data.leakage_history);
         ok = appendFormatted(output, size, pos, "%s", i ? "," : "");
         if (validity[i] == FdrValidity::Valid || validity[i] == FdrValidity::Unknown)
             ok = ok && appendLitres(output, size, pos, value * multiplier, exponent);
@@ -525,7 +532,9 @@ int MeterHistory::generateFullFdrJson(const radian_fdr_data &data, char *output,
         ok = ok && appendFormatted(output, size, pos, "]");
     }
     tm capture{};
-    if (capturedAt > 0 && gmtime_r(&capturedAt, &capture) && capture.tm_year >= 100 && capture.tm_year <= 199)
+    const tm *utc = capturedAt > 0 ? gmtime(&capturedAt) : nullptr;
+    if (utc) capture = *utc;
+    if (utc && capture.tm_year >= 100 && capture.tm_year <= 199)
         ok = ok && appendFormatted(output, size, pos, ",\"captured_at\":\"%04d-%02d-%02dT%02d:%02d:%02dZ\"}",
             capture.tm_year + 1900, capture.tm_mon + 1, capture.tm_mday, capture.tm_hour, capture.tm_min, capture.tm_sec);
     else
