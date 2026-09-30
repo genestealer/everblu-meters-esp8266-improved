@@ -4,6 +4,7 @@
  */
 
 #include "everblu_meter.h"
+#include "esphome/core/version.h"
 #ifndef __INTELLISENSE__
 #include "esphome/core/log.h"
 #endif
@@ -283,8 +284,12 @@ void EverbluMeterComponent::loop() {
     // Initialize meter reader when Home Assistant connects (ensures safe boot sequence)
     // This is better than WiFi-only check because API connection is more stable
     if (esphome::api::global_api_server != nullptr) {
-      // Use is_connected_with_state_subscription() to check for state subscription (HA is actively monitoring)
+      // ESPHome 2026.3 split the state-subscription query into a dedicated method.
+#if ESPHOME_VERSION_CODE >= VERSION_CODE(2026, 3, 0)
       bool is_ha_connected = esphome::api::global_api_server->is_connected_with_state_subscription();
+#else
+      bool is_ha_connected = esphome::api::global_api_server->is_connected(true);
+#endif
 
       // Initialize meter reader if not already done
       if (!this->meter_initialized_ && is_ha_connected && !FrequencyManager::isScanInProgress()) {
